@@ -1,0 +1,15 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "/hello"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "msg": "world" }
+      }
+    }
+  ]
+}
