@@ -1,0 +1,43 @@
+# Charon named-connection registry (charon/contracts.md §4 / plan §4 Stage 2.3).
+#
+# **Bora-owned content (plan §8): which named connections exist at v1.** The
+# entries below are the canonical v1 set — an ERP read-replica (read-only) and
+# an analytics-staging DB (read/write). Credentials are NEVER inline: `${ENV}`
+# tokens are substituted from the container env, which is fed by the
+# `charon-db-credentials` sealed secret (fabric-infra; see deployment.yaml).
+#
+# **Pythia's internal Postgres is deliberately NOT listed** (contracts §4) — so
+# no request can reach it through Charon.
+#
+# Reload without a redeploy: `POST /refresh` (cluster-internal) re-reads this
+# file and atomically swaps the live set.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: charon-connections
+  namespace: kantheon
+  labels:
+    app: charon
+data:
+  connections.yaml: |
+    connections:
+      - id: erp-replica
+        kind: mssql
+        jdbc_url: ${ERP_REPLICA_URL}
+        username: ${ERP_REPLICA_USER}
+        password: ${ERP_REPLICA_PASSWORD}
+        allow:
+          read: true
+          write: false
+          schemas: ["dbo"]
+        pool: { max: 4 }
+      - id: analytics-staging
+        kind: postgres
+        jdbc_url: ${ANALYTICS_PG_URL}
+        username: ${ANALYTICS_PG_USER}
+        password: ${ANALYTICS_PG_PASSWORD}
+        allow:
+          read: true
+          write: true
+          schemas: ["staging"]
+        pool: { max: 4 }

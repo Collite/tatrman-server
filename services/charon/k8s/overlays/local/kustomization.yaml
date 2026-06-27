@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kantheon
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Deployment
+      name: charon
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      # Local cluster has no Alloy/Tempo endpoint — disable OTel export so the
+      # pod doesn't spam connection errors on startup. Re-enable once the
+      # observability stack is provisioned locally.
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: CHARON_HTTP_PORT
+            value: "7250"
+          - name: CHARON_GRPC_PORT
+            value: "7251"
+          - name: CHARON_S3_ENDPOINT
+            value: "http://data-seaweedfs:8333"
+          - name: CHARON_REDIS_URL
+            value: "redis://data-redis:6379"
+          - name: OTEL_SERVICE_NAME
+            value: charon
+          - name: OTEL_ENABLED_CHARON
+            value: "false"
