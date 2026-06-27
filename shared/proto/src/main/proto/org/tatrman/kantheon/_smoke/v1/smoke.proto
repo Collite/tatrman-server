@@ -1,0 +1,13 @@
+// Placeholder proto to exercise the codegen pipeline at Stage 1.1.
+// Deleted at end of Phase 1 once real kantheon protos (capabilities/v1, themis/v1, ...)
+// have landed and the codegen is well-trodden.
+syntax = "proto3";
+
+package org.tatrman.kantheon._smoke.v1;
+
+option java_multiple_files = true;
+option java_package = "org.tatrman.kantheon._smoke.v1";
+
+message Smoke {
+  string echo = 1;
+}

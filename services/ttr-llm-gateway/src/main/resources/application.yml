@@ -1,0 +1,164 @@
+spring:
+  application:
+    name: prometheus
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:postgresql://${POSTGRESQL_HOST:localhost}:${POSTGRESQL_PORT:5432}/${PROMETHEUS_DATABASE:prometheus}
+    username: ${PROMETHEUS_DB_USER:postgres}
+    password: ${PROMETHEUS_DB_PASSWORD:password}
+  flyway:
+    locations: classpath:db/migration
+  # Phase 09 A3 — Redis client connection (host/port/optional password). Standard Spring Data
+  # Redis auto-config — when `llm.cache.enabled=true` and the broker is reachable, the
+  # `ChatResponseCache` bean comes up automatically. Defaults make it a no-op against a
+  # localhost broker that may not exist; explicit env vars point at the real one.
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT_MS:2000}ms
+  docker:
+    compose:
+      enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:df-test}
+          jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:df-test}/protocol/openid-connect/certs
+    api-keys: ${API_KEYS:}
+  ai:
+      chat:
+          client:
+              enabled: false
+      azure:
+          openai:
+              api-key: ${AZURE_OPENAI_API_KEY:azure-placeholder}
+              api-version: ${AZURE_OPENAI_API_VERSION:2024-12-01-preview}
+              endpoint: ${AZURE_OPENAI_ENDPOINT:https://oai-dolphin-1.openai.azure.com/}
+              chat:
+                  options:
+                      deployment-name: ${AZURE_OPENAI_CHAT_DEPLOYMENT:gpt-4o}
+              embedding:
+                  options:
+                      deployment-name: ${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:text-embedding-ada-002}
+      # Gap 10 Stage A / Phase 06 A1 — Anthropic provider. Real deployments set ANTHROPIC_API_KEY;
+      # local-dev boots cleanly with the placeholder (any actual call will fail until the key is set).
+      anthropic:
+          api-key: ${ANTHROPIC_API_KEY:anthropic-placeholder}
+          base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+          chat:
+              options:
+                  model: ${ANTHROPIC_CHAT_MODEL:claude-sonnet-4-6}
+
+security:
+  enabled: ${SECURITY_ENABLED:false}
+  api-keys: ${API_KEYS:}
+  cors:
+    allowed-hosts: ${KTOR_CORS_ALLOWED_HOSTS:}
+  service:
+    name: ${SECURITY_SERVICE_NAME:prometheus}
+    keycloak-client-id: ${PROMETHEUS_KEYCLOAK_CLIENT_ID:}
+    keycloak-client-secret: ${PROMETHEUS_KEYCLOAK_CLIENT_SECRET:}
+
+llm:
+  security:
+    enabled: ${SECURITY_ENABLED:false}
+  async :
+    enabled: ${PROMETHEUS_ASYNC_ENABLED:false}
+  storage:
+    type: ${PROMETHEUS_STORAGE_TYPE:postgres}
+  # Phase 09 A3 — Redis-backed response cache. Disabled by default; turn on by setting
+  # `PROMETHEUS_CACHE_ENABLED=true` and pointing `spring.data.redis.host` at the broker. Cache
+  # entries expire after `PROMETHEUS_CACHE_TTL_SECONDS` (default one hour). The Redis broker
+  # itself is deployed from the separate infra repo.
+  cache:
+    enabled: ${PROMETHEUS_CACHE_ENABLED:false}
+    ttl-seconds: ${PROMETHEUS_CACHE_TTL_SECONDS:3600}
+    key-prefix: ${PROMETHEUS_CACHE_KEY_PREFIX:prometheus:chat:}
+
+server:
+  port: ${PROMETHEUS_SERVER_PORT:7280}
+
+logging:
+  level:
+    org.tatrman.prometheus: DEBUG
+    org.springframework.security: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+otel:
+  metrics:
+    exporter: otlp
+  traces:
+    exporter: otlp
+  logs:
+    exporter: otlp
+  exporter:
+    otlp:
+      protocol: ${PROMETHEUS_OTEL_PROTOCOL:grpc}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  flyway:
+      enabled: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-h2.sql
+  datasource:
+    url: jdbc:h2:mem:prometheus;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+
+security:
+  enabled: false
+  api-keys: ""
+
+llm:
+  security:
+    enabled: false
+  storage:
+    type: h2
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+otel:
+  metrics:
+    exporter: none
+  traces:
+    exporter: none
+  logs:
+    exporter: none
+
+logging:
+  level:
+    org.tatrman.prometheus: DEBUG
+    org.springframework.security: DEBUG
+
+
+---
+spring:
+  config:
+    activate:
+      on-profile: async-enabled
+  nats:
+    spring:
+      server: ${NATS_SERVER_URL:nats://localhost:4222}
+llm:
+  async:
+    enabled: true

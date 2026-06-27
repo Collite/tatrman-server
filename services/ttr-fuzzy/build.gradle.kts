@@ -1,0 +1,109 @@
+plugins {
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.ktor)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.jib)
+}
+
+application {
+    mainClass.set("org.tatrman.kantheon.echo.ApplicationKt")
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+val osArch = System.getProperty("os.arch").lowercase()
+val isArm64 = osArch.contains("aarch64") || osArch.contains("arm64")
+val isCi = System.getenv("CI") != null
+
+jib {
+    from {
+        image = "eclipse-temurin:21-jre"
+        platforms {
+            if (isCi) {
+                platform {
+                    architecture = "arm64"
+                    os = "linux"
+                }
+                platform {
+                    architecture = "amd64"
+                    os = "linux"
+                }
+            } else {
+                platform {
+                    architecture = if (isArm64) "arm64" else "amd64"
+                    os = "linux"
+                }
+            }
+        }
+    }
+    to {
+        image = "echo:dev"
+    }
+    container {
+        mainClass = "org.tatrman.kantheon.echo.ApplicationKt"
+        ports = listOf("7265", "7266")
+    }
+    dockerClient {
+        executable = "docker"
+    }
+}
+
+dependencies {
+    implementation(project(":shared:libs:kotlin:ktor-configurator"))
+    api(libs.otel.logback.appender)
+    implementation(project(":shared:libs:kotlin:logging-config"))
+
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.server.cors)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.server.call.logging)
+    implementation(libs.logback.classic)
+    implementation(libs.logstash.logback.encoder)
+
+    // Stage 2.2 lean: no SQL backend at v1 (the catalog is an in-repo JSON).
+    // exposed / hikaricp / mssql / pgsql are dropped from the kantheon echo
+    // fork per the lean carve-out. Re-add when the metadata-driven loader
+    // (ariadne + SQL warehouse) is wired in a later stage.
+    implementation(libs.typesafe.config)
+
+    implementation(libs.java.string.similarity)
+    implementation(project(":shared:libs:kotlin:fuzzy-common"))
+
+    // Kadmos (Phase 2.3) Czech lemmatisation client — kept but disabled at v1
+    // (see application.conf `echo.nlp.enabled = false`). When the lib is
+    // unused (NoopLemmatizer path) the engine dependency tree stays small.
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
+
+    // OpenTelemetry
+    implementation(libs.ktor.opentelemetry)
+    implementation(project(":shared:libs:kotlin:otel-config"))
+    implementation(libs.micrometer.registry.prometheus)
+
+    // gRPC — :shared:proto generates the EchoService coroutine base class
+    // and the AriadneService stub the metadata loader calls.
+    implementation(project(":shared:proto"))
+    implementation(libs.grpc.kotlin.stub)
+    implementation(libs.grpc.netty.shaded)
+    implementation(libs.grpc.services)
+    implementation(libs.kotlinx.serialization.json)
+
+    // SQL backend for the `metadata` loader source (Ariadne → SELECT pk,col → DB
+    // → catalog). Off the path for the `static` (in-repo JSON catalog) source;
+    // DatabaseFactory.connect runs only when echo.loader.source = "metadata".
+    implementation(libs.exposed.core)
+    implementation(libs.exposed.jdbc)
+    implementation(libs.hikaricp)
+    implementation(libs.postgresql)
+    implementation(libs.mssql.jdbc)
+
+    testImplementation(libs.bundles.kotest)
+    testImplementation(libs.mockk)
+    testImplementation(libs.grpc.inprocess)
+    testImplementation(libs.ktor.client.mock)
+}

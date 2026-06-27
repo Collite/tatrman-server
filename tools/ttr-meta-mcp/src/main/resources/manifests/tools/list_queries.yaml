@@ -1,0 +1,17 @@
+capability_id: "ariadne.list_queries:v1"
+category: "ariadne"
+version: "1.0.0"
+description: |
+  List query templates authored against the ariadne model. Filter by
+  package and parse status. The MCP wrapper returns the query descriptors
+  with their SQL template + parameter list.
+service_endpoint: "http://ariadne-mcp.kantheon.svc.cluster.local:7262"
+search_tags:
+  - ariadne
+  - queries
+  - list
+cost_hints:
+  typical_latency_ms: 500
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 16

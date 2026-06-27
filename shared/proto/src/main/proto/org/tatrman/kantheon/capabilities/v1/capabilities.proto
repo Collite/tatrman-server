@@ -1,0 +1,202 @@
+// Capabilities/v1 — unified registry types for tools + agents.
+// Lifted from docs/architecture/themis/contracts.md §1.1.
+syntax = "proto3";
+
+package org.tatrman.kantheon.capabilities.v1;
+
+import "google/protobuf/timestamp.proto";
+import "org/tatrman/kantheon/common/v1/response_message.proto";
+
+option java_multiple_files = true;
+option java_package = "org.tatrman.kantheon.capabilities.v1";
+
+// =========================================================================
+// Capability sealed union
+// =========================================================================
+message Capability {
+  oneof kind {
+    ToolCapability tool   = 1;
+    AgentCapability agent = 2;
+  }
+}
+
+// =========================================================================
+// Tool capability — `kind: TOOL`
+// =========================================================================
+message ToolCapability {
+  string capability_id                                = 1;   // e.g. "model.fit.arima:v1"
+  string category                                     = 2;   // e.g. "model.fit.*"
+  string version                                      = 3;   // semver; embedded in capability_id after :
+  repeated Predicate preconditions                    = 4;
+  CostHints cost_hints                                = 5;
+  repeated string search_tags                         = 6;
+  string service_endpoint                             = 7;   // resolvable from kantheon namespace
+  string description                                  = 8;
+  string registration_id                              = 9;   // assigned on register; opaque
+  google.protobuf.Timestamp last_heartbeat_at         = 10;  // unset for fixtures
+}
+
+// =========================================================================
+// Agent capability — `kind: AGENT`
+// =========================================================================
+message AgentCapability {
+  AgentKind agent_kind                                = 1;
+  string agent_id                                     = 2;   // "pythia" / "golem-erp" / ...
+  string display_name                                 = 3;
+  repeated IntentKind intent_kinds_supported          = 4;
+  string description_for_router                       = 5;   // Themis Layer 2 prompt input
+  repeated string example_questions                   = 6;   // positive few-shot for Layer 2
+  repeated string counter_examples                    = 7;   // negative few-shot for Layer 2
+  repeated string capability_refs                     = 8;   // ToolCapability IDs this agent provides/uses
+  string service_endpoint                             = 9;
+  string health_check_path                            = 10;
+  int32 typical_latency_ms                            = 11;
+  double typical_cost_usd                             = 12;
+  HitlProfile hitl_default                            = 13;
+  string registration_id                              = 14;
+  google.protobuf.Timestamp last_heartbeat_at         = 15;
+  // Excluded from Themis routing (all four cascade layers). For agents that
+  // are constellation *clients* rather than question-answerers — e.g. Hebe.
+  // Inverted polarity deliberately: proto3 default false == routable, so
+  // existing manifests stay routable without migration.
+  bool non_routable                                   = 16;
+  // PD-8 (2026-06-12): area entitlement. Empty == visible to all
+  // authenticated users. Convention: per-area realm roles
+  // "kantheon-area-<area>", mapped to customer groups in Keycloak.
+  // Themis filters its routing view by the caller's roles BEFORE Layer 1;
+  // agents re-check at request admission. See kantheon-security.md §3.
+  repeated string visibility_roles                    = 17;
+
+  // ─────────────────────────────────────────────────────────────────────
+  // ShemManifest-specific fields — populated ONLY when agent_kind == AREA_QA.
+  // Discriminator semantics; not a separate proto message.
+  // "area" = subject area (renamed from "domain" 2026-06-25 — "domain" is now
+  // a TTR value concept). Field numbers unchanged.
+  // ─────────────────────────────────────────────────────────────────────
+  string area_name                                    = 20;  // "accounting" / "HR" / "Sales"
+  repeated string area_entities                       = 21;
+  repeated TermDef area_terminology                   = 22;
+  repeated string preferred_queries                   = 23;  // curated metadata-mcp query IDs
+  repeated string preferred_capabilities              = 24;  // curated ToolCapability IDs
+  string style_addendum                               = 25;  // voice/presentation only — NEVER correctness
+  repeated LocaleDefault locale_defaults              = 26;
+}
+
+enum AgentKind {
+  AGENT_KIND_UNSPECIFIED  = 0;
+  INVESTIGATOR            = 1;  // Pythia
+  AREA_QA                 = 2;  // Golem-* instances (renamed from DOMAIN_QA 2026-06-25)
+  PERSONAL_ASSISTANT      = 3;  // Hebe (agents/hebe; registers non_routable=true)
+  KNOWLEDGE_QA            = 4;  // Kleio (DocWH NotebookLM; kleio/contracts.md §9, additive 2026-06-26)
+}
+
+enum IntentKind {
+  INTENT_KIND_UNSPECIFIED = 0;
+  PROCEDURAL              = 1;
+  RCA                     = 2;
+  FORECAST                = 3;
+  SIMULATION              = 4;
+  KNOWLEDGE               = 5;  // document/notebook questions → Kleio (kleio/contracts.md §9, additive 2026-06-26)
+}
+
+enum HitlProfile {
+  HITL_PROFILE_UNSPECIFIED = 0;
+  INTERACTIVE              = 1;  // default for Iris
+  SPECULATIVE              = 2;  // for Hebe-class messaging clients
+  STRICT                   = 3;  // refuse on any blocker
+}
+
+// =========================================================================
+// Supporting types
+// =========================================================================
+message Predicate {
+  string expression  = 1;   // e.g. "input.shape == Arrow.Table"
+  string description = 2;
+}
+
+message CostHints {
+  double typical_latency_ms = 1;
+  double typical_cost_usd   = 2;
+  bool   is_idempotent      = 3;
+  int32  max_concurrent     = 4;  // per-provider concurrency cap
+}
+
+message TermDef {
+  string term              = 1;   // e.g. "private channel"
+  string definition        = 2;   // 1-sentence
+  repeated string synonyms = 3;
+}
+
+message LocaleDefault {
+  string locale      = 1;   // "cs", "en", "cs-CZ"
+  string greeting    = 2;
+  string date_format = 3;
+  string currency    = 4;
+}
+
+// =========================================================================
+// RPC surface — mirrored as MCP tools and REST endpoints in Stage 1.3.
+// =========================================================================
+message CapabilityFilter {
+  optional bool include_tools  = 1;   // default true
+  optional bool include_agents = 2;   // default true
+  optional bool include_pruned = 3;   // default false; if true, returns audit-only entries
+}
+
+message SearchRequest {
+  repeated IntentKind intent_kinds    = 1;
+  repeated string     entity_types    = 2;
+  repeated string     capability_tags = 3;
+  optional CapabilityFilter filter    = 4;
+}
+
+message SearchResponse {
+  repeated Capability entries                                                 = 1;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages            = 99;
+}
+
+message ListRequest {
+  optional string category         = 1;   // tool-only filter
+  optional CapabilityFilter filter = 2;
+}
+
+message ListResponse {
+  repeated Capability entries                                                 = 1;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages            = 99;
+}
+
+message ListAgentsRequest {
+  optional CapabilityFilter filter = 1;
+}
+
+message ListAgentsResponse {
+  repeated AgentCapability agents                                             = 1;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages            = 99;
+}
+
+message GetRequest {
+  string id = 1;   // capability_id OR agent_id — registry knows which by lookup
+}
+
+message GetResponse {
+  optional Capability capability                                              = 1;   // absent → not found
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages            = 99;
+}
+
+message RegisterRequest {
+  Capability capability = 1;
+}
+
+message RegisterResponse {
+  string registration_id                                                      = 1;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages            = 99;
+}
+
+message HeartbeatRequest {
+  string registration_id = 1;
+}
+
+message HeartbeatResponse {
+  google.protobuf.Timestamp accepted_at                                       = 1;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages            = 99;
+}

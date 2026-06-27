@@ -1,0 +1,39 @@
+# Czech stop-words for the keyword search algorithm.
+# One token per line, UTF-8. Lines starting with # are comments. Blank lines ignored.
+# Loaded by org.tatrman.kantheon.ariadne.search.keyword.StopWords at startup.
+# Tokens here are compared AFTER NFD diacritic-fold + lowercase, so list the
+# folded form (e.g. `ze` not `že`).
+a
+i
+nebo
+ten
+ta
+to
+ti
+ty
+je
+jsou
+byl
+byla
+bylo
+byly
+neni
+tento
+tato
+toto
+ktery
+ktera
+ktere
+pro
+na
+v
+do
+od
+s
+se
+o
+ze
+co
+jak
+kde
+kdy

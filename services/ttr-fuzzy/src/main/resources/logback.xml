@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+        </encoder>
+    </appender>
+
+    <!-- OpenTelemetry appender: forwards log records to SdkLoggerProvider → OTLP exporter.
+         The SDK is installed into this appender via OpenTelemetryAppender.install(sdk)
+         called in OtelConfig.kt after the OpenTelemetrySdk is built. -->
+    <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <captureExperimentalAttributes>true</captureExperimentalAttributes>
+        <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
+        <captureLoggerContext>true</captureLoggerContext>
+        <captureMdcAttributes>*</captureMdcAttributes>
+    </appender>
+
+    <root level="DEBUG">
+        <appender-ref ref="JSON_CONSOLE"/>
+        <appender-ref ref="OTEL"/>
+    </root>
+
+    <!-- HikariCP is noisy at DEBUG (per-connection add/close, pool housekeeping). Pin to INFO so
+         the pool only logs startup/shutdown and problems, not under the app's DEBUG output. -->
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+</configuration>

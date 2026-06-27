@@ -1,0 +1,322 @@
+// =============================================================================
+// AI Platform v1 — Plan wire format
+//
+// Promoted in Phase 1.0 from docs/v1/protos/ — this is the canonical location.
+//
+// Defines the canonical wire form of the v1 RelOp subset. Used by the
+// Translator (in/out), the Validator (in/out), the Dispatcher (in), and the
+// Worker (in). RelNode is the lingua franca of the v1 query pipeline; this
+// proto is its serialised form.
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.plan.v1;
+
+option java_package = "org.tatrman.plan.v1";
+option java_multiple_files = true;
+
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
+
+// Schema codes. Used as the canonical schema discriminator across the platform.
+// The old reserved-namespace string "er" / "db" is now expressed as ER / DB enum values.
+enum SchemaCode {
+  SCHEMA_CODE_UNSPECIFIED = 0;
+  DB = 1;
+  ER = 2;
+  CNC = 3;
+  WS = 4;
+  OBJ = 5;
+  // MD, DF reserved for v1.5+
+}
+
+// -----------------------------------------------------------------------------
+// PlanNode — the recursive top-level message for a relational tree.
+// -----------------------------------------------------------------------------
+
+message PlanNode {
+  oneof node {
+    ScanNode        scan         = 1;
+    ProjectNode     project      = 2;
+    FilterNode      filter       = 3;
+    JoinNode        join         = 4;
+    AggregateNode   aggregate    = 5;
+    SortNode        sort         = 6;
+    LimitOffsetNode limit_offset = 7;
+    ValuesNode      values       = 8;
+    SubqueryNode    subquery     = 9;
+    // Activated in Phase 2.4 — references a session-scoped workspace
+    // produced by an earlier Execute on a stateful Worker (Polars).
+    WorkspaceRef    workspace_ref = 10;
+    TableScanNode   table_scan   = 11;
+  }
+  reserved 12 to 15;
+}
+
+// -----------------------------------------------------------------------------
+// WorkspaceRef — session-scoped DataFrame reference (Phase 2.4).
+//
+// A node with `workspace_ref` set is a leaf — it has no children. The
+// referenced workspace is keyed by `(PipelineContext.session_id,
+// workspace_name)`. Stateful Workers (Polars) resolve it against their
+// in-memory store; the Dispatcher routes any plan containing a
+// `workspace_ref` to a Worker advertising
+// `supports_stateful_sessions = true` and uses sticky-routing to keep
+// the same session_id pinned to the same pod.
+//
+// A PlanNode with `workspace_ref` set MUST NOT also have `table_scan`
+// (mutually exclusive — enforced by validator).
+// -----------------------------------------------------------------------------
+message WorkspaceRef {
+  // Logical name within the session, e.g. "q1". Resolved against
+  // `PipelineContext.session_id` (implicit; not duplicated here).
+  string workspace_name = 1;
+  reserved 2 to 7;
+}
+
+// -----------------------------------------------------------------------------
+// RelOp leaves
+// -----------------------------------------------------------------------------
+
+// Scan — pre-physical leaf. May reference any schema kind (DB, ER, OBJ, …).
+// Produced by TO_REL / RESOLVE / UNFOLD; consumed and rewritten by MAP_TO_PHYSICAL.
+// Validator pass 1 may attach filters above a Scan.
+// A tree containing any ScanNode is, by contract, pre-physical.
+message ScanNode {
+  QualifiedName object = 1;             // qname.schema_code carries the kind
+  repeated ColumnRef output_columns = 2; // field naming is generic; "column" includes attributes
+  reserved 3 to 7;
+}
+
+// TableScan — physical leaf. By contract, table.schema_code = DB (later: WS, DUCKDB, …).
+// Only produced by MAP_TO_PHYSICAL. Worker accepts only TableScan / Subquery / WorkspaceRef.
+message TableScanNode {
+  QualifiedName table = 1;
+  repeated ColumnRef output_columns = 2;
+  reserved 3 to 7;
+}
+
+// Project — selects/renames columns and computes new ones.
+message ProjectNode {
+  PlanNode input = 1;
+  repeated NamedExpression expressions = 2;
+  reserved 3 to 7;
+}
+
+// Filter — applies a boolean condition to rows.
+message FilterNode {
+  PlanNode input = 1;
+  Expression condition = 2;
+  reserved 3 to 7;
+}
+
+// Join — combines two inputs with an optional condition.
+// A null/missing condition yields a Cartesian join; the Joiner may produce
+// these intentionally and the Validator may flag them.
+message JoinNode {
+  PlanNode left = 1;
+  PlanNode right = 2;
+  JoinType join_type = 3;
+  Expression condition = 4;
+  reserved 5 to 9;
+}
+
+enum JoinType {
+  JOIN_TYPE_UNSPECIFIED = 0;
+  INNER = 1;
+  LEFT = 2;
+  RIGHT = 3;
+  FULL = 4;
+}
+
+// Aggregate — group-by + aggregate calls.
+message AggregateNode {
+  PlanNode input = 1;
+  repeated ColumnRef group_keys = 2;
+  repeated AggregateCall aggregates = 3;
+  reserved 4 to 8;
+}
+
+// AggregateCall — a single aggregate column in an Aggregate node.
+// "function" is one of the aggregate operator names from the operator enum
+// in v1-architecture.md §3.2 (sum, count, count_distinct, avg, min, max).
+message AggregateCall {
+  string function = 1;
+  repeated ColumnRef args = 2;
+  bool distinct = 3;            // true when the canonical form uses _distinct
+  string alias = 4;
+  reserved 5 to 9;
+}
+
+// Sort — order rows. Multi-key sorting; nulls ordering explicit.
+message SortNode {
+  PlanNode input = 1;
+  repeated SortKey sort_keys = 2;
+  reserved 3 to 7;
+}
+
+message SortKey {
+  ColumnRef column = 1;
+  bool descending = 2;
+  bool nulls_first = 3;
+  reserved 4 to 8;
+}
+
+// LimitOffset — restrict row count and skip prefix.
+// Either field may be unset; semantically null = no bound / no offset.
+message LimitOffsetNode {
+  PlanNode input = 1;
+  optional int64 limit = 2;
+  optional int64 offset = 3;
+  reserved 4 to 8;
+}
+
+// Values — inline literal rows.
+message ValuesNode {
+  repeated Row rows = 1;
+  repeated ColumnRef output_columns = 2;
+  reserved 3 to 7;
+}
+
+message Row {
+  repeated Literal cells = 1;
+  reserved 2 to 6;
+}
+
+// Subquery — wraps another PlanNode as an inline source.
+// Used by:
+//   (a) stackable-query expansion (queryRef → inlined plan)
+//   (b) entity → SQL-query mappings (entity table is itself a query)
+message SubqueryNode {
+  PlanNode subquery = 1;
+  string alias = 2;
+  reserved 3 to 7;
+}
+
+// -----------------------------------------------------------------------------
+// Expressions
+// -----------------------------------------------------------------------------
+
+message Expression {
+  oneof expr {
+    Literal            literal      = 1;
+    ColumnRef          column_ref   = 2;
+    FunctionCall       function     = 3;
+    ParameterRef       parameter    = 4;
+    CastExpression     cast         = 5;
+    SubqueryExpression subquery     = 7;
+  }
+  // DSL surface type: text | int | float | bool | datetime
+  // For physical-typed expressions (post-MAP_TO_PHYSICAL), this may carry a
+  // physical type code (decimal:19,5; varchar:90; etc.) that downstream
+  // services preserve for round-trip but DSL-level callers ignore.
+  string result_type = 6;
+  reserved 8 to 11;
+}
+
+// FunctionCall — operator from the standardised expression enum
+// in v1-architecture.md §3.2. Operands evaluated left-to-right.
+message FunctionCall {
+  string operation = 1;
+  repeated Expression operands = 2;
+  reserved 3 to 7;
+}
+
+// CastExpression — explicit type coercion.
+message CastExpression {
+  Expression value = 1;
+  string target_type = 2;
+  reserved 3 to 7;
+}
+
+// SubqueryExpression — an expression-level subquery (scalar / EXISTS / IN).
+//
+// Distinct from the plan-level `SubqueryNode` (an inline FROM source): this is a
+// subquery used *as a value* inside an Expression, e.g. the right-hand side of
+// `WHERE x = (SELECT ...)` (scalar), `WHERE EXISTS (SELECT ...)`, or
+// `WHERE x IN (SELECT ...)`.
+//
+// Bridges Calcite's `RexSubQuery`:
+//   - subquery: the nested relational plan. For `scalar`/`in` it must project
+//               exactly one column.
+//   - kind:     "scalar" | "exists" | "in".
+//   - operands: the left-hand-side expressions for `in` (the `x` in
+//               `x IN (SELECT ...)`); empty for `scalar` / `exists`.
+message SubqueryExpression {
+  PlanNode subquery = 1;
+  string kind = 2;
+  repeated Expression operands = 3;
+  reserved 4 to 7;
+}
+
+// ParameterRef — reference to a bound or unbound parameter from
+// PipelineContext.parameters. Both fields populated:
+//   - "name" is the source-of-truth identity (per Round 1 identity rule).
+//   - "positional_index" is the Calcite RexDynamicParam bridge for
+//     round-tripping through Calcite-based parsers.
+message ParameterRef {
+  string name = 1;
+  int32 positional_index = 2;
+  reserved 3 to 7;
+}
+
+// -----------------------------------------------------------------------------
+// Leaf types
+// -----------------------------------------------------------------------------
+
+message Literal {
+  oneof value {
+    string string_value   = 1;
+    int64  int_value      = 2;
+    double float_value    = 3;
+    bool   bool_value     = 4;
+    string datetime_value = 5;   // ISO-8601
+  }
+  bool is_null = 6;
+  // DSL surface type tag — text | int | float | bool | datetime
+  string type = 7;
+  reserved 8 to 12;
+}
+
+message NamedExpression {
+  Expression expression = 1;
+  string alias = 2;
+  reserved 3 to 7;
+}
+
+// ColumnRef — reference to a column from some source in the plan.
+//   - source_alias: optional; matches a PlanNode alias if disambiguation needed
+//   - name: the column's local name
+//   - alias: result alias if different from name
+//   - type: DSL surface type tag for read-time type inference
+message ColumnRef {
+  string source_alias = 1;
+  string name = 2;
+  string alias = 3;
+  string type = 4;
+  reserved 5 to 9;
+}
+
+// QualifiedName — four-part identifier:
+//   package:     top-level package (e.g. "cnc")
+//   schema_code: "db" | "er" | (reserved: obj | md | df | cnc)
+//   namespace:   e.g. "dbo", "entity"
+//   name:        the bare object name
+message QualifiedName {
+  string package = 4;
+  SchemaCode schema_code = 1;
+  string namespace = 2;
+  string name = 3;
+  reserved 5 to 8;
+}
+
+// ObjectRef — pointer to any model object. Used in PipelineContext.used_objects
+// for audit and lineage.
+message ObjectRef {
+  SchemaCode schema_code = 1;
+  string kind = 2;            // table | column | entity | attribute | relation | query | ...
+  string qualified_name = 3;  // dot-path
+  reserved 4 to 8;
+}

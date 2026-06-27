@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: query-runner
+  description: Thin orchestrator over the translate → validate → dispatch → worker chain; agent's single entry point for "run a query"
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - kotlin
+    - ktor
+    - grpc
+    - service
+    - v1
+spec:
+  type: service
+  lifecycle: production
+  owner: df-platform
+  system: ai-platform

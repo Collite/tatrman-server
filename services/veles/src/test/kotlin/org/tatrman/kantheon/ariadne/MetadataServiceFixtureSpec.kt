@@ -1,0 +1,322 @@
+package org.tatrman.kantheon.ariadne
+
+import org.tatrman.ariadne.v1.GetModelRequest
+import org.tatrman.ariadne.v1.GetObjectRequest
+import org.tatrman.ariadne.v1.GetSnapshotRequest
+import org.tatrman.ariadne.v1.GetStatusRequest
+import org.tatrman.ariadne.v1.ListObjectsRequest
+import org.tatrman.ariadne.v1.OverallStatus
+import org.tatrman.ariadne.v1.ValidateModelRequest
+import org.tatrman.plan.v1.QualifiedName
+import org.tatrman.kantheon.ariadne.graph.ModelGraph
+import org.tatrman.kantheon.ariadne.grpc.MetadataServiceImpl
+import org.tatrman.kantheon.ariadne.model.ModelDescriptor
+import org.tatrman.kantheon.ariadne.reconcile.ModelReconciler
+import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
+import org.tatrman.kantheon.ariadne.source.FileBasedSource
+import org.tatrman.kantheon.ariadne.source.LocalFsStorage
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldHaveAtLeastSize
+import io.kotest.matchers.ints.shouldBeGreaterThan
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldNotBeEmpty
+import java.nio.file.Path
+
+/**
+ * End-to-end-against-the-MVP-surface integration test:
+ *  TTR fixture files
+ *    -> FileBasedSource (LocalFsStorage + DslParser via ttr-parser lib)
+ *    -> ModelReconciler
+ *    -> MetadataRegistry (AtomicReference<RegistrySnapshot>)
+ *    -> MetadataServiceImpl (gRPC RPCs)
+ */
+class MetadataServiceFixtureSpec :
+    StringSpec({
+
+        val fixtureRoot: Path =
+            Path.of(checkNotNull(this::class.java.classLoader.getResource("fixture-model")).toURI())
+
+        fun service(): MetadataServiceImpl {
+            val source =
+                FileBasedSource(
+                    sourceId = "fixture",
+                    priority = 100,
+                    storage = LocalFsStorage(id = "fixture", rootPath = fixtureRoot),
+                )
+            val reconciler = ModelReconciler(ModelDescriptor(id = "test", name = "test", description = "fixture"))
+            val result = reconciler.reconcile(listOf(source.load()))
+            val registry = MetadataRegistry()
+            registry.swap(result.model, ModelGraph.build(result.model), result.warnings + result.errors)
+            return MetadataServiceImpl(registry)
+        }
+
+        "GetModel(packages=[fixture-model]) returns non-empty ModelBundle from the fixture" {
+            val r = service().getModel(GetModelRequest.newBuilder().addPackages("fixture-model").build())
+            r.model.packageVersionsList.isEmpty() shouldBe false
+            r.model.entitiesList.size shouldBeGreaterThan 0
+            // M3: lock down the PackageVersion shape — name echoed, hash is a real sha256 hex.
+            r.model.packageVersionsList[0].packageName shouldBe "fixture-model"
+            r.model.packageVersionsList[0]
+                .contentHash.length shouldBe 64
+            r.model.packageVersionsList[0]
+                .contentHash
+                .all { it in "0123456789abcdef" } shouldBe true
+        }
+
+        "GetModel rejects empty packages list with EMPTY_PACKAGES error" {
+            val r = service().getModel(GetModelRequest.newBuilder().build())
+            r.messagesList.map { it.code } shouldContainAll listOf("EMPTY_PACKAGES")
+        }
+
+        "ListObjects returns the customers + orders tables and their columns" {
+            val r = service().listObjects(ListObjectsRequest.getDefaultInstance())
+            r.itemsList shouldHaveAtLeastSize 1
+            // The fixture has 2 tables + 6 columns + 1 entity + 3 attributes = 12 objects.
+            r.pageInfo.totalCount shouldBeGreaterThan 5
+        }
+
+        "ListObjects filters by kind" {
+            val r =
+                service().listObjects(
+                    ListObjectsRequest.newBuilder().setKind("table").build(),
+                )
+            // Two tables in the fixture (customers, orders).
+            r.itemsList.size shouldBe 2
+            r.itemsList.all { it.kind == "table" } shouldBe true
+        }
+
+        "ListObjects filters by tag" {
+            val r =
+                service().listObjects(
+                    ListObjectsRequest.newBuilder().addTags("core").build(),
+                )
+            r.itemsList shouldHaveAtLeastSize 2
+            r.itemsList.all { it.tagsList.contains("core") } shouldBe true
+        }
+
+        "GetObject returns descriptor by qname" {
+            val qn =
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(org.tatrman.plan.v1.SchemaCode.DB)
+                    .setNamespace("dbo")
+                    .setName("customers")
+                    .build()
+            val r = service().getObject(GetObjectRequest.newBuilder().setQualifiedName(qn).build())
+            r.objectDescriptor.localName shouldBe "customers"
+            r.objectDescriptor.kind shouldBe "table"
+            r.messagesList.size shouldBe 0
+        }
+
+        "GetObject on a db table returns DbTableDetail with columns + primary key (DF-M07)" {
+            val qn =
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(org.tatrman.plan.v1.SchemaCode.DB)
+                    .setNamespace("dbo")
+                    .setName("customers")
+                    .build()
+            val r = service().getObject(GetObjectRequest.newBuilder().setQualifiedName(qn).build())
+            r.hasTable() shouldBe true
+            r.table.columnsList.map { it.name } shouldContainAll listOf("id", "name", "tenant_id")
+            r.table.primaryKeyList shouldBe listOf("id")
+            r.table.columnsList
+                .first { it.name == "id" }
+                .dataType
+                .shouldNotBeEmpty()
+        }
+
+        "GetObject on a db column returns DbColumnDetail (DF-M07)" {
+            val svc = service()
+            val anyColumn =
+                svc.listObjects(ListObjectsRequest.newBuilder().setKind("column").build()).itemsList.first()
+            val r = svc.getObject(GetObjectRequest.newBuilder().setQualifiedName(anyColumn.qualifiedName).build())
+            r.hasColumn() shouldBe true
+            r.column.dataType.shouldNotBeEmpty()
+        }
+
+        "GetSnapshot entries carry per-kind detail for db tables (DF-M07)" {
+            val snap = service().getSnapshot(GetSnapshotRequest.getDefaultInstance())
+            val customers = snap.snapshot.objectsList.first { it.objectDescriptor.localName == "customers" }
+            customers.hasTable() shouldBe true
+            customers.table.columnsList.size shouldBe 3
+        }
+
+        "GetObject reports object_not_found via messages, NOT a gRPC error" {
+            val qn =
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(org.tatrman.plan.v1.SchemaCode.DB)
+                    .setNamespace("dbo")
+                    .setName("does_not_exist")
+                    .build()
+            val r = service().getObject(GetObjectRequest.newBuilder().setQualifiedName(qn).build())
+            r.messagesList.size shouldBe 1
+            r.messagesList[0].code shouldBe "object_not_found"
+        }
+
+        "GetSnapshot returns 304-equivalent (notModified) for matching ETag" {
+            val svc = service()
+            val first = svc.getSnapshot(GetSnapshotRequest.getDefaultInstance())
+            first.notModified shouldBe false
+            first.etag.shouldNotBeEmpty()
+
+            val second =
+                svc.getSnapshot(GetSnapshotRequest.newBuilder().setIfNoneMatch(first.etag).build())
+            second.notModified shouldBe true
+            second.etag shouldBe first.etag
+        }
+
+        "GetStatus reports overall OK once the snapshot is loaded" {
+            val r = service().getStatus(GetStatusRequest.getDefaultInstance())
+            r.modelLoaded shouldBe true
+            r.overallStatus shouldBe OverallStatus.OK
+            r.modelVersion.shouldNotBeEmpty()
+        }
+
+        "GetStatus reports DEGRADED when no snapshot has been loaded" {
+            val empty = MetadataServiceImpl(MetadataRegistry())
+            val r = empty.getStatus(GetStatusRequest.getDefaultInstance())
+            r.modelLoaded shouldBe false
+            r.overallStatus shouldBe OverallStatus.DEGRADED
+        }
+
+        "ValidateModel returns warnings_count = 0 on a clean fixture" {
+            val r = service().validateModel(ValidateModelRequest.getDefaultInstance())
+            r.errorsCount shouldBe 0
+            r.warningsCount shouldBe 0
+        }
+
+        "ListObjects pagination — small page size advances via page tokens" {
+            val svc = service()
+            val first =
+                svc.listObjects(
+                    ListObjectsRequest
+                        .newBuilder()
+                        .setPage(
+                            org.tatrman.ariadne.v1.PageRequest
+                                .newBuilder()
+                                .setPageSize(2),
+                        ).build(),
+                )
+            first.itemsList.size shouldBe 2
+            first.pageInfo.nextPageToken.shouldNotBeEmpty()
+
+            val second =
+                svc.listObjects(
+                    ListObjectsRequest
+                        .newBuilder()
+                        .setPage(
+                            org.tatrman.ariadne.v1.PageRequest
+                                .newBuilder()
+                                .setPageSize(2)
+                                .setPageToken(first.pageInfo.nextPageToken),
+                        ).build(),
+                )
+            second shouldNotBe null
+            second.itemsList.size shouldBeGreaterThan 0
+        }
+
+        // ---- Phase 07 B1 — TraverseEdges over the fixture model ----
+
+        "TraverseEdges OUTGOING from a column reaches its table via DEFINES" {
+            val svc = service()
+            // Column qnames in the fixture are table-qualified: db.dbo.customers.id
+            val columnQname =
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(org.tatrman.plan.v1.SchemaCode.DB)
+                    .setNamespace("dbo")
+                    .setName("customers.id")
+                    .build()
+            val r =
+                svc.traverseEdges(
+                    org.tatrman.ariadne.v1.TraverseEdgesRequest
+                        .newBuilder()
+                        .setFromQualifiedName(columnQname)
+                        .setMaxDepth(1)
+                        .addEdgeTypes(org.tatrman.ariadne.v1.EdgeType.DEFINES)
+                        .build(),
+                )
+            r.edgesList.size shouldBe 1
+            val edge = r.edgesList.first()
+            edge.type shouldBe org.tatrman.ariadne.v1.EdgeType.DEFINES
+            edge.depth shouldBe 1
+            edge.source.qualifiedName.name shouldBe "customers.id"
+            edge.target.qualifiedName.name shouldBe "customers"
+            edge.target.kind shouldBe "table"
+        }
+
+        "TraverseEdges INCOMING from a table reaches all its columns" {
+            val svc = service()
+            val tableQname =
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(org.tatrman.plan.v1.SchemaCode.DB)
+                    .setNamespace("dbo")
+                    .setName("customers")
+                    .build()
+            val r =
+                svc.traverseEdges(
+                    org.tatrman.ariadne.v1.TraverseEdgesRequest
+                        .newBuilder()
+                        .setFromQualifiedName(tableQname)
+                        .setDirection(org.tatrman.ariadne.v1.Direction.INCOMING)
+                        .setMaxDepth(1)
+                        .build(),
+                )
+            // customers has 3 columns: id, name, tenant_id.
+            r.edgesList.size shouldBe 3
+            r.edgesList.all { it.type == org.tatrman.ariadne.v1.EdgeType.DEFINES } shouldBe true
+            r.edgesList.map { it.target.qualifiedName.name }.toSet() shouldBe setOf("customers")
+            r.edgesList.map { it.source.qualifiedName.name }.toSet() shouldBe
+                setOf("customers.id", "customers.name", "customers.tenant_id")
+        }
+
+        "TraverseEdges from an unknown qname returns no edges + object_not_found warning" {
+            val svc = service()
+            val r =
+                svc.traverseEdges(
+                    org.tatrman.ariadne.v1.TraverseEdgesRequest
+                        .newBuilder()
+                        .setFromQualifiedName(
+                            QualifiedName
+                                .newBuilder()
+                                .setSchemaCode(org.tatrman.plan.v1.SchemaCode.DB)
+                                .setNamespace("dbo")
+                                .setName("ghost")
+                                .build(),
+                        ).setMaxDepth(1)
+                        .build(),
+                )
+            r.edgesList.size shouldBe 0
+            r.messagesList.map { it.code } shouldContainAll listOf("object_not_found")
+        }
+
+        "TraverseEdges max_depth bound is respected" {
+            val svc = service()
+            val tableQname =
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(org.tatrman.plan.v1.SchemaCode.DB)
+                    .setNamespace("dbo")
+                    .setName("customers")
+                    .build()
+            // depth=0 → request normalises to 1 internally; the test confirms the cap path works
+            // by walking depth=10 (capped at MAX_DEPTH_CAP=10) and finding only direct neighbours
+            // since the fixture has no chained edges.
+            val r =
+                svc.traverseEdges(
+                    org.tatrman.ariadne.v1.TraverseEdgesRequest
+                        .newBuilder()
+                        .setFromQualifiedName(tableQname)
+                        .setDirection(org.tatrman.ariadne.v1.Direction.INCOMING)
+                        .setMaxDepth(10)
+                        .build(),
+                )
+            // Each column edge is at depth 1; columns don't have further inbound edges in this fixture.
+            r.edgesList.all { it.depth == 1 } shouldBe true
+        }
+    })

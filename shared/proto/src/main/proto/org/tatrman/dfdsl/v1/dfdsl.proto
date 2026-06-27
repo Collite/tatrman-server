@@ -1,0 +1,163 @@
+// =============================================================================
+// AI Platform v1 — DataFrame DSL ("Pandish") wire form
+//
+// Promoted in Phase 1.0 from docs/v1/protos/ — this is the canonical location.
+//
+// The DataFrame DSL is the procedural Pandas-shaped language from Round 1.
+// A pipeline is an ordered list of operations applied to a starting data
+// source. Each operation maps 1:1 to a v1 RelOp (per the Round 1 §3.5e
+// aggressive subset commitment).
+//
+// Operator chain (canonical, fixed at v1):
+//   from → select → filter → assign → groupby → orderby → limit
+//
+// Converters in query-translator/codec/dfdsl/ translate Pipeline → RelNode
+// (parse) and RelNode → Pipeline (unparse). When a RelNode tree contains
+// an op that has no clean DataFrame mapping (e.g. a complex Join shape
+// the v1 chain doesn't express), the unparser fails with code
+// "operation_not_supported_in_target_language".
+//
+// Future executor: the Polars / DuckDB Worker (v1.5+) consumes Pipelines
+// directly. For v1, the DSL is parser/unparser-only — no execution path.
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.dfdsl.v1;
+
+import "org/tatrman/plan/v1/plan.proto";
+
+option java_package = "org.tatrman.dfdsl.v1";
+option java_multiple_files = true;
+
+// =============================================================================
+// Top level
+// =============================================================================
+
+message Pipeline {
+  // Ordered operations applied left-to-right. The first op MUST be a
+  // FromOp (the source); subsequent ops transform the running DataFrame.
+  repeated Operation ops = 1;
+  reserved 2 to 6;
+}
+
+message Operation {
+  oneof op {
+    FromOp     from     = 1;
+    SelectOp   select   = 2;
+    FilterOp   filter   = 3;
+    AssignOp   assign   = 4;
+    GroupByOp  groupby  = 5;
+    OrderByOp  orderby  = 6;
+    LimitOp    limit    = 7;
+    // Phase 08 B1 / DF-DSL01 — join with a second source. v1 allows at most one join per
+    // pipeline (hub-and-spoke), positioned between `from` and `select`. Refused at parse
+    // time when `on` is absent (B0 option (b)).
+    JoinOp     join     = 8;
+  }
+  reserved 9 to 12;
+}
+
+// =============================================================================
+// Operations (1:1 with v1 RelOps)
+// =============================================================================
+
+// Starting source. Maps to TableScanNode, SubqueryNode, or WorkspaceRef.
+message FromOp {
+  oneof source {
+    org.tatrman.plan.v1.QualifiedName table = 1;
+    string query_ref = 2;       // stackable-query reference (per Round 5)
+    // Phase 08 B2 / DF-DSL02 — workspace reference. The named workspace was materialised by
+    // a prior query in the same session; the executing worker resolves it from the
+    // session-scoped workspace store. Maps to PlanNode.WorkspaceRef. The session_id travels
+    // separately (PipelineContext); the codec carries only the workspace name here.
+    string workspace_ref = 4;
+  }
+  string alias = 3;
+  reserved 5 to 8;
+}
+
+// Project (selection + rename). Maps to ProjectNode.
+// Order of columns in the output matches the order in this list.
+message SelectOp {
+  repeated SelectColumn columns = 1;
+  reserved 2 to 6;
+}
+
+message SelectColumn {
+  string name = 1;
+  string alias = 2;             // optional; defaults to name
+  reserved 3 to 7;
+}
+
+// Filter rows. Maps to FilterNode.
+message FilterOp {
+  org.tatrman.plan.v1.Expression condition = 1;
+  reserved 2 to 6;
+}
+
+// Add computed columns alongside existing ones. Maps to ProjectNode that
+// preserves all input columns plus the new computed ones.
+message AssignOp {
+  repeated AssignExpression expressions = 1;
+  reserved 2 to 6;
+}
+
+message AssignExpression {
+  string alias = 1;
+  org.tatrman.plan.v1.Expression expression = 2;
+  reserved 3 to 7;
+}
+
+// Group + aggregate. Maps to AggregateNode.
+message GroupByOp {
+  // Group key column names (after any preceding select/assign).
+  repeated string keys = 1;
+
+  // Aggregate calls. Reuses the Plan-level AggregateCall type for
+  // function name, args, distinct flag, and result alias.
+  repeated org.tatrman.plan.v1.AggregateCall aggregates = 2;
+  reserved 3 to 7;
+}
+
+// Sort. Maps to SortNode.
+message OrderByOp {
+  // Reuses Plan-level SortKey for column / descending / nulls_first.
+  repeated org.tatrman.plan.v1.SortKey keys = 1;
+  reserved 2 to 6;
+}
+
+// Limit + Offset. Maps to LimitOffsetNode.
+message LimitOp {
+  // Maximum rows; 0 = unbounded.
+  int64 n = 1;
+  // Rows to skip; 0 = no offset.
+  int64 offset = 2;
+  reserved 3 to 7;
+}
+
+// Phase 08 B1 / DF-DSL01 — JoinOp.
+//
+// The pipeline's running DataFrame is the LEFT side; this op attaches a RIGHT side and an
+// `on` condition. Maps to plan.JoinNode. The right side accepts the same source kinds as
+// FromOp (table / query_ref / workspace_ref).
+//
+// v1 constraints (enforced at parse):
+//   - `on` MUST be set (a non-trivial condition expression); refusal carries the structured
+//     code `join_condition_required` per B0's option-(b) decision.
+//   - At most one JoinOp per Pipeline. A future extension can relax this once the chain
+//     ordering rule is updated to support n-way left-deep joins.
+message JoinOp {
+  oneof right {
+    org.tatrman.plan.v1.QualifiedName right_table = 1;
+    string right_query_ref = 2;
+    string right_workspace_ref = 3;
+  }
+  // Optional alias for the right side (mirrors FromOp.alias).
+  string right_alias = 4;
+  // Join kind. UNSPECIFIED defaults to INNER.
+  org.tatrman.plan.v1.JoinType join_type = 5;
+  // Required join condition. Refused at parse time if absent.
+  org.tatrman.plan.v1.Expression on = 6;
+  reserved 7 to 12;
+}

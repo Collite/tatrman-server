@@ -1,0 +1,2 @@
+# Placeholder — populate when Slovak content is exercised by real fixtures.
+# See stop-words-cs.txt for format conventions.

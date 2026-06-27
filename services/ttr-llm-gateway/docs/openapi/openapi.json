@@ -1,0 +1,690 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:7101",
+      "description": "Generated server url"
+    }
+  ],
+  "paths": {
+    "/api/v1/chat/responses": {
+      "post": {
+        "tags": [
+          "chat-controller"
+        ],
+        "operationId": "createResponse",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequestApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletionResponseApi"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/conversations": {
+      "post": {
+        "tags": [
+          "chat-controller"
+        ],
+        "operationId": "createConversation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationApi"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/completions": {
+      "post": {
+        "tags": [
+          "chat-controller"
+        ],
+        "operationId": "chat",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequestApi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletionResponseApi"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/observability/logs": {
+      "get": {
+        "tags": [
+          "observability-controller"
+        ],
+        "operationId": "getLogs",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PromptLog"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/models": {
+      "get": {
+        "tags": [
+          "model-controller"
+        ],
+        "operationId": "listModels",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/responses/{id}": {
+      "get": {
+        "tags": [
+          "chat-controller"
+        ],
+        "operationId": "getResponse",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletionResponseApi"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/conversations/{id}": {
+      "get": {
+        "tags": [
+          "chat-controller"
+        ],
+        "operationId": "getConversation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationApi"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chat-controller"
+        ],
+        "operationId": "deleteConversation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteConversationResponseApi"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChatCompletionRequestApi": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessageApi"
+            }
+          },
+          "conversation": {
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/ResponseInputApi"
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "background": {
+            "type": "string"
+          },
+          "temperature": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxOutputTokens": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxToolsCalls": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reasoning": {
+            "$ref": "#/components/schemas/ReasoningConfigApi"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolApi"
+            }
+          },
+          "modelTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "responseFormat": {
+            "$ref": "#/components/schemas/ResponseFormatApi"
+          }
+        }
+      },
+      "ChatMessageApi": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "toolCalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCallApi"
+            }
+          }
+        }
+      },
+      "FunctionApi": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonElement"
+            },
+            "properties": {
+              "values": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              },
+              "empty": {
+                "type": "boolean"
+              },
+              "size": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "$ref": "#/components/schemas/JsonElement"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "uniqueItems": true
+              },
+              "keys": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "uniqueItems": true
+              }
+            }
+          },
+          "strict": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FunctionCallApi": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "arguments": {
+            "type": "string"
+          }
+        }
+      },
+      "JsonElement": {},
+      "JsonObject": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/JsonElement"
+        },
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JsonElement"
+            }
+          },
+          "empty": {
+            "type": "boolean"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "$ref": "#/components/schemas/JsonElement"
+                },
+                "key": {
+                  "type": "string"
+                }
+              }
+            },
+            "uniqueItems": true
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "JsonSchemaApi": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "schema": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "strict": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReasoningConfigApi": {
+        "type": "object",
+        "properties": {
+          "effort": {
+            "type": "string"
+          }
+        }
+      },
+      "ResponseFormatApi": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "jsonSchema": {
+            "$ref": "#/components/schemas/JsonSchemaApi"
+          }
+        }
+      },
+      "ResponseInputApi": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "ToolApi": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "function": {
+            "$ref": "#/components/schemas/FunctionApi"
+          }
+        }
+      },
+      "ToolCallApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "function": {
+            "$ref": "#/components/schemas/FunctionCallApi"
+          }
+        }
+      },
+      "ChatCompletionResponseApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "created": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "conversationId": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "output": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResponseOutputApi"
+            }
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChoiceApi"
+            }
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageApi"
+          },
+          "reasoning": {
+            "$ref": "#/components/schemas/ResponseReasoningApi"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "ChoiceApi": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "$ref": "#/components/schemas/ChatMessageApi"
+          },
+          "finishReason": {
+            "type": "string"
+          }
+        }
+      },
+      "ResponseOutputApi": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "toolCalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCallApi"
+            }
+          }
+        }
+      },
+      "ResponseReasoningApi": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          }
+        }
+      },
+      "UsageApi": {
+        "type": "object",
+        "properties": {
+          "totalTokens": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inputTokens": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ConversationApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PromptLog": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "modelName": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "promptText": {
+            "type": "string"
+          },
+          "responseText": {
+            "type": "string"
+          },
+          "tokensPrompt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tokensCompletion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeleteConversationResponseApi": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

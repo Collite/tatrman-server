@@ -1,0 +1,60 @@
+# Default values for health. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# environments (Olymp cluster values, or test-context values) override image, telemetry, and
+# retune the per-target check wiring through the HEALTH_* env overrides (extraEnv).
+
+replicaCount: 1
+
+image:
+  repository: health
+  # Defaults to .Chart.appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# health exposes a single HTTP port (the roll-up REST API). No gRPC, no MCP wrapper.
+ports:
+  http: 7000
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 192Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: "1"
+
+# OpenTelemetry. Reads a single OTLP endpoint URL (OTEL_EXPORTER_OTLP_ENDPOINT) plus the
+# per-service OTEL_ENABLED_HEALTH flag. Point `endpoint` at a collector (e.g. the cluster's
+# Alloy) and set enabled; leave disabled where no collector exists (e.g. test runs).
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: health-check-service
+
+# Per-target check wiring. The bundled application.conf carries kantheon + fabric-infra defaults;
+# a deploying env appends HEALTH_*_URL / HEALTH_*_HOST / HEALTH_*_PORT overrides here to retune
+# DNS/ports/paths for its cluster (and the monitoring Prometheus URL for prometheus-type checks).
+extraEnv: []
+
+# Probes. The aggregator has no self /health route (installKtorServerBase adds none) — it only
+# serves the roll-up. `/health/all?threshold=0` returns 200 whenever the service itself is alive
+# (0% of targets need be healthy), so it is a true self-liveness/readiness signal independent of
+# downstream target state. (A target-state gate belongs on the dashboard, not the pod probe.)
+readinessProbe:
+  path: "/health/all?threshold=0"
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 30
+livenessProbe:
+  path: "/health/all?threshold=0"
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

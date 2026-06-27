@@ -1,0 +1,33 @@
+# Kantheon Developer Portal (Backstage)
+
+> **forked-from:** `ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4` (`infra/backstage/`), tag `kantheon-fork-point`, forked 2026-06-24 (fork Phase 5 Stage 5.5).
+> Maintained independently since the fork; do not assume parity with the ai-platform original. The fork is a **rebrand + catalog re-point** — the Backstage app source is unchanged; `organization.name`, `app.title`, baseUrls and the **software catalog** move to Kantheon.
+
+The Kantheon developer portal — a technical-wave (no-persona) Backstage app in `infra/`. Own Node +
+Yarn toolchain (a documented build exception, like Prometheus's Spring Boot), its own backend on
+**port 7007**, TechDocs + scaffolder.
+
+## Rebrand surface (Stage 5.5)
+
+- `app-config.yaml`: `organization.name` → **Kantheon**; `app.title` → **Kantheon Developer Portal**.
+- `examples/kantheon-catalog.yaml` (new): the constellation as a Backstage catalog — a `kantheon`
+  System + Group and a `Component` per pantheon citizen (agents Iris-BFF/Themis/Golem/Pythia/Hebe;
+  platform services Ariadne/Theseus/Echo/Kadmos/Proteus/Kyklop/Argos/Prometheus/Charon/Metis;
+  workers Brontes/Steropes/Arges; `capabilities-mcp`; technical wave whois/health/landing). Wired as
+  a `catalog.locations` file entry; replaces ai-platform's example catalog.
+- `docs/catalog-info.yaml`, `templates/agent-starter/template.yaml`, `app-config.local.yaml`
+  (`doc.aip.localhost` → `doc.kantheon.localhost`), the OIDC username-transform comment in
+  `packages/backend/src/index.ts` — all swept off DF-Partner / ai-platform.
+
+## Build / run
+
+```sh
+yarn install
+yarn tsc && yarn build      # Node-toolchain exception — CI-gated (yarn 4 berry, large dep tree)
+yarn start
+```
+
+The image is built and tagged `kantheon/backstage` (port 7007) at deploy; deploy manifests fork
+from `deployment/apps/backstage`. The `yarn tsc && yarn build` + Backstage component tests run in
+CI (the Node toolchain is not exercised on the local Rancher path); this stage's deterministic
+local gate is YAML/catalog well-formedness + the `df-partner|ai-platform` sweep.

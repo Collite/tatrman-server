@@ -1,0 +1,53 @@
+# Default values for echo. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# environments override image, telemetry, and any extra wiring.
+
+replicaCount: 1
+
+image:
+  repository: echo
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# HTTP port (probes + REST) and gRPC port (constellation services call the matcher over gRPC).
+ports:
+  http: 7265
+  grpc: 7266
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: "1"
+
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: echo
+
+# Secret-backed env (valueFrom.secretKeyRef) — none by default.
+secretEnv: []
+
+# Any other env (a deploying env REPLACES this list).
+extraEnv: []
+
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 2
+  periodSeconds: 3
+  failureThreshold: 20
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

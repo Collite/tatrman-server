@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kantheon
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Deployment
+      name: ariadne-mcp
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: ARIADNE_MCP_SERVER_PORT
+            value: "7262"
+          - name: ARIADNE_PROTOCOL
+            value: grpc
+          # Local cluster: point at the ariadne service's NodePort/port-forward.
+          # Default to localhost:7261 which works with `kubectl port-forward svc/ariadne 7261:7261`.
+          - name: ARIADNE_GRPC_HOST
+            value: localhost
+          - name: ARIADNE_GRPC_PORT
+            value: "7261"
+          - name: OTEL_SERVICE_NAME
+            value: ariadne-mcp
+          - name: OTEL_ENABLED_ARIADNE_MCP
+            value: "false"
