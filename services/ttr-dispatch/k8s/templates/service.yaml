@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kyklop.fullname" . }}
+  labels:
+    {{- include "kyklop.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "kyklop.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.ports.http }}
+      targetPort: {{ .Values.ports.http }}
+    - name: grpc
+      port: {{ .Values.ports.grpc }}
+      targetPort: {{ .Values.ports.grpc }}

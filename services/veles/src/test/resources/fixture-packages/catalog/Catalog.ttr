@@ -1,0 +1,14 @@
+package catalog
+
+import er.sales.Product
+
+schema er namespace catalog
+
+def entity Catalog {
+    description: "References Product in package sales via a named import (step 3)"
+    nameAttribute: cat_id
+    roles: [Product]
+    attributes: [
+        def attribute cat_id { type: int, isKey: true }
+    ]
+}

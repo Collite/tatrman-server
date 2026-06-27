@@ -1,0 +1,12 @@
+apiVersion: v2
+name: kyklop
+description: |
+  The Kantheon kyklop service — an env-agnostic Helm chart. Holds no cluster knowledge:
+  image, replicas, resources, telemetry endpoint and downstream wiring are all values.
+  Per-environment values live in the deploying repo (Olymp clusters via ArgoCD multi-source
+  D3'; test contexts via the Olymp scripted harness D23). Converted from the kustomize
+  base/overlays, mirroring tools/capabilities-mcp/k8s (D20).
+type: application
+# Chart version: the packaging. appVersion tracks the default image tag.
+version: 0.1.0
+appVersion: "dev"

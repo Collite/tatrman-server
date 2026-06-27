@@ -1,0 +1,199 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: agent-starter
+  title: Agent Starter
+  description: Scaffolds a new agent project for the DF Platform
+  tags:
+    - agent
+    - starter
+    - python
+    - kotlin
+  owner: kantheon
+spec:
+  type: service
+  parameters:
+    - title: Agent Details
+      required:
+        - agentName
+        - agentDescription
+        - agentVersion
+      properties:
+        agentName:
+          title: Agent Name
+          type: string
+          pattern: "^[a-z][a-z0-9-]*$"
+          description: Unique name for the agent (kebab-case, e.g., my-agent)
+        agentDescription:
+          title: Description
+          type: string
+          description: What does this agent do?
+        agentVersion:
+          title: Version
+          type: string
+          default: "0.1.0"
+          pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          description: Semver version (e.g., 0.1.0)
+
+    - title: Technology Stack
+      required:
+        - language
+        - agenticFramework
+        - serviceFramework
+        - dependencyManager
+      properties:
+        language:
+          title: Language
+          type: string
+          enum:
+            - python
+            - kotlin
+            - n8n
+          enumNames:
+            - Python
+            - Kotlin
+            - n8n
+      dependencies:
+        language:
+          oneOf:
+            - properties:
+                language:
+                  const: python
+                agenticFramework:
+                  title: Agentic Framework
+                  type: string
+                  enum:
+                    - langchain
+                    - langgraph
+                  enumNames:
+                    - LangChain
+                    - LangGraph
+                  default: langgraph
+                serviceFramework:
+                  title: Service Framework
+                  type: string
+                  enum:
+                    - fastapi
+                  enumNames:
+                    - FastAPI
+                  default: fastapi
+                dependencyManager:
+                  title: Dependency Manager
+                  type: string
+                  enum:
+                    - uv
+                  enumNames:
+                    - uv
+                  default: uv
+              required:
+                - language
+                - agenticFramework
+                - serviceFramework
+                - dependencyManager
+            - properties:
+                language:
+                  const: kotlin
+                agenticFramework:
+                  title: Agentic Framework
+                  type: string
+                  enum:
+                    - koog
+                    - embabel
+                    - spring-ai
+                  enumNames:
+                    - Koog
+                    - Embabel
+                    - Spring AI
+                  default: spring-ai
+                serviceFramework:
+                  title: Service Framework
+                  type: string
+                  enum:
+                    - spring-boot
+                    - ktor
+                  enumNames:
+                    - Spring Boot
+                    - Ktor
+                  default: ktor
+                dependencyManager:
+                  title: Dependency Manager
+                  type: string
+                  enum:
+                    - gradle
+                  enumNames:
+                    - Gradle (Kotlin)
+                  default: gradle
+              required:
+                - language
+                - agenticFramework
+                - serviceFramework
+                - dependencyManager
+            - properties:
+                language:
+                  const: n8n
+                agenticFramework:
+                  title: Agentic Framework
+                  type: string
+                  enum:
+                    - n8n
+                  enumNames:
+                    - n8n
+                  default: n8n
+                serviceFramework:
+                  title: Service Framework
+                  type: string
+                  enum:
+                    - n8n
+                  enumNames:
+                    - n8n
+                  default: n8n
+                dependencyManager:
+                  title: Dependency Manager
+                  type: string
+                  enum:
+                    - n8n
+                  enumNames:
+                    - n8n
+                  default: n8n
+              required:
+                - language
+                - agenticFramework
+                - serviceFramework
+                - dependencyManager
+
+    - title: Connected Services
+      properties:
+        connectedServices:
+          title: Connected Services
+          type: array
+          items:
+            type: string
+            enum:
+              - LLM_GATEWAY
+              - ERP_PATTERN_QUERIES
+              - ERP_NAMED_QUERIES
+              - ERP_ENTITIES
+              - ERP_FREE_SQL
+              - FUZZY_MATCHING
+              - AGENT_CHAT_FRONTEND
+          default: []
+
+  steps:
+    - id: generate
+      name: Generate Agent Project
+      action: agent-starter:generate
+      input:
+        agentName: ${{ parameters.agentName }}
+        agentDescription: ${{ parameters.agentDescription }}
+        agentVersion: ${{ parameters.agentVersion }}
+        language: ${{ parameters.language }}
+        agenticFramework: ${{ parameters.agenticFramework }}
+        serviceFramework: ${{ parameters.serviceFramework }}
+        dependencyManager: ${{ parameters.dependencyManager }}
+        connectedServices: ${{ parameters.connectedServices }}
+
+  output:
+    links:
+      - title: Download Agent Project
+        url: ${{ steps['generate'].output.downloadUrl }}
+        icon: download

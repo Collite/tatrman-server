@@ -1,0 +1,204 @@
+package org.tatrman.kantheon.ariadne
+
+import org.tatrman.ariadne.v1.GetQueryRequest
+import org.tatrman.ariadne.v1.ListQueriesRequest
+import org.tatrman.ariadne.v1.ParseStatus as ProtoParseStatus
+import org.tatrman.ariadne.v1.ParseStatusFilter
+import org.tatrman.plan.v1.QualifiedName
+import org.tatrman.plan.v1.SchemaCode
+import org.tatrman.plan.v1.parseSchemaCode
+import org.tatrman.kantheon.ariadne.graph.ModelGraph
+import org.tatrman.kantheon.ariadne.grpc.MetadataServiceImpl
+import org.tatrman.kantheon.ariadne.model.DbColumn
+import org.tatrman.kantheon.ariadne.model.DbSchema
+import org.tatrman.kantheon.ariadne.model.DbTable
+import org.tatrman.kantheon.ariadne.model.Model
+import org.tatrman.kantheon.ariadne.model.ModelDescriptor
+import org.tatrman.kantheon.ariadne.model.ModelVersion
+import org.tatrman.kantheon.ariadne.model.ParseStatus
+import org.tatrman.kantheon.ariadne.model.Query
+import org.tatrman.kantheon.ariadne.parse.MetadataModelHandle
+import org.tatrman.kantheon.ariadne.parse.QueryParseState
+import org.tatrman.kantheon.ariadne.parse.QueryParseWorker
+import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeInstanceOf
+import java.time.Instant
+
+class QueryParseWorkerSpec :
+    StringSpec({
+
+        fun qn(
+            schema: String,
+            ns: String,
+            name: String,
+        ) = QualifiedName
+            .newBuilder()
+            .setSchemaCode(parseSchemaCode(schema) ?: SchemaCode.SCHEMA_CODE_UNSPECIFIED)
+            .setNamespace(ns)
+            .setName(name)
+            .build()
+
+        val customersQn = qn("db", "dbo", "customers")
+        // db.dbo.customers(id INT PK, name TEXT)
+        val dbSchema =
+            DbSchema(
+                namespace = "dbo",
+                tables =
+                    mapOf(
+                        customersQn to
+                            DbTable(
+                                internalId = "t-customers",
+                                qname = customersQn,
+                                columns =
+                                    listOf(
+                                        DbColumn(
+                                            internalId = "c-id",
+                                            qname = qn("db", "dbo", "id"),
+                                            table = customersQn,
+                                            dataType = "int",
+                                            nullable = false,
+                                            isPrimaryKey = true,
+                                        ),
+                                        DbColumn(
+                                            internalId = "c-name",
+                                            qname = qn("db", "dbo", "name"),
+                                            table = customersQn,
+                                            dataType = "text",
+                                        ),
+                                    ),
+                                primaryKey = listOf("id"),
+                            ),
+                    ),
+            )
+
+        val okQuery =
+            Query(
+                internalId = "q-ok",
+                qname = qn("obj", "q", "okQuery"),
+                sourceLanguage = "SQL",
+                sourceText = "SELECT id, name FROM customers",
+                parseStatus = ParseStatus.ParsePending,
+            )
+        val badSqlQuery =
+            Query(
+                internalId = "q-bad-sql",
+                qname = qn("obj", "q", "badSqlQuery"),
+                sourceLanguage = "SQL",
+                sourceText = "SELEKT * FROM customers",
+                parseStatus = ParseStatus.ParsePending,
+            )
+        val unknownTableQuery =
+            Query(
+                internalId = "q-unknown-table",
+                qname = qn("obj", "q", "unknownTableQuery"),
+                sourceLanguage = "SQL",
+                sourceText = "SELECT id FROM no_such_table",
+                parseStatus = ParseStatus.ParsePending,
+            )
+        val unsupportedLangQuery =
+            Query(
+                internalId = "q-unsupported",
+                qname = qn("obj", "q", "unsupportedLangQuery"),
+                sourceLanguage = "PYTHON",
+                sourceText = "print('hi')",
+                parseStatus = ParseStatus.ParsePending,
+            )
+
+        fun model() =
+            Model(
+                descriptor = ModelDescriptor(id = "test", name = "test"),
+                version = ModelVersion(value = "v1", swappedAt = Instant.now()),
+                schemas = mapOf("db" to dbSchema),
+                mappings = emptyList(),
+                queries =
+                    listOf(okQuery, badSqlQuery, unknownTableQuery, unsupportedLangQuery).associateBy { it.qname },
+            )
+
+        "MetadataModelHandle exposes db tables and columns from the model" {
+            val handle = MetadataModelHandle(model())
+            val tables = handle.tables(SchemaCode.DB, "dbo")
+            tables.keys shouldContainExactlyInAnyOrder listOf(customersQn)
+            handle.columns(customersQn).map { it.name } shouldContainExactlyInAnyOrder listOf("id", "name")
+            handle.tables(SchemaCode.ER, "entity") shouldBe emptyMap()
+            handle.currentVersion() shouldBe "v1"
+        }
+
+        "QueryParseWorker parses each query against the model and records PARSED / FAILED" {
+            val state = QueryParseState()
+            val m = model()
+            state.reset(m.queries.keys)
+            val worker = QueryParseWorker()
+            worker.parseAll(m, state).join()
+
+            state.get(okQuery.qname).shouldBeInstanceOf<ParseStatus.ParseSuccess>()
+            state.get(badSqlQuery.qname).shouldBeInstanceOf<ParseStatus.ParseFailure>()
+            state.get(unknownTableQuery.qname).shouldBeInstanceOf<ParseStatus.ParseFailure>()
+            val unsupported = state.get(unsupportedLangQuery.qname)
+            unsupported.shouldBeInstanceOf<ParseStatus.ParseFailure>()
+            unsupported.message shouldContain "PYTHON"
+
+            val counts = state.counts()
+            counts.parsed shouldBe 1
+            counts.failed shouldBe 3
+            counts.pending shouldBe 0
+
+            // the parsed query's canonical form round-trips as a PlanNode
+            val ok = state.get(okQuery.qname)
+            ok.shouldBeInstanceOf<ParseStatus.ParseSuccess>()
+            org.tatrman.plan.v1.PlanNode
+                .parseFrom(ok.canonicalFormProtoBytes) // must not throw
+            worker.close()
+        }
+
+        "MetadataServiceImpl reflects the live parse state in ListQueries / GetQuery / GetStatus" {
+            val m = model()
+            val registry = MetadataRegistry()
+            registry.swap(m, ModelGraph.build(m))
+            val state = QueryParseState()
+            state.reset(m.queries.keys)
+            val service = MetadataServiceImpl(registry = registry, parseState = state)
+
+            // before the worker runs: everything PENDING
+            service
+                .getStatus(
+                    org.tatrman.ariadne.v1.GetStatusRequest
+                        .getDefaultInstance(),
+                ).let {
+                    it.queriesTotal shouldBe 4
+                    it.queriesPending shouldBe 4
+                    it.queriesParsed shouldBe 0
+                }
+
+            QueryParseWorker().also { it.parseAll(m, state).join() }.close()
+
+            service
+                .getStatus(
+                    org.tatrman.ariadne.v1.GetStatusRequest
+                        .getDefaultInstance(),
+                ).let {
+                    it.queriesParsed shouldBe 1
+                    it.queriesFailed shouldBe 3
+                    it.queriesPending shouldBe 0
+                }
+            service.getQuery(GetQueryRequest.newBuilder().setQualifiedName(okQuery.qname).build()).parseStatus shouldBe
+                ProtoParseStatus.PARSE_STATUS_PARSED
+            service.getQuery(GetQueryRequest.newBuilder().setQualifiedName(badSqlQuery.qname).build()).let {
+                it.parseStatus shouldBe ProtoParseStatus.PARSE_STATUS_FAILED
+                it.parseErrorMessage.isNotEmpty() shouldBe true
+            }
+            // ListQueries filter by parse status now sees the live result
+            service
+                .listQueries(
+                    ListQueriesRequest
+                        .newBuilder()
+                        .setParseStatusFilter(
+                            ParseStatusFilter.PARSE_STATUS_FILTER_PARSED,
+                        ).build(),
+                ).itemsList
+                .map { it.objectDescriptor.localName } shouldContainExactlyInAnyOrder listOf("okQuery")
+        }
+    })

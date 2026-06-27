@@ -1,0 +1,56 @@
+# Default values for kadmos (Python/FastAPI, HTTP-only). Env-agnostic: sane defaults, NO cluster
+# knowledge. Deploying environments override image, telemetry, and any extra wiring.
+
+replicaCount: 1
+
+image:
+  repository: kadmos
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# HTTP port only — uvicorn. (No gRPC.)
+ports:
+  http: 7270
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: "1"
+
+# OpenTelemetry — kadmos uses a host + gRPC-port + protocol triple (not a single endpoint URL).
+# Rendered only when enabled + otlpHost set; leave disabled for test runs.
+telemetry:
+  enabled: false
+  otlpHost: ""
+  otlpGrpcPort: 4317
+  protocol: grpc
+
+# Secret-backed env (valueFrom.secretKeyRef) — none by default.
+secretEnv: []
+
+# Any other env (a deploying env REPLACES this list).
+extraEnv: []
+
+# Probes — FastAPI exposes /readyz + /healthz.
+readinessProbe:
+  path: /readyz
+  initialDelaySeconds: 2
+  periodSeconds: 3
+  failureThreshold: 20
+livenessProbe:
+  path: /healthz
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

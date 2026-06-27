@@ -1,0 +1,18 @@
+capability_id: "ariadne.search:v1"
+category: "ariadne"
+version: "1.0.0"
+description: |
+  Fuzzy search across ariadne objects. The `query` argument is matched
+  against the model object's `name`, `localized labels`, `aliases`, and
+  search-keyword tables. Returns the top-N `SearchResult`s with relevance
+  scores and snippets.
+service_endpoint: "http://ariadne-mcp.kantheon.svc.cluster.local:7262"
+search_tags:
+  - ariadne
+  - search
+  - fuzzy
+cost_hints:
+  typical_latency_ms: 800
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 16

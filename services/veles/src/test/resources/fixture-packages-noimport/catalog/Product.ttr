@@ -1,0 +1,10 @@
+schema er namespace catalog
+
+def entity Product {
+    description: "Product entity"
+    nameAttribute: id
+    attributes: [
+        def attribute id { type: int, isKey: true },
+        def attribute name { type: text }
+    ]
+}

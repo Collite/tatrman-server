@@ -1,0 +1,26 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: prometheus
+  description: Prometheus — LLM gateway (Spring Boot); centralizes access to Azure OpenAI / Anthropic for the constellation
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  lifecycle: production
+  owner: df-platform
+  system: kantheon
+  providesApis:
+    - prometheus-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: prometheus-api
+  description: OpenAPI definition for Prometheus (LLM gateway)
+spec:
+  type: openapi
+  lifecycle: production
+  owner: user:guest
+  definition:
+    $text: openapi.json

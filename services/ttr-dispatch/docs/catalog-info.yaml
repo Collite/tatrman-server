@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: dispatcher
+  description: Worker selection by capability match (engine + connection_id) + sticky routing for stateful sessions; forwards validated PlanNodes to a worker
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - kotlin
+    - ktor
+    - grpc
+    - service
+    - v1
+spec:
+  type: service
+  lifecycle: production
+  owner: df-platform
+  system: ai-platform

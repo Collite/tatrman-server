@@ -1,0 +1,19 @@
+capability_id: "echo.match:v1"
+category: "echo"
+version: "1.0.0"
+description: |
+  Fuzzy match an entity name against the echo catalog (LEVENSHTEIN /
+  TATRMAN / JARO_WINKLER cascade; Czech-aware diacritic stripping).
+  Optional `category` narrows the search; `algorithm` selects the cascade
+  step (precision-first, recall-fallback); `limit` bounds the result size.
+service_endpoint: "http://echo-mcp.kantheon.svc.cluster.local:7267"
+search_tags:
+  - echo
+  - fuzzy
+  - match
+  - cascade
+cost_hints:
+  typical_latency_ms: 100
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 32

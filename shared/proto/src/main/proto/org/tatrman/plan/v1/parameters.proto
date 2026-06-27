@@ -1,0 +1,50 @@
+// =============================================================================
+// AI Platform v1 — Parameter binding
+//
+// Promoted in Phase 1.0 from docs/v1/protos/ — this is the canonical location.
+//
+// Defines parameter bindings that travel as a side-channel alongside a
+// PlanNode through the v1 pipeline. See PipelineContext in context.proto.
+//
+// Parameter identity rule (Round 1): same name + same type → identity
+// (single binding applied to all sites). Same name + different type →
+// compile-time error during the Translator's RESOLVE stage.
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.plan.v1;
+
+option java_package = "org.tatrman.plan.v1";
+option java_multiple_files = true;
+
+// ParameterBinding — a single named parameter and its (possibly unbound) value.
+//
+// Unbound case: "value" is unset. The Translator collects bindings during
+// RESOLVE; the caller must supply concrete values (via Value below) before
+// the query can execute. The query-runner's Compile RPC is the typical
+// vehicle for fetching unbound parameters of a stored query before binding.
+message ParameterBinding {
+  string name = 1;
+  // DSL surface type tag: text | int | float | bool | datetime
+  string type = 2;
+  Value value = 3;
+  // Human-readable label for UX surfaces (forms, parameter pickers).
+  // Inherited from stackable-query refs per the closest-scope-wins rule.
+  string label = 4;
+  reserved 5 to 9;
+}
+
+// Value — a typed scalar value. Null is encoded with "is_null = true" and
+// the value oneof unset. Datetime values are ISO-8601 strings.
+message Value {
+  oneof v {
+    string string_value   = 1;
+    int64  int_value      = 2;
+    double float_value    = 3;
+    bool   bool_value     = 4;
+    string datetime_value = 5;
+  }
+  bool is_null = 6;
+  reserved 7 to 11;
+}

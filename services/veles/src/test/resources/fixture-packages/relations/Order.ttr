@@ -1,0 +1,14 @@
+package relations
+
+import er.sales.*
+
+schema er namespace relations
+
+def entity Order {
+    description: "References Product in package sales via a wildcard import (step 4)"
+    nameAttribute: ord_id
+    roles: [Product]
+    attributes: [
+        def attribute ord_id { type: int, isKey: true }
+    ]
+}

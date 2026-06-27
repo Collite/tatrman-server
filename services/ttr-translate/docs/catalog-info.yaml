@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: proteus
+  description: Proteus — thin gRPC wrapper around the query-translator (Calcite/RelNode) library; lang ↔ RelNode ↔ SQL
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - kotlin
+    - ktor
+    - grpc
+    - service
+    - v1
+spec:
+  type: service
+  lifecycle: production
+  owner: df-platform
+  system: kantheon

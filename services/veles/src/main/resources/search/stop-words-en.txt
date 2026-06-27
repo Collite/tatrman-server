@@ -1,0 +1,36 @@
+# English stop-words for the keyword search algorithm.
+# One token per line, UTF-8. Lines starting with # are comments. Blank lines ignored.
+# Loaded by org.tatrman.kantheon.ariadne.search.keyword.StopWords at startup.
+a
+an
+the
+and
+or
+is
+are
+was
+were
+be
+been
+being
+this
+that
+these
+those
+for
+on
+in
+to
+from
+with
+by
+at
+of
+which
+what
+how
+where
+when
+me
+my
+it

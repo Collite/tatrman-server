@@ -1,0 +1,3 @@
+site_name: backstage Documentation
+plugins:
+  - techdocs-core

@@ -1,0 +1,299 @@
+# kadmos
+
+> **forked-from:** `ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4` (`infra/nlp/`), tag `kantheon-fork-point`, forked 2026-06-14.
+> Maintained independently since the fork; do not assume parity with the ai-platform original.
+
+The **NLP foundation service** for kantheon — multi-engine analysis (Stanza, spaCy, NameTag/MorphoDiTa via UFAL, langid) over Python/FastAPI.
+
+## Overview
+
+`services/kadmos` is a stateless Python/FastAPI service that provides NLP operations (tokenize, lemmatize, POS, dependency parse, NER, language detection) via a plugin-based engine architecture, with per-op-per-language routing (Czech routed through the UFAL stack). It is the NLP foundation consumed by Themis (via `tools/kadmos-mcp`) and Echo. HTTP at v1; proto types fork as `org.tatrman.kadmos.v1` (no gRPC binding). Default HTTP port **7270**.
+
+## Supported Operations
+
+| Operation | Description | Engines |
+|-----------|-------------|---------|
+| `TOKENIZE` | Tokenization | Stanza, spaCy |
+| `SENTENCE_SPLIT` | Sentence boundary detection | Stanza |
+| `LEMMATIZE` | Lemmatization | Stanza |
+| `POS_TAG` | Part-of-speech tagging (UD + language-specific) | Stanza |
+| `DEP_PARSE` | Dependency parsing | Stanza |
+| `NER` | Named Entity Recognition | Stanza, spaCy, NameTag |
+| `DETECT_LANGUAGE` | Language detection | langid (lingua) |
+
+## Engines
+
+### Stanza
+- **Languages**: Czech (cs), English (en)
+- **Operations**: All except NER (cs/en), with full POS and dependency parsing
+- **Models**: Bundled in Docker image (pre-downloaded at build time)
+
+### spaCy
+- **Languages**: English (en)
+- **Operations**: Tokenization, NER
+- **Models**: `en_core_web_md` bundled in Docker image
+
+### NameTag (UFAL)
+- **Languages**: Czech (cs), English (en)
+- **Operations**: NER only
+- **Endpoint**: `https://lindat.mff.cuni.cz/services/nametag`
+- **Rate Limit**: 5 req/min (configurable)
+
+### langid (lingua-language-detector)
+- **Languages**: Multiple (cs, en, de, sk, pl, hu, sl, hr, sr, mk, bg)
+- **Operations**: DETECT_LANGUAGE only
+
+## Configuration
+
+Configuration is managed via `config.yaml`:
+
+```yaml
+service:
+  host: "0.0.0.0"
+  port: 7270
+
+engines:
+  stanza:
+    enabled: true
+    model_dir: "/opt/nlp-models/stanza"
+  spacy:
+    enabled: true
+    model_name: "en_core_web_md"
+  nametag:
+    enabled: true
+    # `/services/nametag` 301-redirects; the REST API is at `/api/recognize`.
+    endpoint: "https://lindat.mff.cuni.cz/services/nametag/api/recognize"
+    timeout_seconds: 30
+    max_retries: 3
+    rate_limit_per_minute: 5
+  morphodita:
+    enabled: true
+    endpoint: "https://lindat.mff.cuni.cz/services/morphodita/api/tag"
+    timeout_seconds: 30
+    max_retries: 3
+    rate_limit_per_minute: 5
+  langid:
+    enabled: true
+
+# Per-operation routing: {op}.{lang} -> engine_name
+op_routing:
+  # Czech (cs) — UFAL stack; Stanza's cs model has no NER head, so we route
+  # tokenize/sentence_split/lemmatize/POS through morphodita and NER through nametag.
+  TOKENIZE.cs: "morphodita"
+  SENTENCE_SPLIT.cs: "morphodita"
+  LEMMATIZE.cs: "morphodita"
+  POS_TAG.cs: "morphodita"
+  DEP_PARSE.cs: "stanza"
+  NER.cs: "nametag"
+  NER.cs.fallback: ""        # No fallback — stanza-cs has no NER model.
+
+  TOKENIZE.en: "stanza"
+  LEMMATIZE.en: "stanza"
+  POS_TAG.en: "stanza"
+  DEP_PARSE.en: "stanza"
+  NER.en: "stanza"           # Stanza for English NER
+  NER.en.fallback: "spacy"   # spaCy fallback
+
+  DETECT_LANGUAGE: "langid"
+
+default_language: "cs"
+```
+
+## API
+
+### POST /v1/analyze
+
+Run NLP analysis on input text.
+
+**Request:**
+```json
+{
+  "text": "Které faktury Shell ještě neuhradil?",
+  "language": "cs",
+  "ops": ["TOKENIZE", "LEMMATIZE", "POS_TAG", "DEP_PARSE", "NER"],
+  "mode": "NORMAL",
+  "engineHints": {}
+}
+```
+
+**Response:**
+```json
+{
+  "language": "cs",
+  "languageConfidence": 1.0,
+  "engineUsed": "stanza",
+  "tokens": [
+    {
+      "text": "Které",
+      "charStart": 0,
+      "charEnd": 5,
+      "lemma": "který",
+      "upos": "DET",
+      "xpos": "派4",
+      "feats": {"Number": "Plur", "Case": "Nom"},
+      "depHead": 4,
+      "depRelation": "det"
+    },
+    ...
+  ],
+  "sentences": [{"charStart": 0, "charEnd": 33}],
+  "paragraphs": [],
+  "entities": [
+    {
+      "text": "Shell",
+      "label": "PER",
+      "charStart": 13,
+      "charEnd": 18,
+      "normalizedValue": "",
+      "sourceEngine": "nametag"
+    }
+  ],
+  "byEngine": {},
+  "traceId": "abc123...",
+  "elapsedMs": 150,
+  "messages": []
+}
+```
+
+### GET /healthz
+
+Health check endpoint.
+
+### GET /readyz
+
+Readiness check - returns 503 if no engines are available.
+
+### GET /version
+
+Service version and engine information.
+
+## Local Development
+
+```bash
+# Install dependencies
+cd services/kadmos
+uv sync
+
+# Run service (default port 7270)
+uv run python src/main.py
+
+# Or with uvicorn directly
+uvicorn kadmos_service.api.routes:app --reload --port 7270
+```
+
+## Testing
+
+```bash
+# Run tests (from repo root; regenerates proto-py first)
+just test-py services/kadmos
+
+# Lint (ruff)
+just lint-py services/kadmos
+```
+
+## Evaluation
+
+The NLP eval corpus (`eval/corpus/seed.jsonl`, 50 hand-curated Czech questions
+with expected parses + entity bindings) and harness (`eval/run_eval.py`) are
+carried over **verbatim** from the ai-platform original — same code, same corpus.
+Run it against a deployed service:
+
+```bash
+just eval-kadmos                 # port-forwards the kadmos pod (7270) + runs the harness
+# or against a local instance:
+uv run python eval/run_eval.py --url http://localhost:7270
+```
+
+**Baseline:** because the engine code and corpus are byte-identical to the
+ai-platform original at the fork point, Kadmos answers identically by
+construction — the Stage 2.6 Themis gate builds on this. A numeric baseline is
+recorded at the first live deployment (the ai-platform original shipped no
+recorded `eval/reports` metrics, and the harness needs a running service +
+remote UFAL endpoints to score; live infra was unavailable in the fork session,
+deferred to the deployment pipeline — Ariadne/Echo precedent). Reports land in
+`eval/reports/` (`metrics.json` + `report.md`).
+
+## Container & deployment
+
+```bash
+# Build the Docker image (tagged kadmos:dev) — repo-root build context so the
+# uv path-deps (../../shared/...) resolve.
+just build-py services/kadmos
+
+# Build + deploy to local K3s (applies k8s/overlays/local)
+just deploy-py services/kadmos
+```
+
+### Image-size strategy (cached model layer)
+
+The NLP engine models (Stanza `cs`+`en`, spaCy `en_core_web_md`) dominate image
+size and build time, so the Dockerfile isolates them in a dedicated `models`
+stage that depends **only** on the dependency layer (`pyproject.toml` +
+`uv.lock`). App-source edits invalidate only the final thin `runtime` COPY
+layers — never the heavy model download (the Metis/prophet "cached base layer"
+pattern, `metis/architecture.md` §2). NameTag / MorphoDiTa use the remote UFAL
+endpoints, so no local model is bundled for them; the only bundled engines are
+Stanza + spaCy.
+
+| Stage | Holds | Cache-busts on |
+|-------|-------|----------------|
+| `base` | python:3.13-slim + build-essential/curl | base image bump |
+| `deps` | uv venv (incl. torch-cpu) from `pyproject.toml`+`uv.lock` | dependency change |
+| `models` | Stanza cs+en + spaCy en_core_web_md under `/opt/nlp-models` | dependency change (not app code) |
+| `runtime` | venv + models + **app `src/`** (thin) | app-source change |
+
+**Image sizes:** the actual built-image size is recorded at first pipeline
+build — the Docker daemon was not available in the fork session, so the build /
+live-K3s deploy is left to the deployment pipeline (same precedent as Ariadne /
+Echo: manifests + recipes validated, live infra deferred). The dominant
+contributors are torch-cpu (~200 MB), the Stanza models (~1 GB across cs+en),
+and spaCy `en_core_web_md` (~40 MB).
+
+## Architecture
+
+```
+                    ┌─────────────────────────────────────────────┐
+                    │              services/kadmos                 │
+                    │                                              │
+Request ──────────► │ ┌─────────┐    ┌────────────────────────┐  │
+                    │ │ FastAPI │───►│     Orchestrator        │  │
+                    │ └─────────┘    │  (per-op engine routing) │  │
+                    │                └───────────┬────────────┘  │
+                    │                            │                 │
+                    │       ┌────────────────────┼────────────────┐ │
+                    │       │                    │                │ │
+                    │       ▼                    ▼                ▼ │
+                    │  ┌─────────┐         ┌─────────┐     ┌─────────┐ │
+                    │  │  Stanza │         │  spaCy  │     │ NameTag │ │
+                    │  └─────────┘         └─────────┘     └─────────┘ │
+                    │                                              │
+                    │       ┌─────────┐                           │
+                    │       │ langid  │ (for DETECT_LANGUAGE)       │
+                    │       └─────────┘                           │
+                    └─────────────────────────────────────────────┘
+```
+
+## Engine Plugin Contract
+
+To add a new engine, implement `NlpEngine` protocol:
+
+```python
+from kadmos_service.engines.base import NlpEngine, NlpOp, EngineResult
+
+class MyEngine(NlpEngine):
+    @property
+    def name(self) -> str:
+        return "my_engine"
+
+    def supported_languages(self) -> Set[str]:
+        return {"cs", "en"}
+
+    def supports(self, lang: str, op: NlpOp) -> bool:
+        return lang in self.supported_languages() and op in {NlpOp.TOKENIZE, NlpOp.NER}
+
+    def analyze(self, text: str, lang: str, ops: Set[NlpOp]) -> EngineResult:
+        # Your implementation
+        return EngineResult(...)
+```
+
+Then register it in `EngineRegistry.__init__`.

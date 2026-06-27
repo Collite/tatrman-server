@@ -1,0 +1,65 @@
+# Default values for prometheus (LLM gateway, Spring Boot). Env-agnostic: sane defaults, NO cluster
+# knowledge. Deploying environments override image, telemetry, the Postgres target, the LLM keys
+# (secretEnv) and — for a test context — the LLM upstream base URL (via extraEnv → WireMock).
+
+replicaCount: 1
+
+image:
+  repository: prometheus
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# HTTP port (REST + actuator) and gRPC port.
+ports:
+  http: 7280
+  grpc: 9090
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 768Mi
+    cpu: 250m
+  limits:
+    memory: 1536Mi
+    cpu: "1"
+
+# Postgres target (the default Spring profile). Env-agnostic bare service name.
+db:
+  host: postgres
+  port: 5432
+
+# OpenTelemetry. OTEL_SERVICE_NAME always; the OTLP endpoint renders only when enabled.
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: prometheus
+
+# Secret-backed env (valueFrom.secretKeyRef). Upstream LLM-provider keys; `optional: true` so the
+# pod boots without them (a test context stubs the upstream at WireMock and needs no real key).
+secretEnv:
+  - { name: AZURE_OPENAI_API_KEY, secretName: prometheus-secrets, secretKey: azure-openai-api-key, optional: true }
+  - { name: ANTHROPIC_API_KEY, secretName: prometheus-secrets, secretKey: anthropic-api-key, optional: true }
+
+# Any other env (a deploying env adds to / replaces this list). A test context sets the LLM upstream
+# base URL here to retarget it at WireMock (e.g. AZURE_OPENAI_ENDPOINT / ANTHROPIC_BASE_URL).
+extraEnv: []
+
+# Probes — Spring Boot actuator health groups.
+readinessProbe:
+  path: /actuator/health/readiness
+  initialDelaySeconds: 15
+  periodSeconds: 5
+  failureThreshold: 30
+livenessProbe:
+  path: /actuator/health/liveness
+  initialDelaySeconds: 45
+  periodSeconds: 15
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

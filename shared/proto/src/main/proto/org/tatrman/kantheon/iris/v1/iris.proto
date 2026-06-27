@@ -1,0 +1,123 @@
+// iris/v1 — the iris-bff session + chat + stream surface (Iris arc, Stage 1.1).
+//
+// Authority: docs/architecture/iris/contracts.md §1.2. Deliberately does NOT
+// import themis/v1, golem/v1, pythia/v1 (kantheon-architecture §4) — iris/v1 is
+// the conversation-state contract; agent routing/answer types stay agent-side.
+syntax = "proto3";
+
+package org.tatrman.kantheon.iris.v1;
+
+import "org/tatrman/kantheon/envelope/v1/envelope.proto";
+import "org/tatrman/kantheon/common/v1/handoff.proto";          // ViewProvenance, EntityBinding (TurnPointer)
+import "org/tatrman/kantheon/common/v1/response_message.proto"; // kantheon Rule-6 stand-in
+
+option java_multiple_files = true;
+option java_package = "org.tatrman.kantheon.iris.v1";
+
+// ---- Session surface ----
+message Session {
+  string session_id = 1;
+  string user_id    = 2;
+  string tenant_id  = 3;
+  repeated org.tatrman.kantheon.envelope.v1.EntityContextSnapshot entity_context = 4;
+  repeated TurnPointer turns = 5;
+  string created_at = 6;
+  string updated_at = 7;
+  reserved 99;  // Rule 6: messages = 99 reserved across the board
+}
+
+message TurnPointer {
+  string turn_id      = 1;
+  string agent_id     = 2;              // "pythia" | "golem-erp" | "golem-v2" (transitional) | ...
+  string artifact_ref = 3;              // agent-side per-turn record pointer
+  repeated string displayed_block_ids = 4;
+  optional string question = 5;         // verbatim user text (for excerpt building)
+  string created_at = 6;
+  // PD-1/PD-4 (2026-06-12): per-turn snapshot of what the agent echoed.
+  // current_view is agent-owned; the BFF only snapshots and forwards.
+  optional org.tatrman.kantheon.common.v1.ViewProvenance current_view = 7;
+  repeated org.tatrman.kantheon.common.v1.EntityBinding applied_context = 8;
+  reserved 99;  // Rule 6: messages = 99 reserved across the board
+}
+
+// PD-1 assembly rule (2026-06-12): on EVERY dispatch the BFF builds a
+// common.v1.HandoffContext from the previous TurnPointer (source_agent_id,
+// source_turn_ref=artifact_ref, user_question, current_view, applied_context)
+// + the session EntityContext, and sends it (a) to Themis inside ResolveRequest
+// (this IS themis_prior_context) and (b) to the routed agent's request.
+// PD-4: the BFF compares each response's applied_context against what it sent —
+// scope indicator in the FE; warning bubble on mismatch.
+
+// ---- Chat surface ----
+message ChatTurnRequest {
+  string session_id = 1;
+  string question   = 2;
+  optional string routing_hint_agent_id = 3;   // RoutingPickChip click reissue
+  optional string desired_format = 4;          // /format slash arming
+  optional bool dry_run = 5;                    // /sql slash arming
+  // Hebe co-design, landed 2026-06-12 (cohesion review; hebe/contracts.md §3.1):
+  // scheduled turns are persisted/routed/rendered exactly like user turns;
+  // origin is metadata for the session log, inbox badge, audit, analytics.
+  // iris-bff must NOT gate on it.
+  TurnOrigin origin       = 6;                  // default USER
+  optional string origin_ref = 7;               // routine_id for SCHEDULED; empty otherwise
+  reserved 99;  // Rule 6: messages = 99 reserved across the board
+}
+
+enum TurnOrigin {
+  TURN_ORIGIN_UNSPECIFIED = 0;
+  USER                    = 1;
+  SCHEDULED               = 2;                  // Hebe routine
+}
+
+message ChatResumeRequest {
+  string session_id   = 1;
+  string resume_token = 2;
+  oneof answer {
+    string selected_option_id = 3;
+    string free_text_answer   = 4;
+  }
+  reserved 99;  // Rule 6: messages = 99 reserved across the board
+}
+
+message TypedActionRequest {
+  string session_id = 1;
+  string bubble_id  = 2;                        // which envelope the action targets
+  TypedAction action = 3;
+  reserved 99;  // Rule 6: messages = 99 reserved across the board
+}
+
+message TypedAction {
+  string kind = 1;          // sort | filter | paginate | select_row | chip_invocation | edit_resend
+  string payload_json = 2;  // Rule-7 style; schema per kind documented in contracts §2.4
+  reserved 99;  // Rule 6: messages = 99 reserved across the board
+}
+
+// ---- Stream events (SSE payloads; one JSON-serialised IrisStreamEvent per SSE event) ----
+message IrisStreamEvent {
+  string turn_id = 1;
+  int64 sequence = 2;                           // monotone per turn
+  oneof event {
+    org.tatrman.kantheon.envelope.v1.FormatEnvelope envelope = 3;
+    StepEvent step          = 4;
+    ToolCallEvent tool_call = 5;
+    ThinkingEvent thinking  = 6;
+    ErrorEvent error        = 7;
+    DoneEvent done          = 8;
+  }
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;
+}
+
+message StepEvent     { string node = 1; string phase = 2;        // started | completed | failed
+                        optional string summary = 3; optional string detail_json = 4;
+                        optional int64 latency_ms = 5;
+                        reserved 99; }  // Rule 6: messages = 99 reserved across the board
+message ToolCallEvent { string tool = 1; string phase = 2; optional string summary = 3;
+                        reserved 99; }  // Rule 6: messages = 99 reserved across the board
+message ThinkingEvent { string text_delta = 1;
+                        reserved 99; }  // Rule 6: messages = 99 reserved across the board
+message ErrorEvent    { string code = 1; string message = 2; bool recoverable = 3;
+                        reserved 99; }  // Rule 6: messages = 99 reserved across the board
+message DoneEvent     { string outcome = 1;                       // done | failed | clarification
+                        optional string turn_pointer_json = 2;
+                        reserved 99; }  // Rule 6: messages = 99 reserved across the board

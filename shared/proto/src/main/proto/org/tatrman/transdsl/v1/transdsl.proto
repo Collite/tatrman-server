@@ -1,0 +1,132 @@
+// =============================================================================
+// AI Platform v1 — Transformation DSL wire form
+//
+// Promoted in Phase 1.0 from docs/v1/protos/ — this is the canonical location.
+//
+// The Transformation DSL is the declarative JSONC tree language from
+// Round 1. This proto file is the canonical shape; humans authoring DSL
+// see JSON via proto3's standard JSON encoding (camelCase keys, oneof
+// dispatch). Converters in query-translator/codec/transdsl/ translate
+// Query → RelNode (parse) and RelNode → Query (unparse).
+//
+// Operator precedence and shape per Round 1 §3.3-3.7:
+//   - core: list of sources (Cartesian default; Joiner adds joins later)
+//   - columns: explicit projection (no '*')
+//   - calculations: derived expressions (evaluated in list order)
+//   - filter: logical expression (becomes WHERE and/or HAVING)
+//   - aggregation: group/sum/max/min/avg/count
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.transdsl.v1;
+
+import "org/tatrman/plan/v1/plan.proto";
+
+option java_package = "org.tatrman.transdsl.v1";
+option java_multiple_files = true;
+
+// =============================================================================
+// Top level
+// =============================================================================
+
+message Query {
+  // One or more sources. Multiple cores = implicit Cartesian; Joiner
+  // resolves to explicit Joins downstream (Round 6 Joiner pipeline).
+  repeated Source core = 1;
+
+  // Explicit column list. No "*" allowed at this layer; expansion is the
+  // caller's responsibility before the converter sees the Query.
+  repeated Column columns = 2;
+
+  // Derived columns. Evaluated in list order; later calculations may
+  // reference earlier ones by alias.
+  repeated Calculation calculations = 3;
+
+  // Filter — a logical Expression. The converter decides WHERE vs HAVING
+  // based on whether the expression references aggregated columns.
+  org.tatrman.plan.v1.Expression filter = 4;
+
+  Aggregation aggregation = 5;
+  reserved 6 to 10;
+}
+
+// =============================================================================
+// Source
+// =============================================================================
+
+message Source {
+  oneof source_kind {
+    // Leaf — a data object reference. For db schema this is a table qname.
+    org.tatrman.plan.v1.QualifiedName data_object = 1;
+
+    // Nested query — composes another Query as a sub-source.
+    Query query = 2;
+
+    // Reference to a stored query (stackable-query expansion via the
+    // metadata service, per Round 5).
+    string query_ref = 3;
+
+    // Phase 2.4 — session-scoped workspace reference. The named workspace
+    // must have been produced by a prior Execute in the same session
+    // (PipelineContext.session_id) on a stateful Worker.
+    string workspace_ref = 5;
+  }
+
+  // Alias used to qualify column references upwards in the tree.
+  string alias = 4;
+  reserved 6 to 9;
+}
+
+// =============================================================================
+// Column
+// =============================================================================
+
+message Column {
+  // Source alias matching one of the Sources in core. Optional when the
+  // column name is unique across all sources.
+  string source = 1;
+
+  // Column name in the source.
+  string name = 2;
+
+  // Result alias. Optional when the name is unique and unchanged.
+  string alias = 3;
+  reserved 4 to 8;
+}
+
+// =============================================================================
+// Calculation
+// =============================================================================
+
+message Calculation {
+  string alias = 1;
+  org.tatrman.plan.v1.Expression expression = 2;
+  reserved 3 to 7;
+}
+
+// =============================================================================
+// Aggregation
+// =============================================================================
+
+message Aggregation {
+  // Group keys — bare column aliases (no source qualifier; sources are
+  // already resolved by the time Aggregation is evaluated).
+  repeated string group = 1;
+
+  // Aggregate columns per function. Each AggregateColumn names the input
+  // column alias and the result alias.
+  repeated AggregateColumn sum = 2;
+  repeated AggregateColumn max = 3;
+  repeated AggregateColumn min = 4;
+  repeated AggregateColumn avg = 5;
+  repeated AggregateColumn count = 6;
+  repeated AggregateColumn count_distinct = 7;
+  reserved 8 to 12;
+}
+
+message AggregateColumn {
+  string name = 1;     // column alias to aggregate
+  string alias = 2;    // alias of the SUM(...) AS <alias> result
+  reserved 3 to 7;
+}

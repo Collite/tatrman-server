@@ -1,0 +1,103 @@
+// =============================================================================
+// Kantheon — Security (policy evaluation) data contract
+//
+// Forked from ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4 (tag kantheon-fork-point)
+//   (shared/proto/src/main/proto/cz/dfpartner/security/v1/security.proto).
+// Fork Stage 3.1 (Argos): package cz.dfpartner.security.v1 → org.tatrman.security.v1;
+// plan/context refs → org.tatrman.plan.v1; Rule-6 messages=99 → kantheon common.ResponseMessage.
+//
+// Fork Stage 3.2 (the policy fold): policy evaluation moved IN-PROCESS into Argos
+// (contracts §1). The gRPC `SecurityService` surface is **not re-exposed**, and the
+// legacy SQL-fragment endpoint (`EvaluatePoliciesLegacy*`, `LegacyTablePredicate`) +
+// `GetStatus` were dropped. What remains is the **data contract** Argos's in-process
+// `PolicyEngine` consumes/produces: the EvaluatePolicies request/response shapes,
+// `TablePredicate`, and `ColumnRule`. Roles arrive on the bearer
+// (`PipelineContext.auth_roles`), not whois.
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.security.v1;
+
+import "org/tatrman/plan/v1/plan.proto";
+import "org/tatrman/plan/v1/context.proto";
+import "org/tatrman/kantheon/common/v1/response_message.proto";   // for ResponseMessage — applied universally to v1 service responses
+
+option java_package = "org.tatrman.security.v1";
+option java_multiple_files = true;
+option java_outer_classname = "SecurityProto";
+
+// =============================================================================
+// EvaluatePolicies — the in-process policy-evaluation contract
+// =============================================================================
+
+message EvaluatePoliciesRequest {
+  // The PlanNode the policies should be evaluated against. The policy engine
+  // walks the tree to discover which tables / columns are referenced and
+  // which policies apply.
+  org.tatrman.plan.v1.PlanNode plan = 1;
+
+  // User identity, model_version, correlation_id. user_id drives policy
+  // lookup; roles arrive on the bearer (auth_roles in PipelineContext).
+  org.tatrman.plan.v1.PipelineContext context = 2;
+  reserved 3 to 7;
+}
+
+message EvaluatePoliciesResponse {
+  // One TablePredicate per (table_qname, applicable policy set). Tables
+  // without applicable policies are omitted. Argos wraps each
+  // predicate as a FilterNode above the matching TableScan in its
+  // PlanNode.
+  repeated TablePredicate predicates = 1;
+
+  // Updated context with any warnings appended (skipped policies,
+  // metadata-version mismatches, etc.).
+  org.tatrman.plan.v1.PipelineContext context = 2;
+
+  // Column-level rules for the referenced tables (DF-S02): columns that are
+  // denied outright or must be masked. The policy engine returns the rules
+  // that apply to the tables in the plan regardless of whether the query
+  // touches those columns; Argos's RuleEnforcer checks the actual query's
+  // column set against this list (deny → reject; mask → rewrite).
+  repeated ColumnRule column_rules = 3;
+
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message TablePredicate {
+  // Physical table qname (db schema). Multiple TablePredicates may target
+  // the same table when multiple policies apply; Argos AND-s them
+  // into a single FilterNode.
+  org.tatrman.plan.v1.QualifiedName table = 1;
+
+  // Structured predicate. Wrapped by Argos as a FilterNode.
+  org.tatrman.plan.v1.Expression predicate = 2;
+
+  // Stable policy identifier from the policy store. Returned
+  // to the caller via Argos.SecurityRuleApplied for audit.
+  string rule_id = 3;
+
+  // Human-readable summary of the predicate, safe for UI display.
+  // Example: "WHERE customer_id IN (subset visible to your tenant)".
+  string predicate_summary = 4;
+  reserved 5 to 9;
+}
+
+// Column-level access rule (DF-S02). Applies to a (table, column) pair.
+message ColumnRule {
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    DENY = 1;              // the query may not reference this column at all
+    MASK = 2;              // the column is replaced by `mask_expression` in the result
+  }
+
+  org.tatrman.plan.v1.QualifiedName table = 1;
+  string column = 2;                                 // local column name
+  Action action = 3;
+  // For MASK: the expression substituted for the column (e.g. a literal '***',
+  // or NULL). Unset for DENY.
+  org.tatrman.plan.v1.Expression mask_expression = 4;
+  string rule_id = 5;                                // owning policy id, for audit
+  reserved 6 to 10;
+}

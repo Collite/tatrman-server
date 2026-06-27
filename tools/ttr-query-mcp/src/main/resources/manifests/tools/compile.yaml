@@ -1,0 +1,20 @@
+capability_id: "theseus.compile:v1"
+category: "theseus"
+version: "1.0.0"
+description: |
+  Compile a query without executing it: run the front of the pipeline (Proteus
+  parse → Argos validate) and return the validated PlanNode, the parameters it
+  requires, and the predicted result schema fingerprint. Use for parameter
+  binding, dry-run / explain surfaces, and validating a query before showing it.
+service_endpoint: "http://theseus-mcp.kantheon.svc.cluster.local:7307"
+search_tags:
+  - theseus
+  - compile
+  - validate
+  - explain
+  - parameters
+cost_hints:
+  typical_latency_ms: 2000
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 8

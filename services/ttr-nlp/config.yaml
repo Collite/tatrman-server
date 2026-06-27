@@ -1,0 +1,76 @@
+# Kadmos (NLP) Service Configuration
+# Engine plugin architecture with per-op-per-language routing
+
+service:
+  host: "0.0.0.0"
+  port: 7270
+
+# Engine instances configuration
+engines:
+  stanza:
+    enabled: true
+    # Stanza downloads models on first use; we bundle them in the Docker image
+    # Model directory is pre-populated via startup script
+    model_dir: "/opt/nlp-models/stanza"
+
+  spacy:
+    enabled: true
+    # spaCy model bundled in Docker image
+    model_name: "en_core_web_md"
+
+  nametag:
+    enabled: true
+    # UFAL public endpoint. `/services/nametag` 301-redirects to a landing
+    # HTML page; the real REST API is at `/api/recognize`.
+    endpoint: "https://lindat.mff.cuni.cz/services/nametag/api/recognize"
+    timeout_seconds: 30
+    max_retries: 3
+    rate_limit_per_minute: 5  # configurable as requested
+
+  morphodita:
+    enabled: true
+    # UFAL public endpoint — same `/api/tag` shape as nametag/api/recognize.
+    endpoint: "https://lindat.mff.cuni.cz/services/morphodita/api/tag"
+    timeout_seconds: 30
+    max_retries: 3
+    rate_limit_per_minute: 5
+
+  langid:
+    enabled: true
+    # lingua-language-detector is a local library, no external endpoint
+
+# Per-operation routing: which engine handles which op per language
+# Format: {op}.{language} -> engine_name
+# Fallback chain: if primary engine unavailable, try fallback
+op_routing:
+  # Czech (cs) — UFAL stack is best-in-class for Czech, and Stanza's bundled
+  # cs model has no NER head (default.pt missing), so we route around it.
+  #   tokenize / sentence_split / lemmatize / POS  → morphodita (/api/tag
+  #     returns vertical word\tlemma\ttag with blank-line sentence breaks)
+  #   NER                                          → nametag (/api/recognize)
+  #   dep_parse                                    → stanza (the one cs op
+  #     Stanza handles cleanly once the broken `ner` processor is excluded)
+  TOKENIZE.cs: "morphodita"
+  SENTENCE_SPLIT.cs: "morphodita"
+  LEMMATIZE.cs: "morphodita"
+  POS_TAG.cs: "morphodita"
+  DEP_PARSE.cs: "stanza"
+  NER.cs: "nametag"
+  NER.cs.fallback: ""    # No fallback — stanza-cs has no NER model.
+
+  # English (en)
+  TOKENIZE.en: "stanza"
+  LEMMATIZE.en: "stanza"
+  POS_TAG.en: "stanza"
+  DEP_PARSE.en: "stanza"
+  NER.en: "stanza"      # Stanza for English NER
+  NER.en.fallback: "spacy"  # spaCy as fallback for English NER
+
+  # Language detection - special handling
+  DETECT_LANGUAGE: "langid"
+
+# Default language when not specified and DETECT_LANGUAGE not requested
+default_language: "cs"
+
+# Logging
+log_level: "INFO"

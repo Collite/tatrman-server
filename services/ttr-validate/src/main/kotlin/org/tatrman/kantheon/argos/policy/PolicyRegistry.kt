@@ -1,0 +1,77 @@
+package org.tatrman.kantheon.argos.policy
+
+import org.tatrman.plan.v1.QualifiedName
+import org.tatrman.plan.v1.SchemaCode
+
+/**
+ * In-memory store of [Policy] instances. Phase 1.5 uses this with a
+ * hardcoded set of fixtures (see [DefaultPolicies]). Future Section B
+ * replaces the construction call with HOCON-driven loading; the registry
+ * surface is stable.
+ */
+class PolicyRegistry(
+    private val policies: List<Policy>,
+) {
+    fun policiesFor(table: QualifiedName): List<Policy> = policies.filter { matches(it.tableMatch, table) }
+
+    /** Column-level rules (DF-S02) from every policy whose table-match covers [table], with their owning policy id. */
+    fun columnRulesFor(table: QualifiedName): List<Pair<Policy, ColumnRule>> =
+        policiesFor(table).flatMap { p -> p.columnRules.map { p to it } }
+
+    fun size(): Int = policies.size
+
+    private fun matches(
+        matcher: TableMatcher,
+        qname: QualifiedName,
+    ): Boolean =
+        when (matcher) {
+            is TableMatcher.All -> true
+            is TableMatcher.Exact -> matcher.qname == qname
+            is TableMatcher.Namespace ->
+                matcher.schemaCode == qname.schemaCode && matcher.namespace == qname.namespace
+        }
+}
+
+/**
+ * Canonical v1.5 fixture policies. Used by Validator integration tests and as the default
+ * registry contents until HOCON-driven storage lands.
+ *
+ * Two named lists:
+ *   - [core] is the DB-only production baseline (just `tenant_isolation`).
+ *   - [all] adds the [erCustomerRegionIsolation] demo policy on top — useful for ER-flow
+ *     fixtures (validator pass-1 + dispatch end-to-end) and any test that wants the full set.
+ *
+ * Tests that don't care about the ER demo should use [core]; tests that exercise the ER
+ * security path (Validator pass 1, `wrapScans` over `ScanNode(ER, ...)`) should use [all].
+ */
+object DefaultPolicies {
+    val tenantIsolation: Policy =
+        Policy(
+            id = "tenant_isolation",
+            tableMatch = TableMatcher.Namespace(schemaCode = SchemaCode.DB, namespace = "dbo"),
+            predicate =
+                PolicyPredicate.Eq(
+                    column = "tenant_id",
+                    value = PolicyValue.UserAttribute("tenant_id"),
+                ),
+            description = "Restrict rows to the calling user's tenant",
+        )
+
+    val erCustomerRegionIsolation: Policy =
+        Policy(
+            id = "er_customer_region_isolation",
+            tableMatch = TableMatcher.Namespace(schemaCode = SchemaCode.ER, namespace = "entity"),
+            predicate =
+                PolicyPredicate.Eq(
+                    column = "region",
+                    value = PolicyValue.UserAttribute("region"),
+                ),
+            description = "Restrict customer entities to the caller's region",
+        )
+
+    /** DB-only production baseline. */
+    val core: List<Policy> = listOf(tenantIsolation)
+
+    /** Production baseline + ER demo fixture (for tests and dev). */
+    val all: List<Policy> = core + erCustomerRegionIsolation
+}
