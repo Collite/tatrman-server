@@ -1,5 +1,6 @@
 package org.tatrman.kantheon.ariadne.search
 
+import org.tatrman.ariadne.v1.PageRequest
 import org.tatrman.ariadne.v1.SearchRequest
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.model.SchemaCode
@@ -116,6 +117,25 @@ class SearchRpcSpec :
                 )
             resp.itemsCount shouldBe 1
             resp.itemsList[0].relevanceScore shouldBe 1.0f
+        }
+
+        "page.page_size caps the number of returned hits (regression: facade dropped page size)" {
+            // Two owners both match the substring "customers".
+            val (service, _) = wire(query("customersA"), query("customersB"))
+            // No page → server-default window (100) → both hits returned.
+            service.search(req("customers", algo = "substring")).itemsCount shouldBe 2
+            // page_size = 1 → exactly one hit (the mapping the facade previously dropped).
+            val capped =
+                service.search(
+                    SearchRequest
+                        .newBuilder()
+                        .setQuery("customers")
+                        .setLanguage("cs")
+                        .setAlgorithm("substring")
+                        .setPage(PageRequest.newBuilder().setPageSize(1))
+                        .build(),
+                )
+            capped.itemsCount shouldBe 1
         }
     })
 
