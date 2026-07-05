@@ -242,15 +242,19 @@ class FileBasedSource(
             warnings += pr.warnings.map { it.toLoadWarning(sourceId) }
             if (!pr.ok) continue
 
-            // yaml-converter-inline-split Stage 3 / item 2: a file with no `schema`
+            // yaml-converter-inline-split Stage 3 / item 2: a file with no model
             // directive is directive-less — each def derives its schema+namespace from
             // its kind (see [schemaNamespaceForKind]). The published symbol table also
             // derives per-kind from an empty file schema, so LoadedFile carries "".
-            val directiveSchema = schemaCodeOverride ?: pr.schemaDirective?.schemaCode
+            // NOTE (2026-07-05, modeler 0.8.4 / grammar 4.0 qname-redesign): the AST
+            // renamed `schemaDirective: SchemaDirective(schemaCode, namespace)` →
+            // `modelDirective: ModelDirective(modelCode, schema)` — the directive is now
+            // `model <code> (schema <id>)?`. Same semantics, new spelling.
+            val directiveSchema = schemaCodeOverride ?: pr.modelDirective?.modelCode
             val directiveLess = directiveSchema == null
             val schemaCode = directiveSchema ?: ""
             val namespace =
-                if (directiveLess) "" else (pr.schemaDirective?.namespace ?: defaultNamespaceFor(directiveSchema!!))
+                if (directiveLess) "" else (pr.modelDirective?.schema ?: defaultNamespaceFor(directiveSchema!!))
             val declaredPackage = pr.packageName
             val computedPackage = computePackageFromPath(file, storage)
             if (declaredPackage != null && declaredPackage != computedPackage) {
