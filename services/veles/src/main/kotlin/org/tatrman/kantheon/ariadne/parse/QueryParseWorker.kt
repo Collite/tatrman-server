@@ -1,8 +1,8 @@
 package org.tatrman.kantheon.ariadne.parse
 
 import org.tatrman.proteus.v1.Language as TranslatorLanguage
-import org.tatrman.kantheon.ariadne.model.Model
-import org.tatrman.kantheon.ariadne.model.ParseStatus
+import org.tatrman.ttr.metadata.model.Model
+import org.tatrman.ttr.metadata.model.ParseStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,7 +51,7 @@ class QueryParseWorker(
 
     private fun parseOne(
         translator: Translator,
-        query: org.tatrman.kantheon.ariadne.model.Query,
+        query: org.tatrman.ttr.metadata.model.Query,
     ): ParseStatus =
         try {
             val lang = translatorLanguage(query.sourceLanguage)

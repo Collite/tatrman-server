@@ -9,6 +9,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import org.slf4j.LoggerFactory
+import org.tatrman.ttr.metadata.refresh.MetadataRefresher
 import java.time.Duration
 
 /**

@@ -1,7 +1,7 @@
 package org.tatrman.kantheon.ariadne.parse
 
-import org.tatrman.plan.v1.QualifiedName
-import org.tatrman.kantheon.ariadne.model.ParseStatus
+import org.tatrman.ttr.metadata.model.ParseStatus
+import org.tatrman.ttr.metadata.model.QualifiedName
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicReference
  * [QueryParseWorker] as parse jobs complete. gRPC handlers capture a single read
  * at request entry — `get(...)` returns a consistent value per call.
  *
- * The model's own [org.tatrman.kantheon.ariadne.model.Query.parseStatus] stays the *initial*
+ * The model's own [org.tatrman.ttr.metadata.model.Query.parseStatus] stays the *initial*
  * value (PENDING for everything loaded from sources, since sources don't parse);
  * this holder is the authoritative live view layered on top of it.
  */

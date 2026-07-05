@@ -37,10 +37,15 @@ tasks.test {
 // recipe no longer applies; the legacy YAML dir stays in tree as a one-time reference.)
 
 dependencies {
-    // TTR parser/writer/semantics — third-party (Collite/modeler), not a fork target.
-    implementation(libs.tatrman.ttr.parser)
-    implementation(libs.tatrman.ttr.writer)
-    implementation(libs.tatrman.ttr.semantics)
+    // TTR metadata library (third-party, Collite/tatrman) — Ariadne runs on this
+    // after the M4.1 swap (MD2): typed model, sources, reconcile, resolve, graph,
+    // search, registry, refresher mechanism, world resolution. It re-exports
+    // ttr-parser/writer/semantics as `api`, so those three are NOT declared here
+    // (MetadataExportRoutes still imports them — they arrive transitively).
+    implementation(libs.tatrman.ttr.metadata)
+    // GitArchiveStorage (jgit) behind the ModelStorage SPI (MD3) — jgit +
+    // commons-compress ride this transitively; Ariadne must not re-declare them.
+    implementation(libs.tatrman.ttr.metadata.git)
     // `erp-sql-metadata` was a declared-but-unused dep in the ai-platform build (no `shared.erp.*`
     // imports in any source). Dropped from the kantheon fork.
     implementation(project(":shared:libs:kotlin:ktor-configurator"))
@@ -55,9 +60,8 @@ dependencies {
     implementation(libs.grpc.netty.shaded)
     implementation(libs.grpc.services)
 
-    implementation(libs.jgrapht.core)
-    // GitArchiveStorage backend.
-    implementation(libs.jgit)
+    // jgrapht (ModelGraph) rides ttr-metadata transitively; jgit/commons-compress
+    // ride ttr-metadata-git (MD3). Ariadne no longer declares any of them directly.
 
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
@@ -65,6 +69,9 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.opentelemetry)
 
+    // commons-compress: used DIRECTLY by the kept MetadataExportRoutes (tar bundle);
+    // it also rides ttr-metadata-git transitively (runtime), but the export routes
+    // need it at compile time, so it stays a direct dep.
     implementation(libs.apache.commons.compress)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.typesafe.config)

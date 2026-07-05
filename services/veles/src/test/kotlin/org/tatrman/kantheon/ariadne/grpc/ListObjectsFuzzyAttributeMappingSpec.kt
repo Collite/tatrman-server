@@ -1,12 +1,12 @@
 package org.tatrman.kantheon.ariadne.grpc
 
 import org.tatrman.ariadne.v1.ListObjectsRequest
-import org.tatrman.kantheon.ariadne.graph.ModelGraph
-import org.tatrman.kantheon.ariadne.model.ModelDescriptor
-import org.tatrman.kantheon.ariadne.reconcile.ModelReconciler
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
-import org.tatrman.kantheon.ariadne.source.FileBasedSource
-import org.tatrman.kantheon.ariadne.source.LocalFsStorage
+import org.tatrman.ttr.metadata.graph.ModelGraph
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.reconcile.ModelReconciler
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.source.FileBasedSource
+import org.tatrman.ttr.metadata.source.LocalFsStorage
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.nio.file.Files
@@ -35,7 +35,7 @@ class ListObjectsFuzzyAttributeMappingSpec :
             Files.writeString(
                 dir.resolve("db.ttr"),
                 """
-                schema db namespace dbo
+                model db schema dbo
 
                 def table QSTRED_DF {
                     primaryKey: ["IDSTRED"]
@@ -49,7 +49,7 @@ class ListObjectsFuzzyAttributeMappingSpec :
             Files.writeString(
                 dir.resolve("er.ttr"),
                 """
-                schema er namespace entity
+                model er schema entity
 
                 def entity stredisko {
                     attributes: [
@@ -62,7 +62,7 @@ class ListObjectsFuzzyAttributeMappingSpec :
             Files.writeString(
                 dir.resolve("map.ttr"),
                 """
-                schema binding namespace map
+                model binding
 
                 def er2db_entity stredisko { entity: er.entity.stredisko, target: { table: db.dbo.QSTRED_DF } }
                 def er2db_attribute stredisko.id_strediska {

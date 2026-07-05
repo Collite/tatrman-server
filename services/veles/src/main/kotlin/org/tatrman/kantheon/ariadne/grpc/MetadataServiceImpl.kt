@@ -76,41 +76,41 @@ import org.tatrman.plan.v1.SchemaCode as ProtoSchemaCode
 import org.tatrman.kantheon.common.v1.Severity
 import org.tatrman.ariadne.v1.ValidateModelRequest
 import org.tatrman.ariadne.v1.ValidateModelResponse
-import org.tatrman.kantheon.ariadne.graph.TraverseEdgesHandler
-import org.tatrman.kantheon.ariadne.refresh.MetadataRefresher
-import org.tatrman.kantheon.ariadne.model.AttributeMappingTarget
-import org.tatrman.kantheon.ariadne.model.Attribute
-import org.tatrman.kantheon.ariadne.model.Binding as DomainBinding
-import org.tatrman.kantheon.ariadne.model.CncSchema
-import org.tatrman.kantheon.ariadne.model.DbColumn
-import org.tatrman.kantheon.ariadne.model.DbForeignKey
-import org.tatrman.kantheon.ariadne.model.DbSchema
-import org.tatrman.kantheon.ariadne.model.DbTable
-import org.tatrman.kantheon.ariadne.model.DbView
-import org.tatrman.kantheon.ariadne.model.Entity
-import org.tatrman.kantheon.ariadne.model.Er2CncRoleMapping
-import org.tatrman.kantheon.ariadne.model.Er2DbAttributeMapping
-import org.tatrman.kantheon.ariadne.model.Er2DbEntityMapping
-import org.tatrman.kantheon.ariadne.model.Er2DbRelationMapping
-import org.tatrman.kantheon.ariadne.model.ErSchema
-import org.tatrman.kantheon.ariadne.model.LocalizedText
-import org.tatrman.kantheon.ariadne.model.LocalizedTextList
-import org.tatrman.kantheon.ariadne.model.MappingTarget
-import org.tatrman.kantheon.ariadne.model.Model
-import org.tatrman.kantheon.ariadne.model.ModelObject
-import org.tatrman.kantheon.ariadne.model.ParseStatus as DomainParseStatus
-import org.tatrman.kantheon.ariadne.model.Query
-import org.tatrman.kantheon.ariadne.model.Relation
-import org.tatrman.kantheon.ariadne.model.Role
-import org.tatrman.kantheon.ariadne.model.SearchHints
+import org.tatrman.ttr.metadata.query.MetadataQuery
+import org.tatrman.ttr.metadata.refresh.MetadataRefresher
+import org.tatrman.ttr.metadata.model.AttributeMappingTarget
+import org.tatrman.ttr.metadata.model.Attribute
+import org.tatrman.ttr.metadata.model.Binding as DomainBinding
+import org.tatrman.ttr.metadata.model.CncSchema
+import org.tatrman.ttr.metadata.model.DbColumn
+import org.tatrman.ttr.metadata.model.DbForeignKey
+import org.tatrman.ttr.metadata.model.DbSchema
+import org.tatrman.ttr.metadata.model.DbTable
+import org.tatrman.ttr.metadata.model.DbView
+import org.tatrman.ttr.metadata.model.Entity
+import org.tatrman.ttr.metadata.model.Er2CncRoleMapping
+import org.tatrman.ttr.metadata.model.Er2DbAttributeMapping
+import org.tatrman.ttr.metadata.model.Er2DbEntityMapping
+import org.tatrman.ttr.metadata.model.Er2DbRelationMapping
+import org.tatrman.ttr.metadata.model.ErSchema
+import org.tatrman.ttr.metadata.model.LocalizedText
+import org.tatrman.ttr.metadata.model.LocalizedTextList
+import org.tatrman.ttr.metadata.model.MappingTarget
+import org.tatrman.ttr.metadata.model.Model
+import org.tatrman.ttr.metadata.model.ModelObject
+import org.tatrman.ttr.metadata.model.ParseStatus as DomainParseStatus
+import org.tatrman.ttr.metadata.model.Query
+import org.tatrman.ttr.metadata.model.Relation
+import org.tatrman.ttr.metadata.model.Role
+import org.tatrman.ttr.metadata.model.SearchHints
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.Instant
 import org.tatrman.kantheon.ariadne.parse.QueryParseState
-import org.tatrman.kantheon.ariadne.search.postProcess
+import org.tatrman.ttr.metadata.search.SearchQuery
 import io.opentelemetry.api.trace.Tracer
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
 
 /**
  * Metadata service gRPC surface.
@@ -128,10 +128,10 @@ import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
  */
 class MetadataServiceImpl(
     private val registry: MetadataRegistry,
-    private val searchRegistry: org.tatrman.kantheon.ariadne.search.SearchAlgorithmRegistry =
-        org.tatrman.kantheon.ariadne.search
+    private val searchRegistry: org.tatrman.ttr.metadata.search.SearchAlgorithmRegistry =
+        org.tatrman.ttr.metadata.search
             .SearchAlgorithmRegistry(emptyMap()),
-    private val searchIndexHolder: org.tatrman.kantheon.ariadne.search.SearchIndexHolder? = null,
+    private val searchIndexHolder: org.tatrman.ttr.metadata.search.SearchIndexHolder? = null,
     private val tracer: Tracer? = null,
     private val parseState: QueryParseState? = null,
     private val refresher: MetadataRefresher? = null,
@@ -166,9 +166,9 @@ class MetadataServiceImpl(
      * swap, not once per `listObjects` call.
      */
     @Volatile
-    private var effectiveFuzzyCache: Pair<String, Set<org.tatrman.plan.v1.QualifiedName>>? = null
+    private var effectiveFuzzyCache: Pair<String, Set<org.tatrman.ttr.metadata.model.QualifiedName>>? = null
 
-    private fun attributeBackedFuzzyColumns(model: Model): Set<org.tatrman.plan.v1.QualifiedName> {
+    private fun attributeBackedFuzzyColumns(model: Model): Set<org.tatrman.ttr.metadata.model.QualifiedName> {
         val version = model.version.value
         effectiveFuzzyCache?.let { (v, set) -> if (v == version) return set }
 
@@ -187,7 +187,7 @@ class MetadataServiceImpl(
                 .filterIsInstance<Er2DbAttributeMapping>()
                 .associateBy { it.attribute }
 
-        val columns = mutableSetOf<org.tatrman.plan.v1.QualifiedName>()
+        val columns = mutableSetOf<org.tatrman.ttr.metadata.model.QualifiedName>()
         for (attr in fuzzyAttrs) {
             when (val target = mappingByAttr[attr]?.target) {
                 is AttributeMappingTarget.Column -> columns.add(target.qname)
@@ -354,7 +354,7 @@ class MetadataServiceImpl(
                 .asSequence()
                 .filter {
                     request.schema == ProtoSchemaCode.SCHEMA_CODE_UNSPECIFIED ||
-                        it.qname.schemaCode == request.schema
+                        it.qname.schemaCode == request.schema.toDomain()
                 }.filter { request.kind.isEmpty() || it.kind == request.kind }
                 .filter { request.tagsList.isEmpty() || request.tagsList.any(it.tags::contains) }
                 .filter {
@@ -392,7 +392,7 @@ class MetadataServiceImpl(
             registry.read()
                 ?: return GetObjectResponse.newBuilder().addMessages(notReadyMessage()).build()
         val obj =
-            snap.model.objectByQname()[request.qualifiedName]
+            snap.model.objectByQname()[request.qualifiedName.toDomain()]
                 ?: return GetObjectResponse
                     .newBuilder()
                     .addMessages(
@@ -516,7 +516,7 @@ class MetadataServiceImpl(
             registry.read()
                 ?: return GetQueryResponse.newBuilder().addMessages(notReadyMessage()).build()
         val q =
-            snap.model.queries[request.qualifiedName]
+            snap.model.queries[request.qualifiedName.toDomain()]
                 ?: return GetQueryResponse
                     .newBuilder()
                     .addMessages(
@@ -666,15 +666,22 @@ class MetadataServiceImpl(
                     ).build()
             }
 
-            val perAlgoIndex =
-                if (algo.name == "all") {
-                    org.tatrman.kantheon.ariadne.search.SearchIndex.Empty
-                } else {
-                    searchIndexHolder?.get(algo.name, language)
-                        ?: org.tatrman.kantheon.ariadne.search.SearchIndex.Empty
-                }
-            val rawHits = algo.search(request, perAlgoIndex)
-            val processed = postProcess(rawHits, request)
+            // MD2: delegate algorithm selection + per-language index + post-processing to
+            // the library MetadataQuery (the M1.2 pull-down of this exact logic). The proto
+            // SearchRequest is converted to the library's proto-free SearchQuery here.
+            val query =
+                SearchQuery(
+                    query = request.query,
+                    algorithm = requestedAlgo,
+                    language = language,
+                    // Map the proto page size onto the library limit (M1 de-proto: was
+                    // `if (hasPage) page.pageSize else 0`). Dropping this made every search
+                    // ignore the caller's page_size and fall back to the default-100 window.
+                    limit = if (request.hasPage()) request.page.pageSize else 0,
+                    resultThreshold = request.resultThreshold,
+                    includeExtractedParameters = request.includeExtractedParameters,
+                )
+            val processed = MetadataQuery(snap, searchRegistry, searchIndexHolder).search(query)
 
             val byQname = snap.model.objectByQname()
             val protoResults =
@@ -718,6 +725,9 @@ class MetadataServiceImpl(
     private companion object {
         const val DEFAULT_SEARCH_ALGORITHM = "all"
         const val MAX_COMPILE_ERRORS_SURFACED = 50
+
+        // Preserves the old TraverseEdgesHandler.MAX_DEPTH_CAP (now internal to the library).
+        const val MAX_TRAVERSE_DEPTH = 10
     }
 
     override suspend fun listRoles(request: ListRolesRequest): ListRolesResponse {
@@ -756,7 +766,7 @@ class MetadataServiceImpl(
         val snap =
             registry.read()
                 ?: return GetRolesForEntityResponse.newBuilder().addMessages(notReadyMessage()).build()
-        val target = request.entity
+        val target = request.entity.toDomain()
         val mappings =
             snap.model.mappings
                 .filterIsInstance<Er2CncRoleMapping>()
@@ -779,7 +789,7 @@ class MetadataServiceImpl(
         }
         // Preserve insertion order; de-duplicate while keeping first occurrence.
         val seen = LinkedHashSet<org.tatrman.plan.v1.QualifiedName>()
-        for (m in mappings) seen += m.role
+        for (m in mappings) seen += m.role.toProto()
         builder.addAllRoles(seen)
         return builder.build()
     }
@@ -844,8 +854,9 @@ class MetadataServiceImpl(
             registry.read()
                 ?: return TraverseEdgesResponse.newBuilder().addMessages(notReadyMessage()).build()
         val builder = TraverseEdgesResponse.newBuilder()
-        val byQname = snap.model.objectByQname()
-        if (byQname[request.fromQualifiedName] == null) {
+        val fromDomain = request.fromQualifiedName.toDomain()
+        val fromObj = snap.model.objectByQname()[fromDomain]
+        if (fromObj == null) {
             builder.addMessages(
                 ResponseMessage
                     .newBuilder()
@@ -857,21 +868,21 @@ class MetadataServiceImpl(
             )
             return builder.build()
         }
-        val maxDepth =
-            (if (request.maxDepth <= 0) 1 else request.maxDepth)
-                .coerceAtMost(TraverseEdgesHandler.MAX_DEPTH_CAP)
-        val edgeTypes = request.edgeTypesList.toSet()
+        // MD2: traverse the library ModelGraph (the moved TraverseEdgesHandler core).
+        // Graph vertices are internal ids; proto edge-types/direction convert at the boundary.
+        val maxDepth = (if (request.maxDepth <= 0) 1 else request.maxDepth).coerceAtMost(MAX_TRAVERSE_DEPTH)
+        val edgeTypes = request.edgeTypesList.mapNotNull { it.toDomain() }.toSet()
         val kindFilter = request.kindFilterList.toSet()
-        val handler = TraverseEdgesHandler(snap.model)
-        val steps = handler.traverse(request.fromQualifiedName, edgeTypes, request.direction, maxDepth)
+        val graph = snap.graph
+        val steps = graph.traverse(fromObj.internalId, edgeTypes, request.direction.toDomain(), maxDepth)
         for (step in steps) {
-            val source = byQname[step.edge.source] ?: continue
-            val target = byQname[step.edge.target] ?: continue
+            val source = graph.byInternalId[step.edge.source] ?: continue
+            val target = graph.byInternalId[step.edge.target] ?: continue
             if (kindFilter.isNotEmpty() && target.kind !in kindFilter) continue
             builder.addEdges(
                 EdgeResult
                     .newBuilder()
-                    .setType(step.edge.type)
+                    .setType(step.edge.type.toProto())
                     .setDepth(step.depth)
                     .setSource(source.toObjectDescriptor())
                     .setTarget(target.toObjectDescriptor()),
@@ -971,7 +982,7 @@ private fun ModelObject.toObjectDescriptor(): ObjectDescriptor =
     ObjectDescriptor
         .newBuilder()
         .setInternalId(internalId)
-        .setQualifiedName(qname)
+        .setQualifiedName(qname.toProto())
         // `qname.name` is the dotted leaf path under the namespace (e.g.
         // "QTYPDOK.NAZEV_TYPDOK" for a column under db.dbo). Callers like
         // fuzzy-matcher need just the trailing segment as a SQL identifier;
@@ -979,7 +990,7 @@ private fun ModelObject.toObjectDescriptor(): ObjectDescriptor =
         .setLocalName(qname.name.substringAfterLast('.'))
         .setDescription(description)
         .addAllTags(tags)
-        .setSchemaCode(qname.schemaCode)
+        .setSchemaCode(qname.schemaCode.toProto())
         .setKind(kind)
         .setSourceFile(sourceFile)
         .setBinding(toProtoBinding(binding))
@@ -1097,7 +1108,7 @@ private fun Query.toModelBundleQuery(
 private fun Attribute.toAttributeDetail(): AttributeDetail =
     AttributeDetail
         .newBuilder()
-        .setEntity(entity)
+        .setEntity(entity.toProto())
         .setType(type)
         .setIsKey(isKey)
         .setNullable(nullable)
@@ -1115,12 +1126,12 @@ private fun Role.toRoleDetail(): RoleDetail =
         .also { if (!search.isEmpty) it.search = search.toProto() }
         .build()
 
-private fun org.tatrman.kantheon.ariadne.model.DrillMap.toDrillMapDetail(): DrillMapDetail =
+private fun org.tatrman.ttr.metadata.model.DrillMap.toDrillMapDetail(): DrillMapDetail =
     DrillMapDetail
         .newBuilder()
         .setName(qname.name)
-        .setFromPattern(fromPattern)
-        .setToPattern(toPattern)
+        .setFromPattern(fromPattern.toProto())
+        .setToPattern(toPattern.toProto())
         .putAllArgMapping(argMapping)
         .setExplicit(explicit)
         .setOverrideAuto(overrideAuto)
@@ -1141,14 +1152,14 @@ private fun Relation.toRelationDetail(): RelationDetail {
         joinPairs.map { pair ->
             AttributeJoinPair
                 .newBuilder()
-                .setFromAttr(pair.fromAttr)
-                .setToAttr(pair.toAttr)
+                .setFromAttr(pair.fromAttr.toProto())
+                .setToAttr(pair.toAttr.toProto())
                 .build()
         }
     return RelationDetail
         .newBuilder()
-        .setFromEntity(fromEntity)
-        .setToEntity(toEntity)
+        .setFromEntity(fromEntity.toProto())
+        .setToEntity(toEntity.toProto())
         .setCardinality(cardinalityProto)
         .addAllJoinPairs(joinPairProtos)
         .build()
@@ -1243,8 +1254,8 @@ private fun QueryDescriptor.applyBundleOptions(opts: BundleOptions): QueryDescri
 private fun Er2CncRoleMapping.toEr2CncRoleMappingDetail(): Er2CncRoleMappingDetail =
     Er2CncRoleMappingDetail
         .newBuilder()
-        .setEntity(entity)
-        .setRole(role)
+        .setEntity(entity.toProto())
+        .setRole(role.toProto())
         .build()
 
 // ----- DF-M07: per-kind detail for db tables/views/columns/FKs, er2db mappings, and queries -----
@@ -1293,7 +1304,7 @@ private fun DbView.toModelBundleView(): ModelBundleView =
 private fun DbColumn.toDbColumnDetail(): DbColumnDetail =
     DbColumnDetail
         .newBuilder()
-        .setTable(table)
+        .setTable(table.toProto())
         .setDataType(dataType)
         .setNullable(nullable)
         .setIsPrimaryKey(isPrimaryKey)
@@ -1304,19 +1315,19 @@ private fun DbColumn.toDbColumnDetail(): DbColumnDetail =
 private fun DbForeignKey.toDbForeignKeyDetail(): DbForeignKeyDetail =
     DbForeignKeyDetail
         .newBuilder()
-        .addAllFromColumns(fromColumns)
-        .addAllToColumns(toColumns)
+        .addAllFromColumns(fromColumns.map { it.toProto() })
+        .addAllToColumns(toColumns.map { it.toProto() })
         .build()
 
 private fun Er2DbEntityMapping.toEr2DbEntityMappingDetail(): Er2DbEntityMappingDetail =
     Er2DbEntityMappingDetail
         .newBuilder()
-        .setEntity(entity)
+        .setEntity(entity.toProto())
         .also {
             when (val t = target) {
-                is MappingTarget.Table -> it.table = t.qname
-                is MappingTarget.View -> it.view = t.qname
-                is MappingTarget.SqlQuery -> it.sqlQuery = t.qname
+                is MappingTarget.Table -> it.table = t.qname.toProto()
+                is MappingTarget.View -> it.view = t.qname.toProto()
+                is MappingTarget.SqlQuery -> it.sqlQuery = t.qname.toProto()
             }
         }
         // `where_filter` is not modelled on the domain Er2DbEntityMapping (filtered targets are
@@ -1326,12 +1337,12 @@ private fun Er2DbEntityMapping.toEr2DbEntityMappingDetail(): Er2DbEntityMappingD
 private fun Er2DbAttributeMapping.toEr2DbAttributeMappingDetail(): Er2DbAttributeMappingDetail =
     Er2DbAttributeMappingDetail
         .newBuilder()
-        .setAttribute(attribute)
+        .setAttribute(attribute.toProto())
         .also {
             // Column targets map cleanly; the free-form Expression target is a raw unparsed string
             // on the domain side — not reconstructed into a structured plan.v1.Expression here.
             when (val t = target) {
-                is AttributeMappingTarget.Column -> it.column = t.qname
+                is AttributeMappingTarget.Column -> it.column = t.qname.toProto()
                 is AttributeMappingTarget.Expression -> Unit
             }
         }.build()
@@ -1339,8 +1350,8 @@ private fun Er2DbAttributeMapping.toEr2DbAttributeMappingDetail(): Er2DbAttribut
 private fun Er2DbRelationMapping.toEr2DbRelationMappingDetail(): Er2DbRelationMappingDetail =
     Er2DbRelationMappingDetail
         .newBuilder()
-        .setRelation(relation)
-        .setForeignKey(foreignKey)
+        .setRelation(relation.toProto())
+        .setForeignKey(foreignKey.toProto())
         .build()
 
 private fun Query.toQueryDetail(parseStatus: DomainParseStatus): QueryDetail =
@@ -1364,7 +1375,7 @@ private fun Query.toQueryDetail(parseStatus: DomainParseStatus): QueryDetail =
         // (include_canonical_form); `uses` (referenced objects) isn't tracked on the model yet (DF-T03).
         .build()
 
-private fun org.tatrman.kantheon.ariadne.registry.RegistrySnapshot.toProtoDescriptor(): ProtoModelDescriptor =
+private fun org.tatrman.ttr.metadata.registry.RegistrySnapshot.toProtoDescriptor(): ProtoModelDescriptor =
     ProtoModelDescriptor
         .newBuilder()
         .setId(model.descriptor.id)

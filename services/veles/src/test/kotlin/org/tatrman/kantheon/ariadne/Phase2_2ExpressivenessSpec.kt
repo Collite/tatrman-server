@@ -6,16 +6,16 @@ import org.tatrman.ariadne.v1.GetRolesForEntityRequest
 import org.tatrman.ariadne.v1.ListRolesRequest
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.plan.v1.QualifiedName
-import org.tatrman.kantheon.ariadne.graph.ModelGraph
+import org.tatrman.ttr.metadata.graph.ModelGraph
 import org.tatrman.kantheon.ariadne.grpc.MetadataServiceImpl
-import org.tatrman.kantheon.ariadne.model.Er2CncRoleMapping
-import org.tatrman.kantheon.ariadne.model.ModelDescriptor
-import org.tatrman.kantheon.ariadne.reconcile.ModelReconciler
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
-import org.tatrman.kantheon.ariadne.source.BuiltinStockSource
-import org.tatrman.kantheon.ariadne.source.FileBasedSource
-import org.tatrman.kantheon.ariadne.source.LocalFsStorage
-import org.tatrman.kantheon.ariadne.source.SourceSnapshot
+import org.tatrman.ttr.metadata.model.Er2CncRoleMapping
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.reconcile.ModelReconciler
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.source.BuiltinStockSource
+import org.tatrman.ttr.metadata.source.FileBasedSource
+import org.tatrman.ttr.metadata.source.LocalFsStorage
+import org.tatrman.ttr.metadata.source.SourceSnapshot
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
@@ -36,7 +36,7 @@ class Phase2_2ExpressivenessSpec :
     StringSpec({
 
         fun service(userTtr: String? = null): MetadataServiceImpl {
-            val sources = mutableListOf<org.tatrman.kantheon.ariadne.source.ModelSource>(BuiltinStockSource())
+            val sources = mutableListOf<org.tatrman.ttr.metadata.source.ModelSource>(BuiltinStockSource())
             if (userTtr != null) {
                 val tmp = Files.createTempDirectory("phase22-user")
                 Files.writeString(tmp.resolve("user.ttr"), userTtr)
@@ -61,13 +61,12 @@ class Phase2_2ExpressivenessSpec :
             val snap = BuiltinStockSource().load()
             snap.roles.size shouldBe 6
             val factQn =
-                QualifiedName
-                    .newBuilder()
-                    .setPackage("cnc")
-                    .setSchemaCode(org.tatrman.plan.v1.SchemaCode.CNC)
-                    .setNamespace("role")
-                    .setName("fact")
-                    .build()
+                org.tatrman.ttr.metadata.model.QualifiedName(
+                    schemaCode = org.tatrman.ttr.metadata.model.SchemaCode.CNC,
+                    `package` = "cnc",
+                    namespace = "role",
+                    name = "fact",
+                )
             val fact = snap.roles[factQn]!!
             fact.label.byLanguage["cs"] shouldBe "Faktová entita"
             fact.label.byLanguage["en"] shouldBe "Fact entity"
@@ -94,38 +93,41 @@ class Phase2_2ExpressivenessSpec :
             val userTtr =
                 """
                 package cnc
-                schema cnc
+                model cnc
 
                 def role fact {
                     label { cs: "Hijacked" }
                 }
                 """.trimIndent()
             val sources =
-                listOf<org.tatrman.kantheon.ariadne.source.ModelSource>(
+                listOf<org.tatrman.ttr.metadata.source.ModelSource>(
                     BuiltinStockSource(),
-                    object : org.tatrman.kantheon.ariadne.source.ModelSource {
+                    object : org.tatrman.ttr.metadata.source.ModelSource {
                         override fun load(): SourceSnapshot {
                             val pr = TtrLoader.parseString(userTtr, fileLabel = "user.ttr")
                             // Build a minimal snapshot the same way FileBasedSource would
                             // for a single role def, but at lower priority and without
                             // protectedQnames.
-                            val rolesMap = mutableMapOf<QualifiedName, org.tatrman.kantheon.ariadne.model.Role>()
+                            val rolesMap =
+                                mutableMapOf<
+                                    org.tatrman.ttr.metadata.model.QualifiedName,
+                                    org.tatrman.ttr.metadata.model.Role,
+                                >()
                             for (def in pr.definitions.filterIsInstance<org.tatrman.ttr.parser.model.RoleDef>()) {
                                 val qn =
-                                    QualifiedName
-                                        .newBuilder()
-                                        .setPackage("cnc")
-                                        .setSchemaCode(org.tatrman.plan.v1.SchemaCode.CNC)
-                                        .setNamespace("role")
-                                        .setName(def.name)
-                                        .build()
+                                    org.tatrman.ttr.metadata.model.QualifiedName(
+                                        schemaCode = org.tatrman.ttr.metadata.model.SchemaCode.CNC,
+                                        `package` = "cnc",
+                                        namespace = "role",
+                                        name = def.name,
+                                    )
                                 rolesMap[qn] =
-                                    org.tatrman.kantheon.ariadne.model.Role(
+                                    org.tatrman.ttr.metadata.model.Role(
                                         internalId = "user:${def.name}",
                                         qname = qn,
                                         sourceFile = "user.ttr",
                                         label =
-                                            org.tatrman.kantheon.ariadne.model.LocalizedText(
+                                            org.tatrman.ttr.metadata.model.LocalizedText(
                                                 def.label?.byLanguage ?: emptyMap(),
                                             ),
                                     )
@@ -145,14 +147,13 @@ class Phase2_2ExpressivenessSpec :
             protectedRejection shouldBe true
             // Stock label survived.
             val factQn =
-                QualifiedName
-                    .newBuilder()
-                    .setPackage("cnc")
-                    .setSchemaCode(org.tatrman.plan.v1.SchemaCode.CNC)
-                    .setNamespace("role")
-                    .setName("fact")
-                    .build()
-            val fact = (result.model.schemas["cnc"] as org.tatrman.kantheon.ariadne.model.CncSchema).roles[factQn]!!
+                org.tatrman.ttr.metadata.model.QualifiedName(
+                    schemaCode = org.tatrman.ttr.metadata.model.SchemaCode.CNC,
+                    `package` = "cnc",
+                    namespace = "role",
+                    name = "fact",
+                )
+            val fact = (result.model.schemas["cnc"] as org.tatrman.ttr.metadata.model.CncSchema).roles[factQn]!!
             fact.label.byLanguage["cs"] shouldBe "Faktová entita"
         }
 
@@ -161,7 +162,7 @@ class Phase2_2ExpressivenessSpec :
         "entity with `roles: [fact, transaction]` shorthand emits two mappings" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Objednavka {
                     roles: [fact, transaction]
@@ -196,7 +197,7 @@ class Phase2_2ExpressivenessSpec :
         "GetObject(er.entity.Zakaznik) returns EntityDetail.display_label" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Zakaznik {
                     displayLabel { cs: "Zákazník", en: "Customer" }
@@ -218,7 +219,7 @@ class Phase2_2ExpressivenessSpec :
         "GetObject(er.attribute.STAV) returns AttributeDetail.value_labels + display_label" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Zakaznik {
                     attributes: [
@@ -254,7 +255,7 @@ class Phase2_2ExpressivenessSpec :
         "missing display_label / value_labels round-trip as empty" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Plain {
                     attributes: [
@@ -292,7 +293,7 @@ class Phase2_2ExpressivenessSpec :
         "GetRolesForEntity returns the qnames the entity plays" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Objednavka { roles: [fact, transaction] }
                 """.trimIndent()
@@ -330,7 +331,7 @@ class Phase2_2ExpressivenessSpec :
         "Model.mappings includes the Er2CncRoleMappings authored via shorthand" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Objednavka { roles: [fact] }
                 """.trimIndent()
@@ -338,7 +339,7 @@ class Phase2_2ExpressivenessSpec :
             val tmp = Files.createTempDirectory("phase22-mappings")
             Files.writeString(tmp.resolve("user.ttr"), userTtr)
             val sources =
-                listOf<org.tatrman.kantheon.ariadne.source.ModelSource>(
+                listOf<org.tatrman.ttr.metadata.source.ModelSource>(
                     BuiltinStockSource(),
                     FileBasedSource(
                         sourceId = "user",
