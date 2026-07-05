@@ -1,14 +1,1 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "kadmos.fullname" . }}
-  labels:
-    {{- include "kadmos.labels" . | nindent 4 }}
-spec:
-  type: {{ .Values.service.type }}
-  selector:
-    {{- include "kadmos.selectorLabels" . | nindent 4 }}
-  ports:
-    - name: http
-      port: {{ .Values.ports.http }}
-      targetPort: {{ .Values.ports.http }}
+{{ include "kantheon-service.service" . }}

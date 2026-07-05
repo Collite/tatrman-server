@@ -1,17 +1,1 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "theseus.fullname" . }}
-  labels:
-    {{- include "theseus.labels" . | nindent 4 }}
-spec:
-  type: {{ .Values.service.type }}
-  selector:
-    {{- include "theseus.selectorLabels" . | nindent 4 }}
-  ports:
-    - name: http
-      port: {{ .Values.ports.http }}
-      targetPort: {{ .Values.ports.http }}
-    - name: grpc
-      port: {{ .Values.ports.grpc }}
-      targetPort: {{ .Values.ports.grpc }}
+{{ include "kantheon-service.service" . }}
