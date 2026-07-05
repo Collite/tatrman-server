@@ -674,6 +674,10 @@ class MetadataServiceImpl(
                     query = request.query,
                     algorithm = requestedAlgo,
                     language = language,
+                    // Map the proto page size onto the library limit (M1 de-proto: was
+                    // `if (hasPage) page.pageSize else 0`). Dropping this made every search
+                    // ignore the caller's page_size and fall back to the default-100 window.
+                    limit = if (request.hasPage()) request.page.pageSize else 0,
                     resultThreshold = request.resultThreshold,
                     includeExtractedParameters = request.includeExtractedParameters,
                 )
