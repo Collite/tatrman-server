@@ -1,0 +1,58 @@
+# Default values for steropes (Python + Polars worker, HTTP + gRPC). Env-agnostic: sane defaults,
+# NO cluster knowledge. Deploying environments override image, telemetry, and any extra wiring.
+
+replicaCount: 1
+
+image:
+  repository: steropes
+  # Defaults to .Chart.appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# steropes listens on an HTTP port (health/ready) and a gRPC port (the Kyklop dispatcher calls it).
+# These are the container ports AND the service ports; probes target the http port.
+ports:
+  http: 7300
+  grpc: 7301
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    # Stateful workspace store — give it headroom for in-session DataFrames.
+    memory: 4Gi
+    cpu: "2"
+
+# OpenTelemetry. steropes reads a single OTLP endpoint URL (OTEL_EXPORTER_OTLP_ENDPOINT) plus the
+# per-service OTEL_ENABLED_STEROPES flag. Point `endpoint` at a collector (e.g. the cluster's
+# Alloy) and set enabled; leave disabled where no collector exists (e.g. test runs).
+telemetry:
+  enabled: false
+  # e.g. http://alloy.observability.svc.cluster.local:4317
+  endpoint: ""
+  serviceName: steropes
+
+# Any other env (a deploying env REPLACES this list).
+extraEnv: []
+
+# Probes (HTTP on the http port).
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 30
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: echo-mcp
+description: |
+  The Kantheon echo-mcp wrapper — the MCP edge over Echo (the Czech-aware fuzzy matcher).
+  Env-agnostic Helm chart: image, replicas, resources, telemetry endpoint and the downstream gRPC
+  wiring to Echo are all values. Per-environment values live in the deploying repo. Converted from
+  the kustomize base/overlays, mirroring theseus-mcp (D2).
+type: application
+# Chart version: the packaging. appVersion tracks the default image tag.
+version: 0.1.0
+appVersion: "dev"
+# Common Deployment/Service shape from the kantheon-service library chart (D1).
+dependencies:
+  - name: kantheon-service
+    version: 0.1.0
+    repository: "file://../../../shared/charts/kantheon-service"

@@ -1,0 +1,89 @@
+# Default values for backstage (the developer portal — a Node/Backstage app).
+# Env-agnostic: sane defaults, NO cluster knowledge. Per-environment overrides live
+# in Olymp. BEST-EFFORT chart: renders a working Deployment/Service/HTTPRoute; the
+# many env-driven config keys (see app-config.yaml) default to in-cluster names +
+# secretKeyRefs, expected to be overridden per env.
+replicaCount: 1
+
+image:
+  repository: backstage
+  tag: ""           # defaults to .Chart.appVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# The Backstage backend listens on :7007 (app-config.yaml backend.listen.port).
+# Single HTTP port — the library omits grpc when unset.
+ports:
+  http: 7007
+
+service:
+  type: ClusterIP
+  port: 7007        # used by the HTTPRoute backendRef
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+    cpu: "1"
+
+# Backstage is a Node app and does not read the OTEL_ENABLED_* idiom; serviceName is
+# kept for parity but no OTEL env vars are emitted (see templates/_env.tpl).
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: backstage
+
+# Downstream / config wiring (non-secret). Env-agnostic defaults; Olymp overrides the
+# base URLs (hostname-specific) and DB coordinates. Secrets (DB password, session
+# secret, Keycloak client secret) come via secretKeyRef in templates/_env.tpl.
+extraEnv:
+  - { name: BACKSTAGE_APP_BASE_URL, value: "http://localhost:7007" }
+  - { name: BACKSTAGE_BACKEND_BASE_URL, value: "http://localhost:7007" }
+  - { name: BACKSTAGE_DB_HOST, value: "backstage-db" }
+  - { name: BACKSTAGE_DB_PORT, value: "5432" }
+  - { name: BACKSTAGE_DB_USER, value: "backstage" }
+  - { name: BACKSTAGE_DB, value: "backstage" }
+  - { name: VITE_KEYCLOAK_BACKSTAGE_CLIENT_ID, value: "backstage" }
+  - { name: VITE_KEYCLOAK_URL_METADATA, value: "" }
+
+# Secret env sources (rendered in templates/_env.tpl). optional:true so the chart
+# renders + the pod schedules even before the deploying env provisions the Secret.
+secrets:
+  db:
+    secretName: backstage-db-credentials
+    passwordKey: password
+  session:
+    secretName: backstage-secrets
+    key: session-secret
+  keycloak:
+    secretName: backstage-secrets
+    key: keycloak-client-secret
+
+# Gateway API exposure (the portal is externally reached). Default off — Olymp
+# enables it and sets the hostname.
+httpRoute:
+  enabled: false
+  gateway:
+    name: eg
+    namespace: gateway
+  hostname: ""               # e.g. backstage.192-168-1-38.nip.io
+
+# Backstage exposes /healthcheck; use it for both probes.
+readinessProbe:
+  path: /healthcheck
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  failureThreshold: 6
+livenessProbe:
+  path: /healthcheck
+  initialDelaySeconds: 30
+  periodSeconds: 20
+
+envFrom: []
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
