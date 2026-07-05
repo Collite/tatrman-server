@@ -1,12 +1,13 @@
 package org.tatrman.kantheon.ariadne.refresh
 
-import org.tatrman.plan.v1.QualifiedName
-import org.tatrman.kantheon.ariadne.model.DbTable
-import org.tatrman.kantheon.ariadne.model.ModelDescriptor
-import org.tatrman.kantheon.ariadne.reconcile.ModelReconciler
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
-import org.tatrman.kantheon.ariadne.source.ModelSource
-import org.tatrman.kantheon.ariadne.source.SourceSnapshot
+import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttr.metadata.model.DbTable
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.reconcile.ModelReconciler
+import org.tatrman.ttr.metadata.refresh.MetadataRefresher
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.source.ModelSource
+import org.tatrman.ttr.metadata.source.SourceSnapshot
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CoroutineScope
@@ -31,21 +32,19 @@ class RefreshSchedulerSpec :
                 version = version,
                 tables =
                     mapOf(
-                        QualifiedName
-                            .newBuilder()
-                            .setSchemaCode(org.tatrman.plan.v1.SchemaCode.DB)
-                            .setNamespace("dbo")
-                            .setName(tableName)
-                            .build() to
+                        QualifiedName(
+                            schemaCode = org.tatrman.ttr.metadata.model.SchemaCode.DB,
+                            namespace = "dbo",
+                            name = tableName,
+                        ) to
                             DbTable(
                                 internalId = "$id.$tableName",
                                 qname =
-                                    QualifiedName
-                                        .newBuilder()
-                                        .setSchemaCode(org.tatrman.plan.v1.SchemaCode.DB)
-                                        .setNamespace("dbo")
-                                        .setName(tableName)
-                                        .build(),
+                                    QualifiedName(
+                                        schemaCode = org.tatrman.ttr.metadata.model.SchemaCode.DB,
+                                        namespace = "dbo",
+                                        name = tableName,
+                                    ),
                             ),
                     ),
             )

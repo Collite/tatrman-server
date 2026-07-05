@@ -4,23 +4,24 @@ import org.tatrman.ariadne.v1.GetQueryRequest
 import org.tatrman.ariadne.v1.ListQueriesRequest
 import org.tatrman.ariadne.v1.ParseStatus as ProtoParseStatus
 import org.tatrman.ariadne.v1.ParseStatusFilter
-import org.tatrman.plan.v1.QualifiedName
-import org.tatrman.plan.v1.SchemaCode
-import org.tatrman.plan.v1.parseSchemaCode
-import org.tatrman.kantheon.ariadne.graph.ModelGraph
+import org.tatrman.kantheon.ariadne.grpc.toProto
+import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttr.metadata.model.SchemaCode
+import org.tatrman.ttr.metadata.model.parseSchemaCode
+import org.tatrman.ttr.metadata.graph.ModelGraph
 import org.tatrman.kantheon.ariadne.grpc.MetadataServiceImpl
-import org.tatrman.kantheon.ariadne.model.DbColumn
-import org.tatrman.kantheon.ariadne.model.DbSchema
-import org.tatrman.kantheon.ariadne.model.DbTable
-import org.tatrman.kantheon.ariadne.model.Model
-import org.tatrman.kantheon.ariadne.model.ModelDescriptor
-import org.tatrman.kantheon.ariadne.model.ModelVersion
-import org.tatrman.kantheon.ariadne.model.ParseStatus
-import org.tatrman.kantheon.ariadne.model.Query
+import org.tatrman.ttr.metadata.model.DbColumn
+import org.tatrman.ttr.metadata.model.DbSchema
+import org.tatrman.ttr.metadata.model.DbTable
+import org.tatrman.ttr.metadata.model.Model
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.model.ModelVersion
+import org.tatrman.ttr.metadata.model.ParseStatus
+import org.tatrman.ttr.metadata.model.Query
 import org.tatrman.kantheon.ariadne.parse.MetadataModelHandle
 import org.tatrman.kantheon.ariadne.parse.QueryParseState
 import org.tatrman.kantheon.ariadne.parse.QueryParseWorker
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
@@ -35,12 +36,11 @@ class QueryParseWorkerSpec :
             schema: String,
             ns: String,
             name: String,
-        ) = QualifiedName
-            .newBuilder()
-            .setSchemaCode(parseSchemaCode(schema) ?: SchemaCode.SCHEMA_CODE_UNSPECIFIED)
-            .setNamespace(ns)
-            .setName(name)
-            .build()
+        ) = QualifiedName(
+            schemaCode = parseSchemaCode(schema) ?: SchemaCode.UNSPECIFIED,
+            namespace = ns,
+            name = name,
+        )
 
         val customersQn = qn("db", "dbo", "customers")
         // db.dbo.customers(id INT PK, name TEXT)
@@ -120,10 +120,12 @@ class QueryParseWorkerSpec :
 
         "MetadataModelHandle exposes db tables and columns from the model" {
             val handle = MetadataModelHandle(model())
-            val tables = handle.tables(SchemaCode.DB, "dbo")
-            tables.keys shouldContainExactlyInAnyOrder listOf(customersQn)
-            handle.columns(customersQn).map { it.name } shouldContainExactlyInAnyOrder listOf("id", "name")
-            handle.tables(SchemaCode.ER, "entity") shouldBe emptyMap()
+            // MetadataModelHandle implements the proto-typed query-translator ModelHandle
+            // interface, so its schema/qname args + returned keys are proto (converted here).
+            val tables = handle.tables(SchemaCode.DB.toProto(), "dbo")
+            tables.keys shouldContainExactlyInAnyOrder listOf(customersQn.toProto())
+            handle.columns(customersQn.toProto()).map { it.name } shouldContainExactlyInAnyOrder listOf("id", "name")
+            handle.tables(SchemaCode.ER.toProto(), "entity") shouldBe emptyMap()
             handle.currentVersion() shouldBe "v1"
         }
 
@@ -184,9 +186,12 @@ class QueryParseWorkerSpec :
                     it.queriesFailed shouldBe 3
                     it.queriesPending shouldBe 0
                 }
-            service.getQuery(GetQueryRequest.newBuilder().setQualifiedName(okQuery.qname).build()).parseStatus shouldBe
+            service
+                .getQuery(
+                    GetQueryRequest.newBuilder().setQualifiedName(okQuery.qname.toProto()).build(),
+                ).parseStatus shouldBe
                 ProtoParseStatus.PARSE_STATUS_PARSED
-            service.getQuery(GetQueryRequest.newBuilder().setQualifiedName(badSqlQuery.qname).build()).let {
+            service.getQuery(GetQueryRequest.newBuilder().setQualifiedName(badSqlQuery.qname.toProto()).build()).let {
                 it.parseStatus shouldBe ProtoParseStatus.PARSE_STATUS_FAILED
                 it.parseErrorMessage.isNotEmpty() shouldBe true
             }

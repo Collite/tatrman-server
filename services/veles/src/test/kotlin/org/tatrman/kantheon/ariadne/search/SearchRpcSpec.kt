@@ -1,23 +1,25 @@
 package org.tatrman.kantheon.ariadne.search
 
 import org.tatrman.ariadne.v1.SearchRequest
-import org.tatrman.plan.v1.QualifiedName
-import org.tatrman.plan.v1.SchemaCode
-import org.tatrman.plan.v1.parseSchemaCode
-import org.tatrman.kantheon.ariadne.graph.ModelGraph
+import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttr.metadata.model.SchemaCode
+import org.tatrman.ttr.metadata.model.parseSchemaCode
+import org.tatrman.ttr.metadata.graph.ModelGraph
 import org.tatrman.kantheon.ariadne.grpc.MetadataServiceImpl
-import org.tatrman.kantheon.ariadne.model.LocalizedTextList
-import org.tatrman.kantheon.ariadne.model.Model
-import org.tatrman.kantheon.ariadne.model.ModelDescriptor
-import org.tatrman.kantheon.ariadne.model.ModelVersion
-import org.tatrman.kantheon.ariadne.model.Query
-import org.tatrman.kantheon.ariadne.model.SearchHints
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
-import org.tatrman.kantheon.ariadne.search.all.AllAlgorithm
-import org.tatrman.kantheon.ariadne.search.keyword.KeywordAlgorithm
-import org.tatrman.kantheon.ariadne.search.keyword.StopWords
-import org.tatrman.kantheon.ariadne.search.regex.RegexAlgorithm
-import org.tatrman.kantheon.ariadne.search.substring.SubstringAlgorithm
+import org.tatrman.ttr.metadata.model.LocalizedTextList
+import org.tatrman.ttr.metadata.model.Model
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.model.ModelVersion
+import org.tatrman.ttr.metadata.model.Query
+import org.tatrman.ttr.metadata.model.SearchHints
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.search.SearchAlgorithmRegistry
+import org.tatrman.ttr.metadata.search.SearchIndexHolder
+import org.tatrman.ttr.metadata.search.all.AllAlgorithm
+import org.tatrman.ttr.metadata.search.keyword.KeywordAlgorithm
+import org.tatrman.ttr.metadata.search.keyword.StopWords
+import org.tatrman.ttr.metadata.search.regex.RegexAlgorithm
+import org.tatrman.ttr.metadata.search.substring.SubstringAlgorithm
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -176,9 +178,8 @@ private fun qn(
     namespace: String,
     name: String,
 ): QualifiedName =
-    QualifiedName
-        .newBuilder()
-        .setSchemaCode(parseSchemaCode(schema) ?: SchemaCode.SCHEMA_CODE_UNSPECIFIED)
-        .setNamespace(namespace)
-        .setName(name)
-        .build()
+    QualifiedName(
+        schemaCode = parseSchemaCode(schema) ?: SchemaCode.UNSPECIFIED,
+        namespace = namespace,
+        name = name,
+    )
