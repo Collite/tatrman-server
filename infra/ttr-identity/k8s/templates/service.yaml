@@ -1,14 +1,1 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "whois.fullname" . }}
-  labels:
-    {{- include "whois.labels" . | nindent 4 }}
-spec:
-  type: {{ .Values.service.type }}
-  selector:
-    {{- include "whois.selectorLabels" . | nindent 4 }}
-  ports:
-    - name: http
-      port: {{ .Values.ports.http }}
-      targetPort: {{ .Values.ports.http }}
+{{ include "kantheon-service.service" . }}
