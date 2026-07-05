@@ -1,9 +1,11 @@
 package org.tatrman.kantheon.ariadne.parse
 
 import org.tatrman.plan.v1.QualifiedName
-import org.tatrman.kantheon.ariadne.model.DbColumn
-import org.tatrman.kantheon.ariadne.model.DbSchema
-import org.tatrman.kantheon.ariadne.model.Model
+import org.tatrman.kantheon.ariadne.grpc.toDomain
+import org.tatrman.kantheon.ariadne.grpc.toProto
+import org.tatrman.ttr.metadata.model.DbColumn
+import org.tatrman.ttr.metadata.model.DbSchema
+import org.tatrman.ttr.metadata.model.Model
 import shared.translator.framework.ModelColumn
 import shared.translator.framework.ModelForeignKey
 import shared.translator.framework.ModelHandle
@@ -42,22 +44,29 @@ class MetadataModelHandle(
         val out = LinkedHashMap<QualifiedName, ModelTable>()
         for (s in dbSchemas) {
             if (!s.namespace.equals(namespace, ignoreCase = true)) continue
-            for ((qn, t) in s.tables) out[qn] = ModelTable(qn, t.columns.map { it.toModelColumn() }, t.primaryKey)
-            for ((qn, v) in s.views) out[qn] = ModelTable(qn, v.columns.map { it.toModelColumn() })
+            for ((qn, t) in s.tables) {
+                out[qn.toProto()] = ModelTable(qn.toProto(), t.columns.map { it.toModelColumn() }, t.primaryKey)
+            }
+            for ((qn, v) in s.views) {
+                out[qn.toProto()] = ModelTable(qn.toProto(), v.columns.map { it.toModelColumn() })
+            }
         }
         return out
     }
 
     override fun columns(tableQname: QualifiedName): List<ModelColumn> {
+        val domainQname = tableQname.toDomain()
         for (s in dbSchemas) {
-            s.tables[tableQname]?.let { return it.columns.map { c -> c.toModelColumn() } }
-            s.views[tableQname]?.let { return it.columns.map { c -> c.toModelColumn() } }
+            s.tables[domainQname]?.let { return it.columns.map { c -> c.toModelColumn() } }
+            s.views[domainQname]?.let { return it.columns.map { c -> c.toModelColumn() } }
         }
         return emptyList()
     }
 
     override fun foreignKeys(): List<ModelForeignKey> =
-        dbSchemas.flatMap { it.foreignKeys.values }.map { ModelForeignKey(from = it.fromColumns, to = it.toColumns) }
+        dbSchemas.flatMap { it.foreignKeys.values }.map {
+            ModelForeignKey(from = it.fromColumns.map { c -> c.toProto() }, to = it.toColumns.map { c -> c.toProto() })
+        }
 
     override fun entities(
         schemaCode: SchemaCode,

@@ -1,26 +1,26 @@
 package org.tatrman.kantheon.ariadne.grpc
 
 import org.tatrman.ariadne.v1.ListObjectsRequest
-import org.tatrman.plan.v1.QualifiedName
-import org.tatrman.plan.v1.SchemaCode
-import org.tatrman.plan.v1.parseSchemaCode
-import org.tatrman.kantheon.ariadne.graph.ModelGraph
-import org.tatrman.kantheon.ariadne.model.DbColumn
-import org.tatrman.kantheon.ariadne.model.DbSchema
-import org.tatrman.kantheon.ariadne.model.DbTable
-import org.tatrman.kantheon.ariadne.model.Entity
-import org.tatrman.kantheon.ariadne.model.Model
-import org.tatrman.kantheon.ariadne.model.ModelDescriptor
-import org.tatrman.kantheon.ariadne.model.ModelVersion
-import org.tatrman.kantheon.ariadne.model.SearchHints
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
-import org.tatrman.kantheon.ariadne.search.SearchAlgorithmRegistry
-import org.tatrman.kantheon.ariadne.search.SearchIndexHolder
-import org.tatrman.kantheon.ariadne.search.all.AllAlgorithm
-import org.tatrman.kantheon.ariadne.search.keyword.KeywordAlgorithm
-import org.tatrman.kantheon.ariadne.search.keyword.StopWords
-import org.tatrman.kantheon.ariadne.search.regex.RegexAlgorithm
-import org.tatrman.kantheon.ariadne.search.substring.SubstringAlgorithm
+import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttr.metadata.model.SchemaCode
+import org.tatrman.ttr.metadata.model.parseSchemaCode
+import org.tatrman.ttr.metadata.graph.ModelGraph
+import org.tatrman.ttr.metadata.model.DbColumn
+import org.tatrman.ttr.metadata.model.DbSchema
+import org.tatrman.ttr.metadata.model.DbTable
+import org.tatrman.ttr.metadata.model.Entity
+import org.tatrman.ttr.metadata.model.Model
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.model.ModelVersion
+import org.tatrman.ttr.metadata.model.SearchHints
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.search.SearchAlgorithmRegistry
+import org.tatrman.ttr.metadata.search.SearchIndexHolder
+import org.tatrman.ttr.metadata.search.all.AllAlgorithm
+import org.tatrman.ttr.metadata.search.keyword.KeywordAlgorithm
+import org.tatrman.ttr.metadata.search.keyword.StopWords
+import org.tatrman.ttr.metadata.search.regex.RegexAlgorithm
+import org.tatrman.ttr.metadata.search.substring.SubstringAlgorithm
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
@@ -33,12 +33,11 @@ class ListObjectsFuzzyOnlyFilterSpec :
             namespace: String,
             name: String,
         ): QualifiedName =
-            QualifiedName
-                .newBuilder()
-                .setSchemaCode(parseSchemaCode(schema) ?: SchemaCode.SCHEMA_CODE_UNSPECIFIED)
-                .setNamespace(namespace)
-                .setName(name)
-                .build()
+            QualifiedName(
+                schemaCode = parseSchemaCode(schema) ?: SchemaCode.UNSPECIFIED,
+                namespace = namespace,
+                name = name,
+            )
 
         "ListObjects(kind=column, fuzzy_only=false) returns all columns (entity excluded by kind)" {
             val table =
@@ -67,7 +66,7 @@ class ListObjectsFuzzyOnlyFilterSpec :
                         mapOf(
                             "db" to DbSchema(tables = mapOf(table.qname to table)),
                             "er" to
-                                org.tatrman.kantheon.ariadne.model.ErSchema(
+                                org.tatrman.ttr.metadata.model.ErSchema(
                                     entities =
                                         mapOf(
                                             fuzzyEntity.qname to fuzzyEntity,
@@ -121,7 +120,7 @@ class ListObjectsFuzzyOnlyFilterSpec :
                         mapOf(
                             "db" to DbSchema(tables = mapOf(table.qname to table)),
                             "er" to
-                                org.tatrman.kantheon.ariadne.model.ErSchema(
+                                org.tatrman.ttr.metadata.model.ErSchema(
                                     entities =
                                         mapOf(
                                             fuzzyEntity.qname to fuzzyEntity,
@@ -168,7 +167,7 @@ class ListObjectsFuzzyOnlyFilterSpec :
                     schemas =
                         mapOf(
                             "er" to
-                                org.tatrman.kantheon.ariadne.model.ErSchema(
+                                org.tatrman.ttr.metadata.model.ErSchema(
                                     entities = mapOf(entity.qname to entity, nonFuzzyEntity.qname to nonFuzzyEntity),
                                 ),
                         ),
@@ -207,7 +206,7 @@ class ListObjectsFuzzyOnlyFilterSpec :
                     primaryKey = listOf("IDSTRED"),
                 )
             val kodAttr =
-                org.tatrman.kantheon.ariadne.model.Attribute(
+                org.tatrman.ttr.metadata.model.Attribute(
                     internalId = "a-kod",
                     qname = qn("er", "entity", "účetní_středisko.kód_střediska"),
                     entity = qn("er", "entity", "účetní_středisko"),
@@ -215,7 +214,7 @@ class ListObjectsFuzzyOnlyFilterSpec :
                     search = SearchHints(fuzzy = true, searchable = true),
                 )
             val nazevAttr =
-                org.tatrman.kantheon.ariadne.model.Attribute(
+                org.tatrman.ttr.metadata.model.Attribute(
                     internalId = "a-nazev",
                     qname = qn("er", "entity", "účetní_středisko.název_střediska"),
                     entity = qn("er", "entity", "účetní_středisko"),
@@ -231,21 +230,21 @@ class ListObjectsFuzzyOnlyFilterSpec :
                 )
             val mappings =
                 listOf(
-                    org.tatrman.kantheon.ariadne.model.Er2DbAttributeMapping(
+                    org.tatrman.ttr.metadata.model.Er2DbAttributeMapping(
                         internalId = "m-kod",
                         qname = qn("er", "map", "kod"),
                         attribute = kodAttr.qname,
                         target =
-                            org.tatrman.kantheon.ariadne.model.AttributeMappingTarget.Column(
+                            org.tatrman.ttr.metadata.model.AttributeMappingTarget.Column(
                                 qn("db", "dbo", "QSTRED_DF.KOD_STR"),
                             ),
                     ),
-                    org.tatrman.kantheon.ariadne.model.Er2DbAttributeMapping(
+                    org.tatrman.ttr.metadata.model.Er2DbAttributeMapping(
                         internalId = "m-nazev",
                         qname = qn("er", "map", "nazev"),
                         attribute = nazevAttr.qname,
                         target =
-                            org.tatrman.kantheon.ariadne.model.AttributeMappingTarget.Column(
+                            org.tatrman.ttr.metadata.model.AttributeMappingTarget.Column(
                                 qn("db", "dbo", "QSTRED_DF.NAZEV_STR"),
                             ),
                     ),
@@ -258,7 +257,7 @@ class ListObjectsFuzzyOnlyFilterSpec :
                         mapOf(
                             "db" to DbSchema(tables = mapOf(table.qname to table)),
                             "er" to
-                                org.tatrman.kantheon.ariadne.model
+                                org.tatrman.ttr.metadata.model
                                     .ErSchema(entities = mapOf(entity.qname to entity)),
                         ),
                     mappings = mappings,

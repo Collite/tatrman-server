@@ -1,5 +1,4 @@
-schema er
-
+model er
 def entity Customer {
     description: "A customer in the system"
     labelPlural: "Customers"

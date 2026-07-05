@@ -5,12 +5,12 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeEmpty
 import org.tatrman.ariadne.v1.ResolveAreaRequest
-import org.tatrman.kantheon.ariadne.graph.ModelGraph
-import org.tatrman.kantheon.ariadne.model.ModelDescriptor
-import org.tatrman.kantheon.ariadne.reconcile.ModelReconciler
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
-import org.tatrman.kantheon.ariadne.source.FileBasedSource
-import org.tatrman.kantheon.ariadne.source.LocalFsStorage
+import org.tatrman.ttr.metadata.graph.ModelGraph
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.reconcile.ModelReconciler
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.source.FileBasedSource
+import org.tatrman.ttr.metadata.source.LocalFsStorage
 import java.nio.file.Path
 
 /**
