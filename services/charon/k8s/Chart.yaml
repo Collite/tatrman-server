@@ -1,0 +1,19 @@
+apiVersion: v2
+name: charon
+description: |
+  The Kantheon charon service (Arrow data mover) — an env-agnostic Helm chart. Holds no
+  cluster knowledge: image, replicas, resources, telemetry endpoint, the named-connection
+  registry ConfigMap and the DB-credentials secret are all values/deploy-time inputs.
+  Per-environment values live in the deploying repo (Olymp clusters via ArgoCD multi-source
+  D3; test contexts via the Olymp scripted harness). Converted from the kustomize base.
+type: application
+# Chart version: the packaging. appVersion tracks the default image tag.
+version: 0.1.0
+appVersion: "dev"
+# The common Deployment/Service shape lives in the kantheon-service library chart
+# (shared/charts). This chart stays thin: values + the per-module env hook
+# (templates/_env.tpl) + the connections volume override (templates/_volumes.tpl).
+dependencies:
+  - name: kantheon-service
+    version: 0.1.0
+    repository: "file://../../../shared/charts/kantheon-service"
