@@ -94,7 +94,7 @@ class Phase2_2ExpressivenessSpec :
             val userTtr =
                 """
                 package cnc
-                schema cnc
+                model cnc
 
                 def role fact {
                     label { cs: "Hijacked" }
@@ -161,7 +161,7 @@ class Phase2_2ExpressivenessSpec :
         "entity with `roles: [fact, transaction]` shorthand emits two mappings" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Objednavka {
                     roles: [fact, transaction]
@@ -196,7 +196,7 @@ class Phase2_2ExpressivenessSpec :
         "GetObject(er.entity.Zakaznik) returns EntityDetail.display_label" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Zakaznik {
                     displayLabel { cs: "Zákazník", en: "Customer" }
@@ -218,7 +218,7 @@ class Phase2_2ExpressivenessSpec :
         "GetObject(er.attribute.STAV) returns AttributeDetail.value_labels + display_label" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Zakaznik {
                     attributes: [
@@ -254,7 +254,7 @@ class Phase2_2ExpressivenessSpec :
         "missing display_label / value_labels round-trip as empty" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Plain {
                     attributes: [
@@ -292,7 +292,7 @@ class Phase2_2ExpressivenessSpec :
         "GetRolesForEntity returns the qnames the entity plays" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Objednavka { roles: [fact, transaction] }
                 """.trimIndent()
@@ -330,7 +330,7 @@ class Phase2_2ExpressivenessSpec :
         "Model.mappings includes the Er2CncRoleMappings authored via shorthand" {
             val userTtr =
                 """
-                schema er
+                model er
 
                 def entity Objednavka { roles: [fact] }
                 """.trimIndent()

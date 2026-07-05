@@ -1,5 +1,4 @@
-schema db namespace dbo
-
+model db schema dbo
 def table products {
     description: "Product catalog (fuzzy-loader fixture)"
     primaryKey: ["id"]

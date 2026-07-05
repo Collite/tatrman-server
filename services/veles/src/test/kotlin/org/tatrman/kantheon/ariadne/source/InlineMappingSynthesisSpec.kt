@@ -59,7 +59,7 @@ class InlineMappingSynthesisSpec :
         "entity-level inline mapping synthesises Er2DbEntityMapping + per-column Er2DbAttributeMapping" {
             val erTtr =
                 """
-                schema er namespace entity
+                model er schema entity
                 def entity artikl {
                     binding: {
                         target: { table: db.dbo.QZBOZI_DF },
@@ -93,7 +93,7 @@ class InlineMappingSynthesisSpec :
         "attribute-level inline mapping synthesises Er2DbAttributeMapping tagged Inline(\"attribute\")" {
             val erTtr =
                 """
-                schema er namespace entity
+                model er schema entity
                 def entity produkt {
                     attributes: [
                         def attribute id_produktu { type: int, isKey: true, binding: IDSKUPZBOZI },
@@ -114,7 +114,7 @@ class InlineMappingSynthesisSpec :
         "relation-level inline mapping (bare-fk) synthesises Er2DbRelationMapping tagged Inline" {
             val erTtr =
                 """
-                schema er namespace entity
+                model er schema entity
                 def entity a {}
                 def entity b {}
                 def relation artikl_produkt {
@@ -138,7 +138,7 @@ class InlineMappingSynthesisSpec :
         "relation-level inline mapping (wrapped fk) synthesises Er2DbRelationMapping tagged Inline" {
             val erTtr =
                 """
-                schema er namespace entity
+                model er schema entity
                 def entity a {}
                 def entity b {}
                 def relation r {
@@ -156,7 +156,7 @@ class InlineMappingSynthesisSpec :
         "entity without inline mapping contributes no Er2Db mappings" {
             val erTtr =
                 """
-                schema er namespace entity
+                model er schema entity
                 def entity plain {
                     attributes: [
                         def attribute id { type: int, isKey: true }
@@ -172,7 +172,7 @@ class InlineMappingSynthesisSpec :
         "ttr/duplicate-mapping fires when an inline entity mapping and an explicit def er2db_entity share a qname" {
             val erTtr =
                 """
-                schema er namespace entity
+                model er schema entity
                 def entity artikl {
                     binding: { target: { table: db.dbo.QZBOZI_DF } },
                     attributes: [ def attribute id { type: int, isKey: true } ]
@@ -180,7 +180,7 @@ class InlineMappingSynthesisSpec :
                 """.trimIndent()
             val mapTtr =
                 """
-                schema binding
+                model binding
                 def er2db_entity artikl { entity: er.entity.artikl, target: { table: db.dbo.OTHER } }
                 """.trimIndent()
 
@@ -195,7 +195,7 @@ class InlineMappingSynthesisSpec :
         "ttr/duplicate-mapping fires when inline attribute mapping collides with explicit def er2db_attribute" {
             val erTtr =
                 """
-                schema er namespace entity
+                model er schema entity
                 def entity produkt {
                     attributes: [
                         def attribute id_produktu { type: int, isKey: true, binding: IDSKUPZBOZI }
@@ -204,7 +204,7 @@ class InlineMappingSynthesisSpec :
                 """.trimIndent()
             val mapTtr =
                 """
-                schema binding
+                model binding
                 def er2db_attribute produkt.id_produktu {
                     attribute: er.entity.produkt.id_produktu,
                     target: { column: db.dbo.OTHER.IDSKUPZBOZI }
@@ -220,7 +220,7 @@ class InlineMappingSynthesisSpec :
         "ttr/duplicate-mapping fires when inline relation mapping collides with explicit def er2db_relation" {
             val erTtr =
                 """
-                schema er namespace entity
+                model er schema entity
                 def entity a {}
                 def entity b {}
                 def relation artikl_produkt {
@@ -232,7 +232,7 @@ class InlineMappingSynthesisSpec :
                 """.trimIndent()
             val mapTtr =
                 """
-                schema binding
+                model binding
                 def er2db_relation artikl_produkt {
                     relation: er.entity.artikl_produkt,
                     fk: db.dbo.fk_two
@@ -250,7 +250,7 @@ class InlineMappingSynthesisSpec :
         "relation-level inline mapping respects host file's ER namespace" {
             val erTtr =
                 """
-                schema er namespace foo
+                model er schema foo
                 def entity a {}
                 def entity b {}
                 def relation r {
@@ -274,7 +274,7 @@ class InlineMappingSynthesisSpec :
         "no duplicate-mapping when only explicit defs are present (pre-v2.1 behaviour preserved)" {
             val mapTtr =
                 """
-                schema binding
+                model binding
                 def er2db_entity artikl { entity: er.entity.artikl, target: { table: db.dbo.QZBOZI_DF } }
                 """.trimIndent()
             val result = loadInline(mapOf("/map.ttr" to mapTtr))

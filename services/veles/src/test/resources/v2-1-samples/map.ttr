@@ -1,7 +1,6 @@
 package samples.v2_1
 
-schema binding
-
+model binding
 // podprodukt: no inline mapping — covered explicitly
 def er2db_entity podprodukt { entity: er.entity.podprodukt, target: { table: db.dbo.QXXPODSKUPZBOZI } }
 

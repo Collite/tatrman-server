@@ -1,8 +1,7 @@
 package samples.v2_1
 import samples.v2_1.db.*
 
-schema er namespace entity
-
+model er schema entity
 // ---- artikl: entity-level mapping with mixed inline-column forms ----
 def entity artikl { description: """Evidence všech artiklů a jejich vlastností.""",
     displayLabel: { cs: "Artikl", en: "Item" },

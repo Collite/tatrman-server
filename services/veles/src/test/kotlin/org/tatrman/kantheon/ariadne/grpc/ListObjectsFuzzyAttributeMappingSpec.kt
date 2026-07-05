@@ -35,7 +35,7 @@ class ListObjectsFuzzyAttributeMappingSpec :
             Files.writeString(
                 dir.resolve("db.ttr"),
                 """
-                schema db namespace dbo
+                model db schema dbo
 
                 def table QSTRED_DF {
                     primaryKey: ["IDSTRED"]
@@ -49,7 +49,7 @@ class ListObjectsFuzzyAttributeMappingSpec :
             Files.writeString(
                 dir.resolve("er.ttr"),
                 """
-                schema er namespace entity
+                model er schema entity
 
                 def entity stredisko {
                     attributes: [
@@ -62,7 +62,7 @@ class ListObjectsFuzzyAttributeMappingSpec :
             Files.writeString(
                 dir.resolve("map.ttr"),
                 """
-                schema binding namespace map
+                model binding
 
                 def er2db_entity stredisko { entity: er.entity.stredisko, target: { table: db.dbo.QSTRED_DF } }
                 def er2db_attribute stredisko.id_strediska {

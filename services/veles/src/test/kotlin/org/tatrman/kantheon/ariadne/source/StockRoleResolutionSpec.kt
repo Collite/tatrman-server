@@ -59,7 +59,7 @@ class StockRoleResolutionSpec :
             val result =
                 reconcileWithStockRoles(
                     """
-                    schema er namespace entity
+                    model er schema entity
 
                     def entity objednavka {
                         description: "order"
@@ -89,7 +89,7 @@ class StockRoleResolutionSpec :
             val result =
                 reconcileWithStockRoles(
                     """
-                    schema er namespace entity
+                    model er schema entity
 
                     def entity objednavka {
                         description: "order"
