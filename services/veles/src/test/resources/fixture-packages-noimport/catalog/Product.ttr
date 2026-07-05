@@ -1,5 +1,4 @@
-schema er namespace catalog
-
+model er schema catalog
 def entity Product {
     description: "Product entity"
     nameAttribute: id

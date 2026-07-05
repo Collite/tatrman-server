@@ -191,7 +191,7 @@ class MetadataExportPipelineSpec :
             erFile.schemaCode shouldBe null
             erFile.namespace shouldBe null
             val content = TtrRenderer.renderFile(erFile.schemaCode, erFile.namespace, erFile.definitions)
-            content.shouldNotContain("schema er")
+            content.shouldNotContain("model er")
             content shouldContain "def entity customer"
         }
 
@@ -201,7 +201,7 @@ class MetadataExportPipelineSpec :
             dbFile.schemaCode shouldBe null
             dbFile.namespace shouldBe null
             val content = TtrRenderer.renderFile(dbFile.schemaCode, dbFile.namespace, dbFile.definitions)
-            content.shouldNotContain("schema db")
+            content.shouldNotContain("model db")
             content shouldContain "def table customers"
             content shouldContain "def column id"
         }
@@ -272,7 +272,7 @@ class MetadataExportPipelineSpec :
             // Queries now live in `db.ttr` (directive-less; query derives its schema by kind).
             val queryFile = bundle.files.first { it.filename == "db.ttr" }
             val content = TtrRenderer.renderFile(queryFile.schemaCode, queryFile.namespace, queryFile.definitions)
-            content.shouldNotContain("schema query")
+            content.shouldNotContain("model query")
             content shouldContain "def query find_all"
             val result = TtrLoader.parseString(content, fileLabel = "db.ttr")
             result.ok shouldBe true

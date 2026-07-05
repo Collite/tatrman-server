@@ -1,5 +1,4 @@
-schema db namespace dbo
-
+model db schema dbo
 def table customers {
     description: "Customer master table"
     primaryKey: ["id"]

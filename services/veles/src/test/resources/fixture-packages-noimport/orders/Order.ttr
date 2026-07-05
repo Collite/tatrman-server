@@ -1,5 +1,4 @@
-schema er namespace orders
-
+model er schema orders
 def entity OrderWithBadRole {
     description: "Order that references Product without an import"
     nameAttribute: id

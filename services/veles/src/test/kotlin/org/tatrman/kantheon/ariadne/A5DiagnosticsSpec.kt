@@ -47,13 +47,13 @@ class A5DiagnosticsSpec :
 
         fun ReconciliationResult.warnHas(code: String) = warnings.any { it.message.contains(code) }
 
-        "ttr/wrong-file-kind (ERROR) — a `def role` in a `schema db` file blocks load" {
+        "ttr/wrong-file-kind (ERROR) — a `def role` in a `model db` file blocks load" {
             val root = Files.createTempDirectory("diag-wfk")
             write(
                 root,
                 "bad.ttr",
                 """
-                schema db namespace dbo
+                model db schema dbo
                 def role myrole { }
                 """,
             )
@@ -69,7 +69,7 @@ class A5DiagnosticsSpec :
                 "foo/x.ttr",
                 """
                 package bar
-                schema er namespace entity
+                model er schema entity
                 def entity E { attributes: [ def attribute id { type: int, isKey: true } ] }
                 """,
             )
@@ -84,7 +84,7 @@ class A5DiagnosticsSpec :
                 root,
                 "foo/x.ttr",
                 """
-                schema er namespace entity
+                model er schema entity
                 def entity E { attributes: [ def attribute id { type: int, isKey: true } ] }
                 """,
             )
@@ -100,7 +100,7 @@ class A5DiagnosticsSpec :
                 "x.ttr",
                 """
                 import er.entity.Customer
-                schema er namespace entity
+                model er schema entity
                 def entity E { attributes: [ def attribute id { type: int, isKey: true } ] }
                 """,
             )
@@ -115,7 +115,7 @@ class A5DiagnosticsSpec :
                 "x.ttr",
                 """
                 import er.nothinghere.*
-                schema er namespace entity
+                model er schema entity
                 def entity E { attributes: [ def attribute id { type: int, isKey: true } ] }
                 """,
             )
@@ -131,7 +131,7 @@ class A5DiagnosticsSpec :
                 """
                 import er.entity.*
                 import er.entity.*
-                schema er namespace entity
+                model er schema entity
                 def entity E { attributes: [ def attribute id { type: int, isKey: true } ] }
                 """,
             )
@@ -147,7 +147,7 @@ class A5DiagnosticsSpec :
                 """
                 package alpha
                 import beta.entity.*
-                schema er namespace entity
+                model er schema entity
                 def entity A { attributes: [ def attribute id { type: int, isKey: true } ] }
                 """,
             )
@@ -157,7 +157,7 @@ class A5DiagnosticsSpec :
                 """
                 package beta
                 import alpha.entity.*
-                schema er namespace entity
+                model er schema entity
                 def entity B { attributes: [ def attribute id { type: int, isKey: true } ] }
                 """,
             )

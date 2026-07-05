@@ -21,7 +21,7 @@ class FallbackSourceSpec :
             dir.toFile().deleteOnExit()
             dir.resolve("db.ttr").writeText(
                 """
-                schema db namespace dbo
+                model db schema dbo
 
                 def table customers {
                     primaryKey: ["id"]

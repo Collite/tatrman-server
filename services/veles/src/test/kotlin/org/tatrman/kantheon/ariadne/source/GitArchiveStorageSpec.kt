@@ -68,7 +68,7 @@ class GitArchiveStorageSpec :
             val src =
                 makeLocalRepo(
                     mapOf(
-                        "model/customers.ttr" to "schema db\ndef table customers {}\n",
+                        "model/customers.ttr" to "model db\ndef table customers {}\n",
                         "model/README.md" to "ignore me",
                     ),
                 )
@@ -85,13 +85,13 @@ class GitArchiveStorageSpec :
         }
 
         "subsequent fetchVersion picks up new commits and updates the version stamp" {
-            val src = makeLocalRepo(mapOf("model/a.ttr" to "schema db\ndef table a {}\n"))
+            val src = makeLocalRepo(mapOf("model/a.ttr" to "model db\ndef table a {}\n"))
             val checkout = Files.createTempDirectory("git-checkout-")
             checkout.toFile().deleteOnExit()
             val storage = GitArchiveStorage("g1", src.toUri().toString(), checkout)
 
             val v1 = storage.fetchVersion()
-            commitNew(src, "model/b.ttr", "schema db\ndef table b {}\n")
+            commitNew(src, "model/b.ttr", "model db\ndef table b {}\n")
             val v2 = storage.fetchVersion()
 
             (v1 != v2) shouldBe true
@@ -109,7 +109,7 @@ class GitArchiveStorageSpec :
                         "artikl/db.ttr" to
                             """
                             package artikl
-                            schema db namespace dbo
+                            model db schema dbo
 
                             def table t {
                                 primaryKey: ["id"]
@@ -135,8 +135,8 @@ class GitArchiveStorageSpec :
             val src =
                 makeLocalRepo(
                     mapOf(
-                        "config/skipme.ttr" to "schema db\n",
-                        "model/customers.ttr" to "schema db\ndef table customers {}\n",
+                        "config/skipme.ttr" to "model db\n",
+                        "model/customers.ttr" to "model db\ndef table customers {}\n",
                     ),
                 )
             val checkout = Files.createTempDirectory("git-checkout-")
