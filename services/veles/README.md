@@ -5,6 +5,21 @@
 
 The **model-graph service** for kantheon. Loads the `ai-models` model (YAML/JSON via ClasspathStorage, Git source via `METADATA_GIT_*` for live reload) into an in-memory `ModelSnapshot`, then serves `ListObjects` / `GetObject` / `Search` / `ListQueries` / `GetModel` / `ResolveArea` / `GetStatus` / `Refresh` over gRPC (AriadneService) and HTTP. The gRPC service proto is forked as `org.tatrman.ariadne.v1` / `AriadneService` (Stage 1.2; the old `MetadataService` is gone).
 
+## Runs on the `org.tatrman:ttr-metadata` library (Stage M4.1, ttr-metadata adoption)
+
+Since the ttr-metadata swap (arc doc: [`docs/architecture/fork/ttr-metadata-adoption.md`](../../docs/architecture/fork/ttr-metadata-adoption.md)), Ariadne **owns no model/graph/search/resolution logic**. It is a thin gRPC facade over the third-party libraries `org.tatrman:ttr-metadata` (+ `:ttr-metadata-git` for `GitArchiveStorage`, MD3): typed model, sources, reconciler, resolver, graph, search, registry, and the `MetadataRefresher` mechanism all live there. What stays here:
+
+- `grpc/MetadataServiceImpl` — proto ↔ library conversion + delegation to `MetadataQuery`/`WorldResolver` (MD2). The de-proto boundary is `grpc/ProtoConverters.kt` (proto `plan.v1.QualifiedName`/`SchemaCode`, `ariadne.v1.EdgeType`/`Direction` ↔ the library's proto-free types).
+- `grpc/PageTokenCodec` — AIP-158 wire page tokens (wire-level, stays here).
+- `refresh/RefreshScheduler` — scheduling policy over the library `MetadataRefresher`.
+- `parse/` — the in-process query-parse worker (ttr-translator arc).
+- `export/MetadataExportRoutes` — the Ktor `/model/export` + `/model/export/dot` routes (the export *pipeline* — `ModelToDefinitions`/`GraphDotExporter` — is library-owned).
+- `Application.kt`, OTel/metrics/k8s wiring.
+
+**Drift rule (contract, enforced by review + CI grep):** core model/graph/search/resolution fixes ship as a **new `org.tatrman:ttr-metadata` release**, never as a re-fork under `services/ariadne`. A PR adding such logic here is bounced to the library. The guard greps (all must be empty) live in the arc doc's execution checklist. The pinned version is `tatrman-ttr-metadata` in `gradle/libs.versions.toml`.
+
+> **NOTE (local iteration):** the pin is temporarily `0.0.1-LOCAL` (Maven Local, `settings.gradle.kts` `mavenLocal()`) until `kotlin-metadata/v0.1.0` is published to GitHub Packages; flip the version and drop `mavenLocal()` at that point.
+
 **Areas (Golem P4 S4.2, 2026-06-25):** `ResolveArea(area) → packages + description + tags` resolves a subject area to its member packages, loaded from `model-ttr/areas/*.ttrm` (`AreaDef`, modeler ≥ 0.7.0). Golem assembles a Shem by resolving its `areas` → packages → `GetModel`.
 
 **Prompt-serving REMOVED (Golem P4 S4.2, 2026-06-25; reverses the 2026-06-13 addition):** the `GetPrompts` RPC, the `prompts/` package, and the `prompts/` Git subtree are gone — **the model is just the model.** Prompts belong to the **Shem** now (mounted with the Golem pod; each Golem's `PromptStore` loads its own `prompts/{locale}/…`). The Git source is back to `model-ttr/` only. See `docs/architecture/fork/contracts.md` §1.1.

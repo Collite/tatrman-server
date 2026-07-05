@@ -7,34 +7,35 @@ import org.tatrman.ariadne.v1.PageRequest
 import org.tatrman.ariadne.v1.ParseStatus
 import org.tatrman.ariadne.v1.ParseStatusFilter
 import org.tatrman.plan.v1.PlanNode
-import org.tatrman.plan.v1.QualifiedName
-import org.tatrman.kantheon.ariadne.graph.ModelGraph
+import org.tatrman.kantheon.ariadne.grpc.toProto
+import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttr.metadata.model.SchemaCode
+import org.tatrman.ttr.metadata.graph.ModelGraph
 import org.tatrman.kantheon.ariadne.grpc.MetadataServiceImpl
-import org.tatrman.kantheon.ariadne.model.Model
-import org.tatrman.kantheon.ariadne.model.ModelDescriptor
-import org.tatrman.kantheon.ariadne.model.ModelVersion
-import org.tatrman.kantheon.ariadne.model.Query
-import org.tatrman.kantheon.ariadne.model.QueryParameterDef
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.model.Model
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.model.ModelVersion
+import org.tatrman.ttr.metadata.model.Query
+import org.tatrman.ttr.metadata.model.QueryParameterDef
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldBeEmpty
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotBeEmpty
-import org.tatrman.kantheon.ariadne.model.ParseStatus as DomainParseStatus
+import org.tatrman.ttr.metadata.model.ParseStatus as DomainParseStatus
 import java.time.Instant
 
 class MetadataQuerySpec :
     StringSpec({
 
         fun qn(name: String) =
-            QualifiedName
-                .newBuilder()
-                .setSchemaCode(org.tatrman.plan.v1.SchemaCode.SCHEMA_CODE_UNSPECIFIED)
-                .setNamespace("q")
-                .setName(name)
-                .build()
+            QualifiedName(
+                schemaCode = SchemaCode.UNSPECIFIED,
+                namespace = "q",
+                name = name,
+            )
 
         // Three queries: one PARSED, one PENDING, one FAILED — covering the parse-status surface.
         val parsedQuery =
@@ -149,7 +150,7 @@ class MetadataQuerySpec :
 
         "GetQuery returns the source text, parameters and parse status" {
             val r =
-                service().getQuery(GetQueryRequest.newBuilder().setQualifiedName(qn("findCustomers")).build())
+                service().getQuery(GetQueryRequest.newBuilder().setQualifiedName(qn("findCustomers").toProto()).build())
             r.objectDescriptor.localName shouldBe "findCustomers"
             r.sourceLanguage shouldBe Language.SQL
             r.sourceText shouldContain "FROM customers"
@@ -167,7 +168,7 @@ class MetadataQuerySpec :
                     GetQueryRequest
                         .newBuilder()
                         .setQualifiedName(
-                            qn("findCustomers"),
+                            qn("findCustomers").toProto(),
                         ).setIncludeCanonicalForm(true)
                         .build(),
                 )
@@ -176,7 +177,7 @@ class MetadataQuerySpec :
 
         "GetQuery surfaces the parse error for a failed query" {
             val r =
-                service().getQuery(GetQueryRequest.newBuilder().setQualifiedName(qn("brokenQuery")).build())
+                service().getQuery(GetQueryRequest.newBuilder().setQualifiedName(qn("brokenQuery").toProto()).build())
             r.parseStatus shouldBe ParseStatus.PARSE_STATUS_FAILED
             r.parseErrorMessage shouldContain "SELEKT"
             r.parseErrorLocation shouldBe "line 1:0"
@@ -184,7 +185,7 @@ class MetadataQuerySpec :
 
         "GetQuery reports object_not_found via messages, not a gRPC error" {
             val r =
-                service().getQuery(GetQueryRequest.newBuilder().setQualifiedName(qn("noSuchQuery")).build())
+                service().getQuery(GetQueryRequest.newBuilder().setQualifiedName(qn("noSuchQuery").toProto()).build())
             r.messagesList.single().code shouldBe "object_not_found"
         }
 
@@ -197,7 +198,7 @@ class MetadataQuerySpec :
                 .code shouldBe
                 "metadata_not_ready"
             empty
-                .getQuery(GetQueryRequest.newBuilder().setQualifiedName(qn("x")).build())
+                .getQuery(GetQueryRequest.newBuilder().setQualifiedName(qn("x").toProto()).build())
                 .messagesList
                 .single()
                 .code shouldBe "metadata_not_ready"

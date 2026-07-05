@@ -1,26 +1,27 @@
 package org.tatrman.kantheon.ariadne.grpc
 
 import org.tatrman.ariadne.v1.GetObjectRequest
-import org.tatrman.plan.v1.QualifiedName
-import org.tatrman.plan.v1.SchemaCode
-import org.tatrman.plan.v1.parseSchemaCode
-import org.tatrman.kantheon.ariadne.graph.ModelGraph
-import org.tatrman.kantheon.ariadne.model.DbColumn
-import org.tatrman.kantheon.ariadne.model.DbSchema
-import org.tatrman.kantheon.ariadne.model.DbTable
-import org.tatrman.kantheon.ariadne.model.LocalizedTextList
-import org.tatrman.kantheon.ariadne.model.Model
-import org.tatrman.kantheon.ariadne.model.ModelDescriptor
-import org.tatrman.kantheon.ariadne.model.ModelVersion
-import org.tatrman.kantheon.ariadne.model.SearchHints
-import org.tatrman.kantheon.ariadne.registry.MetadataRegistry
-import org.tatrman.kantheon.ariadne.search.SearchAlgorithmRegistry
-import org.tatrman.kantheon.ariadne.search.SearchIndexHolder
-import org.tatrman.kantheon.ariadne.search.all.AllAlgorithm
-import org.tatrman.kantheon.ariadne.search.keyword.KeywordAlgorithm
-import org.tatrman.kantheon.ariadne.search.keyword.StopWords
-import org.tatrman.kantheon.ariadne.search.regex.RegexAlgorithm
-import org.tatrman.kantheon.ariadne.search.substring.SubstringAlgorithm
+import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttr.metadata.model.SchemaCode
+import org.tatrman.ttr.metadata.model.parseSchemaCode
+import org.tatrman.ttr.metadata.graph.ModelGraph
+import org.tatrman.kantheon.ariadne.grpc.toProto
+import org.tatrman.ttr.metadata.model.DbColumn
+import org.tatrman.ttr.metadata.model.DbSchema
+import org.tatrman.ttr.metadata.model.DbTable
+import org.tatrman.ttr.metadata.model.LocalizedTextList
+import org.tatrman.ttr.metadata.model.Model
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.model.ModelVersion
+import org.tatrman.ttr.metadata.model.SearchHints
+import org.tatrman.ttr.metadata.registry.MetadataRegistry
+import org.tatrman.ttr.metadata.search.SearchAlgorithmRegistry
+import org.tatrman.ttr.metadata.search.SearchIndexHolder
+import org.tatrman.ttr.metadata.search.all.AllAlgorithm
+import org.tatrman.ttr.metadata.search.keyword.KeywordAlgorithm
+import org.tatrman.ttr.metadata.search.keyword.StopWords
+import org.tatrman.ttr.metadata.search.regex.RegexAlgorithm
+import org.tatrman.ttr.metadata.search.substring.SubstringAlgorithm
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 
@@ -32,12 +33,11 @@ class GetObjectColumnSearchHintsSpec :
             namespace: String,
             name: String,
         ): QualifiedName =
-            QualifiedName
-                .newBuilder()
-                .setSchemaCode(parseSchemaCode(schema) ?: SchemaCode.SCHEMA_CODE_UNSPECIFIED)
-                .setNamespace(namespace)
-                .setName(name)
-                .build()
+            QualifiedName(
+                schemaCode = parseSchemaCode(schema) ?: SchemaCode.UNSPECIFIED,
+                namespace = namespace,
+                name = name,
+            )
 
         "GetObject returns column with search.fuzzy=true when DbColumn.search.fuzzy is set" {
             val customersQ = qn("db", "dbo", "customers")
@@ -61,7 +61,7 @@ class GetObjectColumnSearchHintsSpec :
             val model = modelOf(table)
             val (service, _) = wire(model)
 
-            val req = GetObjectRequest.newBuilder().setQualifiedName(nameQ).build()
+            val req = GetObjectRequest.newBuilder().setQualifiedName(nameQ.toProto()).build()
             val resp = service.getObject(req)
 
             resp.column.search.fuzzy shouldBe true
@@ -90,7 +90,7 @@ class GetObjectColumnSearchHintsSpec :
             val model = modelOf(table)
             val (service, _) = wire(model)
 
-            val req = GetObjectRequest.newBuilder().setQualifiedName(idQ).build()
+            val req = GetObjectRequest.newBuilder().setQualifiedName(idQ.toProto()).build()
             val resp = service.getObject(req)
 
             resp.column.hasSearch() shouldBe false
@@ -124,7 +124,7 @@ class GetObjectColumnSearchHintsSpec :
             val model = modelOf(table)
             val (service, _) = wire(model)
 
-            val req = GetObjectRequest.newBuilder().setQualifiedName(statusQ).build()
+            val req = GetObjectRequest.newBuilder().setQualifiedName(statusQ.toProto()).build()
             val resp = service.getObject(req)
 
             resp.column.search.searchable shouldBe true
