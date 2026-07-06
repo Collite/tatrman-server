@@ -8,7 +8,7 @@ import org.tatrman.plan.v1.FunctionCall
 import org.tatrman.plan.v1.NamedExpression
 import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.QualifiedName
-import shared.translator.joiner.JoinerPlanWalker
+import org.tatrman.translator.joiner.JoinerPlanWalker
 
 /**
  * PlanNode tree utilities used by the validator stages.
@@ -111,6 +111,15 @@ internal object PlanWalker {
                             .toBuilder()
                             .setSubquery(wrapTableScans(plan.subquery.subquery, target, predicate)),
                     ).build()
+            PlanNode.NodeCase.UNION ->
+                PlanNode
+                    .newBuilder()
+                    .setUnion(
+                        plan.union
+                            .toBuilder()
+                            .clearInputs()
+                            .addAllInputs(plan.union.inputsList.map { wrapTableScans(it, target, predicate) }),
+                    ).build()
             // Phase 2.4 — workspace_ref is a session-scoped leaf. Security
             // is skipped on workspace-rooted plans (the SecurityApplier never
             // gets here for those plans; the Validator orchestrator emits a
@@ -181,6 +190,8 @@ internal object WorkspaceRefDetector {
             org.tatrman.plan.v1.PlanNode.NodeCase.FILTER -> hasWorkspaceRef(plan.filter.input)
             org.tatrman.plan.v1.PlanNode.NodeCase.JOIN ->
                 hasWorkspaceRef(plan.join.left) || hasWorkspaceRef(plan.join.right)
+            org.tatrman.plan.v1.PlanNode.NodeCase.UNION ->
+                plan.union.inputsList.any { hasWorkspaceRef(it) }
             org.tatrman.plan.v1.PlanNode.NodeCase.AGGREGATE -> hasWorkspaceRef(plan.aggregate.input)
             org.tatrman.plan.v1.PlanNode.NodeCase.SORT -> hasWorkspaceRef(plan.sort.input)
             org.tatrman.plan.v1.PlanNode.NodeCase.LIMIT_OFFSET -> hasWorkspaceRef(plan.limitOffset.input)
@@ -316,6 +327,7 @@ internal object ColumnUsage {
                 collectTables(plan.join.left, acc)
                 collectTables(plan.join.right, acc)
             }
+            PlanNode.NodeCase.UNION -> plan.union.inputsList.forEach { collectTables(it, acc) }
             PlanNode.NodeCase.AGGREGATE -> collectTables(plan.aggregate.input, acc)
             PlanNode.NodeCase.SORT -> collectTables(plan.sort.input, acc)
             PlanNode.NodeCase.LIMIT_OFFSET -> collectTables(plan.limitOffset.input, acc)
@@ -373,6 +385,7 @@ internal object ColumnUsage {
                 collectColumns(plan.join.left, acc)
                 collectColumns(plan.join.right, acc)
             }
+            PlanNode.NodeCase.UNION -> plan.union.inputsList.forEach { collectColumns(it, acc) }
             PlanNode.NodeCase.AGGREGATE -> {
                 plan.aggregate.groupKeysList.forEach { acc.add(it.name) }
                 plan.aggregate.aggregatesList.forEach { call -> call.argsList.forEach { acc.add(it.name) } }
@@ -470,6 +483,15 @@ internal object ExpressionRewriter {
                             .setCondition(rewriteExpression(plan.join.condition, transform))
                             .setLeft(rewriteColumnRefs(plan.join.left, transform))
                             .setRight(rewriteColumnRefs(plan.join.right, transform)),
+                    ).build()
+            PlanNode.NodeCase.UNION ->
+                PlanNode
+                    .newBuilder()
+                    .setUnion(
+                        plan.union
+                            .toBuilder()
+                            .clearInputs()
+                            .addAllInputs(plan.union.inputsList.map { rewriteColumnRefs(it, transform) }),
                     ).build()
             PlanNode.NodeCase.AGGREGATE ->
                 PlanNode

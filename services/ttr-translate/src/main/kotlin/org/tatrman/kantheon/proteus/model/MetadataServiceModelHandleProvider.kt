@@ -8,7 +8,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import shared.translator.framework.ModelHandle
+import org.tatrman.translator.framework.ModelHandle
 import java.util.concurrent.atomic.AtomicReference
 
 /**

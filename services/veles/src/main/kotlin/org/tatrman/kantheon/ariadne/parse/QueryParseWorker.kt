@@ -12,8 +12,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.slf4j.LoggerFactory
-import shared.translator.orchestrator.ParseResult
-import shared.translator.orchestrator.Translator
+import org.tatrman.translator.orchestrator.ParseResult
+import org.tatrman.translator.orchestrator.Translator
 
 /**
  * Section F (DF-M05) — background query-parse worker. On every model swap it

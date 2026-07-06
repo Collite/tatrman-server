@@ -20,8 +20,8 @@ import org.tatrman.kantheon.argos.stages.RuleEnforcer
 import org.tatrman.kantheon.argos.stages.SecurityApplier
 import org.tatrman.kantheon.argos.stages.StrictCoercionChecker
 import org.tatrman.kantheon.argos.stages.WorkspaceRefDetector
-import shared.translator.framework.SchemaVersionVerifier
-import shared.translator.framework.VerificationResult
+import org.tatrman.translator.framework.SchemaVersionVerifier
+import org.tatrman.translator.framework.VerificationResult
 
 /**
  * gRPC entrypoint for the Validator. The order of operations is:

@@ -31,6 +31,7 @@ internal object PlanScanCollector {
                 walk(plan.join.left, acc)
                 walk(plan.join.right, acc)
             }
+            PlanNode.NodeCase.UNION -> plan.union.inputsList.forEach { walk(it, acc) }
             PlanNode.NodeCase.AGGREGATE -> walk(plan.aggregate.input, acc)
             PlanNode.NodeCase.SORT -> walk(plan.sort.input, acc)
             PlanNode.NodeCase.LIMIT_OFFSET -> walk(plan.limitOffset.input, acc)
@@ -123,6 +124,14 @@ internal object PlanQnameRewriter {
                             .setLeft(rewrite(plan.join.left, defaultSchema, mismatches))
                             .setRight(rewrite(plan.join.right, defaultSchema, mismatches)),
                     ).build()
+            PlanNode.NodeCase.UNION ->
+                b
+                    .setUnion(
+                        plan.union
+                            .toBuilder()
+                            .clearInputs()
+                            .addAllInputs(plan.union.inputsList.map { rewrite(it, defaultSchema, mismatches) }),
+                    ).build()
             PlanNode.NodeCase.AGGREGATE ->
                 b
                     .setAggregate(
@@ -187,6 +196,7 @@ internal object WorkspaceRefDetector {
             PlanNode.NodeCase.PROJECT -> hasWorkspaceRef(plan.project.input)
             PlanNode.NodeCase.FILTER -> hasWorkspaceRef(plan.filter.input)
             PlanNode.NodeCase.JOIN -> hasWorkspaceRef(plan.join.left) || hasWorkspaceRef(plan.join.right)
+            PlanNode.NodeCase.UNION -> plan.union.inputsList.any { hasWorkspaceRef(it) }
             PlanNode.NodeCase.AGGREGATE -> hasWorkspaceRef(plan.aggregate.input)
             PlanNode.NodeCase.SORT -> hasWorkspaceRef(plan.sort.input)
             PlanNode.NodeCase.LIMIT_OFFSET -> hasWorkspaceRef(plan.limitOffset.input)

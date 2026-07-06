@@ -62,7 +62,7 @@ jib {
 }
 
 dependencies {
-    implementation(project(":shared:libs:kotlin:query-translator"))
+    implementation(libs.tatrman.ttr.translator)
     implementation(project(":shared:libs:kotlin:ktor-configurator"))
     implementation(project(":shared:libs:kotlin:otel-config"))
     implementation(project(":shared:libs:kotlin:logging-config"))

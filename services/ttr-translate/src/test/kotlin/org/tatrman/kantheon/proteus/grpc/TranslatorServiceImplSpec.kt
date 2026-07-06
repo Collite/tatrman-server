@@ -17,17 +17,17 @@ import io.kotest.matchers.string.shouldContainIgnoringCase
 import io.kotest.matchers.string.shouldNotContain
 import org.tatrman.kantheon.proteus.model.BootFixtureModel
 import org.tatrman.kantheon.proteus.model.StaticModelHandleProvider
-import shared.translator.framework.EntityMapping
-import shared.translator.framework.ModelAttribute
-import shared.translator.framework.ModelColumn
-import shared.translator.framework.ModelEntity
-import shared.translator.framework.ModelForeignKey
-import shared.translator.framework.ModelHandle
-import shared.translator.framework.ModelRelation
-import shared.translator.framework.ModelSavedQuery
-import shared.translator.framework.ModelTable
-import shared.translator.framework.SavedQueryBody
-import shared.translator.framework.SurfaceType
+import org.tatrman.translator.framework.EntityMapping
+import org.tatrman.translator.framework.ModelAttribute
+import org.tatrman.translator.framework.ModelColumn
+import org.tatrman.translator.framework.ModelEntity
+import org.tatrman.translator.framework.ModelForeignKey
+import org.tatrman.translator.framework.ModelHandle
+import org.tatrman.translator.framework.ModelRelation
+import org.tatrman.translator.framework.ModelSavedQuery
+import org.tatrman.translator.framework.ModelTable
+import org.tatrman.translator.framework.SavedQueryBody
+import org.tatrman.translator.framework.SurfaceType
 
 class TranslatorServiceImplSpec :
     StringSpec({

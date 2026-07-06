@@ -10,17 +10,17 @@ import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.collections.shouldHaveSize
 import org.tatrman.kantheon.proteus.model.StaticModelHandleProvider
-import shared.translator.framework.EntityMapping
-import shared.translator.framework.ModelAttribute
-import shared.translator.framework.ModelColumn
-import shared.translator.framework.ModelEntity
-import shared.translator.framework.ModelForeignKey
-import shared.translator.framework.ModelHandle
-import shared.translator.framework.ModelRelation
-import shared.translator.framework.ModelSavedQuery
-import shared.translator.framework.ModelTable
-import shared.translator.framework.SavedQueryBody
-import shared.translator.framework.SurfaceType
+import org.tatrman.translator.framework.EntityMapping
+import org.tatrman.translator.framework.ModelAttribute
+import org.tatrman.translator.framework.ModelColumn
+import org.tatrman.translator.framework.ModelEntity
+import org.tatrman.translator.framework.ModelForeignKey
+import org.tatrman.translator.framework.ModelHandle
+import org.tatrman.translator.framework.ModelRelation
+import org.tatrman.translator.framework.ModelSavedQuery
+import org.tatrman.translator.framework.ModelTable
+import org.tatrman.translator.framework.SavedQueryBody
+import org.tatrman.translator.framework.SurfaceType
 
 class DetectSourceSchemaSpec :
     StringSpec({
@@ -62,9 +62,9 @@ class DetectSourceSchemaSpec :
                 qname = qskupzboziQname,
                 columns =
                     listOf(
-                        shared.translator.framework.ModelColumn("idskupzbozi", SurfaceType.INT),
-                        shared.translator.framework.ModelColumn("kod_skup_zbozi", SurfaceType.TEXT),
-                        shared.translator.framework.ModelColumn("nazev", SurfaceType.TEXT),
+                        org.tatrman.translator.framework.ModelColumn("idskupzbozi", SurfaceType.INT),
+                        org.tatrman.translator.framework.ModelColumn("kod_skup_zbozi", SurfaceType.TEXT),
+                        org.tatrman.translator.framework.ModelColumn("nazev", SurfaceType.TEXT),
                     ),
             )
         val qzboziTable =
@@ -72,7 +72,7 @@ class DetectSourceSchemaSpec :
                 qname = qzboziQname,
                 columns =
                     listOf(
-                        shared.translator.framework.ModelColumn("id", SurfaceType.INT),
+                        org.tatrman.translator.framework.ModelColumn("id", SurfaceType.INT),
                     ),
             )
         val produktEntity =
@@ -80,8 +80,8 @@ class DetectSourceSchemaSpec :
                 qname = produktQname,
                 attributes =
                     listOf(
-                        shared.translator.framework.ModelAttribute("id", SurfaceType.INT),
-                        shared.translator.framework.ModelAttribute("name", SurfaceType.TEXT),
+                        org.tatrman.translator.framework.ModelAttribute("id", SurfaceType.INT),
+                        org.tatrman.translator.framework.ModelAttribute("name", SurfaceType.TEXT),
                     ),
             )
         val skupinaEntity =
@@ -89,7 +89,7 @@ class DetectSourceSchemaSpec :
                 qname = skupinaQname,
                 attributes =
                     listOf(
-                        shared.translator.framework.ModelAttribute("id", SurfaceType.INT),
+                        org.tatrman.translator.framework.ModelAttribute("id", SurfaceType.INT),
                     ),
             )
 

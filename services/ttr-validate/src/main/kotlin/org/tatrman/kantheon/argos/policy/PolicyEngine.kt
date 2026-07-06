@@ -145,6 +145,7 @@ class PolicyEngine(
                 collectTableScans(plan.join.left, acc)
                 collectTableScans(plan.join.right, acc)
             }
+            PlanNode.NodeCase.UNION -> plan.union.inputsList.forEach { collectTableScans(it, acc) }
             PlanNode.NodeCase.AGGREGATE -> collectTableScans(plan.aggregate.input, acc)
             PlanNode.NodeCase.SORT -> collectTableScans(plan.sort.input, acc)
             PlanNode.NodeCase.LIMIT_OFFSET -> collectTableScans(plan.limitOffset.input, acc)

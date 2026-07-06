@@ -186,6 +186,8 @@ class RuleEnforcer(
             PlanNode.NodeCase.FILTER -> bareColumnRefExistsFor(plan.filter.input, column)
             PlanNode.NodeCase.JOIN ->
                 bareColumnRefExistsFor(plan.join.left, column) || bareColumnRefExistsFor(plan.join.right, column)
+            PlanNode.NodeCase.UNION ->
+                plan.union.inputsList.any { bareColumnRefExistsFor(it, column) }
             PlanNode.NodeCase.LIMIT_OFFSET -> bareColumnRefExistsFor(plan.limitOffset.input, column)
             PlanNode.NodeCase.SUBQUERY -> bareColumnRefExistsFor(plan.subquery.subquery, column)
             PlanNode.NodeCase.TABLE_SCAN,
