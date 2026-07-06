@@ -37,8 +37,8 @@ import org.tatrman.kantheon.proteus.model.StaticModelHandleProvider
 import shared.ktor.KtorConfigFactory
 import shared.ktor.KtorServerBootstrap
 import shared.ktor.installKtorServerBase
-import shared.translator.orchestrator.ParseResult
-import shared.translator.orchestrator.Translator
+import org.tatrman.translator.orchestrator.ParseResult
+import org.tatrman.translator.orchestrator.Translator
 import shared.otel.OtelEndpointConfig
 import shared.otel.createOpenTelemetrySdk
 import java.util.concurrent.TimeUnit

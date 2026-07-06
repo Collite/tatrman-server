@@ -6,9 +6,9 @@ import org.tatrman.proteus.v1.SqlDialect
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.kantheon.proteus.model.BootFixtureModel
-import shared.translator.orchestrator.ParseResult
-import shared.translator.orchestrator.Translator
-import shared.translator.orchestrator.UnparseResult
+import org.tatrman.translator.orchestrator.ParseResult
+import org.tatrman.translator.orchestrator.Translator
+import org.tatrman.translator.orchestrator.UnparseResult
 
 /**
  * Guards the startup Calcite warm-up: [WARMUP_SQL] must actually parse against the

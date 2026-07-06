@@ -52,7 +52,7 @@ dependencies {
     implementation(project(":shared:libs:kotlin:otel-config"))
     implementation(project(":shared:libs:kotlin:logging-config"))
     // Section F query-parse worker parses stored queries in-process against the model (SQL → PlanNode).
-    implementation(project(":shared:libs:kotlin:query-translator"))
+    implementation(libs.tatrman.ttr.translator)
     implementation(project(":shared:proto"))
 
     implementation(libs.kotlinx.coroutines.core)

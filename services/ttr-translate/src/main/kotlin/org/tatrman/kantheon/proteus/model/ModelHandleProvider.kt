@@ -1,6 +1,6 @@
 package org.tatrman.kantheon.proteus.model
 
-import shared.translator.framework.ModelHandle
+import org.tatrman.translator.framework.ModelHandle
 
 /**
  * Source of [ModelHandle] snapshots for the translator service.

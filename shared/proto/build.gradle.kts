@@ -29,7 +29,13 @@ dependencies {
     // ai-platform-proto `api` dep; that dep was removed in fork Stage 2.6, so
     // depend on coroutines directly.
     api(libs.kotlinx.coroutines.core)
-    // All protos are in-repo. The ai-platform Maven dep (cz.dfpartner:shared-proto,
+    // ttr-translator arc B1: the canonical plan.v1/transdsl.v1/dfdsl.v1 wire formats
+    // are owned by tatrman and consumed as an artifact. The protobuf-gradle-plugin
+    // extracts the bundled `.proto` files onto the protoc include path (without
+    // recompiling them here), so `import "org/tatrman/plan/v1/plan.proto"` in the
+    // downstream service protos keeps resolving. FQCNs are identical (org.tatrman.*).
+    api(libs.tatrman.ttr.plan.proto)
+    // All other protos are in-repo. The ai-platform Maven dep (cz.dfpartner:shared-proto,
     // Themis's residual nlp.v1) was removed in fork Stage 2.6 — Themis now imports
     // org.tatrman.kadmos.v1 + common.v1, both generated here.
 

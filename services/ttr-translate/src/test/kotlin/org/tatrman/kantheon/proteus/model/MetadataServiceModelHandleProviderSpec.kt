@@ -16,7 +16,7 @@ import org.tatrman.plan.v1.SchemaCode
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
-import shared.translator.framework.SurfaceType
+import org.tatrman.translator.framework.SurfaceType
 
 class MetadataServiceModelHandleProviderSpec :
     StringSpec({

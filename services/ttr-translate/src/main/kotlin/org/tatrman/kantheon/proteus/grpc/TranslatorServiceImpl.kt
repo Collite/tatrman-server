@@ -27,19 +27,19 @@ import org.tatrman.proteus.v1.UnparseRequest
 import org.tatrman.proteus.v1.UnparseResponse
 import org.slf4j.LoggerFactory
 import org.tatrman.kantheon.proteus.model.ModelHandleProvider
-import shared.translator.codec.transdsl.TransDslCodec
-import shared.translator.orchestrator.ParseResult
-import shared.translator.orchestrator.Translator
-import shared.translator.orchestrator.TranslateResult
-import shared.translator.orchestrator.UnparseResult
-import shared.translator.params.SqlParam
+import org.tatrman.translator.codec.transdsl.TransDslCodec
+import org.tatrman.translator.orchestrator.ParseResult
+import org.tatrman.translator.orchestrator.Translator
+import org.tatrman.translator.orchestrator.TranslateResult
+import org.tatrman.translator.orchestrator.UnparseResult
+import org.tatrman.translator.params.SqlParam
 import org.tatrman.plan.v1.parseSchemaCode
 
 /**
  * gRPC surface for the translator service.
  *
  * Each RPC:
- *   1. Captures the current [shared.translator.framework.ModelHandle] from [ModelHandleProvider]
+ *   1. Captures the current [org.tatrman.translator.framework.ModelHandle] from [ModelHandleProvider]
  *      (per-request snapshot — see provider docs).
  *   2. Constructs a fresh [Translator] orchestrator from the library (rule #2).
  *   3. For TransDSL sources with a metadata client wired ([getQuery] non-null), pre-resolves any
@@ -94,7 +94,7 @@ class TranslatorServiceImpl(
                                 request.targetSchema
                             }
                         runCatching {
-                            shared.translator.suggest.SuggestingMessage.enrich(
+                            org.tatrman.translator.suggest.SuggestingMessage.enrich(
                                 result.message,
                                 handle,
                                 activeSchema,
@@ -220,7 +220,7 @@ class TranslatorServiceImpl(
     override suspend fun detectSourceSchema(request: DetectSchemaRequest): DetectSchemaResponse {
         val handle = modelProvider.current()
         val result =
-            shared.translator.detect.SchemaDetector.detect(
+            org.tatrman.translator.detect.SchemaDetector.detect(
                 source = request.source,
                 sourceLanguage = request.sourceLanguage,
                 statedSchema = request.statedSchema,
@@ -245,7 +245,7 @@ class TranslatorServiceImpl(
         }
 
         when (result.decision) {
-            shared.translator.detect.SchemaDecision.AUTODETECTED -> {
+            org.tatrman.translator.detect.SchemaDecision.AUTODETECTED -> {
                 builder.addMessages(
                     infoMessage(
                         "schema_autodetected",
@@ -253,7 +253,7 @@ class TranslatorServiceImpl(
                     ),
                 )
             }
-            shared.translator.detect.SchemaDecision.CORRECTED -> {
+            org.tatrman.translator.detect.SchemaDecision.CORRECTED -> {
                 builder.addMessages(
                     warnMessage(
                         "schema_corrected",
@@ -265,7 +265,7 @@ class TranslatorServiceImpl(
                     ),
                 )
             }
-            shared.translator.detect.SchemaDecision.AMBIGUOUS -> {
+            org.tatrman.translator.detect.SchemaDecision.AMBIGUOUS -> {
                 val schemas =
                     result.perTableSchemas.values
                         .flatten()
@@ -282,7 +282,7 @@ class TranslatorServiceImpl(
                     ),
                 )
             }
-            shared.translator.detect.SchemaDecision.UNKNOWN -> {
+            org.tatrman.translator.detect.SchemaDecision.UNKNOWN -> {
                 val tables = result.unknownTables.joinToString()
                 builder.addMessages(
                     errorMessage(
@@ -293,7 +293,7 @@ class TranslatorServiceImpl(
                     ),
                 )
             }
-            shared.translator.detect.SchemaDecision.MIXED -> {
+            org.tatrman.translator.detect.SchemaDecision.MIXED -> {
                 val tableSchemas =
                     result.perTableSchemas.entries.joinToString { (t, s) ->
                         "$t:${s.joinToString("/") { schemaCodeToToken(it) }}"
@@ -305,8 +305,8 @@ class TranslatorServiceImpl(
                     ),
                 )
             }
-            shared.translator.detect.SchemaDecision.CONFIRMED,
-            shared.translator.detect.SchemaDecision.NOT_APPLICABLE,
+            org.tatrman.translator.detect.SchemaDecision.CONFIRMED,
+            org.tatrman.translator.detect.SchemaDecision.NOT_APPLICABLE,
             -> {
                 // No message
             }
@@ -315,15 +315,15 @@ class TranslatorServiceImpl(
         return builder.build()
     }
 
-    private fun mapDecision(decision: shared.translator.detect.SchemaDecision): SchemaDecision =
+    private fun mapDecision(decision: org.tatrman.translator.detect.SchemaDecision): SchemaDecision =
         when (decision) {
-            shared.translator.detect.SchemaDecision.CONFIRMED -> SchemaDecision.CONFIRMED
-            shared.translator.detect.SchemaDecision.AUTODETECTED -> SchemaDecision.AUTODETECTED
-            shared.translator.detect.SchemaDecision.CORRECTED -> SchemaDecision.CORRECTED
-            shared.translator.detect.SchemaDecision.AMBIGUOUS -> SchemaDecision.AMBIGUOUS
-            shared.translator.detect.SchemaDecision.UNKNOWN -> SchemaDecision.UNKNOWN
-            shared.translator.detect.SchemaDecision.MIXED -> SchemaDecision.MIXED
-            shared.translator.detect.SchemaDecision.NOT_APPLICABLE -> SchemaDecision.NOT_APPLICABLE
+            org.tatrman.translator.detect.SchemaDecision.CONFIRMED -> SchemaDecision.CONFIRMED
+            org.tatrman.translator.detect.SchemaDecision.AUTODETECTED -> SchemaDecision.AUTODETECTED
+            org.tatrman.translator.detect.SchemaDecision.CORRECTED -> SchemaDecision.CORRECTED
+            org.tatrman.translator.detect.SchemaDecision.AMBIGUOUS -> SchemaDecision.AMBIGUOUS
+            org.tatrman.translator.detect.SchemaDecision.UNKNOWN -> SchemaDecision.UNKNOWN
+            org.tatrman.translator.detect.SchemaDecision.MIXED -> SchemaDecision.MIXED
+            org.tatrman.translator.detect.SchemaDecision.NOT_APPLICABLE -> SchemaDecision.NOT_APPLICABLE
         }
 
     /**
