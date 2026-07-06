@@ -18,6 +18,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
 import org.tatrman.kantheon.kyklop.client.GrpcWorkerClient
 import org.tatrman.kantheon.kyklop.client.WorkerClient
@@ -145,31 +147,29 @@ fun Application.module(config: Config) {
     }
 
     routing {
-        get("/health") { call.respond(mapOf("status" to "UP")) }
+        get("/health") { call.respond(buildJsonObject { put("status", "UP") }) }
         get("/ready") {
             val healthy = registry.all().count { it.health == WorkerHealthStatus.HEALTHY }
-            // Homogeneous values only: the content serializer rejects a Map with mixed element
-            // types (String + Int here), which made /ready throw 500. Stringify the count.
             if (healthy > 0 || config.getBoolean("kyklop.use-fixture")) {
-                call.respond(mapOf("status" to "UP", "healthy_workers" to healthy.toString()))
+                call.respond(buildJsonObject { put("status", "UP"); put("healthy_workers", healthy.toString()) })
             } else {
                 call.respond(
                     io.ktor.http.HttpStatusCode.ServiceUnavailable,
-                    mapOf("status" to "NOT_READY", "healthy_workers" to healthy.toString()),
+                    buildJsonObject { put("status", "NOT_READY"); put("healthy_workers", healthy.toString()) },
                 )
             }
         }
         get("/status") {
             val workers = registry.all()
             call.respond(
-                mapOf(
-                    "service" to "kyklop",
-                    "grpc_port" to grpcPort,
-                    "default_connection" to world.defaultConnection,
-                    "known_workers" to workers.size,
-                    "healthy_workers" to workers.count { it.health == WorkerHealthStatus.HEALTHY },
-                    "active_sticky_sessions" to sticky.size(),
-                ),
+                buildJsonObject {
+                    put("service", "kyklop")
+                    put("grpc_port", grpcPort)
+                    put("default_connection", world.defaultConnection)
+                    put("known_workers", workers.size)
+                    put("healthy_workers", workers.count { it.health == WorkerHealthStatus.HEALTHY })
+                    put("active_sticky_sessions", sticky.size())
+                },
             )
         }
     }

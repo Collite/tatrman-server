@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
 import org.tatrman.kantheon.proteus.grpc.TranslatorServiceImpl
 import org.tatrman.kantheon.proteus.model.BootFixtureModel
@@ -221,7 +222,7 @@ fun Application.module(config: Config) {
     launch { warmUpCalcite() }
 
     routing {
-        get("/health") { call.respond(mapOf("status" to "UP")) }
+        get("/health") { call.respond(buildJsonObject { put("status", "UP") }) }
         get("/ready") {
             // In fixture mode there is no metadata provider, so the fixture IS the intended model → ready.
             // With the metadata provider we are only ready once the first snapshot has loaded; until then
