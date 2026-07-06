@@ -11,6 +11,10 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
@@ -189,28 +193,28 @@ fun Application.module(
     connectionsFile: File? = null,
 ) {
     routing {
-        get("/health") { call.respond(mapOf("status" to "UP")) }
+        get("/health") { call.respond(buildJsonObject { put("status", "UP") }) }
         get("/ready") {
             // Lazily-validated connections: a broken DB connection does NOT
             // make the pod unready (architecture §7 / plan §4 Stage 2.3 —
             // "one broken DB ≠ unready pod"). The registered set is reported
             // as informational degraded-set context.
             call.respond(
-                mapOf(
-                    "status" to "UP",
-                    "stage" to "2.3",
-                    "connections" to connectionRegistry.ids().sorted(),
-                ),
+                buildJsonObject {
+                    put("status", "UP")
+                    put("stage", "2.3")
+                    putJsonArray("connections") { connectionRegistry.ids().sorted().forEach { add(it) } }
+                },
             )
         }
         get("/status") {
             call.respond(
-                mapOf(
-                    "service" to "charon",
-                    "stage" to "2.3",
-                    "endpoints" to "seaweed (live), redis (live), db_table (live); worker_df stubbed",
-                    "connections" to connectionRegistry.ids().sorted(),
-                ),
+                buildJsonObject {
+                    put("service", "charon")
+                    put("stage", "2.3")
+                    put("endpoints", "seaweed (live), redis (live), db_table (live); worker_df stubbed")
+                    putJsonArray("connections") { connectionRegistry.ids().sorted().forEach { add(it) } }
+                },
             )
         }
         // Registry reload (cluster-internal; contracts §4). Re-reads the
@@ -218,10 +222,15 @@ fun Application.module(
         post("/refresh") {
             val file = connectionsFile
             if (file == null || !file.isFile) {
-                call.respond(mapOf("status" to "no-op", "reason" to "no connections file"))
+                call.respond(buildJsonObject { put("status", "no-op"); put("reason", "no connections file") })
             } else {
                 connectionRegistry.refresh(file.readText())
-                call.respond(mapOf("status" to "reloaded", "connections" to connectionRegistry.ids().sorted()))
+                call.respond(
+                    buildJsonObject {
+                        put("status", "reloaded")
+                        putJsonArray("connections") { connectionRegistry.ids().sorted().forEach { add(it) } }
+                    },
+                )
             }
         }
         get("/metrics") {
