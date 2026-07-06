@@ -1,0 +1,114 @@
+package tpcds
+
+// TPC-DS (SF1) retail-sales warehouse — a self-contained Ariadne seed package
+// for the deploy-test query path (WS-T2). Covers the star the four curated
+// queries need: the three sales facts (store/catalog/web) + the shared
+// date/item/customer/store dimensions. Physical tables live in the `public`
+// schema of `tpc-ds-1g` on `test-pg`; the model uses the model-wide default
+// `db.dbo` namespace token (Proteus drops the schema qualifier for PostgreSQL
+// output, so unqualified names resolve via search_path). Loaded by Arges over
+// the `pg-tpcds` read-only connection; Kyklop routes these tables → pg-tpcds.
+
+def table store_sales { description: """Store-channel sales fact (one row per lineitem sold in a store).""",
+    primaryKey: ["ss_item_sk", "ss_ticket_number"],
+    columns: [
+        def column ss_sold_date_sk { type: int, optional: true, description: "FK → date_dim.d_date_sk (date the item was sold)", },
+        def column ss_item_sk { type: int, isKey: true, description: "FK → item.i_item_sk (item sold)", },
+        def column ss_customer_sk { type: int, optional: true, description: "FK → customer.c_customer_sk (buyer)", },
+        def column ss_store_sk { type: int, optional: true, description: "FK → store.s_store_sk (selling store)", },
+        def column ss_ticket_number { type: int, isKey: true, description: "Ticket (order) number — part of the natural key", },
+        def column ss_quantity { type: int, optional: true, description: "Quantity sold", },
+        def column ss_sales_price { type: decimal, optional: true, description: "Per-unit sales price", },
+        def column ss_net_paid { type: decimal, optional: true, description: "Net amount paid (ex-tax)", },
+    ]
+}
+
+def table catalog_sales { description: """Catalog-channel sales fact.""",
+    primaryKey: ["cs_item_sk", "cs_order_number"],
+    columns: [
+        def column cs_sold_date_sk { type: int, optional: true, description: "FK → date_dim.d_date_sk", },
+        def column cs_item_sk { type: int, isKey: true, description: "FK → item.i_item_sk", },
+        def column cs_order_number { type: int, isKey: true, description: "Catalog order number — part of the natural key", },
+        def column cs_quantity { type: int, optional: true, description: "Quantity sold", },
+        def column cs_sales_price { type: decimal, optional: true, description: "Per-unit sales price", },
+        def column cs_net_paid { type: decimal, optional: true, description: "Net amount paid (ex-tax)", },
+    ]
+}
+
+def table web_sales { description: """Web-channel sales fact.""",
+    primaryKey: ["ws_item_sk", "ws_order_number"],
+    columns: [
+        def column ws_sold_date_sk { type: int, optional: true, description: "FK → date_dim.d_date_sk", },
+        def column ws_item_sk { type: int, isKey: true, description: "FK → item.i_item_sk", },
+        def column ws_order_number { type: int, isKey: true, description: "Web order number — part of the natural key", },
+        def column ws_quantity { type: int, optional: true, description: "Quantity sold", },
+        def column ws_sales_price { type: decimal, optional: true, description: "Per-unit sales price", },
+        def column ws_net_paid { type: decimal, optional: true, description: "Net amount paid (ex-tax)", },
+    ]
+}
+
+def table date_dim { description: """Date dimension — one row per calendar day.""",
+    primaryKey: ["d_date_sk"],
+    columns: [
+        def column d_date_sk { type: int, isKey: true, description: "Surrogate key for a calendar day", },
+        def column d_date { type: datetime, optional: true, description: "Calendar date", },
+        def column d_year { type: int, optional: true, description: "Calendar year", },
+        def column d_moy { type: int, optional: true, description: "Month of year (1–12)", },
+        def column d_dom { type: int, optional: true, description: "Day of month (1–31)", },
+    ]
+}
+
+def table item { description: """Item dimension — the product catalog.""",
+    primaryKey: ["i_item_sk"],
+    columns: [
+        def column i_item_sk { type: int, isKey: true, description: "Surrogate key for an item", },
+        def column i_item_id { type: text, optional: true, description: "Business item id", search { searchable: true, fuzzy: true, descriptions { en: ["Match an item by its business id, e.g. WHERE i_item_id = 'AAAAAAAABAAAAAAA'"] } } },
+        def column i_item_desc { type: text, optional: true, description: "Item description", search { searchable: true, fuzzy: true } },
+        def column i_current_price { type: decimal, optional: true, description: "Current list price", },
+    ]
+}
+
+def table customer { description: """Customer dimension.""",
+    primaryKey: ["c_customer_sk"],
+    columns: [
+        def column c_customer_sk { type: int, isKey: true, description: "Surrogate key for a customer", },
+        def column c_customer_id { type: text, optional: true, description: "Business customer id", search { searchable: true, fuzzy: true } },
+        def column c_first_name { type: text, optional: true, description: "Customer first name", },
+        def column c_last_name { type: text, optional: true, description: "Customer last name", },
+    ]
+}
+
+def table store { description: """Store dimension — physical retail stores.""",
+    primaryKey: ["s_store_sk"],
+    columns: [
+        def column s_store_sk { type: int, isKey: true, description: "Surrogate key for a store", },
+        def column s_store_id { type: text, optional: true, description: "Business store id", search { searchable: true, fuzzy: true } },
+        def column s_store_name { type: text, optional: true, description: "Store name", search { searchable: true, fuzzy: true } },
+    ]
+}
+
+// Star-join foreign keys — facts → dimensions on the surrogate keys.
+def fk store_sales_sold_date { description: "Store sale occurred on a calendar day",
+    from: [db.dbo.store_sales.ss_sold_date_sk], to: [db.dbo.date_dim.d_date_sk],
+}
+def fk store_sales_item { description: "Store sale is of an item",
+    from: [db.dbo.store_sales.ss_item_sk], to: [db.dbo.item.i_item_sk],
+}
+def fk store_sales_customer { description: "Store sale was made by a customer",
+    from: [db.dbo.store_sales.ss_customer_sk], to: [db.dbo.customer.c_customer_sk],
+}
+def fk store_sales_store { description: "Store sale happened at a store",
+    from: [db.dbo.store_sales.ss_store_sk], to: [db.dbo.store.s_store_sk],
+}
+def fk catalog_sales_sold_date { description: "Catalog sale occurred on a calendar day",
+    from: [db.dbo.catalog_sales.cs_sold_date_sk], to: [db.dbo.date_dim.d_date_sk],
+}
+def fk catalog_sales_item { description: "Catalog sale is of an item",
+    from: [db.dbo.catalog_sales.cs_item_sk], to: [db.dbo.item.i_item_sk],
+}
+def fk web_sales_sold_date { description: "Web sale occurred on a calendar day",
+    from: [db.dbo.web_sales.ws_sold_date_sk], to: [db.dbo.date_dim.d_date_sk],
+}
+def fk web_sales_item { description: "Web sale is of an item",
+    from: [db.dbo.web_sales.ws_item_sk], to: [db.dbo.item.i_item_sk],
+}

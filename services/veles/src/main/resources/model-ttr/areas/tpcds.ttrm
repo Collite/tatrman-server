@@ -1,0 +1,5 @@
+def area tpcds {
+    description: "TPC-DS retail-sales warehouse — store, catalog and web sales over the shared date/item/customer/store dimensions",
+    tags: ["warehouse", "tpc-ds"],
+    packages: [tpcds],
+}
