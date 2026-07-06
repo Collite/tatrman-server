@@ -4,11 +4,14 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
 import io.ktor.http.ContentType
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.application.call
+import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import kotlinx.serialization.json.add
@@ -192,6 +195,13 @@ fun Application.module(
     connectionRegistry: ConnectionRegistry = ConnectionRegistry.of(emptyList()),
     connectionsFile: File? = null,
 ) {
+    // JSON serialization for the probe/status routes below. Without this the
+    // `call.respond(buildJsonObject { … })` responses have no negotiated
+    // representation and Ktor returns HTTP 406 — a silently-failing
+    // `/health`/`/ready` probe → CrashLoopBackOff on the cluster. Every sibling
+    // service installs this via `installKtorServerBase`; charon wires the Ktor
+    // module by hand, so it must install it explicitly. See EXAMPLES.md §2a.
+    install(ContentNegotiation) { json() }
     routing {
         get("/health") { call.respond(buildJsonObject { put("status", "UP") }) }
         get("/ready") {

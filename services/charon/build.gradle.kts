@@ -133,6 +133,9 @@ dependencies {
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
+    // In-process Ktor host for the HTTP probe/status route specs (guards the
+    // ContentNegotiation-or-406 CrashLoop trap — EXAMPLES.md §2a).
+    testImplementation(libs.ktor.server.test.host)
     // In-process gRPC server for the component suite (Stage 1.1 T6: a
     // `RequestValidationSpec` exercises the five RPCs over an in-process channel
     // without needing a live K3s).
