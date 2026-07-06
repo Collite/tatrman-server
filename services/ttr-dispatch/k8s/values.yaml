@@ -44,6 +44,9 @@ telemetry:
 extraEnv:
   - { name: KYKLOP_WORKER_BRONTES_ENDPOINT, value: "brontes:7296" }
   - { name: KYKLOP_WORKER_STEROPES_ENDPOINT, value: "steropes:7301" }
+  # Arges — the Postgres worker (gRPC 7303). A permanent worker since 2026-06-23, so it
+  # ships wired by default (the application.conf slot skips an unset endpoint). Gates MP-1.
+  - { name: KYKLOP_WORKER_ARGES_ENDPOINT, value: "arges:7303" }
 
 # Probes (HTTP on the http port).
 readinessProbe:
