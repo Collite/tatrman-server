@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.slf4j.LoggerFactory
 import org.tatrman.kantheon.theseus.cache.CompiledPlanCache
 import org.tatrman.kantheon.theseus.client.DispatcherClient
@@ -118,33 +119,35 @@ fun Application.module(config: Config) {
     }
 
     routing {
-        get("/health") { call.respond(mapOf("status" to "UP")) }
+        get("/health") { call.respond(buildJsonObject { put("status", "UP") }) }
         get("/ready") {
             val ready = useFixture || (translatorClient is AutoCloseable)
             if (ready) {
-                call.respond(mapOf("status" to "UP"))
+                call.respond(buildJsonObject { put("status", "UP") })
             } else {
-                call.respond(io.ktor.http.HttpStatusCode.ServiceUnavailable, mapOf("status" to "NOT_READY"))
+                call.respond(
+                    io.ktor.http.HttpStatusCode.ServiceUnavailable,
+                    buildJsonObject { put("status", "NOT_READY") },
+                )
             }
         }
         get("/status") {
             val stats = cache.stats()
             call.respond(
-                mapOf(
-                    "service" to "theseus",
-                    "grpc_port" to grpcPort,
-                    "active_runs" to service.activeRunCount,
-                    "cache" to
-                        mapOf(
-                            "entries" to stats.entries,
-                            "max_entries" to stats.maxEntries,
-                            "hits" to stats.hits,
-                            "misses" to stats.misses,
-                            "invalidations" to stats.invalidations,
-                            "evictions" to stats.evictions,
-                            "current_model_version" to stats.currentModelVersion,
-                        ),
-                ),
+                buildJsonObject {
+                    put("service", "theseus")
+                    put("grpc_port", grpcPort)
+                    put("active_runs", service.activeRunCount)
+                    putJsonObject("cache") {
+                        put("entries", stats.entries)
+                        put("max_entries", stats.maxEntries)
+                        put("hits", stats.hits)
+                        put("misses", stats.misses)
+                        put("invalidations", stats.invalidations)
+                        put("evictions", stats.evictions)
+                        put("current_model_version", stats.currentModelVersion)
+                    }
+                },
             )
         }
         // Unauthenticated, cluster-internal (see DF decision: /refresh has no auth). Drops every

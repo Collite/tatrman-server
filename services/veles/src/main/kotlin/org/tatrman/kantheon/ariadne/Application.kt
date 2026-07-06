@@ -231,25 +231,28 @@ fun Application.module(config: Config) {
     }
 
     routing {
-        get("/health") { call.respond(mapOf("status" to "UP")) }
+        get("/health") { call.respond(buildJsonObject { put("status", "UP") }) }
         get("/ready") {
             val snap = registry.read()
             if (snap == null) {
-                call.respond(io.ktor.http.HttpStatusCode.ServiceUnavailable, mapOf("status" to "NOT_READY"))
+                call.respond(
+                    io.ktor.http.HttpStatusCode.ServiceUnavailable,
+                    buildJsonObject { put("status", "NOT_READY") },
+                )
             } else {
-                call.respond(mapOf("status" to "UP", "model_version" to snap.model.version.value))
+                call.respond(buildJsonObject { put("status", "UP"); put("model_version", snap.model.version.value) })
             }
         }
         get("/status") {
             val snap = registry.read()
             call.respond(
-                mapOf(
-                    "service" to "metadata",
-                    "model_loaded" to (snap != null),
-                    "model_version" to (snap?.model?.version?.value ?: ""),
-                    "object_count" to (snap?.graph?.size() ?: 0),
-                    "queries_total" to (snap?.model?.queries?.size ?: 0),
-                ),
+                buildJsonObject {
+                    put("service", "metadata")
+                    put("model_loaded", snap != null)
+                    put("model_version", snap?.model?.version?.value ?: "")
+                    put("object_count", snap?.graph?.size() ?: 0)
+                    put("queries_total", snap?.model?.queries?.size ?: 0)
+                },
             )
         }
         // Phase 09 B4 / DF-M16 — Prometheus scrape endpoint.
@@ -262,12 +265,17 @@ fun Application.module(config: Config) {
             if (configuredAdminToken == null || token != configuredAdminToken) {
                 call.respond(
                     io.ktor.http.HttpStatusCode.Forbidden,
-                    mapOf("status" to "forbidden", "reason" to "admin_token_required"),
+                    buildJsonObject { put("status", "forbidden"); put("reason", "admin_token_required") },
                 )
                 return@post
             }
             stopWords.reload()
-            call.respond(mapOf("status" to "ok", "languages" to supportedLanguages))
+            call.respond(
+                buildJsonObject {
+                    put("status", "ok")
+                    putJsonArray("languages") { supportedLanguages.forEach { add(it) } }
+                },
+            )
         }
         // Unauthenticated, cluster-internal (see DF decision: /refresh has no auth). Forces a
         // full synchronous reload of every metadata source + the atomic model swap. Golem's

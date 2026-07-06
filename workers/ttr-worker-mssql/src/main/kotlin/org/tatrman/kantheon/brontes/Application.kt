@@ -11,6 +11,11 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.apache.arrow.memory.RootAllocator
 import org.slf4j.LoggerFactory
 import org.tatrman.kantheon.brontes.client.GrpcTranslatorClient
@@ -101,33 +106,43 @@ fun Application.module(config: Config) {
     }
 
     routing {
-        get("/health") { call.respond(mapOf("status" to "UP")) }
+        get("/health") { call.respond(buildJsonObject { put("status", "UP") }) }
         get("/ready") {
             val ready = pool.supportedConnections.isNotEmpty() || useFixture
             if (ready) {
-                // Values must be homogeneous: the content serializer rejects a Map with mixed
-                // element types ("Serializing collections of different element types is not yet
-                // supported"), which made /ready throw 500 once `ready` was true (e.g. fixture
-                // mode). Stringify the count so both values are String.
-                call.respond(mapOf("status" to "UP", "connections" to pool.supportedConnections.size.toString()))
+                call.respond(
+                    buildJsonObject {
+                        put("status", "UP")
+                        put("connections", pool.supportedConnections.size.toString())
+                    },
+                )
             } else {
                 call.respond(
                     io.ktor.http.HttpStatusCode.ServiceUnavailable,
-                    mapOf("status" to "NOT_READY", "reason" to "no connections configured"),
+                    buildJsonObject { put("status", "NOT_READY"); put("reason", "no connections configured") },
                 )
             }
         }
         get("/status") {
             call.respond(
-                mapOf(
-                    "service" to "brontes",
-                    "engine" to config.getString("worker.engine"),
-                    "engine_version" to config.getString("worker.engine-version"),
-                    "grpc_port" to grpcPort,
-                    "supported_connections" to pool.supportedConnections.toList(),
-                    "active_queries" to pipeline.activeQueries,
-                    "pool_stats" to pool.poolStats(),
-                ),
+                buildJsonObject {
+                    put("service", "brontes")
+                    put("engine", config.getString("worker.engine"))
+                    put("engine_version", config.getString("worker.engine-version"))
+                    put("grpc_port", grpcPort)
+                    putJsonArray("supported_connections") { pool.supportedConnections.toList().forEach { add(it) } }
+                    put("active_queries", pipeline.activeQueries)
+                    putJsonObject("pool_stats") {
+                        pool.poolStats().forEach { (id, s) ->
+                            putJsonObject(id) {
+                                put("active", s.active)
+                                put("idle", s.idle)
+                                put("max", s.max)
+                                put("awaiting", s.awaiting)
+                            }
+                        }
+                    }
+                },
             )
         }
     }
