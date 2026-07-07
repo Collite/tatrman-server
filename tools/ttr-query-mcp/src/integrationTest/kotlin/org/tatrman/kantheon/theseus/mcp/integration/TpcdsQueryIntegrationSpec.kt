@@ -1,10 +1,12 @@
 package org.tatrman.kantheon.theseus.mcp.integration
 
+import io.kotest.assertions.withClue
 import io.kotest.core.annotation.Tags
 import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.coroutines.runBlocking
 import org.tatrman.kantheon.testkit.integration.RequiresContext
 import org.tatrman.kantheon.testkit.integration.RequiresContextExtension
@@ -95,32 +97,37 @@ class TpcdsQueryIntegrationSpec :
 
         suspend fun query(sql: String) = contextHandle().callQuery(sqlQueryArgs(sql, rowLimit = 1000), analyst)
 
+        // Surface the full error envelope (code + body) on a non-ok result, so a failing live run
+        // names the pipeline error (detection_failed / validate / translate / execute …) instead of
+        // a bare `expected false but was true`.
+        fun CallToolResult.assertOk() =
+            withClue({ "query failed — code=${firstMessageCode()} body=${bodyText().take(800)}" }) {
+                isError shouldBe false
+                ok() shouldBe true
+            }
+
         "store_sales_by_month (join + group-by) returns the 12 monthly rows for 2002" {
             val res = runBlocking { query(storeSalesByMonth) }
-            res.isError shouldBe false
-            res.ok() shouldBe true
+            res.assertOk()
             res.rowCount() shouldBe 12
             res.columnNames() shouldContain "total_sales"
         }
 
         "top_items_by_revenue (join + agg + ORDER/LIMIT) returns the SF1 item count for 2002" {
             val res = runBlocking { query(topItemsByRevenue) }
-            res.isError shouldBe false
-            res.ok() shouldBe true
+            res.assertOk()
             res.rowCount() shouldBe 30
         }
 
         "customer_running_total (window function) returns the SF1 running-total rows for 2002" {
             val res = runBlocking { query(customerRunningTotal) }
-            res.isError shouldBe false
-            res.ok() shouldBe true
+            res.assertOk()
             res.rowCount() shouldBe 30
         }
 
         "channel_revenue_cte (CTE + UNION ALL) returns exactly the three channels for 2002" {
             val res = runBlocking { query(channelRevenueCte) }
-            res.isError shouldBe false
-            res.ok() shouldBe true
+            res.assertOk()
             res.rowCount() shouldBe 3
             // The 3 channels are structural — every channel is present in the result body.
             val body = res.bodyText()
