@@ -90,4 +90,13 @@ dependencies {
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
+
+    // Component tier (WS-C1 T2) — the golden-SQL PostgreSQL unparse matrix over the four TPC-DS
+    // curated shapes. No container: it drives the **real** ttr-translator parse→RelNode→unparse
+    // path (not a mock) end-to-end and freezes the emitted PostgreSQL to golden files, so it lives
+    // out of the mocked `test` gate. Needs the translator + its `InMemoryModelHandle` test double
+    // (the same fixture the unit `TpcdsUnparseSpec` uses) plus the protos on the compile classpath.
+    "componentTestImplementation"(libs.tatrman.ttr.translator)
+    "componentTestImplementation"(testFixtures(libs.tatrman.ttr.translator))
+    "componentTestImplementation"(project(":shared:proto"))
 }
