@@ -63,6 +63,9 @@ jib {
 
 dependencies {
     implementation(libs.tatrman.ttr.translator)
+    // InMemoryModelHandle (the ModelHandle SPI test double) ships in the
+    // ttr-translator test-fixtures jar — used by TpcdsUnparseSpec (WS-T2 T4).
+    testImplementation(testFixtures(libs.tatrman.ttr.translator))
     implementation(project(":shared:libs:kotlin:ktor-configurator"))
     implementation(project(":shared:libs:kotlin:otel-config"))
     implementation(project(":shared:libs:kotlin:logging-config"))

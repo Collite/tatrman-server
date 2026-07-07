@@ -1,6 +1,8 @@
 package org.tatrman.kantheon.ariadne.grpc
 
 import org.tatrman.ariadne.v1.GetModelRequest
+import org.tatrman.ariadne.v1.Language
+import org.tatrman.ariadne.v1.ListQueriesRequest
 import org.tatrman.kantheon.common.v1.Severity
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.ttr.metadata.graph.ModelGraph
@@ -11,6 +13,7 @@ import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 
@@ -66,6 +69,64 @@ class GetModelSpec :
             resp.model.packageVersionsList[0]
                 .loadedAt
                 .isEmpty() shouldBe false
+        }
+
+        // WS-T2 T1 — the TPC-DS seed package loads cleanly: exactly the seven star
+        // tables resolve (the three sales facts + the four shared dimensions), all
+        // sourced from the tpcds package. This is a db-only package (raw-SQL curated
+        // queries over physical tables — no ER layer), so `relations` (ER-derived,
+        // MetadataServiceImpl §260) is not the guard here; FK join behaviour is
+        // exercised end-to-end by the Proteus unparse + query smoke (T4/T7).
+        "GetModel(packages=[tpcds]) loads the TPC-DS seven-table star" {
+            val svc = service()
+            val resp =
+                svc.getModel(
+                    GetModelRequest
+                        .newBuilder()
+                        .addPackages("tpcds")
+                        .build(),
+                )
+
+            val tableNames =
+                resp.model.tablesList
+                    .filter { it.objectDescriptor.qualifiedName.schemaCode == SchemaCode.DB }
+                    .map { it.objectDescriptor.qualifiedName.name }
+                    .toSet()
+            tableNames shouldContainAll
+                setOf("store_sales", "catalog_sales", "web_sales", "date_dim", "item", "customer", "store")
+            tableNames.size shouldBe 7
+
+            resp.model.packageVersionsList.map { it.packageName } shouldContain "tpcds"
+            resp.model.tablesList.all { it.objectDescriptor.sourceFile.contains("/tpcds/") } shouldBe true
+        }
+
+        // WS-T2 T3 — the four curated queries are registered under the tpcds tag,
+        // each SQL with its single `{year}` param. (Parse→RelNode is validated
+        // separately by TpcdsQueryParseSpec, which runs the parse worker; the bare
+        // reconcile here leaves queries PENDING.)
+        "ListQueries(tags=[tpcds]) returns the four curated queries with their params" {
+            val svc = service()
+            val r = svc.listQueries(ListQueriesRequest.newBuilder().addTags("tpcds").build())
+            val byName = r.itemsList.associateBy { it.objectDescriptor.localName }
+
+            byName.keys shouldContainAll
+                setOf(
+                    "store_sales_by_month",
+                    "top_items_by_revenue",
+                    "customer_running_total",
+                    "channel_revenue_cte",
+                )
+            listOf(
+                "store_sales_by_month",
+                "top_items_by_revenue",
+                "customer_running_total",
+                "channel_revenue_cte",
+            ).forEach { name ->
+                byName.getValue(name).let {
+                    it.sourceLanguage shouldBe Language.SQL
+                    it.parameterCount shouldBe 1
+                }
+            }
         }
 
         "entities list contains an entity with středisko alias when include_search_hints=true" {

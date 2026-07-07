@@ -143,6 +143,38 @@ class RlsEnvelopeSpec :
             }
         }
 
+        // WS-T2 T5 — the contrast to pg-midas: a connection WITHOUT requires-tenant-id (pg-tpcds)
+        // runs the query directly under autocommit — no SET LOCAL, no explicit transaction — even
+        // when the request carries no tenant_id at all.
+        "a connection without requires-tenant-id runs no SET LOCAL and stays on autocommit" {
+            runBlocking {
+                val executed = mutableListOf<String>()
+                val conn = fakeConn(executed)
+                val tpcdsPool = mockk<ConnectionPoolManager>()
+                every { tpcdsPool.supportedConnections } returns setOf("pg-tpcds")
+                every { tpcdsPool.requiresTenantId("pg-tpcds") } returns false
+                every { tpcdsPool.acquire("pg-tpcds") } returns conn
+                val pipeline = ExecutePipeline(tpcdsPool, translator("SELECT n FROM store_sales"), limits)
+
+                val req =
+                    ExecuteRequest
+                        .newBuilder()
+                        .setPlan(scan("public", "store_sales"))
+                        .setContext(PipelineContext.getDefaultInstance()) // NO tenant_id
+                        .setConnectionId("pg-tpcds")
+                        .setOptions(ExecutionOptions.getDefaultInstance())
+                        .build()
+
+                val out = pipeline.execute(req).toList()
+
+                out.flatMap { it.messagesList }.any { it.severity == Severity.ERROR } shouldBe false
+                // Only the query ran — no SET LOCAL app.tenant_id for this non-tenant connection.
+                executed shouldContainExactly listOf("SELECT n FROM store_sales")
+                verify(exactly = 0) { conn.autoCommit = false }
+                verify(exactly = 0) { conn.commit() }
+            }
+        }
+
         "missing tenant_id fails closed with tenant_id_required and runs nothing" {
             runBlocking {
                 val executed = mutableListOf<String>()

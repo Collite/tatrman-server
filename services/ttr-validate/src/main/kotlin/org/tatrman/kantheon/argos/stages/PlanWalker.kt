@@ -353,6 +353,11 @@ internal object ColumnUsage {
     ) {
         when (e.exprCase) {
             Expression.ExprCase.FUNCTION -> e.function.operandsList.forEach { collectTablesInExpr(it, acc) }
+            Expression.ExprCase.OVER -> {
+                e.over.operandsList.forEach { collectTablesInExpr(it, acc) }
+                e.over.partitionKeysList.forEach { collectTablesInExpr(it, acc) }
+                e.over.orderKeysList.forEach { collectTablesInExpr(it.expr, acc) }
+            }
             Expression.ExprCase.CAST -> collectTablesInExpr(e.cast.value, acc)
             Expression.ExprCase.SUBQUERY -> {
                 e.subquery.operandsList.forEach { collectTablesInExpr(it, acc) }
@@ -412,6 +417,11 @@ internal object ColumnUsage {
         when (e.exprCase) {
             Expression.ExprCase.COLUMN_REF -> acc.add(e.columnRef.name)
             Expression.ExprCase.FUNCTION -> e.function.operandsList.forEach { collectColumnsInExpr(it, acc) }
+            Expression.ExprCase.OVER -> {
+                e.over.operandsList.forEach { collectColumnsInExpr(it, acc) }
+                e.over.partitionKeysList.forEach { collectColumnsInExpr(it, acc) }
+                e.over.orderKeysList.forEach { collectColumnsInExpr(it.expr, acc) }
+            }
             Expression.ExprCase.CAST -> collectColumnsInExpr(e.cast.value, acc)
             // A subquery expression carries its own relational plan (which may reference new tables
             // and columns) plus the LHS operands for `IN`. Recurse into both: the nested plan via
@@ -548,6 +558,23 @@ internal object ExpressionRewriter {
                         ).build()
                 }
             }
+            Expression.ExprCase.OVER ->
+                e
+                    .toBuilder()
+                    .setOver(
+                        e.over
+                            .toBuilder()
+                            .clearOperands()
+                            .addAllOperands(e.over.operandsList.map { rewriteExpression(it, transform) })
+                            .clearPartitionKeys()
+                            .addAllPartitionKeys(e.over.partitionKeysList.map { rewriteExpression(it, transform) })
+                            .clearOrderKeys()
+                            .addAllOrderKeys(
+                                e.over.orderKeysList.map {
+                                    it.toBuilder().setExpr(rewriteExpression(it.expr, transform)).build()
+                                },
+                            ),
+                    ).build()
             Expression.ExprCase.CAST -> {
                 val inner = rewriteExpression(e.cast.value, transform)
                 if (inner === e.cast.value) {

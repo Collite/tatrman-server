@@ -55,6 +55,16 @@ class ResolveAreaSpec :
             r.messagesList.size shouldBe 0
         }
 
+        // WS-T2 T2 — the TPC-DS area resolves to its self-contained seed package.
+        "resolveArea(tpcds) returns the tpcds package, description, warehouse tags, found=true" {
+            val r = service().resolveArea(ResolveAreaRequest.newBuilder().setArea("tpcds").build())
+            r.found shouldBe true
+            r.packagesList shouldContainExactly listOf("tpcds")
+            r.description.shouldNotBeEmpty()
+            r.tagsList shouldContainExactly listOf("warehouse", "tpc-ds")
+            r.messagesList.size shouldBe 0
+        }
+
         "resolveArea(nonexistent) returns found=false, empty packages, and a Rule-6 message" {
             val r = service().resolveArea(ResolveAreaRequest.newBuilder().setArea("nonexistent").build())
             r.found shouldBe false

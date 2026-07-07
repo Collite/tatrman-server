@@ -41,6 +41,43 @@ class WorldConfigSpec :
         "resolveOrDefault falls back to default-connection" {
             world.resolveOrDefault(qname("db.dbo.QOTHER")) shouldBe "df-test"
         }
+
+        // WS-T2 T6 — the TPC-DS warehouse tables route to the pg-tpcds connection (served by Arges).
+        val tpcds =
+            WorldConfig.fromConfig(
+                ConfigFactory.parseString(
+                    """
+                    world {
+                      default-connection = "df-test"
+                      table-connections {
+                        "db.dbo.store_sales"   = "pg-tpcds"
+                        "db.dbo.catalog_sales" = "pg-tpcds"
+                        "db.dbo.web_sales"     = "pg-tpcds"
+                        "db.dbo.date_dim"      = "pg-tpcds"
+                        "db.dbo.item"          = "pg-tpcds"
+                        "db.dbo.customer"      = "pg-tpcds"
+                        "db.dbo.store"         = "pg-tpcds"
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+        "TPC-DS fact + dimension tables route to pg-tpcds" {
+            listOf(
+                "db.dbo.store_sales",
+                "db.dbo.catalog_sales",
+                "db.dbo.web_sales",
+                "db.dbo.date_dim",
+                "db.dbo.item",
+                "db.dbo.customer",
+                "db.dbo.store",
+            ).forEach { tpcds.routingFor(qname(it)) shouldBe "pg-tpcds" }
+        }
+
+        "an unmodelled table still falls back to the default connection" {
+            tpcds.resolveOrDefault(qname("db.dbo.web_returns")) shouldBe "df-test"
+        }
     })
 
 private fun qname(dotPath: String): QualifiedName {

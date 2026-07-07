@@ -135,6 +135,27 @@ class ConnectionPoolManagerSpec :
             ConnectionConfig.fromConfig("pg-midas", withoutFlag).requiresTenantId shouldBe false
         }
 
+        // WS-T2 T5 — the pg-tpcds warehouse profile: read-only, NOT multi-tenant (no RLS envelope).
+        "ConnectionConfig.fromConfig parses the pg-tpcds profile: read-only, no tenant gate" {
+            val cfg =
+                ConfigFactory.parseString(
+                    """
+                    host = "test-pg.data.svc.cluster.local"
+                    port = 5432
+                    database = "tpc-ds-1g"
+                    username = "tpcds_readonly"
+                    password = "secret"
+                    read-only = true
+                    requires-tenant-id = false
+                    """.trimIndent(),
+                )
+            val parsed = ConnectionConfig.fromConfig("pg-tpcds", cfg)
+            parsed.readOnly shouldBe true
+            parsed.requiresTenantId shouldBe false
+            parsed.database shouldBe "tpc-ds-1g"
+            parsed.jdbcUrl shouldBe "jdbc:postgresql://test-pg.data.svc.cluster.local:5432/tpc-ds-1g"
+        }
+
         "ConnectionConfig.fromConfig defaults read-only to true" {
             val cfg =
                 ConfigFactory.parseString(
