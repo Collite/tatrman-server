@@ -165,12 +165,9 @@ WHERE d.d_year = {year}""",
     ]
 }
 
-// PARKED (WS-T2 T3): the CTE + UNION ALL shape parses in Calcite but cannot yet be
-// lowered to the plan.v1 wire format — it has no `Union` op ("RelOp 'LogicalUnion'
-// is not in the v1 wire format"). The fix is authored in Collite/tatrman
-// (ttr-plan-proto + ttr-translator) and reaches kantheon with the ttr-translator
-// Phase B swap; TpcdsQueryParseSpec carries the tripwire. The query stays authored
-// so it lights up automatically once Union support lands.
+// CTE + UNION ALL across the three channels. Lowers to the plan.v1 `Union` op
+// (added in tatrman ttr-plan-proto 0.8.1, consumed via the ttr-translator Phase B
+// swap) — parses end-to-end; see TpcdsQueryParseSpec.
 def query channel_revenue_cte { description: "Net revenue by sales channel (store/catalog/web) for a fiscal year (CTE + UNION ALL + agg).",
     language: SQL,
     sourceText: """WITH all_sales AS (
