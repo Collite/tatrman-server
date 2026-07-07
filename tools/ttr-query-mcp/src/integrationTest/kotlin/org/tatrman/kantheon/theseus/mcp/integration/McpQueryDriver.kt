@@ -5,8 +5,11 @@ import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.header
 import io.ktor.http.HttpHeaders
 import io.modelcontextprotocol.kotlin.sdk.client.mcpStreamableHttp
+import io.modelcontextprotocol.kotlin.sdk.shared.RequestOptions
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -43,19 +46,30 @@ fun unsignedJwt(
  * Opens an MCP StreamableHTTP client to the context's theseus-mcp, calls the
  * `query` tool with [arguments], and returns the [CallToolResult]. When [bearer]
  * is set it travels as `Authorization: Bearer …` on every request (the OBO token).
+ *
+ * [callTimeout] bounds the whole MCP call. It defaults generously (3 min) because a real
+ * analytical query — e.g. a TPC-DS SF1 join+aggregate over millions of rows — on a cold JVM in a
+ * CPU-throttled test namespace can take far longer than the ktor CIO engine's 15 s default request
+ * timeout (which otherwise surfaces as `HttpRequestTimeoutException` at the first heavy query). The
+ * CIO engine-level timeout is disabled here so this MCP-level timeout is the single governing bound.
  */
 suspend fun ContextHandle.callQuery(
     arguments: Map<String, Any?>,
     bearer: String? = null,
+    callTimeout: Duration = 3.minutes,
 ): CallToolResult {
-    val http = HttpClient(CIO)
+    val http =
+        HttpClient(CIO) {
+            // 0 = no engine-level request timeout; the MCP RequestOptions timeout below governs.
+            engine { requestTimeout = 0 }
+        }
     try {
         val client =
             http.mcpStreamableHttp("${url("theseus-mcp")}/mcp") {
                 bearer?.let { header(HttpHeaders.Authorization, "Bearer $it") }
             }
         try {
-            return client.callTool("query", arguments)
+            return client.callTool("query", arguments, options = RequestOptions(timeout = callTimeout))
         } finally {
             client.close()
         }
