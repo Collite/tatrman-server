@@ -59,13 +59,6 @@ class ConnectionPoolManager(
      */
     fun requiresTenantId(connectionId: String): Boolean = configs[connectionId]?.requiresTenantId ?: false
 
-    /**
-     * The engine default schema [connectionId] is bound to (Postgres: "public"), or null when the
-     * connection is unknown. Used to concretize a plan's logical table namespace to the physical
-     * schema before unparse (see [org.tatrman.kantheon.arges.pipeline.PlanSchemaConcretizer]).
-     */
-    fun defaultSchemaFor(connectionId: String): String? = configs[connectionId]?.defaultSchema
-
     /** Acquires a connection from the pool for [connectionId], opening the pool on first use. */
     fun acquire(connectionId: String): Connection {
         val cfg = configs[connectionId] ?: throw UnknownConnectionException(connectionId)
