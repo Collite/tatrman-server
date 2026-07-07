@@ -94,4 +94,13 @@ dependencies {
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
     testImplementation(libs.wiremock)
+
+    // Component tier (WS-C1 T3) — proves Argos's tenant-isolation policy decision **enforces** on a
+    // real Postgres: the predicate the PolicyEngine emits, applied as a WHERE clause, denies
+    // cross-tenant rows (and a same-tenant query returns rows). Needs the testkit (Containers.postgres),
+    // the protos (security/plan v1), coroutines (evaluatePolicies is `suspend`), and the pg driver.
+    "componentTestImplementation"(project(":shared:libs:kotlin:component-testkit"))
+    "componentTestImplementation"(project(":shared:proto"))
+    "componentTestImplementation"(libs.kotlinx.coroutines.core)
+    "componentTestImplementation"(libs.postgresql)
 }
