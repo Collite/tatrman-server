@@ -86,4 +86,12 @@ dependencies {
     testImplementation(libs.mockk)
     // In-process gRPC server (review-004 R3.2 — live GetPrompts round-trip).
     testImplementation(libs.grpc.inprocess)
+
+    // Component tier (WS-C1 T4) — loads the **real bundled `model-ttr/` tree** (not a synthetic
+    // fixture) through the live ttr-metadata reconciler and asserts the shipped TPC-DS curated
+    // queries + areas resolve. Needs the metadata library (FileBasedSource / reconciler / registry /
+    // graph) and the protos on the componentTest compile classpath (both `implementation` in main,
+    // so not visible to the suite transitively).
+    "componentTestImplementation"(libs.tatrman.ttr.metadata)
+    "componentTestImplementation"(project(":shared:proto"))
 }
