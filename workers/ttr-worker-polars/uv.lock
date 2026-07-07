@@ -1242,7 +1242,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "protobuf", specifier = ">=4.0.0" },
-    { name = "ttr-plan-proto", specifier = "==0.8.3" },
+    { name = "ttr-plan-proto", specifier = "==0.8.4" },
 ]
 
 [[package]]
@@ -1268,13 +1268,13 @@ wheels = [
 
 [[package]]
 name = "ttr-plan-proto"
-version = "0.8.3"
+version = "0.8.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "protobuf" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d5/f7/c31487a946bd0cab0c1985bf9a38f16fa3bb5b3901acf452447c8b7155d0/ttr_plan_proto-0.8.3-py3-none-any.whl", hash = "sha256:1b76c937e777c017e920bb99be6ea745f280b31a6b7f3f890fb8442bd9769456", size = 10888, upload-time = "2026-07-06T23:35:12.538Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/ec/66defcb52fa48be978d4de324e787053d599f76078c4956b9d40f0a82795/ttr_plan_proto-0.8.4-py3-none-any.whl", hash = "sha256:349ebb39564aa2bad1e2dc0cd30276ebd398da60024b3b41131893a7cb66732d", size = 11178, upload-time = "2026-07-07T00:53:15.772Z" },
 ]
 
 [[package]]
