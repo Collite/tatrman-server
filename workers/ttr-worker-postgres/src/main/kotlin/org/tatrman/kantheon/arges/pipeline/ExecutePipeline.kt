@@ -116,19 +116,12 @@ class ExecutePipeline(
             var sql: String? = null
             var bindCount = 0
             try {
-                // Step 3 — translator unparse. Concretize the logical table namespace to the
-                // connection's physical schema first (e.g. the model's default `dbo` → Postgres
-                // `public`), so the unparsed SQL targets tables that actually exist.
-                val concretePlan =
-                    PlanSchemaConcretizer.withSchema(
-                        request.plan,
-                        pool.defaultSchemaFor(request.connectionId).orEmpty(),
-                    )
+                // Step 3 — translator unparse.
                 val unparse =
                     translator.unparse(
                         UnparseRequest
                             .newBuilder()
-                            .setPlan(concretePlan)
+                            .setPlan(request.plan)
                             .setTargetLanguage(Language.SQL)
                             .setTargetDialect(SqlDialect.POSTGRESQL)
                             .setOptimize(true)
