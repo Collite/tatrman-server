@@ -41,4 +41,43 @@ class RequiresContextExtensionSpec :
 
             ContextRegistry.get(PlainFake::class).shouldBeNull()
         }
+
+        // WS-R1 — context selection: a `integrationTest -Pcontext=X` run fans out over every
+        // module's specs, but only the spec whose @RequiresContext == X may bind to the (single)
+        // live namespace. A non-selected spec is skipped without touching the cluster.
+        "skips a spec whose @RequiresContext differs from the selected -Pcontext" {
+            @RequiresContext("golem-erp")
+            class OtherCtxFake : StringSpec()
+
+            // A reader that would blow up if used — proves the mismatched context never touches it.
+            val reader = mockk<ClusterReader>()
+            System.setProperty("context", "theseus-runquery")
+            try {
+                val fake = OtherCtxFake()
+                runBlocking { RequiresContextExtension { reader }.beforeSpec(fake) }
+                ContextRegistry.get(OtherCtxFake::class).shouldBeNull()
+            } finally {
+                System.clearProperty("context")
+            }
+        }
+
+        "runs the gate when -Pcontext matches the spec's @RequiresContext" {
+            @RequiresContext("theseus-runquery")
+            class MatchCtxFake : StringSpec()
+
+            val reader = mockk<ClusterReader>()
+            every { reader.resolveNamespace("theseus-runquery") } returns "ns-y"
+            every { reader.readinessChecks("ns-y") } returns
+                listOf(ReadinessCheck(ReadinessCheck.Kind.DEPLOYMENT, "d"))
+            every { reader.isReady("ns-y", any()) } returns true
+
+            System.setProperty("context", "theseus-runquery")
+            try {
+                val fake = MatchCtxFake()
+                runBlocking { RequiresContextExtension { reader }.beforeSpec(fake) }
+                ContextRegistry.get(MatchCtxFake::class)!!.namespace shouldBe "ns-y"
+            } finally {
+                System.clearProperty("context")
+            }
+        }
     })
