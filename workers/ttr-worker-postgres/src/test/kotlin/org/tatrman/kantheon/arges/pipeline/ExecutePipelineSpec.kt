@@ -197,6 +197,7 @@ class ExecutePipelineSpec :
                 val pool = mockk<ConnectionPoolManager>()
                 every { pool.supportedConnections } returns setOf("pg-midas")
                 every { pool.requiresTenantId("pg-midas") } returns false
+                every { pool.defaultSchemaFor("pg-midas") } returns "public"
                 every { pool.acquire("pg-midas") } returns conn
 
                 val pipeline = ExecutePipeline(pool, translator, limits)
