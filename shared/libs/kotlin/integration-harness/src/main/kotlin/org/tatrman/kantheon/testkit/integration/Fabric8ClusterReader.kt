@@ -1,5 +1,6 @@
 package org.tatrman.kantheon.testkit.integration
 
+import io.fabric8.kubernetes.client.Config
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.KubernetesClientBuilder
 import io.fabric8.kubernetes.client.LocalPortForward
@@ -25,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
  * `afterSpec`).
  */
 class Fabric8ClusterReader(
-    private val client: KubernetesClient = KubernetesClientBuilder().build(),
+    private val client: KubernetesClient = defaultClient(),
 ) : ClusterReader,
     AutoCloseable {
     private val forwards = ConcurrentHashMap<String, LocalPortForward>()
@@ -148,5 +149,22 @@ class Fabric8ClusterReader(
 
     companion object {
         const val CONTEXT_LABEL = "olymp.collite/context"
+
+        /**
+         * Build the kube client, honouring an optional **`kubeContext`** system property (forwarded
+         * from `-PkubeContext`). Without it, fabric8 auto-configures from the current kubeconfig
+         * context (the bp-olymp01 nightly path, where CI has already selected the context). Setting
+         * it — e.g. `-PkubeContext=dsk` from `just it-bp-dsk` — targets a named context **without**
+         * mutating the developer's global current-context, so a bp-dsk on-demand run doesn't disturb
+         * everyday `kubectl`. Read-only either way (WS-R1 T4).
+         */
+        private fun defaultClient(): KubernetesClient {
+            val kubeContext = System.getProperty("kubeContext")?.takeIf { it.isNotBlank() }
+            return if (kubeContext != null) {
+                KubernetesClientBuilder().withConfig(Config.autoConfigure(kubeContext)).build()
+            } else {
+                KubernetesClientBuilder().build()
+            }
+        }
     }
 }
