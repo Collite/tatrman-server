@@ -93,6 +93,12 @@ management:
     web:
       exposure:
         include: health,info
+  health:
+    # Redis is an OPTIONAL best-effort cache (llm.cache.enabled=false by default; the code degrades
+    # gracefully when it's down). Its health indicator must NOT drag the aggregate /actuator/health
+    # to DOWN/503 when no broker is deployed — that would fail the startupProbe / readiness.
+    redis:
+      enabled: false
 
 otel:
   metrics:

@@ -53,8 +53,11 @@ extraEnv: []
 # While a startupProbe is running, kubelet suspends the liveness + readiness probes, so the
 # 45s liveness budget can't kill the pod mid-boot (the bp-dsk CrashLoop, 2026-07-08). Budget:
 # 10s + 40×10s = 410s before startup is declared failed.
+# Target the readiness GROUP (state-only: readinessState), NOT the full `/actuator/health` — the
+# aggregate goes 503 when the OPTIONAL Redis cache (llm.cache.enabled=false) isn't deployed, which
+# would make the startupProbe never pass and the pod never become Ready (bp-dsk, 2026-07-08).
 startupProbe:
-  path: /actuator/health
+  path: /actuator/health/readiness
   initialDelaySeconds: 10
   periodSeconds: 10
   failureThreshold: 40

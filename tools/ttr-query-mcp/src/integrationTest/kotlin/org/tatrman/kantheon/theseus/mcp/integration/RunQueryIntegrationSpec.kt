@@ -50,29 +50,47 @@ import org.tatrman.kantheon.testkit.integration.contextHandle
 class RunQueryIntegrationSpec :
     StringSpec({
 
-        // ── Scoped close (testing arc Stage 2.3, Bora 2026-06-20) ────────────────────────────
-        // The harness is proven (bring-up → gate → teardown, fail-fast readiness, nightly) and
-        // the identity-discipline assertion below is GREEN end-to-end. The query *result* + RLS
-        // assertions are gated OFF until the context's Model matches its seed: the live first run
-        // showed `detection_failed` (Proteus' fixture model has no `dbo.sample_orders`, so SQL
-        // schema auto-detection can't classify the query — and the `query` tool exposes no schema
-        // hint), and the deployed Argos fixture policy is `tenant_isolation` (row-level on
-        // tenant_id), NOT the column-DENY the RLS case assumes. Re-enable by flipping the flag
-        // once theseus-runquery gains a model aligned with the mssql-init seed (Ariadne model, or
-        // a fixture model containing dbo.sample_orders) + an aligned Argos policy/bearer identity.
-        // Tracking: docs/implementation/v1/testing/plan.md Phase 3 + tasks-p2-s2.3 DONE criteria.
-        val modelAlignedContext = false
+        // ── Two scoped gates (WS-C2 T6, Bora 2026-07-08) ─────────────────────────────────────
+        // resultAlignedContext (ON) — the query *result* path, now wired to REAL MSSQL end-to-end
+        // (theseus→proteus→argos→kyklop→Brontes→mssql). Reaching green took four live runs:
+        //   1. `detection_failed` → added dbo.sample_orders to Proteus BootFixtureModel (aligned with
+        //      the mssql-init seed: id/tenant_id/region/amount, 4 rows incl 't-alpha').
+        //   2. Calcite "Object 'dbo' not found" → reference the table UNQUALIFIED (a namespace is not
+        //      a Calcite schema; Proteus re-qualifies to dbo.sample_orders on MSSQL unparse).
+        //   3. `no_worker_for_connection: df-test` → Brontes ran fixture mode + advertised no
+        //      connection. Now the real-MSSQL variant is wired: the shipped `df-test` connection
+        //      template in brontes application.conf activates from BRONTES_DB_* (host=mssql,
+        //      db=kantheon_local, password from the per-run mssql-sa-secret), `BRONTES_USE_FIXTURE
+        //      =false`, and `KYKLOP_USE_FIXTURE=false` so Kyklop's poller learns df-test from
+        //      Brontes' GetCapabilities. (Needs brontes `:testing` republished from the new fixture.)
+        //
+        // rlsPolicyContext (OFF) — the RLS path. Still NOT testable here: theseus-runquery runs Argos
+        // with `ARGOS_USE_FIXTURE_MODEL=true`, whose fixture SecurityClient applies **no policies at
+        // all** ("no row-level policies applied", Argos Application.kt) — so neither the column-DENY
+        // the deny-case assumes NOR row-level tenant_isolation is enforced (the earlier "fixture
+        // policy is tenant_isolation" note was wrong — that policy loads only in NON-fixture mode).
+        // Real RLS needs Argos non-fixture + a metadata source (Ariadne) + loaded policies + role-
+        // based column rules (the engine's column rules are unconditional today) — a richer,
+        // Ariadne-backed context. Deferred beyond C2 (tracking: testing plan.md Phase 3).
+        val resultAlignedContext = true
+        val rlsPolicyContext = false
 
         // T1 — happy path: real rows from real MSSQL, real columns from Proteus translation.
+        // NOTE: the table is referenced UNQUALIFIED (`sample_orders`, not `dbo.sample_orders`) — the
+        // proven form (Proteus WARMUP_SQL `FROM QSUBJEKT`, tpcds-query `FROM store_sales`). Calcite
+        // resolves it against the model's default DB namespace (dbo); a `dbo.` prefix fails with
+        // "Object 'dbo' not found" because the namespace isn't a literal Calcite schema. Proteus
+        // re-qualifies to `dbo.sample_orders` on unparse to the MSSQL dialect, so Brontes hits the
+        // right table. (First live run 2026-07-08 failed on the qualified form.)
         "query returns the seeded rows from real MSSQL with the expected columns"
-            .config(enabled = modelAlignedContext) {
+            .config(enabled = resultAlignedContext) {
                 val handle = contextHandle()
                 val bearer = unsignedJwt("alice", roles = listOf("analyst"))
 
                 val res =
                     runBlocking {
                         handle.callQuery(
-                            sqlQueryArgs("SELECT id, tenant_id, region, amount FROM dbo.sample_orders ORDER BY id"),
+                            sqlQueryArgs("SELECT id, tenant_id, region, amount FROM sample_orders ORDER BY id"),
                             bearer,
                         )
                     }
@@ -91,24 +109,24 @@ class RunQueryIntegrationSpec :
         "a missing OBO bearer fails closed with missing_user_identity" {
             val handle = contextHandle()
 
-            val res = runBlocking { handle.callQuery(sqlQueryArgs("SELECT id FROM dbo.sample_orders"), bearer = null) }
+            val res = runBlocking { handle.callQuery(sqlQueryArgs("SELECT id FROM sample_orders"), bearer = null) }
 
             res.isError shouldBe true
             res.ok() shouldBe false
             res.firstMessageCode() shouldBe "missing_user_identity"
         }
 
-        // T4 — RLS negative path. NOTE: assumes a column-DENY Argos policy; the deployed fixture
-        // is `tenant_isolation` (row-level), so this needs realignment when re-enabled (see flag).
+        // T4 — RLS negative path. Assumes a column-DENY Argos policy. GATED (rlsPolicyContext):
+        // fixture-mode Argos applies no policies, so this needs an Ariadne-backed non-fixture context.
         "a role denied a column gets a column_denied error envelope (no leaked data)"
-            .config(enabled = modelAlignedContext) {
+            .config(enabled = rlsPolicyContext) {
                 val handle = contextHandle()
                 val restricted = unsignedJwt("bob", roles = listOf("restricted"))
 
                 val res =
                     runBlocking {
                         handle.callQuery(
-                            sqlQueryArgs("SELECT id, amount FROM dbo.sample_orders"),
+                            sqlQueryArgs("SELECT id, amount FROM sample_orders"),
                             restricted,
                         )
                     }
@@ -117,14 +135,16 @@ class RunQueryIntegrationSpec :
                 res.firstMessageCode() shouldBe "column_denied"
             }
 
-        // T4 — the permitted-role variant of the same query returns rows.
+        // T4 — the permitted-role variant of the same query returns rows. GATED with the deny case
+        // (rlsPolicyContext): only a meaningful contrast to the deny when real policies are loaded —
+        // in fixture mode every role gets rows, which T1 already proves.
         "a permitted role gets rows for the same column query"
-            .config(enabled = modelAlignedContext) {
+            .config(enabled = rlsPolicyContext) {
                 val handle = contextHandle()
                 val analyst = unsignedJwt("alice", roles = listOf("analyst"))
 
                 val res =
-                    runBlocking { handle.callQuery(sqlQueryArgs("SELECT id, amount FROM dbo.sample_orders"), analyst) }
+                    runBlocking { handle.callQuery(sqlQueryArgs("SELECT id, amount FROM sample_orders"), analyst) }
 
                 res.isError shouldBe false
                 (res.rowCount() ?: 0) shouldBeGreaterThan 0

@@ -163,9 +163,24 @@ class ConnectionPoolManager(
         fun fromConfig(config: Config): ConnectionPoolManager {
             if (!config.hasPath("connections")) return ConnectionPoolManager(emptyMap())
             val root = config.getConfig("connections")
+            // A connection block whose `host` is absent/blank is INERT — skipped, not an error.
+            // This lets a shipped, env-driven template block (e.g. `df-test { host = ${?BRONTES_DB_HOST} … }`)
+            // stay dormant when the env is unset (fixture deployments boot with zero connections) and
+            // activate only where an overlay supplies BRONTES_DB_HOST/… (charon/architecture §6).
             val map =
-                root.root().keys.associateWith { id ->
-                    ConnectionConfig.fromConfig(id, root.getConfig(id))
+                buildMap {
+                    for (id in root.root().keys) {
+                        val entry = root.getConfig(id)
+                        val host = if (entry.hasPath("host")) entry.getString("host").trim() else ""
+                        if (host.isEmpty()) {
+                            log.info(
+                                "Skipping connection '{}' — no host configured (env-driven template left inert).",
+                                id,
+                            )
+                            continue
+                        }
+                        put(id, ConnectionConfig.fromConfig(id, entry))
+                    }
                 }
             return ConnectionPoolManager(map)
         }
