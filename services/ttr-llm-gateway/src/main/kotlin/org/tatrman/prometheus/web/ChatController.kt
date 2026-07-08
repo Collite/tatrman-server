@@ -5,7 +5,10 @@ import org.tatrman.prometheus.model.ModelService
 import org.tatrman.prometheus.observability.ObservabilityService
 
 @RestController
-@RequestMapping("/api/v1/chat")
+// `/api/v1/chat` is the native path; `/v1/chat` is an alias so the constellation's shared
+// LlmGatewayClient (Themis, Golem) — which posts to `/v1/chat/completions` (OpenAI convention) —
+// reaches the gateway without a 404. Both resolve to the same handlers.
+@RequestMapping("/api/v1/chat", "/v1/chat")
 class ChatController(
     private val modelService: ModelService,
     private val observabilityService: ObservabilityService,
