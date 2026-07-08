@@ -48,7 +48,16 @@ secretEnv:
 # base URL here to retarget it at WireMock (e.g. AZURE_OPENAI_ENDPOINT / ANTHROPIC_BASE_URL).
 extraEnv: []
 
-# Probes — Spring Boot actuator health groups.
+# Probes — Spring Boot actuator health groups. Prometheus (Spring Boot + Spring AI + gRPC
+# autoconfig) is a SLOW starter — ~97s on a CPU-throttled node — so it needs a startupProbe.
+# While a startupProbe is running, kubelet suspends the liveness + readiness probes, so the
+# 45s liveness budget can't kill the pod mid-boot (the bp-dsk CrashLoop, 2026-07-08). Budget:
+# 10s + 40×10s = 410s before startup is declared failed.
+startupProbe:
+  path: /actuator/health
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  failureThreshold: 40
 readinessProbe:
   path: /actuator/health/readiness
   initialDelaySeconds: 15
