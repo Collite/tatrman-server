@@ -44,6 +44,27 @@ object BootFixtureModel {
             primaryKey = listOf("id"),
         )
 
+    // Aligned with the `theseus-runquery` MSSQL seed (olymp platform/data/mssql:
+    // dbo.sample_orders — id/tenant_id/region/amount, 4 rows incl. tenant_id 't-alpha').
+    // Lets the raw-SQL `query` path resolve + unparse against the fixture model so
+    // RunQueryIntegrationSpec's result assertion runs end-to-end through Brontes → MSSQL
+    // (SurfaceType has no DECIMAL; FLOAT is the surface type for the amount column — a bare
+    // projection never coerces, so MSSQL returns the real DECIMAL(18,2) values as-is).
+    private val sampleOrders =
+        ModelTable(
+            qname = qname(SchemaCode.DB, "dbo", "sample_orders"),
+            columns =
+                listOf(
+                    ModelColumn("id", SurfaceType.INT, nullable = false),
+                    ModelColumn("tenant_id", SurfaceType.TEXT, nullable = false),
+                    ModelColumn("region", SurfaceType.TEXT, nullable = false),
+                    ModelColumn("amount", SurfaceType.FLOAT, nullable = false),
+                ),
+            primaryKey = listOf("id"),
+        )
+
+    private val dbTables = listOf(qsubjekt, sampleOrders)
+
     private val customerEntity =
         ModelEntity(
             qname = qname(SchemaCode.ER, "entity", "customer"),
@@ -60,12 +81,12 @@ object BootFixtureModel {
                 schemaCode: SchemaCode,
                 namespace: String,
             ): Map<QualifiedName, ModelTable> =
-                listOf(qsubjekt)
+                dbTables
                     .filter { it.qname.schemaCode == schemaCode && it.qname.namespace == namespace }
                     .associateBy { it.qname }
 
             override fun columns(tableQname: QualifiedName): List<ModelColumn> =
-                if (tableQname == qsubjekt.qname) qsubjekt.columns else emptyList()
+                dbTables.firstOrNull { it.qname == tableQname }?.columns ?: emptyList()
 
             override fun foreignKeys(): List<ModelForeignKey> = emptyList()
 
