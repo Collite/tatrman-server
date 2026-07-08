@@ -43,3 +43,25 @@ models:
     type: chat
     tags: ["fast", "cheap"]
     cost: 1
+  # Tier aliases — the constellation's LlmGatewayClient sends abstract tier ids (Themis: "haiku"
+  # CHEAP / "sonnet" FAST; Golem's GolemModels.Cheap: "claude-haiku"). findByName is an EXACT match,
+  # so without these the request falls through to the Azure default (gpt-4.1) — wrong provider. Map
+  # each tier to its concrete Anthropic model (fullName = the AnthropicChatOptions.model() id).
+  - name: haiku
+    fullName: claude-haiku-4-5
+    provider: anthropic
+    type: chat
+    tags: ["fast", "cheap"]
+    cost: 1
+  - name: claude-haiku
+    fullName: claude-haiku-4-5
+    provider: anthropic
+    type: chat
+    tags: ["fast", "cheap"]
+    cost: 1
+  - name: sonnet
+    fullName: claude-sonnet-4-6
+    provider: anthropic
+    type: chat
+    tags: ["balanced", "default"]
+    cost: 3
