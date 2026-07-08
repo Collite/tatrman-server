@@ -38,6 +38,15 @@ val osArch = System.getProperty("os.arch").lowercase()
 val isArm64 = osArch.contains("aarch64") || osArch.contains("arm64")
 val isCi = System.getenv("CI") != null
 
+// Image target is parameterized so the same jib config serves local dev and registry publish
+// (mirrors agents/golem):
+//   local : ./gradlew :services:prometheus:jibDockerBuild                 -> prometheus:dev
+//   GHCR  : ./gradlew :services:prometheus:jib \
+//             -PimageRepo=ghcr.io/boraperusic/prometheus -PimageTag=testing \
+//             -Djib.to.auth.username=<gh-user> -Djib.to.auth.password=<ghcr-PAT>
+val imageRepo = (project.findProperty("imageRepo") as String?) ?: "prometheus"
+val imageTag = (project.findProperty("imageTag") as String?) ?: "dev"
+
 jib {
     from {
         image = "eclipse-temurin:21-jre"
@@ -60,7 +69,7 @@ jib {
         }
     }
     to {
-        image = "prometheus:dev"
+        image = "$imageRepo:$imageTag"
     }
     container {
         mainClass = "org.tatrman.prometheus.PrometheusApplicationKt"
