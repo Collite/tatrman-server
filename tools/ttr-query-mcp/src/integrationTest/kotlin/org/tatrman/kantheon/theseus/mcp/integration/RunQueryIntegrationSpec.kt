@@ -71,6 +71,12 @@ class RunQueryIntegrationSpec :
         val rlsPolicyContext = false
 
         // T1 — happy path: real rows from real MSSQL, real columns from Proteus translation.
+        // NOTE: the table is referenced UNQUALIFIED (`sample_orders`, not `dbo.sample_orders`) — the
+        // proven form (Proteus WARMUP_SQL `FROM QSUBJEKT`, tpcds-query `FROM store_sales`). Calcite
+        // resolves it against the model's default DB namespace (dbo); a `dbo.` prefix fails with
+        // "Object 'dbo' not found" because the namespace isn't a literal Calcite schema. Proteus
+        // re-qualifies to `dbo.sample_orders` on unparse to the MSSQL dialect, so Brontes hits the
+        // right table. (First live run 2026-07-08 failed on the qualified form.)
         "query returns the seeded rows from real MSSQL with the expected columns"
             .config(enabled = resultAlignedContext) {
                 val handle = contextHandle()
@@ -79,7 +85,7 @@ class RunQueryIntegrationSpec :
                 val res =
                     runBlocking {
                         handle.callQuery(
-                            sqlQueryArgs("SELECT id, tenant_id, region, amount FROM dbo.sample_orders ORDER BY id"),
+                            sqlQueryArgs("SELECT id, tenant_id, region, amount FROM sample_orders ORDER BY id"),
                             bearer,
                         )
                     }
@@ -98,7 +104,7 @@ class RunQueryIntegrationSpec :
         "a missing OBO bearer fails closed with missing_user_identity" {
             val handle = contextHandle()
 
-            val res = runBlocking { handle.callQuery(sqlQueryArgs("SELECT id FROM dbo.sample_orders"), bearer = null) }
+            val res = runBlocking { handle.callQuery(sqlQueryArgs("SELECT id FROM sample_orders"), bearer = null) }
 
             res.isError shouldBe true
             res.ok() shouldBe false
@@ -115,7 +121,7 @@ class RunQueryIntegrationSpec :
                 val res =
                     runBlocking {
                         handle.callQuery(
-                            sqlQueryArgs("SELECT id, amount FROM dbo.sample_orders"),
+                            sqlQueryArgs("SELECT id, amount FROM sample_orders"),
                             restricted,
                         )
                     }
@@ -133,7 +139,7 @@ class RunQueryIntegrationSpec :
                 val analyst = unsignedJwt("alice", roles = listOf("analyst"))
 
                 val res =
-                    runBlocking { handle.callQuery(sqlQueryArgs("SELECT id, amount FROM dbo.sample_orders"), analyst) }
+                    runBlocking { handle.callQuery(sqlQueryArgs("SELECT id, amount FROM sample_orders"), analyst) }
 
                 res.isError shouldBe false
                 (res.rowCount() ?: 0) shouldBeGreaterThan 0
