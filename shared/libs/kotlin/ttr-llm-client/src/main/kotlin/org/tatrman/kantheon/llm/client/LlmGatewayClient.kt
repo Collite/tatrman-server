@@ -24,7 +24,8 @@ data class LlmGatewayEndpoint(
 )
 
 /**
- * Client for the Prometheus LLM gateway's OpenAI-shaped `/v1/chat/completions`.
+ * Client for the Prometheus LLM gateway's OpenAI-shaped `/v1/chat/completions`
+ * (Prometheus's ChatController serves this as an alias of `/api/v1/chat/completions`).
  * Shared across the constellation (Themis nodes, Golem's PlanComposer). `model`
  * is a flat tier key (`"haiku"` CHEAP / `"sonnet"` FAST / `"opus"`), mapped to a
  * Prometheus tag downstream. Failures return a [Result.failure] — callers decide

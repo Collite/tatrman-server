@@ -119,7 +119,10 @@ fun Application.module(config: Config) {
             } else {
                 call.respond(
                     io.ktor.http.HttpStatusCode.ServiceUnavailable,
-                    buildJsonObject { put("status", "NOT_READY"); put("reason", "no connections configured") },
+                    buildJsonObject {
+                        put("status", "NOT_READY")
+                        put("reason", "no connections configured")
+                    },
                 )
             }
         }
