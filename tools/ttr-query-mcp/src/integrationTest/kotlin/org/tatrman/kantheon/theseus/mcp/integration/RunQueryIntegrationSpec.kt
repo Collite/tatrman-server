@@ -51,37 +51,28 @@ class RunQueryIntegrationSpec :
     StringSpec({
 
         // ── Two scoped gates (WS-C2 T6, Bora 2026-07-08) ─────────────────────────────────────
-        // The result path and the RLS path have different prerequisites; both gate OFF here — the
-        // theseus-runquery context is fixture-backed BY DESIGN (a wiring proof), so it can't return
-        // real MSSQL rows without further worker wiring. The real-data result proof is `tpcds-query`
-        // (green: real SF1 rows through theseus→proteus→argos→kyklop→**Arges**→Postgres). What T6
-        // did land: the Proteus fixture model + the query form, so the chain now compiles, validates
-        // and DISPATCHES a real MSSQL-shaped query end-to-end (theseus→proteus→argos→kyklop) — it
-        // stops only at Brontes' fixture connection. Progress across three live runs:
-        //   1. `detection_failed` → fixed: added dbo.sample_orders to Proteus BootFixtureModel
-        //      (aligned with the mssql-init seed: id/tenant_id/region/amount, 4 rows incl 't-alpha').
-        //   2. Calcite "Object 'dbo' not found" → fixed: reference the table UNQUALIFIED (a namespace
-        //      is not a Calcite schema; Proteus re-qualifies to dbo.sample_orders on MSSQL unparse).
-        //   3. `no_worker_for_connection: connection_id=df-test` → the real blocker below.
+        // resultAlignedContext (ON) — the query *result* path, now wired to REAL MSSQL end-to-end
+        // (theseus→proteus→argos→kyklop→Brontes→mssql). Reaching green took four live runs:
+        //   1. `detection_failed` → added dbo.sample_orders to Proteus BootFixtureModel (aligned with
+        //      the mssql-init seed: id/tenant_id/region/amount, 4 rows incl 't-alpha').
+        //   2. Calcite "Object 'dbo' not found" → reference the table UNQUALIFIED (a namespace is not
+        //      a Calcite schema; Proteus re-qualifies to dbo.sample_orders on MSSQL unparse).
+        //   3. `no_worker_for_connection: df-test` → Brontes ran fixture mode + advertised no
+        //      connection. Now the real-MSSQL variant is wired: the shipped `df-test` connection
+        //      template in brontes application.conf activates from BRONTES_DB_* (host=mssql,
+        //      db=kantheon_local, password from the per-run mssql-sa-secret), `BRONTES_USE_FIXTURE
+        //      =false`, and `KYKLOP_USE_FIXTURE=false` so Kyklop's poller learns df-test from
+        //      Brontes' GetCapabilities. (Needs brontes `:testing` republished from the new fixture.)
         //
-        // resultAlignedContext (OFF) — Brontes runs `BRONTES_USE_FIXTURE=true` and advertises NO
-        // real connection (brontes.values.yaml: "the whole chain runs fixture-backed — NOT live
-        // data"). Real MSSQL rows need Brontes wired to the `df-test` connection → the mssql seed:
-        // the `df-test` block is COMMENTED in brontes application.conf (needs an image change to
-        // activate) + BRONTES_DB_* env from the per-run mssql SA secret + a Kyklop World-config entry
-        // routing df-test→brontes + `use-fixture=false`. That is a multi-service worker-wiring arc,
-        // and it duplicates what tpcds-query already proves for "does the result path work" — so it
-        // is deferred beyond C2 (its own follow-up: "theseus-runquery real-MSSQL variant").
-        //
-        // rlsPolicyContext (OFF) — the RLS path. Also NOT testable here: theseus-runquery runs Argos
+        // rlsPolicyContext (OFF) — the RLS path. Still NOT testable here: theseus-runquery runs Argos
         // with `ARGOS_USE_FIXTURE_MODEL=true`, whose fixture SecurityClient applies **no policies at
         // all** ("no row-level policies applied", Argos Application.kt) — so neither the column-DENY
         // the deny-case assumes NOR row-level tenant_isolation is enforced (the earlier "fixture
         // policy is tenant_isolation" note was wrong — that policy loads only in NON-fixture mode).
         // Real RLS needs Argos non-fixture + a metadata source (Ariadne) + loaded policies + role-
-        // based column rules (the engine's column rules are unconditional today) — the same richer,
+        // based column rules (the engine's column rules are unconditional today) — a richer,
         // Ariadne-backed context. Deferred beyond C2 (tracking: testing plan.md Phase 3).
-        val resultAlignedContext = false
+        val resultAlignedContext = true
         val rlsPolicyContext = false
 
         // T1 — happy path: real rows from real MSSQL, real columns from Proteus translation.
