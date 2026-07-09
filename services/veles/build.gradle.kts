@@ -32,6 +32,20 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// AriadneModelLoadComponentSpec reconciles the real bundled model tree through the live
+// ttr-metadata reconciler (LocalFsStorage → a real directory). The suite carries Ariadne on its
+// runtime classpath as a JAR, so the spec cannot resolve the model dir from a classpath resource
+// URI (that would be a `jar:` URI → FileSystemNotFoundException). Hand it the authored resources
+// dir on disk instead.
+tasks.named<Test>("componentTest") {
+    systemProperty(
+        "ariadne.modelRoot",
+        layout.projectDirectory
+            .dir("src/main/resources/model-ttr")
+            .asFile.absolutePath,
+    )
+}
+
 // (yamlToTtr task removed: TTR-only fork — model is now sourced from `org.tatrman.ttr.*`
 // modeler artifacts and the bundled `model-ttr` resource tree. The `just yaml-to-ttr`
 // recipe no longer applies; the legacy YAML dir stays in tree as a one-time reference.)

@@ -36,13 +36,18 @@ import java.nio.file.Path
 class AriadneModelLoadComponentSpec :
     StringSpec({
 
-        // Root the source at the packaged model tree itself (parent of `model-ttr/tpcds`), so the
+        // Root the source at the authored model tree (`src/main/resources/model-ttr`), so the
         // WHOLE shipped model — every package + the `areas/*.ttrm` — reconciles exactly as the
-        // service loads it at runtime.
+        // service loads it at runtime. The dir is injected by the build (`ariadne.modelRoot`)
+        // rather than resolved from a classpath resource: on CI the project rides the suite
+        // classpath as a JAR, so `getResource("model-ttr/..").toURI()` is a `jar:` URI with no
+        // open filesystem (FileSystemNotFoundException) — and `LocalFsStorage` needs a real dir.
         val modelRoot: Path =
-            Path
-                .of(checkNotNull(this::class.java.classLoader.getResource("model-ttr/tpcds")).toURI())
-                .parent
+            Path.of(
+                checkNotNull(System.getProperty("ariadne.modelRoot")) {
+                    "ariadne.modelRoot not set — see services/ariadne/build.gradle.kts componentTest config"
+                },
+            )
 
         fun service(): MetadataServiceImpl {
             val source =
