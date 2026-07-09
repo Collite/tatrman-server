@@ -95,7 +95,9 @@ private fun policyWhere(
                     .build(),
             )
         }
-    require(resp.predicatesList.size == 1) { "expected exactly one tenant-isolation predicate, got ${resp.predicatesList.size}" }
+    require(resp.predicatesList.size == 1) {
+        "expected exactly one tenant-isolation predicate, got ${resp.predicatesList.size}"
+    }
     val fn = resp.predicatesList[0].predicate.function
     require(fn.operation == "eq") { "expected an `eq` predicate, got ${fn.operation}" }
     val column = fn.operandsList[0].columnRef.name

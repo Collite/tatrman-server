@@ -59,7 +59,8 @@ class TpcdsLoadComponentSpec :
 
 /** Drop the single trailing `|` per row so an N-column table sees exactly N fields. */
 private fun stripTrailingPipe(dat: String): String =
-    dat.lineSequence()
+    dat
+        .lineSequence()
         .filter { it.isNotEmpty() }
         .joinToString(separator = "\n", postfix = "\n") { it.removeSuffix("|") }
 
@@ -68,7 +69,8 @@ private fun copyInto(
     table: String,
     data: String,
 ) {
-    c.unwrap(PGConnection::class.java)
+    c
+        .unwrap(PGConnection::class.java)
         .copyAPI
         .copyIn("COPY $table FROM STDIN WITH (DELIMITER '|', NULL '')", StringReader(data))
 }
@@ -88,7 +90,10 @@ private fun count(
     table: String,
 ): Long =
     c.createStatement().use { st ->
-        st.executeQuery("SELECT count(*) FROM $table").use { it.next(); it.getLong(1) }
+        st.executeQuery("SELECT count(*) FROM $table").use {
+            it.next()
+            it.getLong(1)
+        }
     }
 
 /** `char(N)` columns come back space-padded — trim to the logical value. */

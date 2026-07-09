@@ -62,9 +62,12 @@ class DetectSourceSchemaSpec :
                 qname = qskupzboziQname,
                 columns =
                     listOf(
-                        org.tatrman.translator.framework.ModelColumn("idskupzbozi", SurfaceType.INT),
-                        org.tatrman.translator.framework.ModelColumn("kod_skup_zbozi", SurfaceType.TEXT),
-                        org.tatrman.translator.framework.ModelColumn("nazev", SurfaceType.TEXT),
+                        org.tatrman.translator.framework
+                            .ModelColumn("idskupzbozi", SurfaceType.INT),
+                        org.tatrman.translator.framework
+                            .ModelColumn("kod_skup_zbozi", SurfaceType.TEXT),
+                        org.tatrman.translator.framework
+                            .ModelColumn("nazev", SurfaceType.TEXT),
                     ),
             )
         val qzboziTable =
@@ -72,7 +75,8 @@ class DetectSourceSchemaSpec :
                 qname = qzboziQname,
                 columns =
                     listOf(
-                        org.tatrman.translator.framework.ModelColumn("id", SurfaceType.INT),
+                        org.tatrman.translator.framework
+                            .ModelColumn("id", SurfaceType.INT),
                     ),
             )
         val produktEntity =
@@ -80,8 +84,10 @@ class DetectSourceSchemaSpec :
                 qname = produktQname,
                 attributes =
                     listOf(
-                        org.tatrman.translator.framework.ModelAttribute("id", SurfaceType.INT),
-                        org.tatrman.translator.framework.ModelAttribute("name", SurfaceType.TEXT),
+                        org.tatrman.translator.framework
+                            .ModelAttribute("id", SurfaceType.INT),
+                        org.tatrman.translator.framework
+                            .ModelAttribute("name", SurfaceType.TEXT),
                     ),
             )
         val skupinaEntity =
@@ -89,7 +95,8 @@ class DetectSourceSchemaSpec :
                 qname = skupinaQname,
                 attributes =
                     listOf(
-                        org.tatrman.translator.framework.ModelAttribute("id", SurfaceType.INT),
+                        org.tatrman.translator.framework
+                            .ModelAttribute("id", SurfaceType.INT),
                     ),
             )
 
