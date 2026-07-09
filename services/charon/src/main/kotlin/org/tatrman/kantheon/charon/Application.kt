@@ -232,7 +232,12 @@ fun Application.module(
         post("/refresh") {
             val file = connectionsFile
             if (file == null || !file.isFile) {
-                call.respond(buildJsonObject { put("status", "no-op"); put("reason", "no connections file") })
+                call.respond(
+                    buildJsonObject {
+                        put("status", "no-op")
+                        put("reason", "no connections file")
+                    },
+                )
             } else {
                 connectionRegistry.refresh(file.readText())
                 call.respond(
