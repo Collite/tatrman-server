@@ -53,7 +53,7 @@ import java.sql.Connection
 class ArgesNoRlsTpcdsComponentSpec :
     StringSpec({
 
-        "a pg-tpcds (requires-tenant-id=false) scan runs with NO tenant and NO SET LOCAL, mapping numeric at the (20,4) boundary" {
+        "a pg-tpcds (requires-tenant-id=false) scan runs with NO tenant and NO SET LOCAL, numeric at (20,4) boundary" {
             Containers.postgres().use { pg ->
                 pg.start()
 
@@ -73,16 +73,21 @@ class ArgesNoRlsTpcdsComponentSpec :
                         st.execute("GRANT USAGE ON SCHEMA public TO $ROLE")
                         st.execute("GRANT SELECT ON web_sales_small TO $ROLE")
                     }
-                    su.prepareStatement(
-                        "INSERT INTO web_sales_small VALUES (?, ?::numeric, ?)",
-                    ).use { ps ->
-                        // Row 1 carries the max value the column can hold: 16 integer + 4 fractional
-                        // digits = precision 20 — the declared boundary.
-                        ps.setLong(1, 1L); ps.setString(2, "9999999999999999.9999"); ps.setString(3, "site.example")
-                        ps.executeUpdate()
-                        ps.setLong(1, 2L); ps.setString(2, "0.0001"); ps.setString(3, "shop.example")
-                        ps.executeUpdate()
-                    }
+                    su
+                        .prepareStatement(
+                            "INSERT INTO web_sales_small VALUES (?, ?::numeric, ?)",
+                        ).use { ps ->
+                            // Row 1 carries the max value the column can hold: 16 integer + 4 fractional
+                            // digits = precision 20 — the declared boundary.
+                            ps.setLong(1, 1L)
+                            ps.setString(2, "9999999999999999.9999")
+                            ps.setString(3, "site.example")
+                            ps.executeUpdate()
+                            ps.setLong(1, 2L)
+                            ps.setString(2, "0.0001")
+                            ps.setString(3, "shop.example")
+                            ps.executeUpdate()
+                        }
                 }
 
                 val pool =
@@ -149,7 +154,11 @@ private val limits =
 private fun translator(): TranslatorClient =
     object : TranslatorClient {
         override suspend fun unparse(request: UnparseRequest): UnparseResponse =
-            UnparseResponse.newBuilder().setOutput(QUERY).setContext(request.context).build()
+            UnparseResponse
+                .newBuilder()
+                .setOutput(QUERY)
+                .setContext(request.context)
+                .build()
 
         override suspend fun probe() = Unit
     }

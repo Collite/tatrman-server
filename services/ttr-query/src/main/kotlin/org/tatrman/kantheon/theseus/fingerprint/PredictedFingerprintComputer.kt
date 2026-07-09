@@ -63,7 +63,9 @@ object PredictedFingerprintComputer {
             // A Union takes its output schema from the first branch (all branches
             // share the row type in SQL set-op semantics).
             PlanNode.NodeCase.UNION ->
-                plan.union.inputsList.firstOrNull()?.let { topLevelColumns(it) } ?: emptyList()
+                plan.union.inputsList
+                    .firstOrNull()
+                    ?.let { topLevelColumns(it) } ?: emptyList()
             PlanNode.NodeCase.JOIN, PlanNode.NodeCase.VALUES, PlanNode.NodeCase.NODE_NOT_SET -> emptyList()
             // Phase 2.4 — workspace_ref is a session-scoped leaf whose schema
             // is only knowable at the Worker. Best-effort fingerprint falls

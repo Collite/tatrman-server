@@ -45,7 +45,12 @@ class ProteusUnparseComponentSpec :
     StringSpec({
 
         fun qn(name: String): QualifiedName =
-            QualifiedName.newBuilder().setSchemaCode(SchemaCode.DB).setNamespace("dbo").setName(name).build()
+            QualifiedName
+                .newBuilder()
+                .setSchemaCode(SchemaCode.DB)
+                .setNamespace("dbo")
+                .setName(name)
+                .build()
 
         fun col(
             name: String,

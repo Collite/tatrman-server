@@ -151,11 +151,19 @@ fun Application.module(config: Config) {
         get("/ready") {
             val healthy = registry.all().count { it.health == WorkerHealthStatus.HEALTHY }
             if (healthy > 0 || config.getBoolean("kyklop.use-fixture")) {
-                call.respond(buildJsonObject { put("status", "UP"); put("healthy_workers", healthy.toString()) })
+                call.respond(
+                    buildJsonObject {
+                        put("status", "UP")
+                        put("healthy_workers", healthy.toString())
+                    },
+                )
             } else {
                 call.respond(
                     io.ktor.http.HttpStatusCode.ServiceUnavailable,
-                    buildJsonObject { put("status", "NOT_READY"); put("healthy_workers", healthy.toString()) },
+                    buildJsonObject {
+                        put("status", "NOT_READY")
+                        put("healthy_workers", healthy.toString())
+                    },
                 )
             }
         }

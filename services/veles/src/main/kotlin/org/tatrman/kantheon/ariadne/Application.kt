@@ -240,7 +240,12 @@ fun Application.module(config: Config) {
                     buildJsonObject { put("status", "NOT_READY") },
                 )
             } else {
-                call.respond(buildJsonObject { put("status", "UP"); put("model_version", snap.model.version.value) })
+                call.respond(
+                    buildJsonObject {
+                        put("status", "UP")
+                        put("model_version", snap.model.version.value)
+                    },
+                )
             }
         }
         get("/status") {
@@ -265,7 +270,10 @@ fun Application.module(config: Config) {
             if (configuredAdminToken == null || token != configuredAdminToken) {
                 call.respond(
                     io.ktor.http.HttpStatusCode.Forbidden,
-                    buildJsonObject { put("status", "forbidden"); put("reason", "admin_token_required") },
+                    buildJsonObject {
+                        put("status", "forbidden")
+                        put("reason", "admin_token_required")
+                    },
                 )
                 return@post
             }
