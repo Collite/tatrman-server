@@ -40,17 +40,18 @@ telemetry:
 # DNS/ports/paths for its cluster (and the monitoring Prometheus URL for prometheus-type checks).
 extraEnv: []
 
-# Probes. The aggregator has no self /health route (installKtorServerBase adds none) — it only
-# serves the roll-up. `/health/all?threshold=0` returns 200 whenever the service itself is alive
-# (0% of targets need be healthy), so it is a true self-liveness/readiness signal independent of
-# downstream target state. (A target-state gate belongs on the dashboard, not the pod probe.)
+# Probes hit /healthz — the cheap SELF-liveness route (200 immediately, independent of any target;
+# HealthRoutes.kt). NOT /health/all: that fans out to every configured target (each up to a 30s
+# timeout), so with any unreachable target it exceeds the kubelet probe timeout → the request is
+# cancelled → the pod is killed even though the aggregator itself is fine. /health/all is the
+# DASHBOARD roll-up; target-state belongs there, not on the pod probe.
 readinessProbe:
-  path: "/health/all?threshold=0"
+  path: /healthz
   initialDelaySeconds: 5
   periodSeconds: 10
   failureThreshold: 30
 livenessProbe:
-  path: "/health/all?threshold=0"
+  path: /healthz
   initialDelaySeconds: 10
   periodSeconds: 30
 

@@ -15,6 +15,14 @@ import kotlinx.serialization.json.put
 
 fun Application.healthRoutes(service: HealthCheckService) {
     routing {
+        // Self-liveness/readiness: is THIS aggregator process up? Answers immediately, independent
+        // of any downstream target — the pod probe target. Contrast /health/all, which fans out to
+        // every configured target (each up to a 30s timeout) and is the DASHBOARD roll-up, not a
+        // self-probe: using it as a probe lets one unreachable target's latency kill the pod.
+        get("/healthz") {
+            call.respond(HttpStatusCode.OK, buildJsonObject { put("status", JsonPrimitive("ok")) })
+        }
+
         get("/health/{technology}") {
             val technology =
                 call.parameters["technology"]?.lowercase()
