@@ -1,8 +1,8 @@
 package org.tatrman.kantheon.charon.core
 
 import org.apache.arrow.vector.ipc.ArrowReader
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MoveResult
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MoveResult
 
 /**
  * The single streaming pump over any Source→Target pair — the heart of the

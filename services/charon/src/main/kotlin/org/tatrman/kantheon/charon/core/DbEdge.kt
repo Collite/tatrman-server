@@ -1,6 +1,6 @@
 package org.tatrman.kantheon.charon.core
 
-import org.tatrman.charon.v1.DescribeResult
+import org.tatrman.transfer.v1.DescribeResult
 
 /**
  * The driver-agnostic DB-edge interfaces (charon/plan.md §4 Stage 2.1 T3 spike).
@@ -45,6 +45,6 @@ interface AdbcWriter {
         handle: ConnectionHandle,
         schema: String,
         table: String,
-        writeMode: org.tatrman.charon.v1.DbWriteMode,
+        writeMode: org.tatrman.transfer.v1.DbWriteMode,
     ): Target
 }

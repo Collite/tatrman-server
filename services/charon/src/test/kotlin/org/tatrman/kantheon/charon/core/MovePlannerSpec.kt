@@ -4,17 +4,17 @@ import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import org.tatrman.charon.v1.CopyRequest
-import org.tatrman.charon.v1.DbTable
-import org.tatrman.charon.v1.DbWriteMode
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MaterializeRequest
-import org.tatrman.charon.v1.MoveOptions
-import org.tatrman.charon.v1.RedisEntry
-import org.tatrman.charon.v1.SeaweedBlob
-import org.tatrman.charon.v1.StageRequest
-import org.tatrman.charon.v1.WorkerKind
-import org.tatrman.charon.v1.WorkerSessionDf
+import org.tatrman.transfer.v1.CopyRequest
+import org.tatrman.transfer.v1.DbTable
+import org.tatrman.transfer.v1.DbWriteMode
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MaterializeRequest
+import org.tatrman.transfer.v1.MoveOptions
+import org.tatrman.transfer.v1.RedisEntry
+import org.tatrman.transfer.v1.SeaweedBlob
+import org.tatrman.transfer.v1.StageRequest
+import org.tatrman.transfer.v1.WorkerKind
+import org.tatrman.transfer.v1.WorkerSessionDf
 
 /**
  * Walks the entire [legality] matrix and asserts each cell. The matrix is the

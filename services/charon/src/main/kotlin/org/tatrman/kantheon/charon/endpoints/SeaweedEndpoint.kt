@@ -9,9 +9,9 @@ import org.apache.arrow.vector.ipc.ArrowStreamReader
 import org.apache.arrow.vector.ipc.ArrowStreamWriter
 import org.apache.arrow.vector.types.pojo.Schema
 import org.slf4j.LoggerFactory
-import org.tatrman.charon.v1.DescribeResult
-import org.tatrman.charon.v1.EvictResult
-import org.tatrman.charon.v1.SeaweedBlob
+import org.tatrman.transfer.v1.DescribeResult
+import org.tatrman.transfer.v1.EvictResult
+import org.tatrman.transfer.v1.SeaweedBlob
 import org.tatrman.kantheon.charon.core.Integrity
 import org.tatrman.kantheon.charon.core.LocationKind
 import org.tatrman.kantheon.charon.core.Source

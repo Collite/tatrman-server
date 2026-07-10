@@ -1,13 +1,13 @@
 package org.tatrman.kantheon.charon.core
 
-import org.tatrman.charon.v1.CopyRequest
-import org.tatrman.charon.v1.DbWriteMode
-import org.tatrman.charon.v1.DescribeRequest
-import org.tatrman.charon.v1.EvictRequest
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MaterializeRequest
-import org.tatrman.charon.v1.MoveOptions
-import org.tatrman.charon.v1.StageRequest
+import org.tatrman.transfer.v1.CopyRequest
+import org.tatrman.transfer.v1.DbWriteMode
+import org.tatrman.transfer.v1.DescribeRequest
+import org.tatrman.transfer.v1.EvictRequest
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MaterializeRequest
+import org.tatrman.transfer.v1.MoveOptions
+import org.tatrman.transfer.v1.StageRequest
 
 /**
  * A [Plan] is what the planner hands to the [MoveExecutor] when the legality
@@ -203,5 +203,5 @@ fun Location.kind(): LocationKind =
 /** Promote a proto `WorkerSessionDf` to a `Location` (used by `Stage`'s typed
  *  request — the worker target is a `WorkerSessionDf`, not a `Location` on the
  *  wire). */
-private fun org.tatrman.charon.v1.WorkerSessionDf.toLocation(): Location =
+private fun org.tatrman.transfer.v1.WorkerSessionDf.toLocation(): Location =
     Location.newBuilder().setWorkerDf(this).build()

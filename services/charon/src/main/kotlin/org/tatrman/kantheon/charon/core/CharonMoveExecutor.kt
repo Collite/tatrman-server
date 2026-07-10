@@ -6,11 +6,11 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import java.sql.SQLException
 import org.slf4j.LoggerFactory
-import org.tatrman.charon.v1.DbTable
-import org.tatrman.charon.v1.DescribeResult
-import org.tatrman.charon.v1.EvictResult
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MoveResult
+import org.tatrman.transfer.v1.DbTable
+import org.tatrman.transfer.v1.DescribeResult
+import org.tatrman.transfer.v1.EvictResult
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MoveResult
 import org.tatrman.kantheon.charon.endpoints.JdbcAdbcReader
 import org.tatrman.kantheon.charon.endpoints.JdbcAdbcWriter
 import org.tatrman.kantheon.charon.endpoints.LettuceRedisOps
@@ -415,7 +415,7 @@ class CharonMoveExecutor(
      *  carries the `db_write_mode` from the request). */
     private fun buildTarget(
         loc: Location,
-        options: org.tatrman.charon.v1.MoveOptions,
+        options: org.tatrman.transfer.v1.MoveOptions,
     ): Either<CharonError, Target> =
         when {
             loc.hasSeaweed() ->
@@ -455,8 +455,8 @@ class CharonMoveExecutor(
 
     private fun pipeWithOptions(
         plan: Plan,
-        src: org.tatrman.charon.v1.Location,
-        tgt: org.tatrman.charon.v1.Location,
+        src: org.tatrman.transfer.v1.Location,
+        tgt: org.tatrman.transfer.v1.Location,
         source: org.tatrman.kantheon.charon.core.Source,
         target: org.tatrman.kantheon.charon.core.Target,
     ): Either<CharonError, MoveResult> {

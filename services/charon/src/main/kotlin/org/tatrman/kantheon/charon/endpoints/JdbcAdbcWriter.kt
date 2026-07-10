@@ -25,7 +25,7 @@ import org.apache.arrow.vector.VarCharVector
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.types.pojo.Schema
 import org.slf4j.LoggerFactory
-import org.tatrman.charon.v1.DbWriteMode
+import org.tatrman.transfer.v1.DbWriteMode
 import org.tatrman.kantheon.charon.core.AdbcWriter
 import org.tatrman.kantheon.charon.core.ConnectionHandle
 import org.tatrman.kantheon.charon.core.DbConnectionProvider

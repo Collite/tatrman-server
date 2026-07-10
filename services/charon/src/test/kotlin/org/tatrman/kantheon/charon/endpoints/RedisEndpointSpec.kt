@@ -9,7 +9,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.tatrman.charon.v1.RedisEntry
+import org.tatrman.transfer.v1.RedisEntry
 
 /**
  * Mocked unit suite for the Stage 1.3 Redis-backed endpoint.

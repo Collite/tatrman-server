@@ -5,7 +5,7 @@ import io.grpc.ManagedChannelBuilder
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import org.slf4j.LoggerFactory
-import org.tatrman.charon.v1.WorkerKind
+import org.tatrman.transfer.v1.WorkerKind
 import org.tatrman.kantheon.charon.core.WorkerGateway
 import org.tatrman.kantheon.charon.core.WorkerGatewayFactory
 import org.tatrman.metis.v1.MetisServiceGrpcKt

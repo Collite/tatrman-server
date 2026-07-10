@@ -10,11 +10,11 @@ import io.kotest.assertions.throwables.shouldThrowExactly
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.TimeUnit
-import org.tatrman.charon.v1.CharonServiceGrpc
-import org.tatrman.charon.v1.CopyRequest
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MaterializeRequest
-import org.tatrman.charon.v1.SeaweedBlob
+import org.tatrman.transfer.v1.CharonServiceGrpc
+import org.tatrman.transfer.v1.CopyRequest
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MaterializeRequest
+import org.tatrman.transfer.v1.SeaweedBlob
 import org.tatrman.kantheon.charon.core.MovePlanner
 import org.tatrman.kantheon.charon.core.SkeletonMoveExecutor
 import org.tatrman.kantheon.common.v1.ResponseMessage
@@ -85,9 +85,9 @@ class ResponseMessageTrailerSpec :
                         Location
                             .newBuilder()
                             .setWorkerDf(
-                                org.tatrman.charon.v1.WorkerSessionDf
+                                org.tatrman.transfer.v1.WorkerSessionDf
                                     .newBuilder()
-                                    .setWorkerKind(org.tatrman.charon.v1.WorkerKind.POLARS)
+                                    .setWorkerKind(org.tatrman.transfer.v1.WorkerKind.POLARS)
                                     .setSessionId("s")
                                     .setDfName("d")
                                     .build(),

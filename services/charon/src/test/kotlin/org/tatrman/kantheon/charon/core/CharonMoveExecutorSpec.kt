@@ -16,12 +16,12 @@ import org.apache.arrow.vector.types.pojo.ArrowType
 import org.apache.arrow.vector.types.pojo.Field
 import org.apache.arrow.vector.types.pojo.FieldType
 import org.apache.arrow.vector.types.pojo.Schema
-import org.tatrman.charon.v1.DescribeResult
-import org.tatrman.charon.v1.EvictResult
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MoveOptions
-import org.tatrman.charon.v1.MoveResult
-import org.tatrman.charon.v1.SeaweedBlob
+import org.tatrman.transfer.v1.DescribeResult
+import org.tatrman.transfer.v1.EvictResult
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MoveOptions
+import org.tatrman.transfer.v1.MoveResult
+import org.tatrman.transfer.v1.SeaweedBlob
 import org.tatrman.kantheon.charon.endpoints.SeaweedEndpoint
 import software.amazon.awssdk.core.ResponseInputStream
 import software.amazon.awssdk.services.s3.S3Client
@@ -472,7 +472,7 @@ class CharonMoveExecutorSpec :
                         Location
                             .newBuilder()
                             .setRedis(
-                                org.tatrman.charon.v1.RedisEntry
+                                org.tatrman.transfer.v1.RedisEntry
                                     .newBuilder()
                                     .setKey("r")
                                     .setTtlSeconds(60)
@@ -537,7 +537,7 @@ class CharonMoveExecutorSpec :
                         Location
                             .newBuilder()
                             .setRedis(
-                                org.tatrman.charon.v1.RedisEntry
+                                org.tatrman.transfer.v1.RedisEntry
                                     .newBuilder()
                                     .setKey("src")
                                     .build(),
@@ -598,7 +598,7 @@ class CharonMoveExecutorSpec :
                         Location
                             .newBuilder()
                             .setRedis(
-                                org.tatrman.charon.v1.RedisEntry
+                                org.tatrman.transfer.v1.RedisEntry
                                     .newBuilder()
                                     .setKey("r")
                                     .build(),
@@ -621,7 +621,7 @@ class CharonMoveExecutorSpec :
             every { ops.strlen("k".toByteArray(Charsets.UTF_8)) } returns 99L
             val executor = CharonMoveExecutor(s3, ops)
             val entry =
-                org.tatrman.charon.v1.RedisEntry
+                org.tatrman.transfer.v1.RedisEntry
                     .newBuilder()
                     .setKey("k")
                     .build()
@@ -650,7 +650,7 @@ class CharonMoveExecutorSpec :
             every { ops.del("k".toByteArray(Charsets.UTF_8), "k:schema-fp".toByteArray(Charsets.UTF_8)) } returns 2L
             val executor = CharonMoveExecutor(s3, ops)
             val entry =
-                org.tatrman.charon.v1.RedisEntry
+                org.tatrman.transfer.v1.RedisEntry
                     .newBuilder()
                     .setKey("k")
                     .build()
@@ -673,7 +673,7 @@ class CharonMoveExecutorSpec :
             every { ops.pttl("k".toByteArray(Charsets.UTF_8)) } returns 30_000L
             val executor = CharonMoveExecutor(s3, ops)
             val entry =
-                org.tatrman.charon.v1.RedisEntry
+                org.tatrman.transfer.v1.RedisEntry
                     .newBuilder()
                     .setKey("k")
                     .build()

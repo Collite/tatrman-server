@@ -6,14 +6,14 @@ import io.grpc.StatusRuntimeException
 import io.grpc.stub.StreamObserver
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import org.tatrman.charon.v1.DbTable
-import org.tatrman.charon.v1.DescribeRequest
-import org.tatrman.charon.v1.DescribeResult
-import org.tatrman.charon.v1.EvictRequest
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MaterializeRequest
-import org.tatrman.charon.v1.MoveResult
-import org.tatrman.charon.v1.SeaweedBlob
+import org.tatrman.transfer.v1.DbTable
+import org.tatrman.transfer.v1.DescribeRequest
+import org.tatrman.transfer.v1.DescribeResult
+import org.tatrman.transfer.v1.EvictRequest
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MaterializeRequest
+import org.tatrman.transfer.v1.MoveResult
+import org.tatrman.transfer.v1.SeaweedBlob
 import org.tatrman.kantheon.charon.core.MovePlanner
 import org.tatrman.kantheon.charon.core.SkeletonMoveExecutor
 import java.util.concurrent.atomic.AtomicInteger
@@ -39,7 +39,7 @@ class NoDoubleCloseSpec :
             )
 
         "evict on a DB table closes exactly once with onError, no onCompleted" {
-            val evictSpy = CountingObserver<org.tatrman.charon.v1.EvictResult>()
+            val evictSpy = CountingObserver<org.tatrman.transfer.v1.EvictResult>()
             service().evict(
                 EvictRequest
                     .newBuilder()
@@ -108,7 +108,7 @@ class NoDoubleCloseSpec :
                         Location
                             .newBuilder()
                             .setRedis(
-                                org.tatrman.charon.v1.RedisEntry
+                                org.tatrman.transfer.v1.RedisEntry
                                     .newBuilder()
                                     .setKey("r")
                                     .build(),

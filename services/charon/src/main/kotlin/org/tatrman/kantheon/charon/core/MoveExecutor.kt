@@ -1,8 +1,8 @@
 package org.tatrman.kantheon.charon.core
 
-import org.tatrman.charon.v1.DescribeResult
-import org.tatrman.charon.v1.EvictResult
-import org.tatrman.charon.v1.MoveResult
+import org.tatrman.transfer.v1.DescribeResult
+import org.tatrman.transfer.v1.EvictResult
+import org.tatrman.transfer.v1.MoveResult
 
 /**
  * The I/O seam Charon's gRPC layer calls. The real implementations

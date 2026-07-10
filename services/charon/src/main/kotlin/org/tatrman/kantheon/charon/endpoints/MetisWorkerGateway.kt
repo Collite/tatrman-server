@@ -12,9 +12,9 @@ import org.apache.arrow.memory.BufferAllocator
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.ipc.ArrowReader
 import org.apache.arrow.vector.types.pojo.Schema
-import org.tatrman.charon.v1.DescribeResult
-import org.tatrman.charon.v1.EvictResult
-import org.tatrman.charon.v1.WorkerKind
+import org.tatrman.transfer.v1.DescribeResult
+import org.tatrman.transfer.v1.EvictResult
+import org.tatrman.transfer.v1.WorkerKind
 import org.tatrman.kantheon.charon.core.Integrity
 import org.tatrman.kantheon.charon.core.WorkerDfNotFoundException
 import org.tatrman.kantheon.charon.core.WorkerGateway

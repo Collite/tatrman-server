@@ -14,8 +14,8 @@ import org.apache.arrow.vector.types.pojo.ArrowType
 import org.apache.arrow.vector.types.pojo.Field
 import org.apache.arrow.vector.types.pojo.FieldType
 import org.apache.arrow.vector.types.pojo.Schema
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MoveResult
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MoveResult
 import org.tatrman.kantheon.charon.endpoints.SeaweedEndpoint
 
 /**
@@ -178,7 +178,7 @@ class MultiBatchMoveSpec :
             val target =
                 SeaweedEndpoint(s3, alloc).apply {
                     setLocation(
-                        org.tatrman.charon.v1.SeaweedBlob
+                        org.tatrman.transfer.v1.SeaweedBlob
                             .newBuilder()
                             .setBucket("b")
                             .setKey("tgt")

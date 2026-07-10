@@ -18,12 +18,12 @@ import org.apache.arrow.vector.types.pojo.ArrowType
 import org.apache.arrow.vector.types.pojo.Field
 import org.apache.arrow.vector.types.pojo.FieldType
 import org.apache.arrow.vector.types.pojo.Schema
-import org.tatrman.charon.v1.DbTable
-import org.tatrman.charon.v1.DbWriteMode
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MoveOptions
-import org.tatrman.charon.v1.MoveResult
-import org.tatrman.charon.v1.SeaweedBlob
+import org.tatrman.transfer.v1.DbTable
+import org.tatrman.transfer.v1.DbWriteMode
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MoveOptions
+import org.tatrman.transfer.v1.MoveResult
+import org.tatrman.transfer.v1.SeaweedBlob
 import org.tatrman.kantheon.charon.endpoints.H2TestSupport
 import software.amazon.awssdk.core.ResponseInputStream
 import software.amazon.awssdk.core.sync.RequestBody
@@ -237,7 +237,7 @@ class DbMoveComponentSpec :
                 executorFor(s3, h).describe(
                     Plan(MoveRpc.DESCRIBE, dbLoc("comp-describe", "dd"), null, MoveOptions.getDefaultInstance()),
                 )
-            result.shouldBeInstanceOf<Either.Right<org.tatrman.charon.v1.DescribeResult>>()
+            result.shouldBeInstanceOf<Either.Right<org.tatrman.transfer.v1.DescribeResult>>()
             (result as Either.Right).value.exists shouldBe true
         }
     })
