@@ -1,6 +1,6 @@
 package org.tatrman.worker.postgres.client
 
-import org.tatrman.translate.v1.ProteusServiceGrpcKt
+import org.tatrman.translate.v1.TranslateServiceGrpcKt
 import org.tatrman.translate.v1.UnparseRequest
 import org.tatrman.translate.v1.UnparseResponse
 import io.grpc.ManagedChannel
@@ -41,7 +41,7 @@ class GrpcTranslatorClient(
             .intercept(OutgoingCallLoggingInterceptor())
             .build()
 
-    private val stub = ProteusServiceGrpcKt.ProteusServiceCoroutineStub(channel)
+    private val stub = TranslateServiceGrpcKt.TranslateServiceCoroutineStub(channel)
 
     override suspend fun unparse(request: UnparseRequest): UnparseResponse =
         stub.withDeadlineAfter(timeoutSeconds, TimeUnit.SECONDS).unparseFromRelNode(request)

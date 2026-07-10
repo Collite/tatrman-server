@@ -5,7 +5,7 @@ import com.typesafe.config.ConfigFactory
 import org.tatrman.meta.v1.GetQueryRequest
 import org.tatrman.meta.v1.GetQueryResponse
 import org.tatrman.meta.v1.GetSnapshotRequest
-import org.tatrman.meta.v1.AriadneServiceGrpcKt
+import org.tatrman.meta.v1.VelesServiceGrpcKt
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translate.v1.Language
 import org.tatrman.translate.v1.SqlDialect
@@ -168,7 +168,7 @@ fun Application.module(config: Config) {
                 } else {
                     5
                 }
-            val stub = AriadneServiceGrpcKt.AriadneServiceCoroutineStub(channel)
+            val stub = VelesServiceGrpcKt.VelesServiceCoroutineStub(channel)
             getQueryFn = { req: GetQueryRequest -> stub.withDeadlineAfter(10, TimeUnit.SECONDS).getQuery(req) }
             log.info(
                 "Proteus using Ariadne at {}:{} (poll every {}s, snapshot deadline {}s, initial retry {}s)",

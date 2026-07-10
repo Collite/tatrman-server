@@ -54,7 +54,7 @@ import org.tatrman.meta.v1.RelationDetail
 import org.tatrman.meta.v1.RoleEntry
 import org.tatrman.meta.v1.LocalizedString as ProtoLocalizedString
 import org.tatrman.meta.v1.LocalizedStringList as ProtoLocalizedStringList
-import org.tatrman.meta.v1.AriadneServiceGrpcKt
+import org.tatrman.meta.v1.VelesServiceGrpcKt
 import org.tatrman.meta.v1.SearchHints as ProtoSearchHints
 import org.tatrman.meta.v1.SearchRequest
 import org.tatrman.meta.v1.SearchResponse
@@ -135,7 +135,7 @@ class MetadataServiceImpl(
     private val tracer: Tracer? = null,
     private val parseState: QueryParseState? = null,
     private val refresher: MetadataRefresher? = null,
-) : AriadneServiceGrpcKt.AriadneServiceCoroutineImplBase() {
+) : VelesServiceGrpcKt.VelesServiceCoroutineImplBase() {
     private val logger = org.slf4j.LoggerFactory.getLogger(MetadataServiceImpl::class.java)
 
     /** Live parse status for a query — the background worker's view if available, else the model's stored value. */

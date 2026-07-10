@@ -27,7 +27,7 @@ import org.tatrman.query.client.TranslatorClient
 import org.tatrman.query.client.TranslatorDetectClient
 import org.tatrman.query.client.TranslatorTranslateClient
 import org.tatrman.query.client.ValidatorClient
-import org.tatrman.query.grpc.TheseusServiceImpl
+import org.tatrman.query.grpc.QueryServiceImpl
 import org.tatrman.query.retry.RetryPolicy
 import java.time.Duration
 
@@ -264,7 +264,7 @@ class QueryRefE2ESpec :
                             .build()
                     }
                 val svc =
-                    TheseusServiceImpl(
+                    QueryServiceImpl(
                         combinedTranslator,
                         detectStub,
                         TranslatorTranslateClient { throw IllegalStateException("translate not used") },
@@ -332,7 +332,7 @@ class QueryRefE2ESpec :
                             .build()
                     }
                 val svc =
-                    TheseusServiceImpl(
+                    QueryServiceImpl(
                         combinedTranslator,
                         detectStub2,
                         TranslatorTranslateClient { throw IllegalStateException() },

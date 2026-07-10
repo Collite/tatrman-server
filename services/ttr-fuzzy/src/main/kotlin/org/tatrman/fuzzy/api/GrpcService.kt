@@ -7,14 +7,14 @@ import org.tatrman.fuzzy.core.cascadeFrom
 import org.tatrman.fuzzy.telemetry.EchoTelemetry
 import org.tatrman.fuzzy.v1.FuzzyMatch
 import org.tatrman.fuzzy.v1.FuzzyMatchResponse
-import org.tatrman.fuzzy.v1.EchoServiceGrpcKt
+import org.tatrman.fuzzy.v1.FuzzyServiceGrpcKt
 import org.tatrman.fuzzy.v1.MatchRequest
 import org.slf4j.LoggerFactory
 
 class GrpcService(
     private val fuzzyMatcher: EchoMatcher,
     private val telemetry: EchoTelemetry? = null,
-) : EchoServiceGrpcKt.EchoServiceCoroutineImplBase() {
+) : FuzzyServiceGrpcKt.FuzzyServiceCoroutineImplBase() {
     private val logger = LoggerFactory.getLogger(GrpcService::class.java)
 
     override suspend fun match(request: MatchRequest): FuzzyMatchResponse {

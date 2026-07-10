@@ -13,7 +13,7 @@ import org.tatrman.query.v1.CacheStatus
 import org.tatrman.query.v1.CompileResponse
 import org.tatrman.query.v1.GetStatusRequest
 import org.tatrman.query.v1.GetStatusResponse
-import org.tatrman.query.v1.TheseusServiceGrpcKt
+import org.tatrman.query.v1.QueryServiceGrpcKt
 import org.tatrman.query.v1.RunRequest
 import org.tatrman.translate.v1.DetectSchemaRequest
 import org.tatrman.translate.v1.Language
@@ -65,7 +65,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * so callers handle every failure mode uniformly. This matches the shape
  * the Dispatcher and Worker also use.
  */
-class TheseusServiceImpl(
+class QueryServiceImpl(
     rawTranslator: TranslatorClient,
     rawTranslatorDetect: TranslatorDetectClient,
     rawTranslatorTranslate: TranslatorTranslateClient,
@@ -74,7 +74,7 @@ class TheseusServiceImpl(
     private val cache: CompiledPlanCache,
     private val retry: RetryPolicy,
     openTelemetry: OpenTelemetry = GlobalOpenTelemetry.get(),
-) : TheseusServiceGrpcKt.TheseusServiceCoroutineImplBase() {
+) : QueryServiceGrpcKt.QueryServiceCoroutineImplBase() {
     private val tracer = openTelemetry.getTracer("theseus")
 
     // Tracing decorators (Stage 4.1 T3) — every downstream RPC opens a child span
@@ -990,6 +990,6 @@ class TheseusServiceImpl(
     )
 
     companion object {
-        private val log = LoggerFactory.getLogger(TheseusServiceImpl::class.java)
+        private val log = LoggerFactory.getLogger(QueryServiceImpl::class.java)
     }
 }

@@ -45,8 +45,8 @@ class ValidatorServiceImplSpec :
             llmEnabled: Boolean = false,
             metadataClient: MetadataClient = StaticMetadataClient(metadataVersion),
             roleSource: RoleSource = BearerRoleSource(),
-        ): ArgosServiceImpl =
-            ArgosServiceImpl(
+        ): ValidateServiceImpl =
+            ValidateServiceImpl(
                 securityApplier = SecurityApplier(client),
                 ruleEnforcer = RuleEnforcer(serviceDefault = 30),
                 llmGuard = LlmGuard(enabled = llmEnabled),

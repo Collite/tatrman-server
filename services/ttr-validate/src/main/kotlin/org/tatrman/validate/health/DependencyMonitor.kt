@@ -13,7 +13,7 @@ import kotlin.random.Random
 /**
  * Background liveness gate for the validator's hard dependencies (metadata + sql-security).
  *
- * The validator fails *hard* on a dependency outage (see `ArgosServiceImpl` — a metadata
+ * The validator fails *hard* on a dependency outage (see `ValidateServiceImpl` — a metadata
  * or sql-security failure propagates as gRPC `UNAVAILABLE` rather than degrading). To stop
  * K8s routing traffic to a validator that cannot serve, this monitor probes each dependency
  * on its own coroutine and exposes a readiness verdict that `/ready` reflects (→ 503 while a

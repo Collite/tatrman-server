@@ -1,17 +1,17 @@
 package org.tatrman.query.client
 
 import org.tatrman.dispatch.v1.DispatchRequest
-import org.tatrman.dispatch.v1.KyklopServiceGrpcKt
+import org.tatrman.dispatch.v1.DispatchServiceGrpcKt
 import org.tatrman.translate.v1.DetectSchemaRequest
 import org.tatrman.translate.v1.DetectSchemaResponse
 import org.tatrman.translate.v1.ParseRequest
 import org.tatrman.translate.v1.ParseResponse
 import org.tatrman.translate.v1.TranslateRequest
 import org.tatrman.translate.v1.TranslateResponse
-import org.tatrman.translate.v1.ProteusServiceGrpcKt
+import org.tatrman.translate.v1.TranslateServiceGrpcKt
 import org.tatrman.validate.v1.ValidateRequest
 import org.tatrman.validate.v1.ValidateResponse
-import org.tatrman.validate.v1.ArgosServiceGrpcKt
+import org.tatrman.validate.v1.ValidateServiceGrpcKt
 import org.tatrman.worker.v1.ResultBatch
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
@@ -52,7 +52,7 @@ class GrpcTranslatorClient(
     TranslatorTranslateClient,
     AutoCloseable {
     private val channel: ManagedChannel = openChannel(host, port)
-    private val stub = ProteusServiceGrpcKt.ProteusServiceCoroutineStub(channel)
+    private val stub = TranslateServiceGrpcKt.TranslateServiceCoroutineStub(channel)
 
     override suspend fun parse(request: ParseRequest): ParseResponse =
         stub.withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS).parseToRelNode(request)
@@ -75,7 +75,7 @@ class GrpcValidatorClient(
 ) : ValidatorClient,
     AutoCloseable {
     private val channel: ManagedChannel = openChannel(host, port)
-    private val stub = ArgosServiceGrpcKt.ArgosServiceCoroutineStub(channel)
+    private val stub = ValidateServiceGrpcKt.ValidateServiceCoroutineStub(channel)
 
     override suspend fun validate(request: ValidateRequest): ValidateResponse =
         stub.withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS).validate(request)
@@ -91,7 +91,7 @@ class GrpcDispatcherClient(
 ) : DispatcherClient,
     AutoCloseable {
     private val channel: ManagedChannel = openChannel(host, port)
-    private val stub = KyklopServiceGrpcKt.KyklopServiceCoroutineStub(channel)
+    private val stub = DispatchServiceGrpcKt.DispatchServiceCoroutineStub(channel)
 
     override fun dispatch(request: DispatchRequest): Flow<ResultBatch> = stub.dispatch(request)
 

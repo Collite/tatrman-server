@@ -17,7 +17,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlinx.coroutines.runBlocking
-import org.tatrman.meta.v1.AriadneServiceGrpc
+import org.tatrman.meta.v1.VelesServiceGrpc
 import org.tatrman.meta.v1.DbTableDetail
 import org.tatrman.meta.v1.GetObjectRequest
 import org.tatrman.meta.v1.GetObjectResponse
@@ -41,7 +41,7 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * End-to-end component test for the metadata-driven loader path (re-forked
  * 2026-06-14). Exercises the real [MetadataServiceClient] over `io.grpc.inprocess`
- * against a hand-rolled stub `AriadneService`. Asserts on data flow (returned
+ * against a hand-rolled stub `VelesService`. Asserts on data flow (returned
  * maps, captured requests) — not just call counts.
  */
 class MetadataLoaderSourceComponentTest :
@@ -82,7 +82,7 @@ class MetadataLoaderSourceComponentTest :
                 .setPageInfo(PageInfo.newBuilder().setNextPageToken(nextPageToken).build())
                 .build()
 
-        class StubAriadneService : AriadneServiceGrpc.AriadneServiceImplBase() {
+        class StubVelesService : VelesServiceGrpc.VelesServiceImplBase() {
             var listObjectsResponses: List<ListObjectsResponse> = emptyList()
             var getObjectResponses: Map<QualifiedName, GetObjectResponse> = emptyMap()
             var listObjectsError: Status? = null
@@ -125,7 +125,7 @@ class MetadataLoaderSourceComponentTest :
         }
 
         class TestHarness(
-            val stub: StubAriadneService,
+            val stub: StubVelesService,
             val server: Server,
             val channel: ManagedChannel,
             val client: MetadataServiceClient,
@@ -138,7 +138,7 @@ class MetadataLoaderSourceComponentTest :
 
         fun harness(timeoutMs: Long = 2_000): TestHarness {
             val name = "echo-loader-it-${UUID.randomUUID()}"
-            val stub = StubAriadneService()
+            val stub = StubVelesService()
             val server =
                 InProcessServerBuilder
                     .forName(name)

@@ -26,7 +26,7 @@ import org.tatrman.query.client.TranslatorClient
 import org.tatrman.query.client.TranslatorDetectClient
 import org.tatrman.query.client.TranslatorTranslateClient
 import org.tatrman.query.client.ValidatorClient
-import org.tatrman.query.grpc.TheseusServiceImpl
+import org.tatrman.query.grpc.QueryServiceImpl
 import org.tatrman.query.retry.RetryPolicy
 import shared.ktor.KtorConfigFactory
 import shared.ktor.KtorServerBootstrap
@@ -49,7 +49,7 @@ fun Application.module(config: Config) {
 
     // OTel SDK init: configures OTLP trace/metric/log exporters AND installs the bridge
     // into the Logback OpenTelemetryAppender so all SLF4J logs are forwarded to OTLP → Alloy → Loki.
-    // The instance is also handed to TheseusServiceImpl so its orchestration spans
+    // The instance is also handed to QueryServiceImpl so its orchestration spans
     // (theseus.run → parse/validate/dispatch) export on the same SDK (Stage 4.1 T3).
     val openTelemetry =
         createOpenTelemetrySdk(
@@ -82,7 +82,7 @@ fun Application.module(config: Config) {
     val dispatcherClient = pickDispatcherClient(config, useFixture)
 
     val service =
-        TheseusServiceImpl(
+        QueryServiceImpl(
             rawTranslator = translatorClient,
             rawTranslatorDetect = translatorDetectClient,
             rawTranslatorTranslate = translatorTranslateClient,

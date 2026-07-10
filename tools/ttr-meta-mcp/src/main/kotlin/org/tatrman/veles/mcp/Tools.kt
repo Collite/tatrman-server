@@ -1767,9 +1767,7 @@ private fun encodeQueryDescriptorsJson(
     }
 
 /** Encode a `GetQueryResponse` (from `GetQuery`) as the detailed query JSON shape. */
-private fun encodeQueryDetailJson(
-    resp: org.tatrman.meta.v1.GetQueryResponse,
-): kotlinx.serialization.json.JsonObject {
+private fun encodeQueryDetailJson(resp: org.tatrman.meta.v1.GetQueryResponse): kotlinx.serialization.json.JsonObject {
     val obj = resp.objectDescriptor
     val dotted = obj.qualifiedName.toDottedQname()
     return buildJsonObject {

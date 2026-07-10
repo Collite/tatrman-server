@@ -35,7 +35,7 @@ import org.tatrman.query.retry.RetryPolicy
 import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
 
-class TheseusServiceImplSpec :
+class QueryServiceImplSpec :
     StringSpec({
         val customers =
             QualifiedName
@@ -134,8 +134,8 @@ class TheseusServiceImplSpec :
             dispatcher: DispatcherClient = dispatcherStub,
             cache: CompiledPlanCache = CompiledPlanCache(100, Duration.ofMinutes(60)),
             retry: RetryPolicy = nojitterRetry,
-        ): TheseusServiceImpl =
-            TheseusServiceImpl(
+        ): QueryServiceImpl =
+            QueryServiceImpl(
                 translator,
                 translatorDetect,
                 translatorTranslate,

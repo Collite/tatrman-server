@@ -8,7 +8,7 @@ import org.tatrman.llmgateway.web.*
 @Service
 class GrpcChatService(
     private val chatController: ChatController,
-) : PrometheusServiceGrpc.PrometheusServiceImplBase() {
+) : LlmGatewayServiceGrpc.LlmGatewayServiceImplBase() {
     override fun createResponse(
         request: CreateResponseRequest,
         responseObserver: StreamObserver<Response>,

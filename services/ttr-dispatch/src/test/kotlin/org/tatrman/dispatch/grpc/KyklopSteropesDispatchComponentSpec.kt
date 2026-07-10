@@ -73,7 +73,7 @@ class KyklopSteropesDispatchComponentSpec :
                 },
             )
 
-        fun svc(vararg workers: SteropesStub): KyklopServiceImpl {
+        fun svc(vararg workers: SteropesStub): DispatchServiceImpl {
             val registry = WorkerRegistry()
             registry.seed(
                 workers.map {
@@ -88,7 +88,7 @@ class KyklopSteropesDispatchComponentSpec :
                     )
                 },
             )
-            return KyklopServiceImpl(registry, StickyRegistry(), world)
+            return DispatchServiceImpl(registry, StickyRegistry(), world)
         }
 
         "workspace-rooted plan + session routes to Steropes and Arrow IPC streams back intact" {

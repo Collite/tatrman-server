@@ -22,7 +22,7 @@ import org.tatrman.translate.v1.StageArtifact
 import org.tatrman.translate.v1.SuggestionGroup
 import org.tatrman.translate.v1.TranslateRequest
 import org.tatrman.translate.v1.TranslateResponse
-import org.tatrman.translate.v1.ProteusServiceGrpcKt
+import org.tatrman.translate.v1.TranslateServiceGrpcKt
 import org.tatrman.translate.v1.UnparseRequest
 import org.tatrman.translate.v1.UnparseResponse
 import org.slf4j.LoggerFactory
@@ -52,14 +52,14 @@ import org.tatrman.plan.v1.parseSchemaCode
  * carrying a structured [ResponseMessage]; gRPC status codes are reserved for transport failures.
  *
  * [getQuery] is injected so tests can supply a canned response without a real channel; in
- * production it's a thin wrapper over `AriadneServiceCoroutineStub.getQuery(...)`. `null` (the
+ * production it's a thin wrapper over `VelesServiceCoroutineStub.getQuery(...)`. `null` (the
  * fixture / no-metadata path) disables `query_ref` resolution — `query_ref` sources then fall
  * back to the codec's placeholder behaviour.
  */
 class TranslatorServiceImpl(
     private val modelProvider: ModelHandleProvider,
     private val getQuery: (suspend (GetQueryRequest) -> GetQueryResponse)? = null,
-) : ProteusServiceGrpcKt.ProteusServiceCoroutineImplBase() {
+) : TranslateServiceGrpcKt.TranslateServiceCoroutineImplBase() {
     override suspend fun parseToRelNode(request: ParseRequest): ParseResponse {
         val builder = ParseResponse.newBuilder().setContext(request.context)
         val queryRefs =

@@ -2,7 +2,7 @@ package org.tatrman.dispatch.grpc
 
 import com.google.protobuf.kotlin.toByteString
 import org.tatrman.dispatch.v1.DispatchRequest
-import org.tatrman.dispatch.v1.KyklopServiceGrpcKt
+import org.tatrman.dispatch.v1.DispatchServiceGrpcKt
 import org.tatrman.dispatch.v1.GetStatusRequest
 import org.tatrman.dispatch.v1.GetStatusResponse
 import org.tatrman.dispatch.v1.ListWorkersRequest
@@ -48,13 +48,13 @@ import java.util.concurrent.atomic.AtomicInteger
  * `is_first = is_last = true`, empty `arrow_ipc`, and a populated
  * `messages` field) so callers can treat the stream uniformly.
  */
-class KyklopServiceImpl(
+class DispatchServiceImpl(
     private val registry: WorkerRegistry,
     private val sticky: StickyRegistry,
     private val world: WorldConfig,
     private val allowStickyFailover: Boolean = false,
     internal val loadTracker: LoadTracker = LoadTracker(),
-) : KyklopServiceGrpcKt.KyklopServiceCoroutineImplBase() {
+) : DispatchServiceGrpcKt.DispatchServiceCoroutineImplBase() {
     private val activeDispatches = AtomicInteger(0)
 
     override fun dispatch(request: DispatchRequest): Flow<ResultBatch> {
@@ -414,6 +414,6 @@ class KyklopServiceImpl(
     private fun nowIso(): String = Instant.now().toString()
 
     companion object {
-        private val log = LoggerFactory.getLogger(KyklopServiceImpl::class.java)
+        private val log = LoggerFactory.getLogger(DispatchServiceImpl::class.java)
     }
 }

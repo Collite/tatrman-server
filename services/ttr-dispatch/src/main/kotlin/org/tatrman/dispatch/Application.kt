@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory
 import org.tatrman.dispatch.client.GrpcWorkerClient
 import org.tatrman.dispatch.client.WorkerClient
 import org.tatrman.dispatch.config.WorkerConfigLoader
-import org.tatrman.dispatch.grpc.KyklopServiceImpl
+import org.tatrman.dispatch.grpc.DispatchServiceImpl
 import org.tatrman.dispatch.registry.CapabilityPoller
 import org.tatrman.dispatch.registry.WorkerEntry
 import org.tatrman.dispatch.registry.WorkerRegistry
@@ -117,7 +117,7 @@ fun Application.module(config: Config) {
         config.hasPath("kyklop.sticky.allow-failover") &&
             config.getBoolean("kyklop.sticky.allow-failover")
     val service =
-        KyklopServiceImpl(
+        DispatchServiceImpl(
             registry = registry,
             sticky = sticky,
             world = world,

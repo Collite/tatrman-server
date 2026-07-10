@@ -31,7 +31,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
-            groupId = "cz.tatrman"
+            groupId = "org.tatrman"
             artifactId = "capabilities-client"
             version = project.version.toString()
         }

@@ -94,7 +94,7 @@ class KyklopBrontesDispatchComponentSpec :
                 },
             )
 
-        fun svc(): KyklopServiceImpl {
+        fun svc(): DispatchServiceImpl {
             val registry = WorkerRegistry()
             registry.seed(
                 listOf(
@@ -109,7 +109,7 @@ class KyklopBrontesDispatchComponentSpec :
                     ),
                 ),
             )
-            return KyklopServiceImpl(registry, StickyRegistry(), world)
+            return DispatchServiceImpl(registry, StickyRegistry(), world)
         }
 
         "validated plan routes to Brontes and Arrow IPC streams back through Kyklop intact" {

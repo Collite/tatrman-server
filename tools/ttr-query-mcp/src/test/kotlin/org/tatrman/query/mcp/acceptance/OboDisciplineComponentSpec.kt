@@ -27,7 +27,7 @@ import org.tatrman.query.client.TranslatorClient
 import org.tatrman.query.client.TranslatorDetectClient
 import org.tatrman.query.client.TranslatorTranslateClient
 import org.tatrman.query.client.ValidatorClient
-import org.tatrman.query.grpc.TheseusServiceImpl
+import org.tatrman.query.grpc.QueryServiceImpl
 import org.tatrman.query.mcp.QueryMcpConfig
 import org.tatrman.query.mcp.identity.IdentityGate
 import org.tatrman.query.mcp.tools.QueryTool
@@ -136,7 +136,7 @@ class OboDisciplineComponentSpec :
                 ).build()
 
         // Real in-process Theseus; the Argos (validator) stub records the roles it sees.
-        fun theseusWithCapture(seenRoles: MutableList<List<String>>): TheseusServiceImpl {
+        fun theseusWithCapture(seenRoles: MutableList<List<String>>): QueryServiceImpl {
             val detect =
                 TranslatorDetectClient {
                     org.tatrman.translate.v1.DetectSchemaResponse
@@ -182,7 +182,7 @@ class OboDisciplineComponentSpec :
                             .build(),
                     )
                 }
-            return TheseusServiceImpl(
+            return QueryServiceImpl(
                 parse,
                 detect,
                 translate,
@@ -193,7 +193,7 @@ class OboDisciplineComponentSpec :
             )
         }
 
-        fun runnerOver(theseus: TheseusServiceImpl): QueryRunnerClient =
+        fun runnerOver(theseus: QueryServiceImpl): QueryRunnerClient =
             object : QueryRunnerClient {
                 override fun run(request: RunRequest): Flow<ResultBatch> = theseus.run(request)
 

@@ -6,7 +6,7 @@ import org.tatrman.plan.v1.PipelineContext
 import org.tatrman.plan.v1.Warning
 import org.tatrman.validate.v1.ValidateRequest
 import org.tatrman.validate.v1.ValidateResponse
-import org.tatrman.validate.v1.ArgosServiceGrpcKt
+import org.tatrman.validate.v1.ValidateServiceGrpcKt
 import io.grpc.Status
 import kotlinx.coroutines.CancellationException
 import org.slf4j.LoggerFactory
@@ -52,14 +52,14 @@ import org.tatrman.translator.framework.VerificationResult
  */
 
 @Suppress("ktlint:standard:max-line-length")
-class ArgosServiceImpl(
+class ValidateServiceImpl(
     private val securityApplier: SecurityApplier,
     private val ruleEnforcer: RuleEnforcer,
     private val llmGuard: LlmGuard,
     private val metadataClient: MetadataClient,
     private val adminRole: String = "query-platform-admin",
     private val roleSource: RoleSource = BearerRoleSource(),
-) : ArgosServiceGrpcKt.ArgosServiceCoroutineImplBase() {
+) : ValidateServiceGrpcKt.ValidateServiceCoroutineImplBase() {
     override suspend fun validate(request: ValidateRequest): ValidateResponse {
         val incomingPlan = request.plan
         val incomingContext = request.context
@@ -336,6 +336,6 @@ class ArgosServiceImpl(
     private fun PipelineContext.dumpForLog(): String = "user=$userId, model_version=$modelVersion"
 
     companion object {
-        private val log = LoggerFactory.getLogger(ArgosServiceImpl::class.java)
+        private val log = LoggerFactory.getLogger(ValidateServiceImpl::class.java)
     }
 }

@@ -16,6 +16,13 @@ kotlin {
     jvmToolchain(21)
 }
 
+// The fat jar bundles the full Calcite-backed translator (ttr-translator) + gRPC +
+// ktor, so it exceeds the 65535-entry ZIP limit — enable Zip64 (as kantheon's
+// cli-app does). The ktor plugin's shadowJar is a shadow ShadowJar task.
+tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>().configureEach {
+    isZip64 = true
+}
+
 tasks.test {
     useJUnitPlatform()
     // Arrow IPC reading (via data-formatter) needs these on JDK 17+.
@@ -119,7 +126,7 @@ dependencies {
     testImplementation(libs.arrow.vector)
     testImplementation(libs.arrow.memory.netty)
     // Stage 3.5 T6 — the full-chain component test wires run_query through a real
-    // in-process Theseus (TheseusServiceImpl with mocked Proteus/Argos/Kyklop/worker).
+    // in-process Theseus (QueryServiceImpl with mocked Proteus/Argos/Kyklop/worker).
     testImplementation(project(":services:ttr-query"))
     // Stage 4.1 T3 — in-memory span exporter for the run_query trace-nesting test.
     testImplementation(libs.opentelemetry.sdk.testing)
