@@ -46,7 +46,7 @@ server:
 
 logging:
     level:
-        org.tatrman.prometheus: DEBUG
+        org.tatrman.llmgateway: DEBUG
         org.springframework.security: DEBUG
 
 management:

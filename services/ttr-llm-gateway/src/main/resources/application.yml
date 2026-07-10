@@ -85,7 +85,7 @@ server:
 
 logging:
   level:
-    org.tatrman.prometheus: DEBUG
+    org.tatrman.llmgateway: DEBUG
     org.springframework.security: DEBUG
 
 management:
@@ -153,7 +153,7 @@ otel:
 
 logging:
   level:
-    org.tatrman.prometheus: DEBUG
+    org.tatrman.llmgateway: DEBUG
     org.springframework.security: DEBUG
 
 
