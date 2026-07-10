@@ -1,0 +1,64 @@
+name: tatrman-server-ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Authenticates to the `Collite/tatrman` GitHub Packages repo for the TTR
+      # toolchain (org.tatrman:ttr-*). A standing third-party dep (settings.gradle.kts).
+      packages: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: build
+        run: ./gradlew build
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # P2/RO-6 dependency rules (contracts §7). Passes trivially on the S1 skeleton;
+  # its real bite is S4 once the spine services + protos have arrived.
+  dependency-rules:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: check dependency rules
+        run: bash scripts/check-dependency-rules.sh
+
+  # Persona grep gate (naming ledger §5). Wired now, allow-empty until the S3
+  # move + S4 sweep land — the gate FAILS only if a retired persona string
+  # appears on a wire/build surface. Surviving personas (Veles/Perun/Charon,
+  # Golem/Pythia/Iris) are not in the regex.
+  grep-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: no retired personas on wire/build surfaces
+        run: |
+          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|arges|brontes|steropes|echo\b|kadmos|prometheus' \
+            --include='*.proto' --include='*.kt' --include='*.kts' --include='*.py' --include='*.conf' \
+            --include='*.yaml' --include='*.toml' . \
+            | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|_to_delete' || true)
+          if [ -n "$matches" ]; then
+            echo "::error::retired persona strings found on wire/build surfaces:"
+            echo "$matches"
+            exit 1
+          fi
+          echo "grep-gate: clean"
