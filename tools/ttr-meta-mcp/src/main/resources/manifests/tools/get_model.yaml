@@ -1,5 +1,5 @@
-capability_id: "veles.get_model:v1"
-category: "veles"
+capability_id: "meta.get_model:v1"
+category: "meta"
 version: "1.0.0"
 description: |
   Fetch the full ModelBundle (entities, relations, tables, views, pattern

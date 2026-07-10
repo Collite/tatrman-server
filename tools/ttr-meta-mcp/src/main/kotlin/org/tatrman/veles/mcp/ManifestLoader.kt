@@ -22,7 +22,7 @@ import java.io.File
  * `description` + `service_endpoint` + `search_tags` + `cost_hints`.
  *
  * Review-004 (F4) — the previous single-capability shim impersonated
- * `veles.get_model:v1` and folded the other tools into `search_tags`,
+ * `meta.get_model:v1` and folded the other tools into `search_tags`,
  * so the registry only saw 1 capability. This loader publishes every
  * authored manifest so each tool is discoverable by its own `capability_id`.
  */

@@ -1,5 +1,5 @@
-capability_id: "veles.search:v1"
-category: "veles"
+capability_id: "meta.search:v1"
+category: "meta"
 version: "1.0.0"
 description: |
   Fuzzy search across veles objects. The `query` argument is matched

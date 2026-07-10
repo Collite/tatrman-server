@@ -17,7 +17,7 @@ class CapabilitiesRegistrationSpec :
             val capabilities = ManifestLoader().loadAll()
             capabilities.size shouldBe 2
             capabilities.map { it.tool.capabilityId } shouldContainExactlyInAnyOrder
-                listOf("query.compile:v1", "query.query:v1")
+                listOf("query.compile:v1", "query.run:v1")
         }
 
         "each Capability carries the query-mcp service endpoint" {
@@ -27,7 +27,7 @@ class CapabilitiesRegistrationSpec :
         }
 
         "run_query is discoverable by its own id with sql/dfdsl search tags" {
-            val query = ManifestLoader().loadAll().single { it.tool.capabilityId == "query.query:v1" }
+            val query = ManifestLoader().loadAll().single { it.tool.capabilityId == "query.run:v1" }
             query.tool.searchTagsList shouldContain "sql"
             query.tool.searchTagsList shouldContain "dfdsl"
         }

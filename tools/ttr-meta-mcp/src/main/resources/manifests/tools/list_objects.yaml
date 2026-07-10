@@ -1,5 +1,5 @@
-capability_id: "veles.list_objects:v1"
-category: "veles"
+capability_id: "meta.list_objects:v1"
+category: "meta"
 version: "1.0.0"
 description: |
   List veles objects (tables, views, entities, attributes, relations,

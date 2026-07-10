@@ -1,4 +1,4 @@
-capability_id: "query.query:v1"
+capability_id: "query.run:v1"
 category: "query"
 version: "1.0.0"
 description: |

@@ -1,5 +1,5 @@
-capability_id: "veles.get_object:v1"
-category: "veles"
+capability_id: "meta.get_object:v1"
+category: "meta"
 version: "1.0.0"
 description: |
   Fetch a single veles object by qualified name. The MCP wrapper takes the

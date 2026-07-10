@@ -1,5 +1,5 @@
-capability_id: "veles.list_queries:v1"
-category: "veles"
+capability_id: "meta.list_queries:v1"
+category: "meta"
 version: "1.0.0"
 description: |
   List query templates authored against the veles model. Filter by

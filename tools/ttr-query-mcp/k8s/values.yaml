@@ -49,7 +49,7 @@ extraEnv:
   - { name: QUERY_SERVER, value: "query" }
   - { name: TRANSLATE_SERVER, value: "translate" }
   - { name: VALIDATE_SERVER, value: "validate" }
-  - { name: VELES_SERVER, value: "veles" }
+  - { name: VELES_SERVER, value: "meta" }
 
 # Probes (HTTP on the http port).
 readinessProbe:

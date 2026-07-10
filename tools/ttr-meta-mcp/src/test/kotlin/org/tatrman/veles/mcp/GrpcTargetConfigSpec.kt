@@ -54,7 +54,7 @@ class GrpcTargetConfigSpec :
         "buildGrpcClient defaults the port to 7261 when only the host is set" {
             // Mirrors a minimal cluster config that relies on the conf default;
             // the call must not throw on a missing metadata.port.
-            val config = ConfigFactory.parseString("""metadata { host = "veles" }""")
+            val config = ConfigFactory.parseString("""metadata { host = "meta" }""")
             val client = buildGrpcClient(config)
             client shouldNotBe null
             client?.close()

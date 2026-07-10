@@ -21,7 +21,7 @@ private val log = LoggerFactory.getLogger("query-mcp.capabilities")
  * (the `src/main/resources/manifests/tools` YAML dir) and register each with
  * capabilities-mcp (warn-and-continue). The tool vocabulary forks as-is
  * (contracts §2): the MCP tool names stay `query` / `compile`; the registry
- * capability ids are `query.query:v1` / `query.compile:v1`. Mirrors the
+ * capability ids are `query.run:v1` / `query.compile:v1`. Mirrors the
  * veles-mcp pattern (each tool registered independently; the shared
  * `ManifestYamlLoader` lives in the peer `:tools:capabilities-mcp`, which a
  * wrapper must not depend on, so the simple manifest shape is parsed here).
