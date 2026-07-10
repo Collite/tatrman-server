@@ -9,7 +9,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.theseus.mcp.ApplicationKt")
+    mainClass.set("org.tatrman.query.mcp.ApplicationKt")
 }
 
 kotlin {
@@ -54,7 +54,7 @@ jib {
         image = "theseus-mcp:dev"
     }
     container {
-        mainClass = "org.tatrman.kantheon.theseus.mcp.ApplicationKt"
+        mainClass = "org.tatrman.query.mcp.ApplicationKt"
         ports = listOf("7307")
         // Arrow needs these on JDK 21.
         jvmFlags =
@@ -120,7 +120,7 @@ dependencies {
     testImplementation(libs.arrow.memory.netty)
     // Stage 3.5 T6 — the full-chain component test wires run_query through a real
     // in-process Theseus (TheseusServiceImpl with mocked Proteus/Argos/Kyklop/worker).
-    testImplementation(project(":services:theseus"))
+    testImplementation(project(":services:ttr-query"))
     // Stage 4.1 T3 — in-memory span exporter for the run_query trace-nesting test.
     testImplementation(libs.opentelemetry.sdk.testing)
 

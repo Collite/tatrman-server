@@ -10,7 +10,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.theseus.ApplicationKt")
+    mainClass.set("org.tatrman.query.ApplicationKt")
 }
 
 kotlin {
@@ -50,7 +50,7 @@ jib {
         image = "theseus:dev"
     }
     container {
-        mainClass = "org.tatrman.kantheon.theseus.ApplicationKt"
+        mainClass = "org.tatrman.query.ApplicationKt"
         ports = listOf("7305", "7306")
     }
     dockerClient {

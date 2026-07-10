@@ -1,0 +1,150 @@
+// =============================================================================
+// Kantheon — Kyklop service (the worker dispatcher)
+//
+// Forked from ai-platform `cz/dfpartner/dispatcher/v1/dispatcher.proto`
+// (ai-platform@2575b923, tag kantheon-fork-point) at fork Stage 3.3. Renamed
+// into the constellation: DispatcherService -> DispatchService. Kyklop is the
+// genus carried by the dispatcher; the workers it routes to are the Kyklops
+// (Brontes the MSSQL worker, Steropes the Polars worker).
+//
+// Kyklop routes a validated PlanNode to a capable worker and pipes the Arrow
+// IPC result stream back upstream. v1 has one worker per engine (single MSSQL
+// worker, Brontes), so routing is degenerate; Kyklop exists at v1 to lock the
+// long-term contract per the No-Op-stubs principle.
+//
+// Per Round 6 decisions (inherited from the source):
+//   - Caller may supply an optional `connection_id`; if absent, Kyklop
+//     derives it by walking the plan's TableScan qnames against the World
+//     config. If present, Kyklop uses it authoritatively (with a warning if
+//     it disagrees with the derived value).
+//   - Plans with no TableScans (Values-only) route to the configured
+//     `default_connection`. Kyklop does not police query content.
+//   - Sticky routing is gated on the selected worker's
+//     `supports_stateful_sessions = true` capability.
+//   - Cross-database queries (PlanNode touches > 1 connection_id) are
+//     rejected with code "cross_database_not_supported".
+//
+// HOCON config shape (informational — not part of the proto):
+//   kyklop {
+//     workers = [ { endpoint = "...", role-hint = "mssql" }, ... ]
+//     default-connection = "df-test-main"
+//     capability-refresh {
+//       interval-seconds = 60
+//       timeout-seconds = 5
+//       degraded-after-failures = 2
+//       unreachable-after-failures = 5
+//     }
+//   }
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.dispatch.v1;
+
+import "org/tatrman/plan/v1/plan.proto";
+import "org/tatrman/plan/v1/context.proto";
+import "org/tatrman/meta/v1/meta.proto";
+import "org/tatrman/worker/v1/worker.proto";
+import "org/tatrman/common/v1/response_message.proto";
+
+option java_package = "org.tatrman.dispatch.v1";
+option java_multiple_files = true;
+option java_outer_classname = "DispatchProto";
+
+// =============================================================================
+// Service
+// =============================================================================
+
+service DispatchService {
+  // Route a validated PlanNode to a capable worker and stream results back.
+  // Sticky-routes by context.session_id when the chosen worker advertises
+  // stateful-session support. Caller may supply an optional connection_id;
+  // if absent, derived from the plan + World config.
+  rpc Dispatch(DispatchRequest) returns (stream org.tatrman.worker.v1.ResultBatch);
+
+  // Diagnostics: which workers does this Kyklop know about, what state.
+  rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
+
+  // Service-level status (mirrors ariadne / worker shape).
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+}
+
+// =============================================================================
+// Dispatch
+// =============================================================================
+
+message DispatchRequest {
+  org.tatrman.plan.v1.PlanNode plan = 1;
+  org.tatrman.plan.v1.PipelineContext context = 2;
+  org.tatrman.worker.v1.ExecutionOptions options = 3;
+
+  // Optional explicit connection_id. Caller may know it (e.g. agents that
+  // have World-config visibility, admin tools, debug surfaces).
+  // Behaviour:
+  //   - empty + plan derives 1 connection → use derived
+  //   - empty + plan has no TableScans → use default_connection from HOCON
+  //   - empty + plan derives multiple connections → reject as cross-database
+  //   - present + matches derived → use it
+  //   - present + plan derives 1 different connection → use the explicit
+  //     value, emit Warning code "connection_id_overrides_derived"
+  //   - present + plan derives multiple connections (incl. the explicit) →
+  //     reject as cross-database (the hint doesn't break the rule)
+  string connection_id = 4;
+  reserved 5 to 9;
+}
+
+// Response is `stream org.tatrman.worker.v1.ResultBatch` — defined in worker.proto.
+// Kyklop does not wrap or transform worker batches; it pipes them through.
+// The first batch's PipelineContext may carry additional Warnings Kyklop
+// contributed (routing decision, sticky session match, fallback selection,
+// connection_id override).
+
+// =============================================================================
+// ListWorkers — diagnostics / admin visibility
+// =============================================================================
+
+message ListWorkersRequest {}
+
+message ListWorkersResponse {
+  repeated WorkerInfo workers = 1;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message WorkerInfo {
+  string endpoint = 1;                                            // host:port from HOCON config
+  string role_hint = 2;                                           // informational; capabilities are authoritative
+  org.tatrman.worker.v1.GetCapabilitiesResponse capabilities = 3;
+  WorkerHealthStatus health = 4;
+  string last_polled = 5;                                         // ISO-8601
+  int32 consecutive_capability_failures = 6;
+  int32 active_sticky_sessions = 7;                              // count this Kyklop has stickied here
+  reserved 8 to 12;
+}
+
+enum WorkerHealthStatus {
+  WORKER_HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTHY = 1;
+  DEGRADED = 2;                                                   // capability poll missed but within tolerance
+  UNREACHABLE = 3;                                                // exceeded tolerance
+}
+
+// =============================================================================
+// GetStatus
+// =============================================================================
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+  bool ready = 1;                                                 // true once at least one worker is HEALTHY
+  int32 active_dispatches = 2;
+  int32 known_workers = 3;
+  int32 healthy_workers = 4;
+  int32 degraded_workers = 5;
+  int32 unreachable_workers = 6;
+  int32 active_sticky_sessions = 7;
+  org.tatrman.meta.v1.OverallStatus overall_status = 8;
+  string default_connection = 9;                                  // from HOCON, surfaced for admin visibility
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}

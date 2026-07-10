@@ -19,7 +19,7 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-group = "org.tatrman.prometheus"
+group = "org.tatrman.llmgateway"
 version = "0.1.0"
 
 java {
@@ -40,8 +40,8 @@ val isCi = System.getenv("CI") != null
 
 // Image target is parameterized so the same jib config serves local dev and registry publish
 // (mirrors agents/golem):
-//   local : ./gradlew :services:prometheus:jibDockerBuild                 -> prometheus:dev
-//   GHCR  : ./gradlew :services:prometheus:jib \
+//   local : ./gradlew :services:ttr-llm-gateway:jibDockerBuild                 -> prometheus:dev
+//   GHCR  : ./gradlew :services:ttr-llm-gateway:jib \
 //             -PimageRepo=ghcr.io/boraperusic/prometheus -PimageTag=testing \
 //             -Djib.to.auth.username=<gh-user> -Djib.to.auth.password=<ghcr-PAT>
 val imageRepo = (project.findProperty("imageRepo") as String?) ?: "prometheus"
@@ -72,7 +72,7 @@ jib {
         image = "$imageRepo:$imageTag"
     }
     container {
-        mainClass = "org.tatrman.prometheus.PrometheusApplicationKt"
+        mainClass = "org.tatrman.llmgateway.PrometheusApplicationKt"
         ports = listOf("7280")
     }
     dockerClient {

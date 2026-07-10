@@ -58,6 +58,11 @@ include(":shared:libs:kotlin:whois-common")
 include(":shared:libs:kotlin:keycloak-auth")
 include(":shared:libs:kotlin:ttr-meta-client")   // was ariadne-client
 include(":shared:libs:kotlin:ttr-llm-client")    // was llm-gateway-client
+// Grafted from kantheon per Bora's decision (S4) — capability-registration client
+// (4 MCP tools) + the component/integration test-tier harness libs.
+include(":shared:libs:kotlin:capabilities-client")
+include(":shared:libs:kotlin:component-testkit")
+include(":shared:libs:kotlin:integration-harness")
 
 // Spine services
 include(":services:veles")            // was ariadne

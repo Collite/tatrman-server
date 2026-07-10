@@ -10,7 +10,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.proteus.ApplicationKt")
+    mainClass.set("org.tatrman.translate.ApplicationKt")
 }
 
 tasks.test {
@@ -46,7 +46,7 @@ jib {
         image = "proteus:dev"
     }
     container {
-        mainClass = "org.tatrman.kantheon.proteus.ApplicationKt"
+        mainClass = "org.tatrman.translate.ApplicationKt"
         ports = listOf("7275", "7276")
     }
     dockerClient {

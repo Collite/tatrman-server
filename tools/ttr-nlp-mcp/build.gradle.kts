@@ -9,7 +9,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.kadmos.mcp.ApplicationKt")
+    mainClass.set("org.tatrman.nlp.mcp.ApplicationKt")
 }
 
 val osArch = System.getProperty("os.arch").lowercase()
@@ -41,7 +41,7 @@ jib {
         image = "kadmos-mcp:latest"
     }
     container {
-        mainClass = "org.tatrman.kantheon.kadmos.mcp.ApplicationKt"
+        mainClass = "org.tatrman.nlp.mcp.ApplicationKt"
         ports = listOf("7272")
     }
     dockerClient {
@@ -86,7 +86,7 @@ dependencies {
     implementation(project(":shared:libs:kotlin:logging-config"))
     implementation(project(":shared:libs:kotlin:capabilities-client"))
 
-    // Kadmos is HTTP-only at v1: no gRPC, no `:services:kadmos` project dep
+    // Kadmos is HTTP-only at v1: no gRPC, no `:services:ttr-nlp` project dep
     // (that's a Python module). The wrapper speaks JSON to kadmos:7270.
     implementation(libs.ktor.opentelemetry)
     implementation(libs.micrometer.registry.prometheus)

@@ -38,7 +38,7 @@ dependencies {
     api(libs.tatrman.ttr.plan.proto)
     // All other protos are in-repo. The ai-platform Maven dep (cz.dfpartner:shared-proto,
     // Themis's residual nlp.v1) was removed in fork Stage 2.6 — Themis now imports
-    // org.tatrman.kadmos.v1 + common.v1, both generated here.
+    // org.tatrman.nlp.v1 + common.v1, both generated here.
 
     testImplementation(libs.bundles.kotest)
     // JsonFormat (proto3 JSON ↔ message) for the envelope/v1 golden round-trip

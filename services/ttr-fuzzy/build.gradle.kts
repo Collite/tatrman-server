@@ -7,7 +7,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.echo.ApplicationKt")
+    mainClass.set("org.tatrman.fuzzy.ApplicationKt")
 }
 
 tasks.test {
@@ -43,7 +43,7 @@ jib {
         image = "echo:dev"
     }
     container {
-        mainClass = "org.tatrman.kantheon.echo.ApplicationKt"
+        mainClass = "org.tatrman.fuzzy.ApplicationKt"
         ports = listOf("7265", "7266")
     }
     dockerClient {

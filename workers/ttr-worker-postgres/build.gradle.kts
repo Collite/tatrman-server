@@ -10,7 +10,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.arges.ApplicationKt")
+    mainClass.set("org.tatrman.worker.postgres.ApplicationKt")
 }
 
 kotlin {
@@ -55,7 +55,7 @@ jib {
         image = "arges:dev"
     }
     container {
-        mainClass = "org.tatrman.kantheon.arges.ApplicationKt"
+        mainClass = "org.tatrman.worker.postgres.ApplicationKt"
         ports = listOf("7302", "7303")
         // Arrow needs these on JDK 21.
         jvmFlags =

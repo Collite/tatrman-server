@@ -8,7 +8,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.ariadne.ApplicationKt")
+    mainClass.set("org.tatrman.veles.ApplicationKt")
 }
 
 jib {
@@ -19,7 +19,7 @@ jib {
         image = "ariadne:dev"
     }
     container {
-        mainClass = "org.tatrman.kantheon.ariadne.ApplicationKt"
+        mainClass = "org.tatrman.veles.ApplicationKt"
         ports = listOf("7260", "7261")
     }
 }
