@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ariadne-mcp
+  namespace: kantheon
+  labels:
+    app: ariadne-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ariadne-mcp
+  template:
+    metadata:
+      labels:
+        app: ariadne-mcp
+    spec:
+      containers:
+        - name: ariadne-mcp
+          image: ariadne-mcp:dev
+          ports:
+            - containerPort: 7262
+          env:
+            - name: ARIADNE_MCP_SERVER_PORT
+              value: "7262"
+            # In-cluster DNS points at the ariadne service's gRPC port. The
+            # host's gRPC channel target is the ariadne Deployment's Service.
+            - name: ARIADNE_PROTOCOL
+              value: grpc
+            - name: ARIADNE_GRPC_HOST
+              value: ariadne
+            - name: ARIADNE_GRPC_PORT
+              value: "7261"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://alloy.observability.svc.cluster.local:4317
+            - name: OTEL_SERVICE_NAME
+              value: ariadne-mcp
+            - name: OTEL_ENABLED_ARIADNE_MCP
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7262
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7262
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ariadne-mcp
+  namespace: kantheon
+  labels:
+    app: ariadne-mcp
+spec:
+  selector:
+    app: ariadne-mcp
+  ports:
+    - name: http
+      port: 7262
+      targetPort: 7262

@@ -1,0 +1,19 @@
+apiVersion: v2
+name: theseus
+description: |
+  The Kantheon theseus service — an env-agnostic Helm chart. Holds no cluster knowledge:
+  image, replicas, resources, telemetry endpoint and downstream wiring are all values.
+  Per-environment values live in the deploying repo (Olymp clusters via ArgoCD multi-source
+  D3'; test contexts via the Olymp scripted harness D23). Converted from the kustomize
+  base/overlays, mirroring tools/capabilities-mcp/k8s (D20).
+type: application
+# Chart version: the packaging. appVersion tracks the default image tag.
+version: 0.1.0
+appVersion: "dev"
+# The common Deployment/Service shape lives in the kantheon-service library chart
+# (shared/charts). This chart stays thin: values + the per-module env hook
+# (templates/_env.tpl). See docs/architecture/deploy-test/contracts.md §1.
+dependencies:
+  - name: kantheon-service
+    version: 0.1.0
+    repository: "file://../../../shared/charts/kantheon-service"

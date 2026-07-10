@@ -1,0 +1,17 @@
+apiVersion: v2
+name: prometheus
+description: |
+  The Kantheon prometheus service (LLM gateway, Spring Boot) — an env-agnostic Helm chart. Holds
+  no cluster knowledge: image, replicas, resources, telemetry endpoint, the Postgres target and the
+  upstream LLM-provider keys/base-URL are all values. A test context points the LLM upstream at
+  WireMock via extraEnv. Per-environment values live in the deploying repo (Olymp clusters via
+  ArgoCD multi-source D3'; test contexts via the Olymp scripted harness). Converted from the
+  kustomize base, mirroring services/theseus/k8s (Spring Boot actuator probes).
+type: application
+version: 0.1.0
+appVersion: "dev"
+# Common Deployment/Service shape from the kantheon-service library chart (D1).
+dependencies:
+  - name: kantheon-service
+    version: 0.1.0
+    repository: "file://../../../shared/charts/kantheon-service"

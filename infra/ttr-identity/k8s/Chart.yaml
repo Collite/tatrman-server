@@ -1,0 +1,17 @@
+apiVersion: v2
+name: whois
+description: |
+  The Kantheon whois service — user/role directory + OPA bundle server. Env-agnostic Helm
+  chart (no cluster knowledge): image, replicas, resources, telemetry endpoint, repository
+  mode and the Postgres/Keycloak/ERP wiring are all values. Per-environment values live in
+  the deploying repo (Olymp clusters via ArgoCD multi-source D3'; test contexts via the Olymp
+  scripted harness D23). Mirrors services/argos/k8s (D20). Technical-wave service, fork Phase 5.
+type: application
+# Chart version: the packaging. appVersion tracks the default image tag.
+version: 0.1.0
+appVersion: "dev"
+# Common Deployment/Service shape from the kantheon-service library chart (D1).
+dependencies:
+  - name: kantheon-service
+    version: 0.1.0
+    repository: "file://../../../shared/charts/kantheon-service"

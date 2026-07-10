@@ -1,0 +1,69 @@
+# Default values for arges. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# environments (Olymp cluster values, or test-context values) override image, telemetry,
+# and the downstream wiring in extraEnv.
+
+replicaCount: 1
+
+image:
+  repository: arges
+  # Defaults to .Chart.appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# The service listens on an HTTP port and a gRPC port (Kyklop calls it over gRPC).
+# These are the container ports AND the service ports AND the probe target.
+ports:
+  http: 7302
+  grpc: 7303
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: "1"
+
+# OpenTelemetry. These services read a single OTLP endpoint URL (OTEL_EXPORTER_OTLP_ENDPOINT)
+# plus the per-service OTEL_ENABLED_ARGES flag. Point `endpoint` at a collector (e.g. the
+# cluster's Alloy) and set enabled; leave disabled where no collector exists (e.g. test runs).
+telemetry:
+  enabled: false
+  # e.g. http://alloy.observability.svc.cluster.local:4317
+  endpoint: ""
+  serviceName: arges
+
+# Downstream constellation wiring + any other env. Defaults match the constellation's stable
+# in-cluster service names (env-agnostic — every cluster names them the same). A deploying env
+# REPLACES this list to retarget and to add named-connection credentials. extraEnv is rendered
+# with toYaml, so entries may use `valueFrom` (e.g. a secretKeyRef for a connection password).
+#
+# To activate the pg-tpcds warehouse connection (WS-T2), a deploying env adds:
+#   - { name: ARGES_PG_TPCDS_HOST, value: "test-pg-rw.data.svc.cluster.local" }
+#   - { name: ARGES_PG_TPCDS_USER, value: "tpcds_readonly" }
+#   - name: ARGES_PG_TPCDS_PASSWORD
+#     valueFrom: { secretKeyRef: { name: pg-tpcds-ro-cred, key: password } }
+extraEnv:
+  - { name: PROTEUS_SERVER, value: "proteus" }
+  - { name: PROTEUS_SERVER_GRPC_PORT, value: "7276" }
+
+# Probes (HTTP on the http port).
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 30
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

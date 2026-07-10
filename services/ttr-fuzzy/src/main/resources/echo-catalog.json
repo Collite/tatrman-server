@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "categories": {
+    "product": [
+      { "id": "P001", "value": "Widget Mk I" },
+      { "id": "P002", "value": "Widget Mk II" },
+      { "id": "P003", "value": "Premium Widget" },
+      { "id": "P004", "value": "Bezový sirup" },
+      { "id": "P005", "value": "Čokoládový dort" },
+      { "id": "P006", "value": "Příruční svítilna" },
+      { "id": "P007", "value": "Náhradní baterie" },
+      { "id": "P008", "value": "Přenosný reproduktor" }
+    ],
+    "customer": [
+      { "id": "C001", "value": "Acme Corp" },
+      { "id": "C002", "value": "Bezové království s.r.o." },
+      { "id": "C003", "value": "Čokoládovny Praha" },
+      { "id": "C004", "value": "Národní divadlo" },
+      { "id": "C005", "value": "Přívozní doprava" }
+    ]
+  }
+}

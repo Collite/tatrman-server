@@ -1,0 +1,120 @@
+[
+  {
+    "internalId": 1,
+    "email": "adam.novak@kantheon.example",
+    "firstName": "Adam",
+    "lastName": "Novak",
+    "identities": {
+      "KEYCLOAK": {
+        "userId": "adam-kc-id",
+        "userName": "bora",
+        "active": true,
+        "userRoles": ["admin", "user"]
+      },
+      "ERP": {
+        "userId": "ERP001",
+        "userName": null,
+        "active": true,
+        "userRoles": ["admin", "user"]
+      },
+      "ENTRAID": {
+        "userId": "ENTRAID001",
+        "userName": "Adam Novak",
+        "active": true,
+        "userRoles": []
+      }
+    }
+  },
+  {
+    "internalId": 2,
+    "email": "jiri.krov@kantheon.example",
+    "firstName": "Jiri",
+    "lastName": "Krov",
+    "identities": {
+      "KEYCLOAK": {
+        "userId": "jirik-kc-id",
+        "userName": "jirik",
+        "active": true,
+        "userRoles": ["admin"]
+      },
+      "ERP": {
+        "userId": "ERP002",
+        "userName": null,
+        "active": true,
+        "userRoles": ["admin"]
+      },
+      "ENTRAID": {
+        "userId": "ENTRAID002",
+        "userName": "Jiri Krov",
+        "active": true,
+        "userRoles": []
+      }
+    }
+  },
+  {
+    "internalId": 3,
+    "email": "jan.petr@kantheon.example",
+    "firstName": "Jan",
+    "lastName": "Petr",
+    "identities": {
+      "KEYCLOAK": {
+        "userId": "honza-kc-id",
+        "userName": "honza",
+        "active": true,
+        "userRoles": ["user"]
+      },
+      "ERP": {
+        "userId": "ERP003",
+        "userName": null,
+        "active": true,
+        "userRoles": ["user"]
+      },
+      "ENTRAID": {
+        "userId": "ENTRAID003",
+        "userName": "Jan Petr",
+        "active": true,
+        "userRoles": []
+      }
+    }
+  },
+  {
+    "internalId": 4,
+    "email": "tomas.brecka@kantheon.example",
+    "firstName": "Tomas",
+    "lastName": "Brecka",
+    "identities": {
+      "KEYCLOAK": {
+        "userId": "tomasb-kc-id",
+        "userName": "tomasb",
+        "active": true,
+        "userRoles": ["analyst"]
+      },
+      "ERP": {
+        "userId": "ERP004",
+        "userName": null,
+        "active": true,
+        "userRoles": ["analyst"]
+      }
+    }
+  },
+  {
+    "internalId": 5,
+    "email": "pavel.drha@kantheon.example",
+    "firstName": "Pavel",
+    "lastName": "Drha",
+    "identities": {
+      "KEYCLOAK": {
+        "userId": "paveld-kc-id",
+        "userName": "paveld",
+        "active": true,
+        "userRoles": ["admin"]
+      },
+      "ERP": {
+        "userId": "ERP005",
+        "userName": null,
+        "active": true,
+        "userRoles": ["admin"]
+      }
+    }
+  }
+]

@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: theseus-mcp
+  description: MCP tool exposing Theseus — the query orchestrator — (translate → validate → execute → format) as a single `query()` operation; the OBO/identity edge agents call
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - kotlin
+    - mcp
+    - tool
+    - v1
+spec:
+  type: service
+  lifecycle: production
+  owner: df-platform
+  system: kantheon

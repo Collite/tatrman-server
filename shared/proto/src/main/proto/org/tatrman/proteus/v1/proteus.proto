@@ -1,0 +1,258 @@
+// =============================================================================
+// Kantheon — Proteus (translator) service
+//
+// Forked from ai-platform@kantheon-fork-point
+//   (shared/proto/src/main/proto/com/tatrman/translator/v1/translator.proto).
+// Fork Stage 2.4 (Proteus). Package com.tatrman.translator.v1 →
+// org.tatrman.proteus.v1; service TranslatorService → ProteusService (RPC names
+// kept); plan/context refs → org.tatrman.plan.v1; the Rule-6 messages=99 field
+// re-targeted to org.tatrman.kantheon.common.v1.ResponseMessage. Wire shapes
+// otherwise unchanged.
+//
+// The Proteus service exposes the translator entry points. It is a
+// thin gRPC wrapper around the shared/libs/kotlin/query-translator/ library
+// (which JVM consumers may also embed directly).
+//
+// Per Round 3, the Translator is called twice per query:
+//   1. Front of pipeline: ParseToRelNode converts source language → RelNode.
+//   2. Back of pipeline: UnparseFromRelNode is called by the Worker to
+//      produce dialect-specific output (typically SQL) from the validated
+//      RelNode.
+// Plus Translate as the one-shot any-to-any conversion (frontends,
+// inspection) and Explain as the debug variant returning per-stage artefacts.
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.proteus.v1;
+
+import "org/tatrman/proteus/v1/translator.proto";                 // for Language, SqlDialect (library enums, Stage 1.3)
+import "org/tatrman/plan/v1/plan.proto";
+import "org/tatrman/plan/v1/context.proto";
+import "org/tatrman/kantheon/common/v1/response_message.proto";   // for ResponseMessage — applied universally to v1 service responses
+
+option java_package = "org.tatrman.proteus.v1";
+option java_multiple_files = true;
+option java_outer_classname = "ProteusProto";
+
+// -----------------------------------------------------------------------------
+// Service
+// -----------------------------------------------------------------------------
+
+service ProteusService {
+  // Front of pipeline: language → canonical RelNode in the target schema.
+  // Performs PARSE → TO_REL → RESOLVE → EXPAND_JOINS (logical) →
+  // MAP_TO_PHYSICAL → EXPAND_JOINS (physical). Output PlanNode is in the
+  // target schema (default DB), with all logical refs resolved.
+  rpc ParseToRelNode(ParseRequest) returns (ParseResponse);
+
+  // Back of pipeline: canonical RelNode → text in target language and dialect.
+  // Performs OPTIMIZE → TO_AST → UNPARSE. Called by the Worker once it has
+  // the validated PlanNode and knows its target dialect.
+  rpc UnparseFromRelNode(UnparseRequest) returns (UnparseResponse);
+
+  // Hub-n-spoke: one-shot any-to-any conversion. Internally chains
+  // ParseToRelNode + UnparseFromRelNode. Used by frontends to render queries
+  // in alternate languages, by debug UIs, by agents that want to convert
+  // without executing.
+  rpc Translate(TranslateRequest) returns (TranslateResponse);
+
+  // Debug / explain variant. Runs the same logic but captures per-stage
+  // artefacts (canonical form snapshot, warnings, durations) for each stage
+  // executed. Primary consumer is the future Translator debug UI; secondary
+  // is structured logging at high diagnostic levels.
+  rpc Explain(ExplainRequest) returns (ExplainResponse);
+
+  // Detect which schema the unqualified identifiers in `source` belong to, so a
+  // caller (query-runner) can pick the parse path. Pure inspection: parses the
+  // SQL, extracts table identifiers, tests catalog membership. Does NOT validate
+  // or execute. SQL source only in v1; other languages → decision NOT_APPLICABLE.
+  rpc DetectSourceSchema(DetectSchemaRequest) returns (DetectSchemaResponse);
+}
+
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
+//
+// `Language` and `SqlDialect` live in the library-only `translator.proto`
+// (same package, forked in Stage 1.3 — consumed directly by
+// `:shared:libs:kotlin:query-translator`). The service surface re-uses them via
+// the import above; they are NOT redefined here (proto3 forbids duplicate
+// definitions within a package).
+
+// -----------------------------------------------------------------------------
+// ParseToRelNode
+// -----------------------------------------------------------------------------
+
+message ParseRequest {
+  // Source text in the input language. For RelNode input, this is the
+  // proto-encoded PlanNode serialised as JSON or binary; signalled via
+  // source_language = REL_NODE.
+  string source = 1;
+  Language source_language = 2;
+
+  // Target schema for the output PlanNode. Default DB — the Translator
+  // resolves all logical refs to physical refs via MAP_TO_PHYSICAL. Target
+  // ER preserves logical refs (used for inspection / round-trip flows).
+  org.tatrman.plan.v1.SchemaCode target_schema = 3;
+
+  org.tatrman.plan.v1.PipelineContext context = 4;
+
+  // Catalog Calcite uses when resolving unqualified identifiers in `source`.
+  // When UNSPECIFIED, falls back to `target_schema` (preserves the original
+  // single-knob behavior — `query-runner`'s two-pass relies on that fallback).
+  // Set explicitly to ER when the SQL uses ER identifiers but you want the
+  // pipeline to continue into MapToPhysical (target_schema = DB). Mixed-schema
+  // unqualified references are not supported (a v3.x concern).
+  org.tatrman.plan.v1.SchemaCode source_schema = 5;
+
+  reserved 6 to 9;
+}
+
+message ParseResponse {
+  org.tatrman.plan.v1.PlanNode plan = 1;
+  org.tatrman.plan.v1.PipelineContext context = 2;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// -----------------------------------------------------------------------------
+// UnparseFromRelNode
+// -----------------------------------------------------------------------------
+
+message UnparseRequest {
+  org.tatrman.plan.v1.PlanNode plan = 1;
+  Language target_language = 2;
+
+  // Only meaningful for SQL target. Default MSSQL for v1; the Worker passes
+  // its own engine's dialect as the Worker pattern adds engines.
+  SqlDialect target_dialect = 3;
+
+  // Apply OPTIMIZE before TO_AST + UNPARSE. Default true. Allows debug
+  // surfaces to inspect raw output.
+  bool optimize = 4;
+
+  org.tatrman.plan.v1.PipelineContext context = 5;
+  reserved 6 to 10;
+}
+
+message UnparseResponse {
+  // Output text in target_language + target_dialect. For SQL with parameters,
+  // the format is decided by ParametrizedSql conventions; the parameter map
+  // is in context.parameters.
+  string output = 1;
+  org.tatrman.plan.v1.PipelineContext context = 2;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// -----------------------------------------------------------------------------
+// Translate (one-shot)
+// -----------------------------------------------------------------------------
+
+message TranslateRequest {
+  string source = 1;
+  Language source_language = 2;
+  Language target_language = 3;
+  org.tatrman.plan.v1.SchemaCode target_schema = 4;
+  SqlDialect target_dialect = 5;
+  org.tatrman.plan.v1.PipelineContext context = 6;
+
+  // See `ParseRequest.source_schema` for semantics; defaults to UNSPECIFIED →
+  // falls back to `target_schema`.
+  org.tatrman.plan.v1.SchemaCode source_schema = 7;
+
+  reserved 8 to 11;
+}
+
+message TranslateResponse {
+  string output = 1;
+  org.tatrman.plan.v1.PipelineContext context = 2;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// -----------------------------------------------------------------------------
+// Explain
+// -----------------------------------------------------------------------------
+
+message ExplainRequest {
+  oneof req {
+    ParseRequest     parse     = 1;
+    UnparseRequest   unparse   = 2;
+    TranslateRequest translate = 3;
+  }
+  reserved 4 to 8;
+}
+
+message ExplainResponse {
+  // Per-stage artefacts in execution order.
+  repeated StageArtifact stages = 1;
+  // Final response of whichever request type was given. Encoded as bytes
+  // because gRPC oneof of three different message types is awkward;
+  // decoder picks based on the request type.
+  bytes final_output = 2;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// -----------------------------------------------------------------------------
+// DetectSourceSchema
+// -----------------------------------------------------------------------------
+
+message DetectSchemaRequest {
+  string source = 1;
+  Language source_language = 2;                       // v1: only SQL is analysed
+  // Schema the caller asserts (UNSPECIFIED = none asserted → pure autodetect).
+  org.tatrman.plan.v1.SchemaCode stated_schema = 3;
+  org.tatrman.plan.v1.PipelineContext context = 4;
+  reserved 5 to 9;
+}
+
+message DetectSchemaResponse {
+  // Schema query-runner should parse against. SCHEMA_CODE_UNSPECIFIED when the
+  // decision is an error kind (AMBIGUOUS / UNKNOWN / MIXED) — caller must stop.
+  org.tatrman.plan.v1.SchemaCode effective_schema = 1;
+  SchemaDecision decision = 2;
+
+  // Table identifiers parsed from the FROM/JOIN positions (lowercased), and the
+  // schema(s) each was found in — surfaced for debugging / richer caller UX.
+  repeated string referenced_tables = 3;
+
+  // Populated for UNKNOWN: per-unknown-table "did you mean" candidates, scoped to
+  // the schemas actually searched.
+  repeated SuggestionGroup suggestions = 4;
+
+  // INFO for AUTODETECTED, WARNING for CORRECTED, ERROR for AMBIGUOUS/UNKNOWN/MIXED,
+  // empty for CONFIRMED / NOT_APPLICABLE.
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;
+  reserved 5 to 9, 100 to 104;
+}
+
+message SuggestionGroup {
+  string unknown_name = 1;
+  repeated string candidates = 2;     // ordered by ascending edit distance
+  reserved 3 to 7;
+}
+
+enum SchemaDecision {
+  SCHEMA_DECISION_UNSPECIFIED = 0;
+  CONFIRMED       = 1;   // stated schema present and consistent → no message
+  AUTODETECTED    = 2;   // no stated schema; resolved unambiguously → INFO
+  CORRECTED       = 3;   // stated schema wrong; switched to detected → WARNING
+  AMBIGUOUS       = 4;   // resolvable in >1 schema, not disambiguated → ERROR
+  UNKNOWN         = 5;   // matches no schema (typo) → ERROR + suggestions
+  MIXED           = 6;   // identifiers span multiple schemas → ERROR
+  NOT_APPLICABLE  = 7;   // non-SQL source, or parse failed → caller proceeds normally
+}
+
+message StageArtifact {
+  // Stage code: parse | to_rel | resolve | expand_joins_logical |
+  // map_to_physical | expand_joins_physical | optimize | to_ast | unparse
+  string stage_code = 1;
+  int64 duration_ms = 2;
+  // RelOptUtil.toString or our PlanNode JSON, suitable for human inspection.
+  string canonical_form = 3;
+  repeated org.tatrman.plan.v1.Warning warnings = 4;
+  reserved 5 to 9;
+}

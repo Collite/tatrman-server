@@ -1,0 +1,21 @@
+model db schema dbo
+def table customers {
+    description: "Customer master table"
+    primaryKey: ["id"]
+    tags: ["core"]
+    columns: [
+        def column id { type: int, isKey: true },
+        def column name { type: text },
+        def column tenant_id { type: int }
+    ]
+}
+
+def table orders {
+    description: "Customer orders"
+    primaryKey: ["id"]
+    columns: [
+        def column id { type: int, isKey: true },
+        def column customer_id { type: int },
+        def column total { type: { type: decimal, length: 19, precision: 5 } }
+    ]
+}

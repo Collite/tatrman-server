@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ariadne
+  namespace: kantheon
+  labels:
+    app: ariadne
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ariadne
+  template:
+    metadata:
+      labels:
+        app: ariadne
+    spec:
+      containers:
+        - name: ariadne
+          image: ariadne:dev
+          ports:
+            - name: http
+              containerPort: 7260
+            - name: grpc
+              containerPort: 7261
+          env:
+            - name: ARIADNE_HTTP_PORT
+              value: "7260"
+            - name: ARIADNE_GRPC_PORT
+              value: "7261"
+            - name: METADATA_GIT_REMOTE_URI
+              value: "https://github.com/Tatrman/ai-models.git"
+              # Override per cluster with the canonical fabric-infra secret.
+            - name: METADATA_GIT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ariadne-github-pat
+                  key: token
+                  optional: true
+            - name: PROMPTS_GIT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ariadne-github-pat
+                  key: token
+                  optional: true
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://alloy.observability.svc.cluster.local:4317
+            - name: OTEL_SERVICE_NAME
+              value: ariadne
+            - name: OTEL_ENABLED_ARIADNE
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7260
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7260
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 250m
+            limits:
+              memory: 1Gi
+              cpu: 1000m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ariadne
+  namespace: kantheon
+  labels:
+    app: ariadne
+spec:
+  selector:
+    app: ariadne
+  ports:
+    - name: http
+      port: 7260
+      targetPort: 7260
+    - name: grpc
+      port: 7261
+      targetPort: 7261

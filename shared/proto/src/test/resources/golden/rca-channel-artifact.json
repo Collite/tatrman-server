@@ -1,0 +1,59 @@
+{
+  "id": "rca-channel-001",
+  "status": "STATUS_DONE",
+  "resolution": {
+    "resolvedIntent": {
+      "kind": "INTENT_RCA",
+      "entities": [ { "entityType": "channel", "entityId": "Private", "displayLabel": "Private" } ],
+      "resolvedParamsJson": "{\"period\":\"YoY\"}"
+    }
+  },
+  "plan": {
+    "hypotheses": [
+      { "id": "HB", "statement": "lower order value", "status": "HYP_SUPPORTED", "confidence": 0.7, "estimatedExplanatoryPower": 0.57, "diagnosticPower": 0.6, "displayPriority": "DISPLAY_PRIMARY" },
+      { "id": "HD", "statement": "product mix shift", "status": "HYP_SUPPORTED", "confidence": 0.6, "estimatedExplanatoryPower": 0.43, "diagnosticPower": 0.5, "displayPriority": "DISPLAY_PRIMARY" },
+      { "id": "HB1", "parentId": "HB", "statement": "AOV drop concentrated in SMB tier", "status": "HYP_SUPPORTED", "confidence": 0.8, "displayPriority": "DISPLAY_SECONDARY" }
+    ],
+    "nodes": [
+      { "nodeId": "D0", "testsHypIds": ["HB"], "query": { "queryRef": "confirmRevenueDrop", "paramsJson": "{\"channel\":\"Private\",\"period\":\"YoY\"}" } },
+      { "nodeId": "B1", "testsHypIds": ["HB"], "query": { "queryRef": "avgOrderValueByChannelByMonth" } }
+    ],
+    "rationale": "diagnostic baseline then per-hypothesis probes",
+    "revision": 2
+  },
+  "steps": [
+    { "id": "S0", "nodeId": "D0", "status": "STEP_COMPLETED", "attempts": 1, "cost": { "usd": 0.04, "latencyMs": 1800, "tierUsed": "" } },
+    { "id": "S1", "nodeId": "B1", "status": "STEP_COMPLETED", "attempts": 1, "cost": { "usd": 0.05, "latencyMs": 2600, "tierUsed": "" } }
+  ],
+  "hypotheses": [
+    { "id": "HG", "statement": "data quality issue", "status": "HYP_REFUTED", "confidence": 0.1 },
+    { "id": "HB", "statement": "lower order value", "status": "HYP_SUPPORTED", "confidence": 0.7, "estimatedExplanatoryPower": 0.57, "displayPriority": "DISPLAY_PRIMARY" },
+    { "id": "HD", "statement": "product mix shift", "status": "HYP_SUPPORTED", "confidence": 0.6, "estimatedExplanatoryPower": 0.43, "displayPriority": "DISPLAY_PRIMARY" },
+    { "id": "HC", "statement": "price drops", "status": "HYP_ABANDONED", "confidence": 0.3 },
+    { "id": "HB1", "parentId": "HB", "statement": "AOV drop concentrated in SMB tier", "status": "HYP_SUPPORTED", "confidence": 0.8, "displayPriority": "DISPLAY_SECONDARY" }
+  ],
+  "findings": [
+    { "id": "F0", "kind": "BASELINE", "summary": "Revenue down 14% YoY 2025Q4–2026Q1 vs prior year", "evidenceStepIds": ["S0"] }
+  ],
+  "looseEnds": [
+    { "hypothesisId": "L1", "source": "LOOSE_END_PLANNING_TIME", "reason": "LOOSE_END_OUT_OF_DATA_SCOPE", "why": "no HR data in warehouse", "suggestedFollowup": "Stage HR data via Charon, then re-run with extended scope" },
+    { "hypothesisId": "HC", "source": "LOOSE_END_EXECUTION_TIME", "reason": "LOOSE_END_INCONCLUSIVE_ABANDONED", "why": "price decrease in deeper product subsets not examined", "suggestedFollowup": "Investigate at DEEP depth with explicit per-product price scan" }
+  ],
+  "conclusion": {
+    "primary": {
+      "blocks": [
+        { "blockId": "h0", "role": "HEADING", "text": "Why Private channel revenue fell YoY" },
+        { "blockId": "b1", "role": "PRIMARY", "text": "Primary driver: average order value down 8%, concentrated in the SMB tier." },
+        { "blockId": "b2", "role": "SUMMARY", "text": "Secondary driver: product mix shift toward a lower-revenue family." },
+        { "blockId": "le", "role": "LOOSE_ENDS_SECTION", "text": "Salesforce headcount not tested (out of data scope)." }
+      ]
+    },
+    "evidenceStepIds": ["S0", "S1"],
+    "confidence": { "kind": "CONFIDENCE_HEURISTIC", "score": 0.65, "caveats": ["variance attribution is heuristic, not exact", "salesforce headcount not tested (out of data scope)"] },
+    "stopReason": "STOP_HARD_CAP",
+    "budgetTruncated": false
+  },
+  "resourceUsage": { "totalUsd": 1.34, "totalQueryCount": 13, "totalLatencyMs": 47000 },
+  "createdAt": "2026-06-26T10:00:00Z",
+  "finalisedAt": "2026-06-26T10:00:47Z"
+}

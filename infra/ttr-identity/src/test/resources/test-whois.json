@@ -1,0 +1,26 @@
+[
+  {
+    "id": "user-001",
+    "erpId": "ERP001",
+    "name": "John",
+    "surname": "Doe",
+    "email": "john.doe@example.com",
+    "roles": ["admin", "user"]
+  },
+  {
+    "id": "user-002",
+    "erpId": "ERP002",
+    "name": "Jane",
+    "surname": "Smith",
+    "email": "jane.smith@example.com",
+    "roles": ["viewer"]
+  },
+  {
+    "id": "user-003",
+    "erpId": "ERP003",
+    "name": "Bob",
+    "surname": "Wilson",
+    "email": "bob.wilson@example.com",
+    "roles": []
+  }
+]
