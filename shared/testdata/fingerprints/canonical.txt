@@ -1,0 +1,27 @@
+# list.arrow
+id|int64s|nonnull
+tags|list|null<item|int64s|null>
+
+# map.arrow
+id|int64s|nonnull
+attrs|map_unsorted|null<entries|struct|nonnull<key|utf8|nonnull;value|int32s|null>>
+
+# reference.arrow
+name|utf8|nonnull
+count|int64s|nonnull
+score|float64|null
+amount|decimal128_38_9|null
+ts|timestamp_us_UTC|null
+d|date_day|null
+active|bool|nonnull
+payload|binary|null
+meta|struct|null<key|utf8|nonnull;val|int32s|null>
+
+# scalars.arrow
+i8|int8s|nonnull
+u32|int32u|null
+f32|float32|null
+flag|bool|nonnull
+price|decimal128_18_2|null
+when_ms|timestamp_ms_|null
+blob|large_binary|null
