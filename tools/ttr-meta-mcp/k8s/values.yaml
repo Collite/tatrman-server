@@ -40,7 +40,7 @@ telemetry:
 # (env-agnostic — every cluster names them the same). A deploying env REPLACES this list to retarget.
 extraEnv:
   - { name: VELES_PROTOCOL, value: "grpc" }
-  - { name: VELES_GRPC_HOST, value: "veles" }
+  - { name: VELES_GRPC_HOST, value: "meta" }
   - { name: VELES_GRPC_PORT, value: "7261" }
   # capabilities-mcp registration endpoint (the query-path registry). For the three wrappers whose
   # application.conf lacks a capabilities-mcp{} default block, this env is REQUIRED — without it

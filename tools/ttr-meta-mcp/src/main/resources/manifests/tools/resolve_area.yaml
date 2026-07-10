@@ -1,5 +1,5 @@
-capability_id: "veles.resolve_area:v1"
-category: "veles"
+capability_id: "meta.resolve_area:v1"
+category: "meta"
 version: "1.0.0"
 description: |
   Golem P4 S4.2 — resolve a subject area (e.g. 'accounting') to the package

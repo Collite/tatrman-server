@@ -272,7 +272,7 @@ fun main(args: Array<String>): Unit =
 /**
  * Review-004 R2 — resolve the veles gRPC client target from the
  * `metadata{}` block in `application.conf`. `metadata.host` / `metadata.port`
- * default to `"veles"` / `7261` and are overridden by the `VELES_GRPC_HOST`
+ * default to `"meta"` / `7261` and are overridden by the `VELES_GRPC_HOST`
  * / `VELES_GRPC_PORT` env vars (HOCON `${?…}` substitution) — the exact env
  * vars the k8s deployment sets.
  *
@@ -304,7 +304,7 @@ internal fun buildGrpcClient(config: com.typesafe.config.Config): MetadataGrpcCl
  * Review-004 R5.1 — load the authored `ToolCapability` manifests from
  * `src/main/resources/manifests/tools/` (the per-tool YAML dir) and build one [Capability]
  * per manifest. The previous code shipped a single [Capability] shim
- * that impersonated `veles.get_model:v1` and folded the other tools
+ * that impersonated `meta.get_model:v1` and folded the other tools
  * into `search_tags` — the registry saw 1 capability instead of one per
  * manifest, and each tool was undiscoverable by its own id.
  *

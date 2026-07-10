@@ -9,7 +9,7 @@ import io.kotest.matchers.shouldBe
  *
  * Asserts that the `ManifestLoader` (the review-004 R5.1 answer) publishes
  * one [Capability] per authored manifest under `src/main/resources/manifests/tools/`,
- * not the single-shim `veles.get_model:v1` impersonator that review-004
+ * not the single-shim `meta.get_model:v1` impersonator that review-004
  * F4 flagged. The previous shim folded the other tools into
  * `search_tags` so the registry only saw 1 capability; the loader sees one per manifest.
  */
@@ -23,12 +23,12 @@ class CapabilitiesRegistrationSpec :
             val ids = capabilities.map { it.tool.capabilityId }
             ids shouldContainExactlyInAnyOrder
                 listOf(
-                    "veles.list_objects:v1",
-                    "veles.get_object:v1",
-                    "veles.search:v1",
-                    "veles.list_queries:v1",
-                    "veles.get_model:v1",
-                    "veles.resolve_area:v1",
+                    "meta.list_objects:v1",
+                    "meta.get_object:v1",
+                    "meta.search:v1",
+                    "meta.list_queries:v1",
+                    "meta.get_model:v1",
+                    "meta.resolve_area:v1",
                 )
         }
 
