@@ -18,12 +18,12 @@ import kotlinx.serialization.json.booleanOrNull
 import org.tatrman.testkit.integration.ContextHandle
 import java.util.Base64
 
-// Helpers for the `theseus-runquery` integration specs: minting OBO bearers and
+// Helpers for the `query-runquery` integration specs: minting OBO bearers and
 // calling the MCP `query` tool over real StreamableHTTP through the
-// ContextHandle-resolved theseus-mcp URL.
+// ContextHandle-resolved query-mcp URL.
 
 /**
- * Mints an **unsigned** JWT (`header.payload.sig`). theseus-mcp's IdentityResolver
+ * Mints an **unsigned** JWT (`header.payload.sig`). query-mcp's IdentityResolver
  * base64url-decodes only the payload in v1 — signature verification is the
  * ingress/sidecar's job — so an unsigned token carrying the right claims is
  * sufficient to exercise identity end-to-end. Roles land in `realm_access.roles`
@@ -43,7 +43,7 @@ fun unsignedJwt(
 }
 
 /**
- * Opens an MCP StreamableHTTP client to the context's theseus-mcp, calls the
+ * Opens an MCP StreamableHTTP client to the context's query-mcp, calls the
  * `query` tool with [arguments], and returns the [CallToolResult]. When [bearer]
  * is set it travels as `Authorization: Bearer …` on every request (the OBO token).
  *
@@ -65,7 +65,7 @@ suspend fun ContextHandle.callQuery(
         }
     try {
         val client =
-            http.mcpStreamableHttp("${url("theseus-mcp")}/mcp") {
+            http.mcpStreamableHttp("${url("query-mcp")}/mcp") {
                 bearer?.let { header(HttpHeaders.Authorization, "Bearer $it") }
             }
         try {

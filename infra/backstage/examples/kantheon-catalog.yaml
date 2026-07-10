@@ -1,7 +1,7 @@
 ---
 # The Kantheon constellation, as a Backstage software catalog. Replaces the upstream example
 # catalog (fork Phase 5 Stage 5.5). Components describe the pantheon — the speaking-god agents,
-# the platform services that serve them, the Kyklops workers, the MCP wrappers, and the
+# the platform services that serve them, the Dispatchs workers, the MCP wrappers, and the
 # off-constellation technical-wave infrastructure. Owned by the `kantheon` group.
 apiVersion: backstage.io/v1alpha1
 kind: Group
@@ -60,56 +60,56 @@ spec: { type: service, lifecycle: experimental, owner: kantheon, system: kantheo
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ariadne
+  name: veles
   description: Model graph / metadata + prompt serving (Kotlin).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: theseus
+  name: query
   description: Query orchestrator + plan cache (Kotlin).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: echo
+  name: fuzzy
   description: Czech-aware fuzzy matcher (Kotlin).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: kadmos
+  name: nlp
   description: NLP foundation (Python — spaCy / Stanza / MorphoDiTa).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: proteus
+  name: translate
   description: lang ↔ RelNode ↔ SQL translator (Kotlin / Calcite).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: kyklop
+  name: dispatch
   description: Worker dispatcher (Kotlin).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: argos
+  name: validate
   description: Validator + RLS policy engine (Kotlin; sql-security folded in).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: prometheus
+  name: llm-gateway
   description: LLM gateway (Spring Boot).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
@@ -127,25 +127,25 @@ metadata:
   description: Model estimation — SARIMAX / Prophet / linear (Python).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
-# ── Workers (the Kyklops) ───────────────────────────────────────────────────────────────────
+# ── Workers (the Dispatchs) ───────────────────────────────────────────────────────────────────
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: brontes
+  name: mssql
   description: MSSQL worker (Kotlin).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: steropes
+  name: polars
   description: Polars worker (Python).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: arges
+  name: postgres
   description: Postgres worker — per-tenant RLS (Kotlin).
 spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
 ---

@@ -3,7 +3,7 @@ package shared.formatter.output
 import shared.formatter.core.ColumnMeta
 
 /**
- * Per-writer return type. The columns echo the column list visible to the
+ * Per-writer return type. The columns mirror the column list visible to the
  * writer (after any pre-projection done by the façade), so that
  * [shared.formatter.core.FormattedResult] can reflect them faithfully.
  */

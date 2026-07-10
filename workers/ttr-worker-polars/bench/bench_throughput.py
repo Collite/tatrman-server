@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Read-out throughput micro-benchmark for Steropes cost_hints (Fork Stage 4.1 T4).
+"""Read-out throughput micro-benchmark for Polars cost_hints (Fork Stage 4.1 T4).
 
 Pushes a 1e5-row table through the worker's real read-out path — a representative
 Polars transform, ``df.to_arrow()``, then the worker's own ``_split_table`` +
 ``_serialize_record_batch`` (Arrow IPC) — and reports rows/s + p50/p95 latency.
-The numbers are recorded in ``workers/steropes/README.md`` (Steropes is a worker;
+The numbers are recorded in ``workers/polars/README.md`` (Polars is a worker;
 it has no capability manifest, so the README is the home for the baseline — the
 Charon/Metis idiom adapted). Re-run after a dependency bump:
 
@@ -21,7 +21,7 @@ import time
 
 import polars as pl
 
-from workers_steropes.grpc_service import _serialize_record_batch, _split_table
+from workers_polars.grpc_service import _serialize_record_batch, _split_table
 
 ROWS = 100_000
 BATCH_ROWS = 10_000

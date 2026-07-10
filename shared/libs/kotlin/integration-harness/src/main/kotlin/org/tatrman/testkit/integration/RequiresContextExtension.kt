@@ -30,7 +30,7 @@ import kotlin.reflect.KClass
  * — apply it on the spec alongside the context annotation:
  *
  * ```
- * @RequiresContext("theseus-runquery")
+ * @RequiresContext("query-runquery")
  * @ApplyExtension(RequiresContextExtension::class)
  * class RunQueryIntegrationSpec : StringSpec({ ... })
  * ```

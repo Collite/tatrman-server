@@ -1,11 +1,11 @@
-# Default values for prometheus (LLM gateway, Spring Boot). Env-agnostic: sane defaults, NO cluster
+# Default values for llm-gateway (LLM gateway, Spring Boot). Env-agnostic: sane defaults, NO cluster
 # knowledge. Deploying environments override image, telemetry, the Postgres target, the LLM keys
 # (secretEnv) and — for a test context — the LLM upstream base URL (via extraEnv → WireMock).
 
 replicaCount: 1
 
 image:
-  repository: prometheus
+  repository: llm-gateway
   tag: ""
   pullPolicy: IfNotPresent
 
@@ -36,19 +36,19 @@ db:
 telemetry:
   enabled: false
   endpoint: ""
-  serviceName: prometheus
+  serviceName: llm-gateway
 
 # Secret-backed env (valueFrom.secretKeyRef). Upstream LLM-provider keys; `optional: true` so the
 # pod boots without them (a test context stubs the upstream at WireMock and needs no real key).
 secretEnv:
-  - { name: AZURE_OPENAI_API_KEY, secretName: prometheus-secrets, secretKey: azure-openai-api-key, optional: true }
-  - { name: ANTHROPIC_API_KEY, secretName: prometheus-secrets, secretKey: anthropic-api-key, optional: true }
+  - { name: AZURE_OPENAI_API_KEY, secretName: llm-gateway-secrets, secretKey: azure-openai-api-key, optional: true }
+  - { name: ANTHROPIC_API_KEY, secretName: llm-gateway-secrets, secretKey: anthropic-api-key, optional: true }
 
 # Any other env (a deploying env adds to / replaces this list). A test context sets the LLM upstream
 # base URL here to retarget it at WireMock (e.g. AZURE_OPENAI_ENDPOINT / ANTHROPIC_BASE_URL).
 extraEnv: []
 
-# Probes — Spring Boot actuator health groups. Prometheus (Spring Boot + Spring AI + gRPC
+# Probes — Spring Boot actuator health groups. LLM gateway (Spring Boot + Spring AI + gRPC
 # autoconfig) is a SLOW starter — ~97s on a CPU-throttled node — so it needs a startupProbe.
 # While a startupProbe is running, kubelet suspends the liveness + readiness probes, so the
 # 45s liveness budget can't kill the pod mid-boot (the bp-dsk CrashLoop, 2026-07-08). Budget:

@@ -1,8 +1,8 @@
 """Fork Stage 3.4 T2 — cross-engine schema-fingerprint pin.
 
-Steropes recomputes the canonical fingerprint of every shared reference Arrow
+Polars recomputes the canonical fingerprint of every shared reference Arrow
 IPC fixture and asserts it equals the pinned value in `fingerprints.json`. The
-same fixtures are checked by Brontes (Kotlin) and Charon (Integrity.kt); all
+same fixtures are checked by Mssql (Kotlin) and Charon (Integrity.kt); all
 implementations reading the same bytes must produce the same digest — the
 "same algorithm, multiple implementations, must agree" CI pin.
 
@@ -16,13 +16,13 @@ import pyarrow as pa
 import pyarrow.ipc as ipc
 import pytest
 
-from workers_steropes.fingerprint import schema_fingerprint
+from workers_polars.fingerprint import schema_fingerprint
 
 _FIXTURE_DIR = Path(__file__).resolve().parents[3] / "shared" / "testdata" / "fingerprints"
 _EXPECTED: dict[str, str] = json.loads((_FIXTURE_DIR / "fingerprints.json").read_text())
 
 # Charon already ships this exact digest for its reference schema — pinning it
-# here proves Steropes's algorithm is identical to Charon's, not merely
+# here proves Polars's algorithm is identical to Charon's, not merely
 # self-consistent.
 _CHARON_REFERENCE_DIGEST = "69779ea65b0e127c59dc4f537bc33f62f08835c0098dbf313d61b35955fea7b8"
 
@@ -36,7 +36,7 @@ def _schema_of(path: Path) -> pa.Schema:
 def test_fingerprint_matches_shared_pin(fixture: str) -> None:
     schema = _schema_of(_FIXTURE_DIR / fixture)
     assert schema_fingerprint(schema) == _EXPECTED[fixture], (
-        f"{fixture}: Steropes canonical fingerprint diverged from the shared pin"
+        f"{fixture}: Polars canonical fingerprint diverged from the shared pin"
     )
 
 
@@ -49,7 +49,7 @@ def test_reference_matches_charon_digest() -> None:
 def test_map_is_entries_wrapped() -> None:
     # Cross-engine map agreement depends on the entries-wrapped {key, value}
     # form (the shape Arrow Java exposes). Guard it explicitly.
-    from workers_steropes.fingerprint import canonical_schema_string
+    from workers_polars.fingerprint import canonical_schema_string
 
     schema = _schema_of(_FIXTURE_DIR / "map.arrow")
     canonical = canonical_schema_string(schema)

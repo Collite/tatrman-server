@@ -12,11 +12,11 @@ import org.tatrman.ttr.metadata.model.SchemaCode as DomainSchemaCode
 /**
  * The proto ↔ library boundary (MD2). The `ttr-metadata` library is de-proto'd —
  * its model owns `QualifiedName`/`SchemaCode` and the graph owns `EdgeType`/
- * `Direction`. The Ariadne gRPC facade converts here at the edge; proto types
+ * `Direction`. The Veles gRPC facade converts here at the edge; proto types
  * never cross into a library call, and library types never reach the wire raw.
  *
  * The proto surface is FROZEN (MD7): proto `SchemaCode` has no `WORLD` member, so a
- * library `WORLD` qname (never produced by the Ariadne model, but mapped defensively)
+ * library `WORLD` qname (never produced by the Veles model, but mapped defensively)
  * degrades to `SCHEMA_CODE_UNSPECIFIED`.
  */
 

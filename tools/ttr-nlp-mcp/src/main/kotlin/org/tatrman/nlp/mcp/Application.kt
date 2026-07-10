@@ -24,29 +24,29 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import org.tatrman.capabilities.client.CapabilitiesClient
-import org.tatrman.nlp.mcp.client.KadmosClient
-import org.tatrman.nlp.mcp.telemetry.KadmosMcpTelemetry
+import org.tatrman.nlp.mcp.client.NlpClient
+import org.tatrman.nlp.mcp.telemetry.NlpMcpTelemetry
 import shared.ktor.mcp.McpKtorConfig
 import shared.ktor.mcp.installMcpKtorBase
 import shared.ktor.mcp.safeMcpTool
 
-val logger = LoggerFactory.getLogger("kadmos-mcp")
+val logger = LoggerFactory.getLogger("nlp-mcp")
 
 fun main(): Unit =
     runBlocking {
-        logger.info("Starting kadmos-mcp")
+        logger.info("Starting nlp-mcp")
 
         val config = ConfigFactory.load()
-        val telemetry = KadmosMcpTelemetry()
+        val telemetry = NlpMcpTelemetry()
         val serverPort = config.getString("server.port").toInt()
 
-        // The analyze call goes over HTTP (POST /v1/analyze) to the kadmos
-        // service. The target is read from `kadmos.{host,port}` (HOCON resolves
-        // the KADMOS_HTTP_* env overrides the k8s manifest sets). A blank host →
+        // The analyze call goes over HTTP (POST /v1/analyze) to the nlp
+        // service. The target is read from `nlp.{host,port}` (HOCON resolves
+        // the NLP_HTTP_* env overrides the k8s manifest sets). A blank host →
         // `null` and the tool surfaces a "not wired" error rather than crashing
-        // boot — local-without-cluster mode (ariadne-mcp / echo-mcp pattern).
-        val kadmosClient: KadmosClient? = buildKadmosClient(config)
-        val tools = Tools(kadmosClient, telemetry)
+        // boot — local-without-cluster mode (veles-mcp / fuzzy-mcp pattern).
+        val nlpClient: NlpClient? = buildNlpClient(config)
+        val tools = Tools(nlpClient, telemetry)
 
         // Register with capabilities-mcp (warn-and-continue). The endpoint is
         // empty by default — opt in with CAPABILITIES_MCP_URL or HOCON
@@ -56,7 +56,7 @@ fun main(): Unit =
 
         val mcpKtorConfig =
             McpKtorConfig(
-                serviceName = "kadmos-mcp",
+                serviceName = "nlp-mcp",
                 serverPort = serverPort,
                 callLoggingConfig =
                     McpKtorConfig.CallLoggingConfig(
@@ -71,7 +71,7 @@ fun main(): Unit =
                     ),
             )
 
-        println("kadmos-mcp listening on port $serverPort")
+        println("nlp-mcp listening on port $serverPort")
 
         val appConfig =
             serverConfig {
@@ -80,7 +80,7 @@ fun main(): Unit =
 
                     mcpStreamableHttp {
                         Server(
-                            serverInfo = Implementation(name = "kadmos-mcp", version = "0.1.0"),
+                            serverInfo = Implementation(name = "nlp-mcp", version = "0.1.0"),
                             options =
                                 ServerOptions(
                                     capabilities =
@@ -122,19 +122,19 @@ fun main(): Unit =
     }
 
 /**
- * Builds the HTTP client to the kadmos service from the `kadmos.*` HOCON block.
+ * Builds the HTTP client to the nlp service from the `nlp.*` HOCON block.
  * Returns `null` when the host is blank (local no-backend mode) — the [Tools]
  * then surfaces a "not wired" error on every invocation rather than crashing
- * boot. Mirrors the ariadne-mcp / echo-mcp pattern.
+ * boot. Mirrors the veles-mcp / fuzzy-mcp pattern.
  */
-internal fun buildKadmosClient(config: Config): KadmosClient? {
-    val host = config.getString("kadmos.host")
+internal fun buildNlpClient(config: Config): NlpClient? {
+    val host = config.getString("nlp.host")
     if (host.isBlank()) {
-        logger.warn("kadmos.host is blank — HTTP client disabled; tools will surface 'not wired'")
+        logger.warn("nlp.host is blank — HTTP client disabled; tools will surface 'not wired'")
         return null
     }
-    val port = config.getString("kadmos.port").toInt()
-    val timeout = config.getInt("kadmos.timeout")
+    val port = config.getString("nlp.port").toInt()
+    val timeout = config.getInt("nlp.timeout")
     val httpClient =
         HttpClient(ClientCIO) {
             install(ContentNegotiation) {
@@ -146,8 +146,8 @@ internal fun buildKadmosClient(config: Config): KadmosClient? {
                 socketTimeoutMillis = timeout.toLong()
             }
         }
-    logger.info("kadmos service: $host:$port (timeout: ${timeout}ms)")
-    return KadmosClient(httpClient, "http://$host:$port")
+    logger.info("nlp service: $host:$port (timeout: ${timeout}ms)")
+    return NlpClient(httpClient, "http://$host:$port")
 }
 
 /**

@@ -14,19 +14,19 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import org.fuzzy.common.FuzzyMatchResponse
 import org.slf4j.LoggerFactory
-import org.tatrman.fuzzy.mcp.client.EchoClient
-import org.tatrman.fuzzy.mcp.telemetry.EchoMcpTelemetry
+import org.tatrman.fuzzy.mcp.client.FuzzyClient
+import org.tatrman.fuzzy.mcp.telemetry.FuzzyMcpTelemetry
 
 class Tools(
-    private val client: EchoClient?,
-    private val telemetry: EchoMcpTelemetry,
+    private val client: FuzzyClient?,
+    private val telemetry: FuzzyMcpTelemetry,
 ) {
     private val logger = LoggerFactory.getLogger(Tools::class.java)
 
     private fun notWiredResult(): CallToolResult =
         CallToolResult(
             isError = true,
-            content = listOf(TextContent(text = "echo not wired: gRPC client disabled (echo.client.host is blank)")),
+            content = listOf(TextContent(text = "fuzzy not wired: gRPC client disabled (fuzzy.client.host is blank)")),
         )
 
     private fun resultStructured(result: FuzzyMatchResponse) = Json.encodeToJsonElement(result).jsonObject
@@ -45,7 +45,7 @@ class Tools(
     val matchTool =
         Tool(
             name = "match",
-            description = "Find echo matches for a given name and category",
+            description = "Find fuzzy matches for a given name and category",
             inputSchema =
                 ToolSchema(
                     properties =
@@ -90,7 +90,7 @@ class Tools(
                         buildJsonObject {
                             putJsonObject("matches") {
                                 put("type", "array")
-                                put("description", "List of echo match candidates")
+                                put("description", "List of fuzzy match candidates")
                                 put(
                                     "items",
                                     buildJsonObject {
@@ -143,7 +143,7 @@ class Tools(
                 ?.toInt() ?: 10
 
         logger.info(
-            "MCP echo_match tool invocation: name='{}', category='{}', algorithm='{}', limit={}",
+            "MCP fuzzy_match tool invocation: name='{}', category='{}', algorithm='{}', limit={}",
             name,
             category,
             algorithm,

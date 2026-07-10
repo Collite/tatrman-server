@@ -42,32 +42,32 @@ private val log = LoggerFactory.getLogger("org.tatrman.dispatch.Application")
 
 fun main() {
     val config = ConfigFactory.load()
-    val serverConfig = KtorConfigFactory.fromConfig(config, "kyklop", 7290)
+    val serverConfig = KtorConfigFactory.fromConfig(config, "dispatch", 7290)
     KtorServerBootstrap.createServer(serverConfig) { module(config) }.start(wait = true)
 }
 
 fun Application.module(config: Config) {
-    installKtorServerBase(KtorConfigFactory.fromConfig(config, "kyklop", 7290))
+    installKtorServerBase(KtorConfigFactory.fromConfig(config, "dispatch", 7290))
 
     // OTel SDK init: configures OTLP trace/metric/log exporters AND installs the bridge
     // into the Logback OpenTelemetryAppender so all SLF4J logs are forwarded to OTLP → Alloy → Loki.
     createOpenTelemetrySdk(
         OtelEndpointConfig(
-            serviceName = "kyklop",
-            protocol = System.getenv("KYKLOP_OTEL_PROTOCOL") ?: "grpc",
+            serviceName = "dispatch",
+            protocol = System.getenv("DISPATCH_OTEL_PROTOCOL") ?: "grpc",
         ),
     )
 
     val world = WorldConfig.fromConfig(config)
 
-    val degradedAfter = config.getInt("kyklop.capability-refresh.degraded-after-failures")
-    val unreachableAfter = config.getInt("kyklop.capability-refresh.unreachable-after-failures")
+    val degradedAfter = config.getInt("dispatch.capability-refresh.degraded-after-failures")
+    val unreachableAfter = config.getInt("dispatch.capability-refresh.unreachable-after-failures")
     val registry = WorkerRegistry(degradedAfter = degradedAfter, unreachableAfter = unreachableAfter)
 
     val sticky =
         StickyRegistry(
-            idleTimeout = Duration.ofSeconds(config.getLong("kyklop.sticky.idle-timeout-seconds")),
-            maxEntries = config.getInt("kyklop.sticky.max-entries"),
+            idleTimeout = Duration.ofSeconds(config.getLong("dispatch.sticky.idle-timeout-seconds")),
+            maxEntries = config.getInt("dispatch.sticky.max-entries"),
         )
 
     // Wire callbacks: when a Worker becomes UNREACHABLE, evict its sticky sessions.
@@ -95,17 +95,17 @@ fun Application.module(config: Config) {
         CapabilityPoller(
             registry = registry,
             clients = workerClients,
-            intervalSeconds = config.getLong("kyklop.capability-refresh.interval-seconds"),
+            intervalSeconds = config.getLong("dispatch.capability-refresh.interval-seconds"),
             scope = pollerScope,
         )
-    if (!config.getBoolean("kyklop.use-fixture")) {
+    if (!config.getBoolean("dispatch.use-fixture")) {
         poller.start()
     } else {
-        log.warn("Kyklop booting in fixture mode (kyklop.use-fixture = true); capability poll disabled")
+        log.warn("Dispatch booting in fixture mode (dispatch.use-fixture = true); capability poll disabled")
     }
 
     // Sticky sweep
-    val sweepInterval = config.getLong("kyklop.sticky.sweep-interval-seconds")
+    val sweepInterval = config.getLong("dispatch.sticky.sweep-interval-seconds")
     pollerScope.launch {
         while (isActive) {
             delay(sweepInterval.seconds)
@@ -114,8 +114,8 @@ fun Application.module(config: Config) {
     }
 
     val allowStickyFailover =
-        config.hasPath("kyklop.sticky.allow-failover") &&
-            config.getBoolean("kyklop.sticky.allow-failover")
+        config.hasPath("dispatch.sticky.allow-failover") &&
+            config.getBoolean("dispatch.sticky.allow-failover")
     val service =
         DispatchServiceImpl(
             registry = registry,
@@ -142,7 +142,7 @@ fun Application.module(config: Config) {
 
     launch {
         grpcServer.start()
-        log.info("Kyklop gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
+        log.info("Dispatch gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
         grpcServer.awaitTermination()
     }
 
@@ -150,7 +150,7 @@ fun Application.module(config: Config) {
         get("/health") { call.respond(buildJsonObject { put("status", "UP") }) }
         get("/ready") {
             val healthy = registry.all().count { it.health == WorkerHealthStatus.HEALTHY }
-            if (healthy > 0 || config.getBoolean("kyklop.use-fixture")) {
+            if (healthy > 0 || config.getBoolean("dispatch.use-fixture")) {
                 call.respond(
                     buildJsonObject {
                         put("status", "UP")
@@ -171,7 +171,7 @@ fun Application.module(config: Config) {
             val workers = registry.all()
             call.respond(
                 buildJsonObject {
-                    put("service", "kyklop")
+                    put("service", "dispatch")
                     put("grpc_port", grpcPort)
                     put("default_connection", world.defaultConnection)
                     put("known_workers", workers.size)
@@ -183,7 +183,7 @@ fun Application.module(config: Config) {
     }
 
     monitor.subscribe(ApplicationStopping) {
-        log.info("Shutting down kyklop")
+        log.info("Shutting down dispatch")
         poller.stop()
         pollerScope.cancel()
         grpcServer.shutdown()

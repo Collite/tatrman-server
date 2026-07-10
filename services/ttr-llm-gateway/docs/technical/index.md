@@ -1,6 +1,6 @@
-# Prometheus (LLM Gateway)
+# LLM gateway (LLM Gateway)
 
-Prometheus is a critical infrastructure service that centralizes and manages access to Large Language Models (OpenAI, Anthropic, etc.) for all other services and agents in the constellation.
+LLM gateway is a critical infrastructure service that centralizes and manages access to Large Language Models (OpenAI, Anthropic, etc.) for all other services and agents in the constellation.
 
 ## Architecture Overview
 
@@ -23,16 +23,16 @@ This is a **Spring Boot** application written in **Kotlin**. It acts as a smart 
 
 ### Building
 ```bash
-just build-kt prometheus
+just build-kt llm-gateway
 ```
 
 ### Running Locally
 ```bash
-just run-kt prometheus
+just run-kt llm-gateway
 ```
 
 ## Deployment
 The service is deployed to Kubernetes.
 ```bash
-just deploy-kt prometheus
+just deploy-kt llm-gateway
 ```

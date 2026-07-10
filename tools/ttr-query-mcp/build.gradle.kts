@@ -58,7 +58,7 @@ jib {
         }
     }
     to {
-        image = "theseus-mcp:dev"
+        image = "query-mcp:dev"
     }
     container {
         mainClass = "org.tatrman.query.mcp.ApplicationKt"
@@ -126,13 +126,13 @@ dependencies {
     testImplementation(libs.arrow.vector)
     testImplementation(libs.arrow.memory.netty)
     // Stage 3.5 T6 — the full-chain component test wires run_query through a real
-    // in-process Theseus (QueryServiceImpl with mocked Proteus/Argos/Kyklop/worker).
+    // in-process Query (QueryServiceImpl with mocked Translate/Validate/Dispatch/worker).
     testImplementation(project(":services:ttr-query"))
     // Stage 4.1 T3 — in-memory span exporter for the run_query trace-nesting test.
     testImplementation(libs.opentelemetry.sdk.testing)
 
     // Integration tier (testing arc Stage 2.2) — drives the `query` tool over real
-    // HTTP/MCP (StreamableHTTP) against the live `theseus-runquery` context. The
+    // HTTP/MCP (StreamableHTTP) against the live `query-runquery` context. The
     // convention's integrationTest suite already brings kotest + project(); these
     // add the harness (@RequiresContext/ContextHandle), the MCP SDK client, a Ktor
     // HTTP engine, and JSON parsing for the CallToolResult.

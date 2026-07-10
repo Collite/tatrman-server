@@ -53,12 +53,12 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Fork Stage 4.1 T3 — observability. Proves the `run_query` chain emits **one
- * trace with properly-nested spans** in-process: theseus-mcp's tool boundary is
- * the root, Theseus's orchestration spans nest under it, and each downstream
- * stage (Proteus parse/detect, Argos validate, Kyklop dispatch) is a child of
- * `theseus.run`.
+ * trace with properly-nested spans** in-process: query-mcp's tool boundary is
+ * the root, Query's orchestration spans nest under it, and each downstream
+ * stage (Translate parse/detect, Validate validate, Dispatch dispatch) is a child of
+ * `query.run`.
  *
- * Both the theseus-mcp [InstrumentedTool] root span and the in-process
+ * Both the query-mcp [InstrumentedTool] root span and the in-process
  * [QueryServiceImpl] orchestration spans export to the **same** SDK (an
  * in-memory exporter), so the in-process seam is captured end-to-end. Across
  * pods the same nesting is delivered by gRPC auto-instrumentation, verified in
@@ -126,7 +126,7 @@ class RunQueryTracingComponentSpec :
                     ),
                 ).build()
 
-        fun theseus(sdk: OpenTelemetrySdk): QueryServiceImpl {
+        fun query(sdk: OpenTelemetrySdk): QueryServiceImpl {
             val detect =
                 TranslatorDetectClient {
                     org.tatrman.translate.v1.DetectSchemaResponse
@@ -183,11 +183,11 @@ class RunQueryTracingComponentSpec :
             )
         }
 
-        fun runnerOver(theseus: QueryServiceImpl): QueryRunnerClient =
+        fun runnerOver(query: QueryServiceImpl): QueryRunnerClient =
             object : QueryRunnerClient {
-                override fun run(request: RunRequest): Flow<ResultBatch> = theseus.run(request)
+                override fun run(request: RunRequest): Flow<ResultBatch> = query.run(request)
 
-                override suspend fun compile(request: RunRequest): CompileResponse = theseus.compile(request)
+                override suspend fun compile(request: RunRequest): CompileResponse = query.compile(request)
             }
 
         fun callToolRequest(args: Map<String, String>): CallToolRequest =
@@ -202,7 +202,7 @@ class RunQueryTracingComponentSpec :
                     ),
             )
 
-        "run_query emits one trace nesting mcp.tool.query → theseus.run → parse/detect/validate/dispatch" {
+        "run_query emits one trace nesting mcp.tool.query → query.run → parse/detect/validate/dispatch" {
             val exporter = InMemorySpanExporter.create()
             val sdk =
                 OpenTelemetrySdk
@@ -216,10 +216,10 @@ class RunQueryTracingComponentSpec :
 
             runBlocking {
                 // The tool is wrapped in InstrumentedTool exactly as in production wiring,
-                // sharing the SDK with the in-process Theseus.
+                // sharing the SDK with the in-process Query.
                 val tool =
                     InstrumentedTool(
-                        QueryTool(cfg, runnerOver(theseus(sdk)), fakeMetadata),
+                        QueryTool(cfg, runnerOver(query(sdk)), fakeMetadata),
                         AtomicInteger(0),
                         SimpleMeterRegistry(),
                         sdk,
@@ -236,20 +236,20 @@ class RunQueryTracingComponentSpec :
 
             val spans = exporter.finishedSpanItems.associateBy { it.name }
             val root = spans.getValue("mcp.tool.query")
-            val theseusRun = spans.getValue("theseus.run")
+            val queryRun = spans.getValue("query.run")
 
             // Single trace across the whole in-process chain.
             exporter.finishedSpanItems.map { it.traceId }.toSet() shouldBe setOf(root.traceId)
 
-            // Root is the tool boundary; theseus.run nests under it.
+            // Root is the tool boundary; query.run nests under it.
             root.parentSpanContext.isValid shouldBe false
-            theseusRun.parentSpanId shouldBe root.spanId
+            queryRun.parentSpanId shouldBe root.spanId
 
-            // The orchestration stages are children of theseus.run.
-            val stages = listOf("theseus.detect_schema", "theseus.parse", "theseus.validate", "theseus.dispatch")
+            // The orchestration stages are children of query.run.
+            val stages = listOf("query.detect_schema", "query.parse", "query.validate", "query.dispatch")
             spans.keys shouldContainAll stages
             stages.forEach { name ->
-                spans.getValue(name).parentSpanId shouldBe theseusRun.spanId
+                spans.getValue(name).parentSpanId shouldBe queryRun.spanId
             }
         }
     })

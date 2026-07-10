@@ -52,7 +52,7 @@ class SecurityApplier(
                         .build(),
                 )
                 // DF-V05 / G7 — `security_predicate_applied` pipeline-warning per (table, rule)
-                // so downstream consumers (theseus-mcp -> agents) can surface "extra filters were
+                // so downstream consumers (query-mcp -> agents) can surface "extra filters were
                 // applied to your query because of policy X on table T" without re-deriving it
                 // from `security_applied`. The predicate body is NOT included — leak-safe.
                 warnings.add(

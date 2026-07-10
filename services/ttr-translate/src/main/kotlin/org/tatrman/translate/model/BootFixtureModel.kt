@@ -15,7 +15,7 @@ import org.tatrman.translator.framework.SavedQueryBody
 import org.tatrman.translator.framework.SurfaceType
 
 /**
- * Tiny boot-time fixture model used when `proteus.use-fixture-model = true`.
+ * Tiny boot-time fixture model used when `translate.use-fixture-model = true`.
  * Lets the service start up and serve trivial requests when no metadata service
  * is reachable (development, smoke tests, CI). Production deployments fall
  * back to this only if the metadata client fails to load — see Application.kt.
@@ -44,10 +44,10 @@ object BootFixtureModel {
             primaryKey = listOf("id"),
         )
 
-    // Aligned with the `theseus-runquery` MSSQL seed (olymp platform/data/mssql:
+    // Aligned with the `query-runquery` MSSQL seed (olymp platform/data/mssql:
     // dbo.sample_orders — id/tenant_id/region/amount, 4 rows incl. tenant_id 't-alpha').
     // Lets the raw-SQL `query` path resolve + unparse against the fixture model so
-    // RunQueryIntegrationSpec's result assertion runs end-to-end through Brontes → MSSQL
+    // RunQueryIntegrationSpec's result assertion runs end-to-end through Mssql → MSSQL
     // (SurfaceType has no DECIMAL; FLOAT is the surface type for the amount column — a bare
     // projection never coerces, so MSSQL returns the real DECIMAL(18,2) values as-is).
     private val sampleOrders =

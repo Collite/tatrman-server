@@ -5,8 +5,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 
-from kadmos_service.engines.base import NlpOp
-from kadmos_service.engines.langid_engine import LangidEngine
+from nlp_service.engines.base import NlpOp
+from nlp_service.engines.langid_engine import LangidEngine
 
 
 class TestLangidEngine:

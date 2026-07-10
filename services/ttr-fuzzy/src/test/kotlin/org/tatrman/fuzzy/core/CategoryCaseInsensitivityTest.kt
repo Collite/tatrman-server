@@ -64,7 +64,7 @@ class CategoryCaseInsensitivityTest :
 
         "category lookup is case-insensitive and stays scoped to the requested column" {
             val repo = StringRepository(cfg, loader, telemetry = null)
-            val matcher = EchoMatcher(repo)
+            val matcher = FuzzyMatcher(repo)
             try {
                 eventually(5.seconds) { repo.isCatalogReady() shouldBe true }
 
@@ -90,7 +90,7 @@ class CategoryCaseInsensitivityTest :
 
         "explicit unknown category returns nothing — no silent global fallback" {
             val repo = StringRepository(cfg, loader, telemetry = null)
-            val matcher = EchoMatcher(repo)
+            val matcher = FuzzyMatcher(repo)
             try {
                 eventually(5.seconds) { repo.isCatalogReady() shouldBe true }
 

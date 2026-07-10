@@ -24,7 +24,7 @@ message ResponseMessage {
   // config / fixture file a loader raised a warning against). Domain-neutral on
   // purpose — any file-loading service may set it; empty when there is no source.
   // Kept as a typed field (not folded into human_message) so UIs can render the
-  // offending path distinctly. First consumer: Ariadne source-load warnings (2.1).
+  // offending path distinctly. First consumer: Veles source-load warnings (2.1).
   string source_file    = 4;
 }
 

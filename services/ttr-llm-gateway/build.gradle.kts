@@ -1,6 +1,6 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
-// Prometheus — the LLM gateway, forked from ai-platform infra/llm-gateway.
+// LLM gateway — the LLM gateway, forked from ai-platform infra/llm-gateway.
 // The repo's ONLY Spring Boot module (documented exception, AGENTS.md): every
 // other kantheon JVM module is Ktor. Forked as-is — no Ktor rewrite.
 //
@@ -40,11 +40,11 @@ val isCi = System.getenv("CI") != null
 
 // Image target is parameterized so the same jib config serves local dev and registry publish
 // (mirrors agents/golem):
-//   local : ./gradlew :services:ttr-llm-gateway:jibDockerBuild                 -> prometheus:dev
+//   local : ./gradlew :services:ttr-llm-gateway:jibDockerBuild                 -> llm-gateway:dev
 //   GHCR  : ./gradlew :services:ttr-llm-gateway:jib \
-//             -PimageRepo=ghcr.io/boraperusic/prometheus -PimageTag=testing \
+//             -PimageRepo=ghcr.io/boraperusic/llm-gateway -PimageTag=testing \
 //             -Djib.to.auth.username=<gh-user> -Djib.to.auth.password=<ghcr-PAT>
-val imageRepo = (project.findProperty("imageRepo") as String?) ?: "prometheus"
+val imageRepo = (project.findProperty("imageRepo") as String?) ?: "llm-gateway"
 val imageTag = (project.findProperty("imageTag") as String?) ?: "dev"
 
 jib {
@@ -72,7 +72,7 @@ jib {
         image = "$imageRepo:$imageTag"
     }
     container {
-        mainClass = "org.tatrman.llmgateway.PrometheusApplicationKt"
+        mainClass = "org.tatrman.llmgateway.LlmGatewayApplicationKt"
         ports = listOf("7280")
     }
     dockerClient {

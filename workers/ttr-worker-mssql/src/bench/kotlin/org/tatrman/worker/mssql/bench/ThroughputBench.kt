@@ -13,11 +13,11 @@ import org.apache.arrow.vector.types.pojo.Schema
 import org.tatrman.worker.mssql.arrow.ArrowIpcSerializer
 
 /**
- * Arrow IPC read-out throughput baseline for Brontes cost hints (Fork Stage 4.1 T4).
+ * Arrow IPC read-out throughput baseline for Mssql cost hints (Fork Stage 4.1 T4).
  *
  * Builds a 1e5-row VectorSchemaRoot (id / region / amount) and times the worker's
  * own [ArrowIpcSerializer.serializeBatch] — the CPU-bound read-out that turns a
- * fetched batch into the Arrow IPC bytes Kyklop streams back. Reports rows/s +
+ * fetched batch into the Arrow IPC bytes Dispatch streams back. Reports rows/s +
  * p50/p95. The **DB fetch is excluded** (no MSSQL in unit scope — that is the
  * integration suite's territory); this isolates the serialize step, which is the
  * part shared by every query regardless of source.

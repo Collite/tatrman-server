@@ -9,7 +9,7 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Per-`connection_id` JDBC connection pool registry for Postgres. Mirrors Brontes's
+ * Per-`connection_id` JDBC connection pool registry for Postgres. Mirrors Mssql's
  * manager 1:1; the engine deltas are the `jdbc:postgresql://…` URL shape, the
  * `public` default schema, and the `requires-tenant-id` flag that gates the RLS
  * session contract (added behaviourally in Stage 1.3 — Stage 1.1 only parses it).
@@ -21,12 +21,12 @@ import java.util.concurrent.ConcurrentHashMap
  *
  *     connections {
  *       pg-midas {
- *         host = ${?ARGES_PG_MIDAS_HOST}
+ *         host = ${?POSTGRES_PG_MIDAS_HOST}
  *         port = 5432
  *         database = "midas"
  *         default-schema = "public"
- *         username = ${?ARGES_PG_MIDAS_USER}      # midas_app_readonly (non-owner → RLS applies)
- *         password = ${?ARGES_PG_MIDAS_PASSWORD}
+ *         username = ${?POSTGRES_PG_MIDAS_USER}      # midas_app_readonly (non-owner → RLS applies)
+ *         password = ${?POSTGRES_PG_MIDAS_PASSWORD}
  *         max-pool-size = 10
  *         read-only = true
  *         requires-tenant-id = true

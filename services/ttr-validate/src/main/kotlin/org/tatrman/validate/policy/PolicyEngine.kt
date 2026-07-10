@@ -16,14 +16,14 @@ import org.slf4j.LoggerFactory
  *
  * The fold drops the gRPC/REST service layers, the legacy SQL-fragment endpoint, OPA, and the
  * **whois role lookup**. Roles now arrive on the bearer: `EvaluatePoliciesRequest.context.auth_roles`
- * (populated upstream at the theseus-mcp edge from the JWT's `realm_access.roles`). This is the
+ * (populated upstream at the query-mcp edge from the JWT's `realm_access.roles`). This is the
  * fork-default `roleSource = bearer` (contracts §3); the optional whois enrichment source is a
  * Phase-5 additive, not built here.
  *
  * Policies come from HOCON (DF-S01 — [PolicyConfigLoader]). Metadata-aware checks (DF-S02): the
  * engine consults the [PolicyMetadataClient] to flag tables absent from the model (`unknown_table`)
  * and a stale request `model_version` (`model_version_mismatch`). Column rules (DF-S02) are returned
- * in `EvaluatePoliciesResponse.column_rules` for Argos's RuleEnforcer (DF-V01).
+ * in `EvaluatePoliciesResponse.column_rules` for Validate's RuleEnforcer (DF-V01).
  */
 class PolicyEngine(
     private val registry: PolicyRegistry,
@@ -88,7 +88,7 @@ class PolicyEngine(
                     )
                 }
             }
-            // Column-level rules for this table (DF-S02) — Argos's RuleEnforcer checks the actual
+            // Column-level rules for this table (DF-S02) — Validate's RuleEnforcer checks the actual
             // query's columns against these (deny → reject; mask → rewrite).
             for ((policy, rule) in registry.columnRulesFor(table)) {
                 val b =

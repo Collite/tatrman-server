@@ -17,7 +17,7 @@ class PolicyConfigLoaderSpec :
                 PolicyConfigLoader.load(
                     cfg(
                         """
-                        argos.policies = [
+                        validate.policies = [
                           {
                             id = "tenant_isolation"
                             description = "tenant"
@@ -45,7 +45,7 @@ class PolicyConfigLoaderSpec :
                 PolicyConfigLoader.load(
                     cfg(
                         """
-                        argos.policies = [
+                        validate.policies = [
                           {
                             id = "complex"
                             match { type = "exact", qname = "db.dbo.orders" }
@@ -83,13 +83,13 @@ class PolicyConfigLoaderSpec :
             val policies =
                 PolicyConfigLoader.load(
                     cfg(
-                        """argos.policies = [ { id = "org_wide", match { type = "all" }, predicate { type = "eq", column = "x", value { kind = "literal", value = 1, literal-type = "int" } } } ]""",
+                        """validate.policies = [ { id = "org_wide", match { type = "all" }, predicate { type = "eq", column = "x", value { kind = "literal", value = 1, literal-type = "int" } } } ]""",
                     ),
                 )
             policies.single().tableMatch.shouldBeInstanceOf<TableMatcher.All>()
         }
 
-        "absent argos.policies → empty list (no error)" {
+        "absent validate.policies → empty list (no error)" {
             PolicyConfigLoader.load(cfg("app {}")) shouldBe emptyList()
         }
 
@@ -98,7 +98,7 @@ class PolicyConfigLoaderSpec :
                 shouldThrow<PolicyConfigException> {
                     PolicyConfigLoader.load(
                         cfg(
-                            """argos.policies = [ { id = "bad", match { type = "regex" }, predicate { type = "eq", column = "x", value { kind = "literal", value = 1 } } } ]""",
+                            """validate.policies = [ { id = "bad", match { type = "regex" }, predicate { type = "eq", column = "x", value { kind = "literal", value = 1 } } } ]""",
                         ),
                     )
                 }
@@ -109,7 +109,7 @@ class PolicyConfigLoaderSpec :
             shouldThrow<PolicyConfigException> {
                 PolicyConfigLoader.load(
                     cfg(
-                        """argos.policies = [ { id = "p", match { type = "all" }, predicate { type = "like", column = "x", pattern = "%" } } ]""",
+                        """validate.policies = [ { id = "p", match { type = "all" }, predicate { type = "like", column = "x", pattern = "%" } } ]""",
                     ),
                 )
             }
@@ -119,7 +119,7 @@ class PolicyConfigLoaderSpec :
             shouldThrow<PolicyConfigException> {
                 PolicyConfigLoader.load(
                     cfg(
-                        """argos.policies = [ { id = "p", match { type = "all" }, predicate { type = "eq", column = "x", value { kind = "env-var", name = "X" } } } ]""",
+                        """validate.policies = [ { id = "p", match { type = "all" }, predicate { type = "eq", column = "x", value { kind = "env-var", name = "X" } } } ]""",
                     ),
                 )
             }
@@ -127,12 +127,12 @@ class PolicyConfigLoaderSpec :
 
         "missing predicate block → PolicyConfigException" {
             shouldThrow<PolicyConfigException> {
-                PolicyConfigLoader.load(cfg("""argos.policies = [ { id = "p", match { type = "all" } } ]"""))
+                PolicyConfigLoader.load(cfg("""validate.policies = [ { id = "p", match { type = "all" } } ]"""))
             }
         }
 
         "the bundled application.conf parses into a working tenant-isolation policy" {
-            // Argos ships a default policy store (policies/policies.conf, included by
+            // Validate ships a default policy store (policies/policies.conf, included by
             // application.conf) — the fold's HOCON policy store (Stage 3.2 T4).
             val policies = PolicyConfigLoader.load(ConfigFactory.load())
             policies shouldHaveSize 1

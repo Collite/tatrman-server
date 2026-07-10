@@ -1,38 +1,38 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kadmos-mcp
+  name: nlp-mcp
   namespace: kantheon
   labels:
-    app: kadmos-mcp
+    app: nlp-mcp
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kadmos-mcp
+      app: nlp-mcp
   template:
     metadata:
       labels:
-        app: kadmos-mcp
+        app: nlp-mcp
     spec:
       containers:
-        - name: kadmos-mcp
-          image: kadmos-mcp:dev
+        - name: nlp-mcp
+          image: nlp-mcp:dev
           ports:
             - containerPort: 7272
           env:
-            - name: MCP_KADMOS_SERVER_PORT
+            - name: MCP_NLP_SERVER_PORT
               value: "7272"
-            # HTTP target → kadmos service (contracts §7 port 7270).
-            - name: KADMOS_HTTP_HOST
-              value: kadmos
-            - name: KADMOS_HTTP_PORT
+            # HTTP target → nlp service (contracts §7 port 7270).
+            - name: NLP_HTTP_HOST
+              value: nlp
+            - name: NLP_HTTP_PORT
               value: "7270"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://alloy.observability.svc.cluster.local:4317
             - name: OTEL_SERVICE_NAME
-              value: kadmos-mcp
-            - name: OTEL_ENABLED_KADMOS_MCP
+              value: nlp-mcp
+            - name: OTEL_ENABLED_NLP_MCP
               value: "true"
           readinessProbe:
             httpGet:
@@ -58,13 +58,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: kadmos-mcp
+  name: nlp-mcp
   namespace: kantheon
   labels:
-    app: kadmos-mcp
+    app: nlp-mcp
 spec:
   selector:
-    app: kadmos-mcp
+    app: nlp-mcp
   ports:
     - name: http
       port: 7272

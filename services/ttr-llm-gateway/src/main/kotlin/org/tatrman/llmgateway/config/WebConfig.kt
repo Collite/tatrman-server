@@ -22,7 +22,7 @@ class WebConfig : WebMvcConfigurer {
         // Read allowed origins from env var (comma-separated) with localhost fallback
         val corsHosts =
             System
-                .getenv("PROMETHEUS_CORS_ALLOWED_HOSTS")
+                .getenv("LLM_GATEWAY_CORS_ALLOWED_HOSTS")
                 ?.split(",")
                 ?.map { it.trim() }
                 ?.filter { it.isNotEmpty() }

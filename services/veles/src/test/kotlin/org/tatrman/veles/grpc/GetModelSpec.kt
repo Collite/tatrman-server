@@ -76,7 +76,7 @@ class GetModelSpec :
         // sourced from the tpcds package. This is a db-only package (raw-SQL curated
         // queries over physical tables — no ER layer), so `relations` (ER-derived,
         // MetadataServiceImpl §260) is not the guard here; FK join behaviour is
-        // exercised end-to-end by the Proteus unparse + query smoke (T4/T7).
+        // exercised end-to-end by the Translate unparse + query smoke (T4/T7).
         "GetModel(packages=[tpcds]) loads the TPC-DS seven-table star" {
             val svc = service()
             val resp =
@@ -313,7 +313,7 @@ class GetModelSpec :
 
         // Drill-map LOADING test removed at fork Stage 2.1 (2026-06-13): drill-map
         // definition & usage is being revisited from the product side before the loaded
-        // shape is worth asserting. Deferred to kantheon-v1.1 §8 (Ariadne / model graph).
+        // shape is worth asserting. Deferred to kantheon-v1.1 §8 (Veles / model graph).
         // The proto (`DrillMapDetail`) and loader stay in tree; only the load assertion is
         // dropped. The flag-gating test below (include_drill_map=false) is kept.
 

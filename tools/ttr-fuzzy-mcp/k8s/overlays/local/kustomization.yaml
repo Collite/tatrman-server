@@ -9,7 +9,7 @@ resources:
 patches:
   - target:
       kind: Deployment
-      name: echo-mcp
+      name: fuzzy-mcp
     patch: |
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy
@@ -17,15 +17,15 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env
         value:
-          - name: MCP_ECHO_SERVER_PORT
+          - name: MCP_FUZZY_SERVER_PORT
             value: "7267"
-          # Local cluster: point at the echo service's port-forward
-            # (`kubectl port-forward svc/echo 7266:7266`).
-          - name: ECHO_GRPC_HOST
+          # Local cluster: point at the fuzzy service's port-forward
+            # (`kubectl port-forward svc/fuzzy 7266:7266`).
+          - name: FUZZY_GRPC_HOST
             value: localhost
-          - name: ECHO_GRPC_PORT
+          - name: FUZZY_GRPC_PORT
             value: "7266"
           - name: OTEL_SERVICE_NAME
-            value: echo-mcp
-          - name: OTEL_ENABLED_ECHO_MCP
+            value: fuzzy-mcp
+          - name: OTEL_ENABLED_FUZZY_MCP
             value: "false"

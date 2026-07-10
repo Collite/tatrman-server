@@ -1,14 +1,14 @@
-capability_id: "ariadne.search:v1"
-category: "ariadne"
+capability_id: "veles.search:v1"
+category: "veles"
 version: "1.0.0"
 description: |
-  Fuzzy search across ariadne objects. The `query` argument is matched
+  Fuzzy search across veles objects. The `query` argument is matched
   against the model object's `name`, `localized labels`, `aliases`, and
   search-keyword tables. Returns the top-N `SearchResult`s with relevance
   scores and snippets.
-service_endpoint: "http://ariadne-mcp.kantheon.svc.cluster.local:7262"
+service_endpoint: "http://veles-mcp.kantheon.svc.cluster.local:7262"
 search_tags:
-  - ariadne
+  - veles
   - search
   - fuzzy
 cost_hints:

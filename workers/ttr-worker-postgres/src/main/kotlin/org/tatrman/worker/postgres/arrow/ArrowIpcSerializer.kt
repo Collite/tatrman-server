@@ -17,8 +17,8 @@ import java.security.MessageDigest
  * Serialises Arrow batches to the IPC streaming format and computes the
  * canonical-schema SHA-256 fingerprint required by `ResultBatch.schema_fingerprint`.
  *
- * Engine-agnostic: copied verbatim from Brontes (and byte-identical to Charon's
- * `Integrity.canonicalSchemaString` + the Steropes/pyarrow reference), so the
+ * Engine-agnostic: copied verbatim from Mssql (and byte-identical to Charon's
+ * `Integrity.canonicalSchemaString` + the Polars/pyarrow reference), so the
  * Postgres worker produces the same fingerprint for the same logical schema. The
  * fingerprint is the SHA-256 (lowercase hex) of the canonical logical-schema
  * string, NOT the raw IPC bytes (those are not byte-stable across Arrow
@@ -88,7 +88,7 @@ object ArrowIpcSerializer {
             is ArrowType.FixedSizeList -> "fixed_size_list_" + type.listSize
             is ArrowType.Struct -> "struct"
             is ArrowType.Map -> "map_" + if (type.keysSorted) "sorted" else "unsorted"
-            else -> error("Arges fingerprint: unsupported Arrow type $type")
+            else -> error("Postgres fingerprint: unsupported Arrow type $type")
         }
 
     private fun fpToken(p: FloatingPointPrecision): String =

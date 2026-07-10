@@ -53,7 +53,7 @@ data class LoaderSourceConfig(
 )
 
 data class MetadataConfig(
-    val host: String = "ariadne",
+    val host: String = "veles",
     val port: Int = 7261,
     val timeoutMs: Long = 10_000,
     val schema: String = "db",
@@ -75,10 +75,10 @@ data class TokenBasedConfig(
     val idfEnabled: Boolean = true,
 )
 
-/** Kadmos (Phase 2.3) integration for Czech lemmatisation. Disabled → folded-surface matching only. */
+/** Nlp (Phase 2.3) integration for Czech lemmatisation. Disabled → folded-surface matching only. */
 data class NlpConfig(
     val enabled: Boolean = false,
-    val host: String = "kadmos",
+    val host: String = "nlp",
     val port: Int = 7270,
     val timeoutMs: Long = 5_000,
     val lang: String = "cs",
@@ -89,34 +89,34 @@ data class NlpConfig(
 object ConfigLoader {
     fun load(): AppConfig {
         val config = ConfigFactory.load()
-        val echoConfig = config.getConfig("echo")
+        val fuzzyConfig = config.getConfig("fuzzy")
 
         return AppConfig(
             serverPort = config.getString("ktor.deployment.port").toInt(),
-            grpcPort = echoConfig.getString("grpc.port").toInt(),
+            grpcPort = fuzzyConfig.getString("grpc.port").toInt(),
             grpcReflectionEnabled =
-                echoConfig.hasPath("grpc.reflection-enabled") &&
-                    echoConfig.getBoolean("grpc.reflection-enabled"),
-            refreshIntervalSeconds = echoConfig.getLong("refreshIntervalSeconds"),
-            tokenBasedConfig = loadTokenBasedConfig(echoConfig),
-            nlp = loadNlpConfig(echoConfig),
-            loaderSource = loadLoaderSourceConfig(echoConfig),
-            metadata = loadMetadataConfig(echoConfig),
-            database = loadDatabaseConfig(echoConfig),
+                fuzzyConfig.hasPath("grpc.reflection-enabled") &&
+                    fuzzyConfig.getBoolean("grpc.reflection-enabled"),
+            refreshIntervalSeconds = fuzzyConfig.getLong("refreshIntervalSeconds"),
+            tokenBasedConfig = loadTokenBasedConfig(fuzzyConfig),
+            nlp = loadNlpConfig(fuzzyConfig),
+            loaderSource = loadLoaderSourceConfig(fuzzyConfig),
+            metadata = loadMetadataConfig(fuzzyConfig),
+            database = loadDatabaseConfig(fuzzyConfig),
         )
     }
 
     /**
-     * Reads the warehouse connection from `echo.type` + `echo.{postgres,mssql}`.
-     * Returns null when `echo.type` is absent — the `static` (JSON catalog)
+     * Reads the warehouse connection from `fuzzy.type` + `fuzzy.{postgres,mssql}`.
+     * Returns null when `fuzzy.type` is absent — the `static` (JSON catalog)
      * source needs no DB, so a DB-less config is valid. When the `metadata`
      * source is selected but this is null, `Application.module` fails fast.
      */
-    private fun loadDatabaseConfig(echoConfig: com.typesafe.config.Config): DatabaseConfig? {
-        if (!echoConfig.hasPath("type")) return null
-        return when (echoConfig.getString("type").uppercase()) {
+    private fun loadDatabaseConfig(fuzzyConfig: com.typesafe.config.Config): DatabaseConfig? {
+        if (!fuzzyConfig.hasPath("type")) return null
+        return when (fuzzyConfig.getString("type").uppercase()) {
             "POSTGRES" -> {
-                val pg = echoConfig.getConfig("postgres")
+                val pg = fuzzyConfig.getConfig("postgres")
                 PostgresConfig(
                     host = pg.getString("host"),
                     port = pg.getString("port").toInt(),
@@ -126,7 +126,7 @@ object ConfigLoader {
                 )
             }
             "MSSQL" -> {
-                val ms = echoConfig.getConfig("mssql")
+                val ms = fuzzyConfig.getConfig("mssql")
                 MssqlConfig(
                     host = ms.getString("host"),
                     port = ms.getString("port").toInt(),
@@ -136,14 +136,14 @@ object ConfigLoader {
                 )
             }
             else -> throw IllegalArgumentException(
-                "Unknown echo.type: '${echoConfig.getString("type")}' (expected postgres|mssql)",
+                "Unknown fuzzy.type: '${fuzzyConfig.getString("type")}' (expected postgres|mssql)",
             )
         }
     }
 
-    private fun loadNlpConfig(echoConfig: com.typesafe.config.Config): NlpConfig =
+    private fun loadNlpConfig(fuzzyConfig: com.typesafe.config.Config): NlpConfig =
         try {
-            val nlp = echoConfig.getConfig("nlp")
+            val nlp = fuzzyConfig.getConfig("nlp")
             val defaults = NlpConfig()
             NlpConfig(
                 enabled = if (nlp.hasPath("enabled")) nlp.getBoolean("enabled") else defaults.enabled,
@@ -156,9 +156,9 @@ object ConfigLoader {
             NlpConfig()
         }
 
-    private fun loadTokenBasedConfig(echoConfig: com.typesafe.config.Config): TokenBasedConfig =
+    private fun loadTokenBasedConfig(fuzzyConfig: com.typesafe.config.Config): TokenBasedConfig =
         try {
-            val tokenBasedConfig = echoConfig.getConfig("token-based")
+            val tokenBasedConfig = fuzzyConfig.getConfig("token-based")
             TokenBasedConfig(
                 distanceThreshold = tokenBasedConfig.getDouble("distance-threshold"),
                 orderBonusMultiplier = tokenBasedConfig.getDouble("order-bonus-multiplier"),
@@ -174,9 +174,9 @@ object ConfigLoader {
             TokenBasedConfig()
         }
 
-    private fun loadLoaderSourceConfig(echoConfig: com.typesafe.config.Config): LoaderSourceConfig =
+    private fun loadLoaderSourceConfig(fuzzyConfig: com.typesafe.config.Config): LoaderSourceConfig =
         try {
-            val loader = echoConfig.getConfig("loader")
+            val loader = fuzzyConfig.getConfig("loader")
             LoaderSourceConfig(
                 source = if (loader.hasPath("source")) loader.getString("source") else "static",
             )
@@ -184,9 +184,9 @@ object ConfigLoader {
             LoaderSourceConfig()
         }
 
-    private fun loadMetadataConfig(echoConfig: com.typesafe.config.Config): MetadataConfig =
+    private fun loadMetadataConfig(fuzzyConfig: com.typesafe.config.Config): MetadataConfig =
         try {
-            val metadata = echoConfig.getConfig("metadata")
+            val metadata = fuzzyConfig.getConfig("metadata")
             val defaults = MetadataConfig()
             MetadataConfig(
                 host = if (metadata.hasPath("host")) metadata.getString("host") else defaults.host,

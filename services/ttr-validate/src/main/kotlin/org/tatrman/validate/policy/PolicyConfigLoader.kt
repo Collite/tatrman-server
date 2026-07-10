@@ -10,10 +10,10 @@ import org.tatrman.plan.v1.parseSchemaCode
  * Loads row-level-security [Policy] instances from HOCON (DF-S01). Replaces the hardcoded
  * [DefaultPolicies.all] in production; [DefaultPolicies] survives as a test fixture only.
  *
- * Config shape — `argos.policies` is a list of policy objects:
+ * Config shape — `validate.policies` is a list of policy objects:
  *
  * ```hocon
- * argos.policies = [
+ * validate.policies = [
  *   {
  *     id = "tenant_isolation"
  *     description = "Restrict rows to the calling user's tenant"   # optional
@@ -37,7 +37,7 @@ import org.tatrman.plan.v1.parseSchemaCode
  * `column-rules[].action` ∈ { `deny`, `mask` (+ optional `mask-value` = a `value`) }.
  *
  * A malformed policy aborts startup with a message naming the offending policy id (fail-fast).
- * If `argos.policies` is absent, returns an empty list (the service then applies no row-level
+ * If `validate.policies` is absent, returns an empty list (the service then applies no row-level
  * policies) — a warning is logged.
  */
 object PolicyConfigLoader {
@@ -45,7 +45,7 @@ object PolicyConfigLoader {
 
     fun load(config: Config): List<Policy> {
         if (!config.hasPath(POLICIES_PATH)) {
-            logger.warn("No '{}' configured — Argos will apply no row-level policies", POLICIES_PATH)
+            logger.warn("No '{}' configured — Validate will apply no row-level policies", POLICIES_PATH)
             return emptyList()
         }
         val entries = config.getConfigList(POLICIES_PATH)
@@ -207,7 +207,7 @@ object PolicyConfigLoader {
 
     private fun Config.optString(path: String): String? = if (hasPath(path)) getString(path) else null
 
-    private const val POLICIES_PATH = "argos.policies"
+    private const val POLICIES_PATH = "validate.policies"
 }
 
 class PolicyConfigException(

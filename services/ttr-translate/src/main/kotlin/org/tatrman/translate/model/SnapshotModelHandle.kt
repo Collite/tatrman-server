@@ -242,8 +242,8 @@ class SnapshotModelHandle(
 
 /**
  * Best-effort mapping from a raw SQL `data_type` string to a DSL [SurfaceType]. Mirrors the
- * in-process mapping in Ariadne (the metadata/model-graph service, `MetadataModelHandle`); kept
- * local rather than shared to avoid a Proteus → Ariadne dependency.
+ * in-process mapping in Veles (the metadata/model-graph service, `MetadataModelHandle`); kept
+ * local rather than shared to avoid a Translate → Veles dependency.
  */
 internal fun surfaceTypeOf(dataType: String): SurfaceType {
     val base =

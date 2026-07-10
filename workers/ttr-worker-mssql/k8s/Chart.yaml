@@ -1,7 +1,7 @@
 apiVersion: v2
-name: brontes
+name: mssql
 description: |
-  The Kantheon brontes service — an env-agnostic Helm chart. Holds no cluster knowledge:
+  The Kantheon mssql service — an env-agnostic Helm chart. Holds no cluster knowledge:
   image, replicas, resources, telemetry endpoint and downstream wiring are all values.
   Per-environment values live in the deploying repo (Olymp clusters via ArgoCD multi-source
   D3'; test contexts via the Olymp scripted harness D23). Converted from the kustomize

@@ -1,13 +1,13 @@
-capability_id: "ariadne.list_queries:v1"
-category: "ariadne"
+capability_id: "veles.list_queries:v1"
+category: "veles"
 version: "1.0.0"
 description: |
-  List query templates authored against the ariadne model. Filter by
+  List query templates authored against the veles model. Filter by
   package and parse status. The MCP wrapper returns the query descriptors
   with their SQL template + parameter list.
-service_endpoint: "http://ariadne-mcp.kantheon.svc.cluster.local:7262"
+service_endpoint: "http://veles-mcp.kantheon.svc.cluster.local:7262"
 search_tags:
-  - ariadne
+  - veles
   - queries
   - list
 cost_hints:

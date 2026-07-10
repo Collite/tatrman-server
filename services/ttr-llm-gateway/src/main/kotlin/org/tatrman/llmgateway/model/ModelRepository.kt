@@ -114,7 +114,7 @@ class ModelRepository {
 
     private var models: List<Model> = emptyList()
 
-    @Value("\${prometheus.models-config-path:/etc/prometheus/models.yaml}")
+    @Value("\${llmgateway.models-config-path:/etc/llmgateway/models.yaml}")
     private lateinit var modelsConfigPath: String
 
     @PostConstruct

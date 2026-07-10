@@ -1,34 +1,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: steropes
+  name: polars
   namespace: kantheon
   labels:
-    app: steropes
+    app: polars
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: steropes
+      app: polars
   template:
     metadata:
       labels:
-        app: steropes
+        app: polars
     spec:
       containers:
-        - name: steropes
-          image: steropes:dev
+        - name: polars
+          image: polars:dev
           ports:
             - name: http
               containerPort: 7300
             - name: grpc
               containerPort: 7301
           env:
-            - name: STEROPES_SERVER_PORT
+            - name: POLARS_SERVER_PORT
               value: "7300"
-            - name: STEROPES_SERVER_GRPC_PORT
+            - name: POLARS_SERVER_GRPC_PORT
               value: "7301"
-            - name: OTEL_ENABLED_STEROPES
+            - name: OTEL_ENABLED_POLARS
               value: "true"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://alloy.observability.svc.cluster.local:4317
@@ -57,13 +57,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: steropes
+  name: polars
   namespace: kantheon
   labels:
-    app: steropes
+    app: polars
 spec:
   selector:
-    app: steropes
+    app: polars
   ports:
     - name: http
       port: 7300

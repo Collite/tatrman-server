@@ -1,14 +1,14 @@
-capability_id: "ariadne.list_objects:v1"
-category: "ariadne"
+capability_id: "veles.list_objects:v1"
+category: "veles"
 version: "1.0.0"
 description: |
-  List ariadne objects (tables, views, entities, attributes, relations,
+  List veles objects (tables, views, entities, attributes, relations,
   queries, …) filtered by kind, package, and binding. Paginated; the MCP
   wrapper drains every page server-side and returns a single `objects[]`
   array.
-service_endpoint: "http://ariadne-mcp.kantheon.svc.cluster.local:7262"
+service_endpoint: "http://veles-mcp.kantheon.svc.cluster.local:7262"
 search_tags:
-  - ariadne
+  - veles
   - model
   - list
 cost_hints:

@@ -43,7 +43,7 @@ jib {
         }
     }
     to {
-        image = "argos:dev"
+        image = "validate:dev"
     }
     container {
         mainClass = "org.tatrman.validate.ApplicationKt"
@@ -95,7 +95,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.wiremock)
 
-    // Component tier (WS-C1 T3) — proves Argos's tenant-isolation policy decision **enforces** on a
+    // Component tier (WS-C1 T3) — proves Validate's tenant-isolation policy decision **enforces** on a
     // real Postgres: the predicate the PolicyEngine emits, applied as a WHERE clause, denies
     // cross-tenant rows (and a same-tenant query returns rows). Needs the testkit (Containers.postgres),
     // the protos (security/plan v1), coroutines (evaluatePolicies is `suspend`), and the pg driver.

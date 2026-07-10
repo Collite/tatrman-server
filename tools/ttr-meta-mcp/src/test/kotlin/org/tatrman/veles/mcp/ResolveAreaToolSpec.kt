@@ -21,7 +21,7 @@ import org.tatrman.common.v1.Severity
  * Verifies the zero-logic wrapper contract:
  *  - argument forwarding (`area`)
  *  - shape of the structured response (`packages[]`, `description`, `tags[]`, `found`)
- *  - ariadne's Rule-6 warnings (e.g. `area_not_found`) surfaced in the text payload
+ *  - veles's Rule-6 warnings (e.g. `area_not_found`) surfaced in the text payload
  *  - the missing-area guard short-circuits before the gRPC call
  */
 class ResolveAreaToolSpec :

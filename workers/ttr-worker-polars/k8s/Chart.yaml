@@ -1,11 +1,11 @@
 apiVersion: v2
-name: steropes
+name: polars
 description: |
-  The Kantheon steropes worker (Polars worker — one of the Kyklops, Python + Polars + gRPC) — an
+  The Kantheon polars worker (Polars worker — one of the Dispatchs, Python + Polars + gRPC) — an
   env-agnostic Helm chart. Holds no cluster knowledge: image, replicas, resources, telemetry
   endpoint are all values. Per-environment values live in the deploying repo (Olymp clusters via
   ArgoCD multi-source D3'; test contexts via the Olymp scripted harness). Converted from the
-  kustomize base/overlays, mirroring services/theseus/k8s (OTLP-endpoint OTel idiom). The image is
+  kustomize base/overlays, mirroring services/query/k8s (OTLP-endpoint OTel idiom). The image is
   built via `build-py` (not Jib); the chart itself is identical in shape to a backend chart.
 type: application
 version: 0.1.0

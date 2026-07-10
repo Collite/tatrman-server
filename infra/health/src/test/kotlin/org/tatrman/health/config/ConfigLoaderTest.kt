@@ -34,15 +34,15 @@ class ConfigLoaderTest :
                     // kantheon constellation
                     "iris-bff",
                     "themis",
-                    "ariadne",
-                    "theseus",
-                    "echo",
-                    "kadmos",
-                    "argos",
-                    "kyklop",
-                    "brontes",
+                    "veles",
+                    "query",
+                    "fuzzy",
+                    "nlp",
+                    "validate",
+                    "dispatch",
+                    "mssql",
                     "capabilities-mcp",
-                    "theseus-mcp",
+                    "query-mcp",
                     // technical wave (infra/)
                     "whois",
                     "backstage",
@@ -53,8 +53,11 @@ class ConfigLoaderTest :
             val keys = ConfigLoader.load().technologies.keys
             // Stage 5.2 T3: targets re-pointed to the kantheon estate; the legacy line is gone.
             keys.none { it.startsWith("sql-") } shouldBe true
+            // SV-P0 S4: `fuzzy-mcp` and `llm-gateway` were removed from this legacy guard —
+            // the J-v2 service renames make these functional names our OWN
+            // spine services' health-check targets, colliding with the old ai-platform names.
             keys shouldNotContainAnyOf
-                setOf("metadata", "fuzzy-matcher", "meta-mcp", "fuzzy-mcp", "erp-data-mcp", "llm-gateway", "erp-sql")
+                setOf("metadata", "fuzzy-matcher", "meta-mcp", "erp-data-mcp", "erp-sql")
         }
 
         "Postgres checks are TCP and Keycloak hits its management port" {

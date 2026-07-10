@@ -11,7 +11,7 @@ import java.sql.JDBCType
 import java.sql.ResultSetMetaData
 
 /**
- * PostgreSQL-aware JDBC ResultSet → Arrow type mapper (the Brontes
+ * PostgreSQL-aware JDBC ResultSet → Arrow type mapper (the Mssql
  * `MssqlArrowTypeMapper` re-typed for Postgres; contracts §3 is the table).
  *
  * Disambiguates on `ResultSetMetaData.getColumnTypeName()` (Postgres reports

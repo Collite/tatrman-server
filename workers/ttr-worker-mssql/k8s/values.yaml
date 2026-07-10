@@ -1,11 +1,11 @@
-# Default values for brontes. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# Default values for mssql. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
 # environments (Olymp cluster values, or test-context values) override image, telemetry,
 # and the downstream wiring in extraEnv.
 
 replicaCount: 1
 
 image:
-  repository: brontes
+  repository: mssql
   # Defaults to .Chart.appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent
@@ -30,20 +30,20 @@ resources:
     cpu: "1"
 
 # OpenTelemetry. These services read a single OTLP endpoint URL (OTEL_EXPORTER_OTLP_ENDPOINT)
-# plus the per-service OTEL_ENABLED_BRONTES flag. Point `endpoint` at a collector (e.g. the
+# plus the per-service OTEL_ENABLED_MSSQL flag. Point `endpoint` at a collector (e.g. the
 # cluster's Alloy) and set enabled; leave disabled where no collector exists (e.g. test runs).
 telemetry:
   enabled: false
   # e.g. http://alloy.observability.svc.cluster.local:4317
   endpoint: ""
-  serviceName: brontes
+  serviceName: mssql
 
 # Downstream constellation wiring + any other env. Defaults match the constellation's stable
 # in-cluster service names (env-agnostic — every cluster names them the same). A deploying
 # env REPLACES this list to retarget (e.g. a test context points the LLM upstream at WireMock).
 extraEnv:
-  - { name: PROTEUS_SERVER, value: "proteus" }
-  - { name: PROTEUS_SERVER_GRPC_PORT, value: "7276" }
+  - { name: TRANSLATE_SERVER, value: "translate" }
+  - { name: TRANSLATE_SERVER_GRPC_PORT, value: "7276" }
 
 # Probes (HTTP on the http port).
 readinessProbe:

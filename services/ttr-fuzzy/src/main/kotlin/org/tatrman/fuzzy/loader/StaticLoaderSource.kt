@@ -3,11 +3,11 @@ package org.tatrman.fuzzy.loader
 import org.tatrman.fuzzy.core.Candidate
 
 /**
- * In-memory static catalog loader — the lean-echo v1 default.
+ * In-memory static catalog loader — the lean-fuzzy v1 default.
  *
  * Reads a pre-baked `Map<category, List<Candidate>>` (the entity catalog
- * shipped as JSON in `src/main/resources/echo-catalog.json` and parsed by
- * `EchoCatalog.fromResource(...)`) and returns it as the cache contents.
+ * shipped as JSON in `src/main/resources/fuzzy-catalog.json` and parsed by
+ * `FuzzyCatalog.fromResource(...)`) and returns it as the cache contents.
  *
  * Ai-platform's `StaticLoaderSource` ran `SELECT pk, col FROM table` against
  * a live SQL backend for each query; the kantheon lean carve-out drops the

@@ -274,7 +274,7 @@ class GrpcChatService(
                 ChatResponse
                     .newBuilder()
                     .setContent(result.content ?: "")
-                    .setModel(request.model) // Echo back
+                    .setModel(request.model) // Fuzzy back
                     .build()
 
             responseObserver.onNext(response)

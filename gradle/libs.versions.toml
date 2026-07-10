@@ -60,7 +60,7 @@ ktor-otel                 = "2.18.1-alpha"
 # Caches
 caffeine                  = "3.2.3"
 
-# Algorithm — used by Echo (Stage 2.2) for the LEVENSHTEIN / JARO_WINKLER /
+# Algorithm — used by the fuzzy matcher (Stage 2.2) for the LEVENSHTEIN / JARO_WINKLER /
 # DAMERAU_LEVENSHTEIN branches of the cascade (TATRMAN is in-house).
 java-string-similarity    = "2.0.0"
 
@@ -96,7 +96,7 @@ lettuce                   = "6.8.0.RELEASE"
 grpc                                 = "1.78.0"
 grpc-kotlin                          = "1.5.0"
 
-# Algorithm + graph + VCS — ariadne (Stage 2.1) uses jgrapht for the model graph + jgit for the GitArchiveStorage backend.
+# Algorithm + graph + VCS — the metadata service (Stage 2.1) uses jgrapht for the model graph + jgit for the GitArchiveStorage backend.
 jgrapht                              = "1.5.2"
 jgit                                 = "6.8.0.202311291450-r"
 apache-commons-compress              = "1.24.0"
@@ -106,7 +106,7 @@ micrometer                           = "1.16.2"
 # (Themis's residual nlp.v1) — was removed here. Themis now consumes only in-repo
 # protos via :shared:proto. No cz.dfpartner Maven artifact remains.
 
-# Prometheus (LLM gateway, Spring Boot) — fork Stage 2.5. The repo's only
+# LLM gateway (Spring Boot) — fork Stage 2.5. The repo's only
 # Spring module; resolved from mavenCentral (incl. Spring AI 2.0.0-M2, as
 # ai-platform did — no milestone repo needed).
 spring-boot               = "4.0.2"
@@ -283,11 +283,11 @@ tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",
 # SV-P0 interim: consume the translate.v1-renamed ttr-plan-proto from mavenLocal
 # (S2 published 0.0.1-LOCAL with org/tatrman/translate/v1/translator.proto). Moves to
 # the 0.9.x public line at SV-P1 gate 2. The 0.8.5 published artifact still carries the
-# old proteus/v1 path, so it can't back the renamed translate service protos here.
+# old pre-rename package path, so it can't back the renamed translate service protos here.
 tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                            version = "0.0.1-LOCAL" }
 # SV-P0 interim: the translate.v1-renamed ttr-translator from mavenLocal (S2). Its
 # API exposes org.tatrman.translate.v1.{Language,SqlDialect}; the 0.8.5 published
-# artifact still exposes proteus.v1, which mismatches the renamed service protos.
+# artifact still exposes the old package, which mismatches the renamed service protos.
 tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version = "0.0.1-LOCAL" }
 exposed-core                        = { module = "org.jetbrains.exposed:exposed-core",                    version.ref = "exposed" }
 exposed-jdbc                        = { module = "org.jetbrains.exposed:exposed-jdbc",                    version.ref = "exposed" }
@@ -334,7 +334,7 @@ apache-parquet-hadoop               = { module = "org.apache.parquet:parquet-had
 hadoop-common                       = { module = "org.apache.hadoop:hadoop-common",                       version.ref = "hadoop" }
 hadoop-mapreduce-client-core        = { module = "org.apache.hadoop:hadoop-mapreduce-client-core",        version.ref = "hadoop" }
 
-# Prometheus (LLM gateway, Spring Boot) — fork Stage 2.5.
+# LLM gateway (Spring Boot) — fork Stage 2.5.
 boot-starter-web                    = { module = "org.springframework.boot:spring-boot-starter-web",                       version.ref = "spring-boot" }
 boot-starter-actuator               = { module = "org.springframework.boot:spring-boot-starter-actuator",                  version.ref = "spring-boot" }
 boot-starter-data-jdbc              = { module = "org.springframework.boot:spring-boot-starter-data-jdbc",                 version.ref = "spring-boot" }
@@ -421,7 +421,7 @@ jib                       = { id = "com.google.cloud.tools.jib",                
 ktlint                    = { id = "org.jlleitschuh.gradle.ktlint",             version.ref = "ktlint-plugin" }
 ktor                      = { id = "io.ktor.plugin",                            version.ref = "ktor" }
 
-# Prometheus (LLM gateway, Spring Boot) — fork Stage 2.5.
+# LLM gateway (Spring Boot) — fork Stage 2.5.
 kotlin-spring             = { id = "org.jetbrains.kotlin.plugin.spring",        version.ref = "kotlin" }
 spring-boot               = { id = "org.springframework.boot",                  version.ref = "spring-boot" }
 spring-dep                = { id = "io.spring.dependency-management",           version.ref = "spring-dep" }

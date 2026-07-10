@@ -1,13 +1,13 @@
 spring:
   application:
-    name: prometheus
+    name: llm-gateway
   threads:
     virtual:
       enabled: true
   datasource:
-    url: jdbc:postgresql://${POSTGRESQL_HOST:localhost}:${POSTGRESQL_PORT:5432}/${PROMETHEUS_DATABASE:prometheus}
-    username: ${PROMETHEUS_DB_USER:postgres}
-    password: ${PROMETHEUS_DB_PASSWORD:password}
+    url: jdbc:postgresql://${POSTGRESQL_HOST:localhost}:${POSTGRESQL_PORT:5432}/${LLM_GATEWAY_DATABASE:llm-gateway}
+    username: ${LLM_GATEWAY_DB_USER:postgres}
+    password: ${LLM_GATEWAY_DB_PASSWORD:password}
   flyway:
     locations: classpath:db/migration
   # Phase 09 A3 — Redis client connection (host/port/optional password). Standard Spring Data
@@ -60,28 +60,28 @@ security:
   cors:
     allowed-hosts: ${KTOR_CORS_ALLOWED_HOSTS:}
   service:
-    name: ${SECURITY_SERVICE_NAME:prometheus}
-    keycloak-client-id: ${PROMETHEUS_KEYCLOAK_CLIENT_ID:}
-    keycloak-client-secret: ${PROMETHEUS_KEYCLOAK_CLIENT_SECRET:}
+    name: ${SECURITY_SERVICE_NAME:llm-gateway}
+    keycloak-client-id: ${LLM_GATEWAY_KEYCLOAK_CLIENT_ID:}
+    keycloak-client-secret: ${LLM_GATEWAY_KEYCLOAK_CLIENT_SECRET:}
 
 llm:
   security:
     enabled: ${SECURITY_ENABLED:false}
   async :
-    enabled: ${PROMETHEUS_ASYNC_ENABLED:false}
+    enabled: ${LLM_GATEWAY_ASYNC_ENABLED:false}
   storage:
-    type: ${PROMETHEUS_STORAGE_TYPE:postgres}
+    type: ${LLM_GATEWAY_STORAGE_TYPE:postgres}
   # Phase 09 A3 — Redis-backed response cache. Disabled by default; turn on by setting
-  # `PROMETHEUS_CACHE_ENABLED=true` and pointing `spring.data.redis.host` at the broker. Cache
-  # entries expire after `PROMETHEUS_CACHE_TTL_SECONDS` (default one hour). The Redis broker
+  # `LLM_GATEWAY_CACHE_ENABLED=true` and pointing `spring.data.redis.host` at the broker. Cache
+  # entries expire after `LLM_GATEWAY_CACHE_TTL_SECONDS` (default one hour). The Redis broker
   # itself is deployed from the separate infra repo.
   cache:
-    enabled: ${PROMETHEUS_CACHE_ENABLED:false}
-    ttl-seconds: ${PROMETHEUS_CACHE_TTL_SECONDS:3600}
-    key-prefix: ${PROMETHEUS_CACHE_KEY_PREFIX:prometheus:chat:}
+    enabled: ${LLM_GATEWAY_CACHE_ENABLED:false}
+    ttl-seconds: ${LLM_GATEWAY_CACHE_TTL_SECONDS:3600}
+    key-prefix: ${LLM_GATEWAY_CACHE_KEY_PREFIX:llm-gateway:chat:}
 
 server:
-  port: ${PROMETHEUS_SERVER_PORT:7280}
+  port: ${LLM_GATEWAY_SERVER_PORT:7280}
 
 logging:
   level:
@@ -109,7 +109,7 @@ otel:
     exporter: otlp
   exporter:
     otlp:
-      protocol: ${PROMETHEUS_OTEL_PROTOCOL:grpc}
+      protocol: ${LLM_GATEWAY_OTEL_PROTOCOL:grpc}
 
 ---
 spring:
@@ -123,7 +123,7 @@ spring:
       mode: always
       schema-locations: classpath:schema-h2.sql
   datasource:
-    url: jdbc:h2:mem:prometheus;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    url: jdbc:h2:mem:llm-gateway;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     username: sa
     password:
 

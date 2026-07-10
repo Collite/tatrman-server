@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
 import org.tatrman.query.mcp.QueryMcpConfig
 import org.tatrman.query.mcp.identity.IdentityGate
 
-private val logger = LoggerFactory.getLogger("theseus-mcp.transport")
+private val logger = LoggerFactory.getLogger("query-mcp.transport")
 
 /**
  * Mounts the StreamableHTTP MCP transport with [registry]'s tools.
@@ -18,7 +18,7 @@ private val logger = LoggerFactory.getLogger("theseus-mcp.transport")
  * Cancellation: when the StreamableHTTP transport disconnects, the SDK
  * cancels the coroutine running the in-flight handler; that cancellation
  * propagates to upstream gRPC streams via the standard Flow collector
- * cancellation pathway (see `tools/theseus-mcp/.../upstream/UpstreamClients.kt`).
+ * cancellation pathway (see `tools/query-mcp/.../upstream/UpstreamClients.kt`).
  *
  * @param requestContext per-call thread-local stash — populated by an upstream
  *   Ktor interceptor with `Authorization` and `X-User-Id` headers; tools
@@ -33,7 +33,7 @@ fun Application.installQueryMcp(
     mcpStreamableHttp {
         val server =
             Server(
-                serverInfo = Implementation(name = "theseus-mcp", version = "0.1.0"),
+                serverInfo = Implementation(name = "query-mcp", version = "0.1.0"),
                 options =
                     ServerOptions(
                         capabilities =

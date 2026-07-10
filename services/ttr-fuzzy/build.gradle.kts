@@ -40,7 +40,7 @@ jib {
         }
     }
     to {
-        image = "echo:dev"
+        image = "fuzzy:dev"
     }
     container {
         mainClass = "org.tatrman.fuzzy.ApplicationKt"
@@ -66,16 +66,16 @@ dependencies {
     implementation(libs.logstash.logback.encoder)
 
     // Stage 2.2 lean: no SQL backend at v1 (the catalog is an in-repo JSON).
-    // exposed / hikaricp / mssql / pgsql are dropped from the kantheon echo
+    // exposed / hikaricp / mssql / pgsql are dropped from the kantheon fuzzy
     // fork per the lean carve-out. Re-add when the metadata-driven loader
-    // (ariadne + SQL warehouse) is wired in a later stage.
+    // (veles + SQL warehouse) is wired in a later stage.
     implementation(libs.typesafe.config)
 
     implementation(libs.java.string.similarity)
     implementation(project(":shared:libs:kotlin:fuzzy-common"))
 
-    // Kadmos (Phase 2.3) Czech lemmatisation client — kept but disabled at v1
-    // (see application.conf `echo.nlp.enabled = false`). When the lib is
+    // Nlp (Phase 2.3) Czech lemmatisation client — kept but disabled at v1
+    // (see application.conf `fuzzy.nlp.enabled = false`). When the lib is
     // unused (NoopLemmatizer path) the engine dependency tree stays small.
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
@@ -93,9 +93,9 @@ dependencies {
     implementation(libs.grpc.services)
     implementation(libs.kotlinx.serialization.json)
 
-    // SQL backend for the `metadata` loader source (Ariadne → SELECT pk,col → DB
+    // SQL backend for the `metadata` loader source (Veles → SELECT pk,col → DB
     // → catalog). Off the path for the `static` (in-repo JSON catalog) source;
-    // DatabaseFactory.connect runs only when echo.loader.source = "metadata".
+    // DatabaseFactory.connect runs only when fuzzy.loader.source = "metadata".
     implementation(libs.exposed.core)
     implementation(libs.exposed.jdbc)
     implementation(libs.hikaricp)

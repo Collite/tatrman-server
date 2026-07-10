@@ -43,7 +43,7 @@ jib {
         }
     }
     to {
-        image = "proteus:dev"
+        image = "translate:dev"
     }
     container {
         mainClass = "org.tatrman.translate.ApplicationKt"

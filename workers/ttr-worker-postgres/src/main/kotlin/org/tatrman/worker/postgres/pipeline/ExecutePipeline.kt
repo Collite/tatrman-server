@@ -35,7 +35,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Orchestrates the seven-step Worker pipeline (the Brontes pipeline re-typed for
+ * Orchestrates the seven-step Worker pipeline (the Mssql pipeline re-typed for
  * Postgres):
  *
  *   1. validate `connection_id` ∈ supported_connections
@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * transaction that first binds the tenant via `SET LOCAL app.tenant_id = '<uuid>'` so Postgres
  * row-level-security policies scope every row. Missing tenant → `tenant_id_required` (nothing
  * runs); `SET LOCAL` failure → `rls_set_failed` + rollback. Connections without the flag run
- * with autocommit, exactly as Brontes does.
+ * with autocommit, exactly as Mssql does.
  *
  * Cancellation: the surrounding gRPC context cancels the coroutine; the pipeline
  * catches CancellationException, calls `Statement.cancel()`, and releases the
@@ -191,7 +191,7 @@ class ExecutePipeline(
                                     .setMessage(
                                         "Column '$col' has unsupported type '$origin'; emitted as opaque binary.",
                                     ).setSourceStage("execute")
-                                    .setSourceService("workers/arges")
+                                    .setSourceService("workers/postgres")
                                     .build(),
                             )
                         }

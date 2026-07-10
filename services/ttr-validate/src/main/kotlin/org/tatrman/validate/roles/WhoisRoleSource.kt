@@ -30,7 +30,7 @@ interface WhoisRoleLookup {
 
 /**
  * Enriches the bearer role floor with whois-held roles (the ERP hierarchy the JWT omits). Opt-in
- * via `argos.roleSource = whois`. Identity is never sourced here — `context.user_id` comes from the
+ * via `validate.roleSource = whois`. Identity is never sourced here — `context.user_id` comes from the
  * bearer; whois only widens the role set for that already-trusted id. Results are TTL-cached so the
  * hot path takes the whois hop at most once per user per TTL.
  */

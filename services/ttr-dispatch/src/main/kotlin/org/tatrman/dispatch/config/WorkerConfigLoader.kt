@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import org.slf4j.LoggerFactory
 
 /**
- * Parses the `kyklop.workers` HOCON list into ordered [WorkerSlot]s. A slot whose `endpoint`
+ * Parses the `dispatch.workers` HOCON list into ordered [WorkerSlot]s. A slot whose `endpoint`
  * is empty or absent (e.g. when its env-var override isn't set in the running environment) is
  * skipped — keeps a single conf shape usable across local dev and deployments without forcing
  * every consumer to set every worker env var.
@@ -29,7 +29,7 @@ internal object WorkerConfigLoader {
                     if (entry.hasPath("endpoint")) entry.getString("endpoint").trim() else ""
                 val roleHint = if (entry.hasPath("role-hint")) entry.getString("role-hint") else ""
                 if (endpoint.isEmpty()) {
-                    log.warn("Skipping kyklop.workers entry with empty endpoint (role-hint='{}')", roleHint)
+                    log.warn("Skipping dispatch.workers entry with empty endpoint (role-hint='{}')", roleHint)
                     null
                 } else {
                     WorkerSlot(endpoint = endpoint, roleHint = roleHint)
@@ -37,5 +37,5 @@ internal object WorkerConfigLoader {
             }
     }
 
-    private const val PATH = "kyklop.workers"
+    private const val PATH = "dispatch.workers"
 }

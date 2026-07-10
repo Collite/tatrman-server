@@ -16,13 +16,13 @@ import java.io.File
  * manifest.
  *
  * The shared `ManifestYamlLoader` lives in `:tools:capabilities-mcp` — a
- * peer module that ariadne-mcp must not depend on (and vice-versa), so
+ * peer module that veles-mcp must not depend on (and vice-versa), so
  * we parse the manifests directly. The shapes are simple: a top-level
  * `ToolCapability` with `capability_id` + `category` + `version` +
  * `description` + `service_endpoint` + `search_tags` + `cost_hints`.
  *
  * Review-004 (F4) — the previous single-capability shim impersonated
- * `ariadne.get_model:v1` and folded the other tools into `search_tags`,
+ * `veles.get_model:v1` and folded the other tools into `search_tags`,
  * so the registry only saw 1 capability. This loader publishes every
  * authored manifest so each tool is discoverable by its own `capability_id`.
  */
@@ -59,7 +59,7 @@ internal class ManifestLoader {
     /**
      * Load all tool manifests from the given classpath-relative base
      * directory. The base defaults to `manifests/tools` (matching the
-     * ariadne-mcp's `src/main/resources/manifests/tools/` tree).
+     * veles-mcp's `src/main/resources/manifests/tools/` tree).
      */
     fun loadAll(classpathBase: String = "manifests/tools"): List<Capability> {
         // `javaClass.classLoader.getResource` works for classpath resources;

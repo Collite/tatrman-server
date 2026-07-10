@@ -3,7 +3,7 @@ package org.tatrman.query.mcp
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
-/** Resolved configuration block for the theseus-mcp service. */
+/** Resolved configuration block for the query-mcp service. */
 data class QueryMcpConfig(
     val serverPort: Int,
     val mcpTransport: String,
@@ -41,17 +41,17 @@ data class QueryMcpConfig(
 
     companion object {
         fun load(config: Config = ConfigFactory.load()): QueryMcpConfig {
-            val root = config.getConfig("theseus-mcp")
+            val root = config.getConfig("query-mcp")
             return QueryMcpConfig(
                 serverPort = config.getString("server.port").toInt(),
                 mcpTransport = root.getString("mcp.transport"),
                 mcpPath = root.getString("mcp.path"),
                 upstream =
                     Upstream(
-                        queryRunner = endpointOf(root.getConfig("upstream.theseus")),
-                        translator = endpointOf(root.getConfig("upstream.proteus")),
-                        validator = endpointOf(root.getConfig("upstream.argos")),
-                        metadata = endpointOf(root.getConfig("upstream.ariadne")),
+                        queryRunner = endpointOf(root.getConfig("upstream.query")),
+                        translator = endpointOf(root.getConfig("upstream.translate")),
+                        validator = endpointOf(root.getConfig("upstream.validate")),
+                        metadata = endpointOf(root.getConfig("upstream.veles")),
                     ),
                 limits =
                     Limits(
@@ -76,8 +76,8 @@ data class QueryMcpConfig(
                                     .toLong()
                         },
                 metadataDecorationCacheTtlSeconds =
-                    if (root.hasPath("upstream.ariadne.decoration-cache-ttl-seconds")) {
-                        root.getLong("upstream.ariadne.decoration-cache-ttl-seconds")
+                    if (root.hasPath("upstream.veles.decoration-cache-ttl-seconds")) {
+                        root.getLong("upstream.veles.decoration-cache-ttl-seconds")
                     } else {
                         30L
                     },

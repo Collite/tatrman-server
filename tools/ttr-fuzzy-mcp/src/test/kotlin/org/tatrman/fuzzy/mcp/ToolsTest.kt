@@ -7,11 +7,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.fuzzy.common.FuzzyMatch
 import org.fuzzy.common.FuzzyMatchResponse
-import org.tatrman.fuzzy.mcp.client.EchoClient
+import org.tatrman.fuzzy.mcp.client.FuzzyClient
 
 class ToolsTest :
     StringSpec({
-        val mockClient = mockk<EchoClient>()
+        val mockClient = mockk<FuzzyClient>()
         val tools = Tools(mockClient, mockk())
 
         "matchCallback returns error when name is missing" {
@@ -90,7 +90,7 @@ class ToolsTest :
         }
 
         "matchCallback returns not-wired error when client is null" {
-            // Stage 2.2 R2.3 — when echo.client.host is blank (local no-
+            // Stage 2.2 R2.3 — when fuzzy.client.host is blank (local no-
             // backend mode), Application passes `null` to Tools; the tool
             // must surface a clear error, not crash on the null deref.
             val unwired = Tools(null, mockk())

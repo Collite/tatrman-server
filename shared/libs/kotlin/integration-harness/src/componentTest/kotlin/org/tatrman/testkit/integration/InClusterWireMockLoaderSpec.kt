@@ -45,11 +45,11 @@ class InClusterWireMockLoaderSpec :
                             service: String,
                         ) = if (service == "wiremock") base else null
                     }
-                val handle = ContextHandle("theseus-runquery", "ns", reader)
+                val handle = ContextHandle("query-runquery", "ns", reader)
 
                 val admin = WireMockAdmin(handle.wireMockAdmin)
                 admin.reset()
-                admin.importMappingsFromResource("wiremock/theseus-runquery/healthz/mappings.json")
+                admin.importMappingsFromResource("wiremock/query-runquery/healthz/mappings.json")
 
                 val http = HttpClient.newHttpClient()
                 val res =

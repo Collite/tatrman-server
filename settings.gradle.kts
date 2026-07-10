@@ -56,8 +56,8 @@ include(":shared:libs:kotlin:data-formatter")
 include(":shared:libs:kotlin:fuzzy-common")
 include(":shared:libs:kotlin:whois-common")
 include(":shared:libs:kotlin:keycloak-auth")
-include(":shared:libs:kotlin:ttr-meta-client")   // was ariadne-client
-include(":shared:libs:kotlin:ttr-llm-client")    // was llm-gateway-client
+include(":shared:libs:kotlin:ttr-meta-client")
+include(":shared:libs:kotlin:ttr-llm-client")
 // Grafted from kantheon per Bora's decision (S4) — capability-registration client
 // (4 MCP tools) + the component/integration test-tier harness libs.
 include(":shared:libs:kotlin:capabilities-client")
@@ -65,24 +65,24 @@ include(":shared:libs:kotlin:component-testkit")
 include(":shared:libs:kotlin:integration-harness")
 
 // Spine services
-include(":services:veles")            // was ariadne
-include(":services:ttr-query")        // was theseus
-include(":services:ttr-translate")    // was proteus
-include(":services:ttr-validate")     // was argos
-include(":services:ttr-dispatch")     // was kyklop
-include(":services:ttr-fuzzy")        // was echo
-include(":services:ttr-llm-gateway")  // was prometheus
+include(":services:veles")
+include(":services:ttr-query")
+include(":services:ttr-translate")
+include(":services:ttr-validate")
+include(":services:ttr-dispatch")
+include(":services:ttr-fuzzy")
+include(":services:ttr-llm-gateway")
 
 // Engine workers (JVM; the Polars worker is Python — out of the Gradle build)
-include(":workers:ttr-worker-postgres")  // was arges
-include(":workers:ttr-worker-mssql")     // was brontes
+include(":workers:ttr-worker-postgres")
+include(":workers:ttr-worker-mssql")
 
 // MCP tools
-include(":tools:ttr-meta-mcp")    // was ariadne-mcp
-include(":tools:ttr-query-mcp")   // was theseus-mcp
-include(":tools:ttr-fuzzy-mcp")   // was echo-mcp
-include(":tools:ttr-nlp-mcp")     // was kadmos-mcp
+include(":tools:ttr-meta-mcp")
+include(":tools:ttr-query-mcp")
+include(":tools:ttr-fuzzy-mcp")
+include(":tools:ttr-nlp-mcp")
 
 // Infra (RO-22: health + backstage ride the server repo)
-include(":infra:ttr-identity")    // was whois
+include(":infra:ttr-identity")
 include(":infra:health")

@@ -45,15 +45,15 @@ import java.io.ByteArrayOutputStream
 import java.nio.channels.Channels
 
 /**
- * Fork Stage 3.5 T6 — full-chain component smoke. `run_query` via theseus-mcp's
- * QueryTool → a real in-process **Theseus** (QueryServiceImpl) → mocked Proteus
- * (parse) → mocked Argos (validate) → mocked Kyklop (dispatch) → a mocked worker
+ * Fork Stage 3.5 T6 — full-chain component smoke. `run_query` via query-mcp's
+ * QueryTool → a real in-process **Query** (QueryServiceImpl) → mocked Translate
+ * (parse) → mocked Validate (validate) → mocked Dispatch (dispatch) → a mocked worker
  * emitting real Arrow IPC → decoded to JSON rows in the MCP response.
  *
  * Asserts (a) the labyrinth is walkable: rows come back as JSON; (b) the OBO
- * identity's roles travel as PipelineContext.auth_roles all the way to Argos —
+ * identity's roles travel as PipelineContext.auth_roles all the way to Validate —
  * the bearer-roles contract (kantheon-security §2/§3) end-to-end. A DataFrame-path
- * variant runs the same chain with a session_id (the Steropes/stateful shape).
+ * variant runs the same chain with a session_id (the Polars/stateful shape).
  *
  * True on-K3s full-chain e2e is deferred to the separate integration-test suite.
  */
@@ -87,7 +87,7 @@ class RunQueryFullChainComponentSpec :
                 override suspend fun attributeDecorationsByLocalName(): Map<String, ColumnDecoration> = emptyMap()
             }
 
-        // A worker (Brontes/Steropes) result: real Arrow IPC, one int column `id` = [1, 2].
+        // A worker (Mssql/Polars) result: real Arrow IPC, one int column `id` = [1, 2].
         fun arrowIdColumn(values: LongArray): ByteArray {
             val field = Field("id", FieldType.notNullable(ArrowType.Int(64, true)), null)
             val out = ByteArrayOutputStream()
@@ -120,8 +120,8 @@ class RunQueryFullChainComponentSpec :
                     ),
                 ).build()
 
-        // Build a real Theseus wired to mocked downstreams; capture the roles Argos sees.
-        fun theseusWithCapture(seenRoles: MutableList<List<String>>): QueryServiceImpl {
+        // Build a real Query wired to mocked downstreams; capture the roles Validate sees.
+        fun queryWithCapture(seenRoles: MutableList<List<String>>): QueryServiceImpl {
             val detect =
                 TranslatorDetectClient {
                     org.tatrman.translate.v1.DetectSchemaResponse
@@ -178,11 +178,11 @@ class RunQueryFullChainComponentSpec :
             )
         }
 
-        fun runnerOver(theseus: QueryServiceImpl): QueryRunnerClient =
+        fun runnerOver(query: QueryServiceImpl): QueryRunnerClient =
             object : QueryRunnerClient {
-                override fun run(request: RunRequest): Flow<ResultBatch> = theseus.run(request)
+                override fun run(request: RunRequest): Flow<ResultBatch> = query.run(request)
 
-                override suspend fun compile(request: RunRequest): CompileResponse = theseus.compile(request)
+                override suspend fun compile(request: RunRequest): CompileResponse = query.compile(request)
             }
 
         fun callToolRequest(args: Map<String, String>): CallToolRequest =
@@ -197,10 +197,10 @@ class RunQueryFullChainComponentSpec :
                     ),
             )
 
-        "run_query walks the full chain and returns JSON rows; OBO roles reach Argos" {
+        "run_query walks the full chain and returns JSON rows; OBO roles reach Validate" {
             runBlocking {
                 val seenRoles = mutableListOf<List<String>>()
-                val tool = QueryTool(cfg, runnerOver(theseusWithCapture(seenRoles)), fakeMetadata)
+                val tool = QueryTool(cfg, runnerOver(queryWithCapture(seenRoles)), fakeMetadata)
                 val identity = UserIdentity(id = "alice", roles = setOf("analyst"), source = IdentitySource.TOKEN)
 
                 val res =
@@ -211,7 +211,7 @@ class RunQueryFullChainComponentSpec :
 
                 res.isError shouldBe false
                 (res.structuredContent!!["rowCount"] as JsonPrimitive).content shouldBe "2"
-                // The OBO identity's roles travelled as PipelineContext.auth_roles to Argos.
+                // The OBO identity's roles travelled as PipelineContext.auth_roles to Validate.
                 seenRoles.isNotEmpty() shouldBe true
                 seenRoles.last() shouldContain "analyst"
             }
@@ -220,7 +220,7 @@ class RunQueryFullChainComponentSpec :
         "DataFrame-path variant: a session-scoped run also walks the chain and returns rows" {
             runBlocking {
                 val seenRoles = mutableListOf<List<String>>()
-                val tool = QueryTool(cfg, runnerOver(theseusWithCapture(seenRoles)), fakeMetadata)
+                val tool = QueryTool(cfg, runnerOver(queryWithCapture(seenRoles)), fakeMetadata)
                 val identity = UserIdentity(id = "alice", roles = setOf("analyst"), source = IdentitySource.TOKEN)
 
                 val res =

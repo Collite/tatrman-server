@@ -5,8 +5,8 @@ from __future__ import annotations
 import polars as pl
 import pytest
 
-from workers_steropes.config import WorkspaceConfig
-from workers_steropes.workspace import WorkspaceCapExceeded, WorkspaceStore
+from workers_polars.config import WorkspaceConfig
+from workers_polars.workspace import WorkspaceCapExceeded, WorkspaceStore
 
 
 def _cfg(**overrides) -> WorkspaceConfig:

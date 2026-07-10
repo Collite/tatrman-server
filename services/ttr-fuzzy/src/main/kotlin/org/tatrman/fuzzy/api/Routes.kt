@@ -3,11 +3,11 @@ package org.tatrman.fuzzy.api
 import com.typesafe.config.Config
 import org.tatrman.fuzzy.core.AlgorithmType
 import org.tatrman.fuzzy.core.CascadeStep
-import org.tatrman.fuzzy.core.EchoMatcher
+import org.tatrman.fuzzy.core.FuzzyMatcher
 import org.tatrman.fuzzy.core.cascadeFrom
 import org.tatrman.fuzzy.secured
 import org.tatrman.fuzzy.core.StringRepository
-import org.tatrman.fuzzy.telemetry.EchoTelemetry
+import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.application.Application
@@ -45,12 +45,12 @@ data class AlgorithmSpecDto(
 )
 
 fun Application.configureRoutes(
-    fuzzyMatcher: EchoMatcher,
+    fuzzyMatcher: FuzzyMatcher,
     stringRepository: StringRepository,
-    telemetry: EchoTelemetry,
+    telemetry: FuzzyTelemetry,
     config: Config,
 ) {
-    val logger = LoggerFactory.getLogger("echo.routes")
+    val logger = LoggerFactory.getLogger("fuzzy.routes")
 
     routing {
         secured(config) {

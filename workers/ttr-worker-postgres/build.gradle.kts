@@ -52,7 +52,7 @@ jib {
         }
     }
     to {
-        image = "arges:dev"
+        image = "postgres:dev"
     }
     container {
         mainClass = "org.tatrman.worker.postgres.ApplicationKt"
@@ -99,7 +99,7 @@ dependencies {
     implementation(libs.ktor.opentelemetry)
     api(libs.otel.logback.appender)
 
-    // Postgres flavour — Arges is Brontes adapted to PostgreSQL (architecture §2).
+    // Postgres flavour — Postgres is Mssql adapted to PostgreSQL (architecture §2).
     implementation(libs.postgresql)
     implementation(libs.hikaricp)
     implementation(libs.arrow.vector)
@@ -109,7 +109,7 @@ dependencies {
     testImplementation(libs.mockk)
 
     // Component tier (testing arc Stage 1.2) — real Postgres via Testcontainers. The convention's
-    // `componentTest` suite already brings kotest + the base testcontainers + `project()` (arges
+    // `componentTest` suite already brings kotest + the base testcontainers + `project()` (postgres
     // main, exposing the pg driver on the runtime classpath). These add what the specs compile
     // against directly: the testkit (`Containers.postgres()`), the protos, the Arrow reader for
     // result deserialization, coroutines for the flow, and the pg driver for the seed connection.

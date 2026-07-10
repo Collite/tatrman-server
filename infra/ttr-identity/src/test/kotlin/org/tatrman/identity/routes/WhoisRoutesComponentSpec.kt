@@ -17,7 +17,7 @@ import java.io.File
 
 /**
  * Component-tier spec (mocked: JSON repository over the bundled `whois.json` fixture, no DB).
- * Exercises the public REST surface Argos + ops consume. True e2e against a live Keycloak/PG
+ * Exercises the public REST surface Validate + ops consume. True e2e against a live Keycloak/PG
  * on K3s is deferred to the separate integration-test suite (planning-conventions §4).
  */
 class WhoisRoutesComponentSpec :

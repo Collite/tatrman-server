@@ -8,11 +8,11 @@ import org.apache.arrow.vector.types.pojo.Schema
 import java.io.File
 
 /**
- * Fork Stage 3.4 T2 — cross-engine schema-fingerprint pin (Brontes / Arrow Java side).
+ * Fork Stage 3.4 T2 — cross-engine schema-fingerprint pin (Mssql / Arrow Java side).
  *
- * Brontes reads the shared reference Arrow IPC fixtures (`shared/testdata/fingerprints/`)
+ * Mssql reads the shared reference Arrow IPC fixtures (`shared/testdata/fingerprints/`)
  * and recomputes the canonical fingerprint with its own (Arrow Java) implementation,
- * asserting equality with the pinned `fingerprints.json` — the same digests Steropes
+ * asserting equality with the pinned `fingerprints.json` — the same digests Polars
  * (pyarrow) and Charon (`Integrity.kt`) produce. Same algorithm, multiple
  * implementations, must agree; reading the same bytes, they all converge.
  */
@@ -23,7 +23,7 @@ class SchemaFingerprintCrossEngineSpec :
         val expected = parseFingerprints(File(fixtureDir, "fingerprints.json").readText())
 
         expected.forEach { (fixture, digest) ->
-            "Brontes canonical fingerprint matches the shared pin for $fixture" {
+            "Mssql canonical fingerprint matches the shared pin for $fixture" {
                 ArrowIpcSerializer.fingerprintFor(schemaOf(File(fixtureDir, fixture))) shouldBe digest
             }
         }

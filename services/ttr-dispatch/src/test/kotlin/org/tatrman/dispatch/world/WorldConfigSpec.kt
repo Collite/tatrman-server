@@ -42,7 +42,7 @@ class WorldConfigSpec :
             world.resolveOrDefault(qname("db.dbo.QOTHER")) shouldBe "df-test"
         }
 
-        // WS-T2 T6 — the TPC-DS warehouse tables route to the pg-tpcds connection (served by Arges).
+        // WS-T2 T6 — the TPC-DS warehouse tables route to the pg-tpcds connection (served by Postgres).
         val tpcds =
             WorldConfig.fromConfig(
                 ConfigFactory.parseString(

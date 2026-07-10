@@ -2,7 +2,7 @@ package org.tatrman.fuzzy.core
 
 import org.tatrman.fuzzy.config.AppConfig
 import org.tatrman.fuzzy.loader.LoaderSource
-import org.tatrman.fuzzy.telemetry.EchoTelemetry
+import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
@@ -80,7 +80,7 @@ data class Candidate(
 class StringRepository(
     private val config: AppConfig,
     private val loaderSource: LoaderSource,
-    private val telemetry: EchoTelemetry? = null,
+    private val telemetry: FuzzyTelemetry? = null,
     private val lemmatizer: Lemmatizer = NoopLemmatizer,
 ) {
     private val logger = LoggerFactory.getLogger(StringRepository::class.java)
@@ -130,7 +130,7 @@ class StringRepository(
             return
         }
         // Category keys are matched case-insensitively. The query side
-        // (Routes./match, EchoMatcher.match, getTokenIndex) lowercases the
+        // (Routes./match, FuzzyMatcher.match, getTokenIndex) lowercases the
         // requested category, so the stored key MUST be lowercase too. DB
         // identifiers arrive upper-cased from the loader (e.g.
         // "db.dbo.QSTRED_DF.KOD_STR"); without this the per-column index was

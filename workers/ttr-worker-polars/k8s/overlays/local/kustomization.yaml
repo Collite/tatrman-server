@@ -9,7 +9,7 @@ resources:
 patches:
   - target:
       kind: Deployment
-      name: steropes
+      name: polars
     patch: |
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy
@@ -17,9 +17,9 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env
         value:
-          - name: STEROPES_SERVER_PORT
+          - name: POLARS_SERVER_PORT
             value: "7300"
-          - name: STEROPES_SERVER_GRPC_PORT
+          - name: POLARS_SERVER_GRPC_PORT
             value: "7301"
           # Local cluster: no Alloy collector — disable OTel export to avoid
           # connection-refused noise (standard OTel kill-switch).

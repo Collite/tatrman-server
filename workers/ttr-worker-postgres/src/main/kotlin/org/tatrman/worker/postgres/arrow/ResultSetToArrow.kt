@@ -33,7 +33,7 @@ import java.sql.Timestamp
 
 /**
  * Streams a JDBC [ResultSet] into Arrow [VectorSchemaRoot] batches sized at
- * [batchRows] rows. Engine-agnostic batcher copied from Brontes, wired to the
+ * [batchRows] rows. Engine-agnostic batcher copied from Mssql, wired to the
  * Postgres [PostgresArrowTypeMapper]. Per-cell BLOB enforcement: any binary or
  * varchar value whose serialised length exceeds [maxBlobBytesPerCell] causes the
  * row to be rejected and a `blob_too_large` warning to surface on the batch.

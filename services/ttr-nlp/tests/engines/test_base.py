@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kadmos_service.engines.base import EngineResult, NerEntity, NlpOp, Token
+from nlp_service.engines.base import EngineResult, NerEntity, NlpOp, Token
 
 
 class TestToken:
@@ -125,7 +125,7 @@ class TestNlpEngineProtocol:
             def analyze(self, text: str, lang: str, ops: Set[NlpOp]) -> EngineResult:
                 return EngineResult()
 
-        from kadmos_service.engines.base import NlpEngine
+        from nlp_service.engines.base import NlpEngine
 
         engine = MinimalEngine()
         # Protocol runtime check

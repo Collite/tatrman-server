@@ -2,7 +2,7 @@
 
 The session-workspace ingest path that closes the POLARS stage-in gap: Charon's
 WorkerEndpoint (POLARS) client-streams an external Arrow DataFrame into a
-Steropes session, symmetric to the WorkspaceRef read-out.
+Polars session, symmetric to the WorkspaceRef read-out.
 """
 
 from __future__ import annotations
@@ -15,22 +15,22 @@ import pyarrow.ipc as ipc
 import pytest
 from org.tatrman.worker.v1 import worker_pb2
 
-from workers_steropes.config import (
+from workers_polars.config import (
     CapabilityConfig,
     GrpcConfig,
     HttpConfig,
     LimitsConfig,
     MetadataConfig,
     TelemetryConfig,
-    WorkersSteropesConfig,
+    WorkersPolarsConfig,
     WorkspaceConfig,
 )
-from workers_steropes.grpc_service import WorkerService
-from workers_steropes.workspace import WorkspaceStore
+from workers_polars.grpc_service import WorkerService
+from workers_polars.workspace import WorkspaceStore
 
 
-def _cfg(max_dfs_per_session: int = 10) -> WorkersSteropesConfig:
-    return WorkersSteropesConfig(
+def _cfg(max_dfs_per_session: int = 10) -> WorkersPolarsConfig:
+    return WorkersPolarsConfig(
         grpc=GrpcConfig(host="0", port=7501, max_message_bytes=33554432),
         http=HttpConfig(host="0", port=7502),
         workspace=WorkspaceConfig(
@@ -175,7 +175,7 @@ async def test_import_cap_exceeded_aborts_resource_exhausted():
 
 @pytest.mark.asyncio
 async def test_import_then_execute_workspace_ref_round_trips():
-    """End-to-end within Steropes: import a DF, then read it back via Execute(WorkspaceRef)."""
+    """End-to-end within Polars: import a DF, then read it back via Execute(WorkspaceRef)."""
     from org.tatrman.plan.v1 import context_pb2, plan_pb2
 
     cfg = _cfg()

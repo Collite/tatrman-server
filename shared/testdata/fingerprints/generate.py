@@ -2,7 +2,7 @@
 """Generator + reference for the cross-engine schema-fingerprint fixture set.
 
 Fork Stage 3.4 T2. The schema fingerprint is the cross-engine schema-identity
-check shared by Charon (`Integrity.kt`), Brontes (Kotlin), Steropes (Python),
+check shared by Charon (`Integrity.kt`), Mssql (Kotlin), Polars (Python),
 and — later — Metis. review-006 R3 (Bora, 2026-06-15) settled it as a SHA-256
 over a **canonical, implementation-independent** string form of the *logical*
 Arrow schema (NOT raw IPC bytes — those are not byte-stable across Arrow
@@ -32,7 +32,7 @@ Nested-type child recursion (the cross-engine subtlety, Stream B note):
     `item`);
   - map → the single `value_field`, i.e. the **`entries` struct** (NOT the
     flattened key/value pair). This matches Arrow Java's `Field.children` — the
-    runtime form Charon and Brontes see — so an entries-wrapped map fingerprints
+    runtime form Charon and Mssql see — so an entries-wrapped map fingerprints
     identically across Kotlin and Python.
 
 Run (pyarrow pinned to the worker's version):

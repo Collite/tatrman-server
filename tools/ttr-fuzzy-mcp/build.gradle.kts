@@ -38,7 +38,7 @@ jib {
         }
     }
     to {
-        image = "echo-mcp:latest"
+        image = "fuzzy-mcp:latest"
     }
     container {
         mainClass = "org.tatrman.fuzzy.mcp.ApplicationKt"
@@ -76,7 +76,7 @@ dependencies {
     // Stage 2.2 T6 — load the manifest YAMLs for capabilities-mcp
     // registration. We don't depend on `:tools:capabilities-mcp` (they're
     // peers) so we parse the manifests directly with Jackson (same as
-    // ariadne-mcp).
+    // veles-mcp).
     implementation(libs.jackson.databind)
     implementation(libs.jackson.module.kotlin)
     implementation(libs.jackson.dataformat.yaml)
@@ -88,7 +88,7 @@ dependencies {
     implementation(project(":shared:libs:kotlin:capabilities-client"))
     implementation(project(":shared:libs:kotlin:fuzzy-common"))
 
-    // gRPC client to the echo service.
+    // gRPC client to the fuzzy service.
     implementation(project(":shared:proto"))
     implementation(project(":services:ttr-fuzzy"))
     implementation(libs.grpc.kotlin.stub)

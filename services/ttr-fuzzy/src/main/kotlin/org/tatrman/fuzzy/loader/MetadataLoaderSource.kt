@@ -4,15 +4,15 @@ import org.slf4j.LoggerFactory
 import org.tatrman.meta.v1.DbTableDetail
 import org.tatrman.fuzzy.config.DatabaseConfig
 import org.tatrman.fuzzy.core.Candidate
-import org.tatrman.fuzzy.telemetry.EchoTelemetry
+import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import org.tatrman.plan.v1.QualifiedName
 
 /**
- * Metadata-driven loader: walks fuzzy-tagged DB columns reported by Ariadne,
+ * Metadata-driven loader: walks fuzzy-tagged DB columns reported by Veles,
  * composes `SELECT pk, col FROM table` per column, runs it via [fetchCandidates],
  * and returns the candidate map for `StringRepository.refreshCache` to swap in
  * atomically. This is the full ai-platform `fuzzy-matcher` behaviour, re-forked
- * 2026-06-14 onto Ariadne (`org.tatrman.meta.v1`).
+ * 2026-06-14 onto Veles (`org.tatrman.meta.v1`).
  *
  * The gRPC channel and the [MetadataServiceClient] are constructed and owned by
  * `Application.module(...)` — this class never builds or closes them.
@@ -26,7 +26,7 @@ class MetadataLoaderSource(
     private val dialect: DatabaseConfig,
     private val sourceNamespace: String,
     private val fetchCandidates: (String) -> List<Candidate>,
-    private val telemetry: EchoTelemetry? = null,
+    private val telemetry: FuzzyTelemetry? = null,
 ) : LoaderSource {
     private val logger = LoggerFactory.getLogger(MetadataLoaderSource::class.java)
 
@@ -37,7 +37,7 @@ class MetadataLoaderSource(
                 client.listFuzzyColumns()
             } catch (e: Exception) {
                 telemetry?.recordMetadataFailure()
-                logger.error("Metadata (ariadne) call failed; preserving previous cache", e)
+                logger.error("Metadata (veles) call failed; preserving previous cache", e)
                 return null
             }
 

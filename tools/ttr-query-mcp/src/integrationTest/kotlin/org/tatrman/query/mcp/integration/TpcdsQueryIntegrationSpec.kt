@@ -14,14 +14,14 @@ import org.tatrman.testkit.integration.contextHandle
 
 /**
  * WS-C2 T1 — the **`tpcds-query`** showcase (Goals 2 + 4): the four TPC-DS curated shapes driven
- * through theseus-mcp `query` over the **real** forked chain on the **Postgres** worker —
- * theseus-mcp → Theseus → Proteus → Argos → Kyklop → **Arges** → `tpc-ds-1g` on `test-pg` — asserted
+ * through query-mcp `query` over the **real** forked chain on the **Postgres** worker —
+ * query-mcp → Query → Translate → Validate → Dispatch → **Postgres** → `tpc-ds-1g` on `test-pg` — asserted
  * against the **deterministic SF1 oracle**. This turns the manual 2026-07-07 MP-2 smoke into a
  * repeatable integration spec; it is the convergence demo that lands MP-4.
  *
  * Gated by `@RequiresContext("tpcds-query")` — compiles + skips until olymp stands the context up
- * (C2 T2: services theseus/theseus-mcp/proteus/argos/kyklop/arges/ariadne + platform `test-pg`,
- * with Arges pointed at `pg-tpcds` and Ariadne serving the TPC-DS model).
+ * (C2 T2: services query/query-mcp/translate/validate/dispatch/postgres/veles + platform `test-pg`,
+ * with Postgres pointed at `pg-tpcds` and Veles serving the TPC-DS model).
  *
  * ## The oracle (SF1, year 2002 — as proven live in the MP-2 run)
  *  | query                   | shape                   | rows |
@@ -44,7 +44,7 @@ class TpcdsQueryIntegrationSpec :
 
         val analyst = unsignedJwt("alice", roles = listOf("analyst"))
 
-        // The four curated shapes, verbatim from the Ariadne tpcds model (`model-ttr/tpcds/db.ttr`),
+        // The four curated shapes, verbatim from the Veles tpcds model (`model-ttr/tpcds/db.ttr`),
         // with `{year}` inlined to the oracle year 2002.
         val storeSalesByMonth =
             """

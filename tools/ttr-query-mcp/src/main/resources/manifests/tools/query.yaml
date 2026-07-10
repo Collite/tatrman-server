@@ -1,15 +1,15 @@
-capability_id: "theseus.query:v1"
-category: "theseus"
+capability_id: "query.query:v1"
+category: "query"
 version: "1.0.0"
 description: |
   Run a query against the kantheon platform. Source language may be SQL,
   TransDSL, or DataFrame DSL. Returns formatted result data (json | csv | tsv |
   markdown) plus a structured envelope with row counts, columns, warnings, and
-  pipeline messages. Orchestrated by Theseus: Proteus (translate) → Argos
-  (validate, RLS) → Kyklop (dispatch) → a worker (Brontes / Steropes).
-service_endpoint: "http://theseus-mcp.kantheon.svc.cluster.local:7307"
+  pipeline messages. Orchestrated by Query: Translate (translate) → Validate
+  (validate, RLS) → Dispatch (dispatch) → a worker (Mssql / Polars).
+service_endpoint: "http://query-mcp.kantheon.svc.cluster.local:7307"
 search_tags:
-  - theseus
+  - query
   - query
   - sql
   - transdsl

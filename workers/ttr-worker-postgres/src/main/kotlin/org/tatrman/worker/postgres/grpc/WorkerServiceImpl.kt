@@ -18,13 +18,13 @@ import org.tatrman.worker.postgres.connection.ConnectionPoolManager
 import org.tatrman.worker.postgres.pipeline.ExecutePipeline
 
 /**
- * gRPC entrypoint for the Postgres Worker (Arges).
+ * gRPC entrypoint for the Postgres Worker (Postgres).
  *
  *   - `execute` delegates to [ExecutePipeline] which produces the streamed
  *     `ResultBatch` flow (a `not_implemented` error batch until Stage 1.2;
  *     the real Postgres + RLS pipeline thereafter).
  *   - `getCapabilities` advertises engine/dialect/connection coverage and
- *     stateful-session support (always false for Postgres — Arges is stateless).
+ *     stateful-session support (always false for Postgres — Postgres is stateless).
  *   - `getStatus` reports readiness, active queries, per-pool stats,
  *     per-`connection_id` reachability, and dependency health (translator)
  *     so operators can debug "where is the failure" without grepping logs.

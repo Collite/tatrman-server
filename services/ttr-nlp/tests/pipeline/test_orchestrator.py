@@ -5,8 +5,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 
-from kadmos_service.engines.base import EngineResult, NerEntity, NlpOp, Token
-from kadmos_service.pipeline.orchestrator import AnalyzeResponse, Orchestrator
+from nlp_service.engines.base import EngineResult, NerEntity, NlpOp, Token
+from nlp_service.pipeline.orchestrator import AnalyzeResponse, Orchestrator
 
 
 class MockEngine:
@@ -81,7 +81,7 @@ class TestOrchestrator:
 
     def test_analyze_normal_mode_single_op(self):
         """Test NORMAL mode with single op routes to correct engine."""
-        with patch("kadmos_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
+        with patch("nlp_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
             mock_registry = MagicMock()
             mock_registry_cls.return_value = mock_registry
 
@@ -108,7 +108,7 @@ class TestOrchestrator:
 
     def test_analyze_normal_mode_engine_not_found(self):
         """Test NORMAL mode when no engine is available for an op."""
-        with patch("kadmos_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
+        with patch("nlp_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
             mock_registry = MagicMock()
             mock_registry_cls.return_value = mock_registry
 
@@ -131,7 +131,7 @@ class TestOrchestrator:
 
     def test_analyze_compare_mode_fans_out_to_all_engines(self):
         """Test COMPARE mode invokes all engines for each op."""
-        with patch("kadmos_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
+        with patch("nlp_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
             mock_registry = MagicMock()
             mock_registry_cls.return_value = mock_registry
 
@@ -165,7 +165,7 @@ class TestOrchestrator:
 
     def test_analyze_compare_mode_engine_hints_ignored(self):
         """Test COMPARE mode ignores engine hints - runs all engines."""
-        with patch("kadmos_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
+        with patch("nlp_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
             mock_registry = MagicMock()
             mock_registry_cls.return_value = mock_registry
 
@@ -193,7 +193,7 @@ class TestOrchestrator:
 
     def test_analyze_normal_mode_engine_hints_respected(self):
         """Test NORMAL mode respects engine hints."""
-        with patch("kadmos_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
+        with patch("nlp_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
             mock_registry = MagicMock()
             mock_registry_cls.return_value = mock_registry
 
@@ -223,7 +223,7 @@ class TestOrchestrator:
 
     def test_language_auto_detection(self):
         """Test language auto-detection when language is empty."""
-        with patch("kadmos_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
+        with patch("nlp_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
             mock_registry = MagicMock()
             mock_registry_cls.return_value = mock_registry
 
@@ -254,7 +254,7 @@ class TestOrchestrator:
 
     def test_language_detection_error_falls_back_to_default(self):
         """Test that language detection error falls back to default language."""
-        with patch("kadmos_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
+        with patch("nlp_service.pipeline.orchestrator.EngineRegistry") as mock_registry_cls:
             mock_registry = MagicMock()
             mock_registry_cls.return_value = mock_registry
 

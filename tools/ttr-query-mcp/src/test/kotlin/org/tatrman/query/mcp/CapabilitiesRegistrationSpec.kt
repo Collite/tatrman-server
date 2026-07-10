@@ -8,7 +8,7 @@ import io.kotest.matchers.shouldBe
 /**
  * Stage 3.5 T5 — the run_query/compile ToolCapability manifests load and publish
  * one [Capability] each (the tool vocabulary forks as-is, contracts §2). The
- * registry will find theseus-mcp by these ids.
+ * registry will find query-mcp by these ids.
  */
 class CapabilitiesRegistrationSpec :
     StringSpec({
@@ -17,17 +17,17 @@ class CapabilitiesRegistrationSpec :
             val capabilities = ManifestLoader().loadAll()
             capabilities.size shouldBe 2
             capabilities.map { it.tool.capabilityId } shouldContainExactlyInAnyOrder
-                listOf("theseus.compile:v1", "theseus.query:v1")
+                listOf("query.compile:v1", "query.query:v1")
         }
 
-        "each Capability carries the theseus-mcp service endpoint" {
+        "each Capability carries the query-mcp service endpoint" {
             ManifestLoader().loadAll().forEach { cap ->
-                cap.tool.serviceEndpoint shouldBe "http://theseus-mcp.kantheon.svc.cluster.local:7307"
+                cap.tool.serviceEndpoint shouldBe "http://query-mcp.kantheon.svc.cluster.local:7307"
             }
         }
 
         "run_query is discoverable by its own id with sql/dfdsl search tags" {
-            val query = ManifestLoader().loadAll().single { it.tool.capabilityId == "theseus.query:v1" }
+            val query = ManifestLoader().loadAll().single { it.tool.capabilityId == "query.query:v1" }
             query.tool.searchTagsList shouldContain "sql"
             query.tool.searchTagsList shouldContain "dfdsl"
         }

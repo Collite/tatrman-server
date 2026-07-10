@@ -14,7 +14,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Cascade semantics for [EchoMatcher.matchCascade]: precision-first,
+ * Cascade semantics for [FuzzyMatcher.matchCascade]: precision-first,
  * recall-fallback. Asserts which algorithm wins and that the returned set is
  * the winner's (never a cross-algorithm merge).
  */
@@ -45,12 +45,12 @@ class AlgorithmCascadeTest :
                 metadata = MetadataConfig(),
             )
 
-        fun withMatcher(block: suspend (EchoMatcher) -> Unit) {
+        fun withMatcher(block: suspend (FuzzyMatcher) -> Unit) {
             val repo = StringRepository(cfg, loader, telemetry = null)
             try {
                 runBlocking {
                     eventually(5.seconds) { repo.isCatalogReady() shouldBe true }
-                    block(EchoMatcher(repo))
+                    block(FuzzyMatcher(repo))
                 }
             } finally {
                 repo.close()

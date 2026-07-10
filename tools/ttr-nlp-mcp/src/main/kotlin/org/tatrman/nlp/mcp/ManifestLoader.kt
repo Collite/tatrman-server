@@ -12,12 +12,12 @@ import java.io.File
 
 /**
  * Load the `ToolCapability` manifests under `src/main/resources/manifests/tools/`
- * and build one [Capability] per manifest. Same pattern as ariadne-mcp / echo-mcp.
+ * and build one [Capability] per manifest. Same pattern as veles-mcp / fuzzy-mcp.
  *
  * The shared `ManifestYamlLoader` lives in `:tools:capabilities-mcp` — a peer
- * module that kadmos-mcp must not depend on — so we parse the manifests directly.
+ * module that nlp-mcp must not depend on — so we parse the manifests directly.
  * For Stage 2.3 there's a single manifest: `analyze.yaml` → capability_id
- * `kadmos.analyze:v1` (the NLP ops are tool args, not separate tools, per
+ * `nlp.analyze:v1` (the NLP ops are tool args, not separate tools, per
  * contracts §2, so one capability covers the whole `analyze` surface).
  */
 class ManifestLoader {

@@ -1,14 +1,14 @@
-capability_id: "theseus.compile:v1"
-category: "theseus"
+capability_id: "query.compile:v1"
+category: "query"
 version: "1.0.0"
 description: |
-  Compile a query without executing it: run the front of the pipeline (Proteus
-  parse → Argos validate) and return the validated PlanNode, the parameters it
+  Compile a query without executing it: run the front of the pipeline (Translate
+  parse → Validate validate) and return the validated PlanNode, the parameters it
   requires, and the predicted result schema fingerprint. Use for parameter
   binding, dry-run / explain surfaces, and validating a query before showing it.
-service_endpoint: "http://theseus-mcp.kantheon.svc.cluster.local:7307"
+service_endpoint: "http://query-mcp.kantheon.svc.cluster.local:7307"
 search_tags:
-  - theseus
+  - query
   - compile
   - validate
   - explain

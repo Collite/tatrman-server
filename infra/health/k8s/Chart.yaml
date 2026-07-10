@@ -5,7 +5,7 @@ description: |
   cluster knowledge): image, replicas, resources, telemetry endpoint, and the per-target check
   wiring are all values. Per-environment values live in the deploying repo (Olymp clusters via
   ArgoCD multi-source D3'; test contexts via the Olymp scripted harness D23). Mirrors
-  services/argos/k8s (D20). Technical-wave service, fork Phase 5.
+  services/validate/k8s (D20). Technical-wave service, fork Phase 5.
 type: application
 # Chart version: the packaging. appVersion tracks the default image tag.
 version: 0.1.0

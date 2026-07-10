@@ -9,14 +9,14 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import org.tatrman.nlp.mcp.client.KadmosAnalyzeResult
-import org.tatrman.nlp.mcp.client.KadmosClient
-import org.tatrman.nlp.mcp.client.KadmosClientException
-import org.tatrman.nlp.mcp.client.KadmosToken
+import org.tatrman.nlp.mcp.client.NlpAnalyzeResult
+import org.tatrman.nlp.mcp.client.NlpClient
+import org.tatrman.nlp.mcp.client.NlpClientException
+import org.tatrman.nlp.mcp.client.NlpToken
 
 class ToolsTest :
     StringSpec({
-        val mockClient = mockk<KadmosClient>()
+        val mockClient = mockk<NlpClient>()
         val tools = Tools(mockClient, mockk())
 
         fun analyzeRequest(build: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit): CallToolRequest {
@@ -68,13 +68,13 @@ class ToolsTest :
                     put("ops", JsonArray(listOf(JsonPrimitive("LEMMATIZE"))))
                 }
             coEvery { mockClient.analyze(any(), any(), any(), any(), any()) } returns
-                KadmosAnalyzeResult(
+                NlpAnalyzeResult(
                     language = "cs",
                     languageConfidence = 0.99,
                     engineUsed = "morphodita",
                     tokens =
                         listOf(
-                            KadmosToken(
+                            NlpToken(
                                 text = "světe",
                                 charStart = 5,
                                 charEnd = 10,
@@ -109,7 +109,7 @@ class ToolsTest :
                     put("ops", JsonArray(listOf(JsonPrimitive("LEMMATIZE"))))
                 }
             coEvery { mockClient.analyze(any(), any(), any(), any(), any()) } throws
-                KadmosClientException("Downstream error")
+                NlpClientException("Downstream error")
 
             val result = tools.analyzeCallback(request)
 

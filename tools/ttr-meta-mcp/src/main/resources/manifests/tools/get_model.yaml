@@ -1,14 +1,14 @@
-capability_id: "ariadne.get_model:v1"
-category: "ariadne"
+capability_id: "veles.get_model:v1"
+category: "veles"
 version: "1.0.0"
 description: |
   Fetch the full ModelBundle (entities, relations, tables, views, pattern
   queries, named queries, roles, drill maps, package versions) for one or
   more packages in a single round-trip. This is the heavy tool — the
   MCP-side timeout is 30s to accommodate fixture load.
-service_endpoint: "http://ariadne-mcp.kantheon.svc.cluster.local:7262"
+service_endpoint: "http://veles-mcp.kantheon.svc.cluster.local:7262"
 search_tags:
-  - ariadne
+  - veles
   - model
   - bundle
   - full

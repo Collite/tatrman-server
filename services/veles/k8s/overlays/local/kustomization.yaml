@@ -9,7 +9,7 @@ resources:
 patches:
   - target:
       kind: Deployment
-      name: ariadne
+      name: veles
     patch: |
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy
@@ -20,11 +20,11 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env
         value:
-          - name: ARIADNE_HTTP_PORT
+          - name: VELES_HTTP_PORT
             value: "7260"
-          - name: ARIADNE_GRPC_PORT
+          - name: VELES_GRPC_PORT
             value: "7261"
           - name: OTEL_SERVICE_NAME
-            value: ariadne
-          - name: OTEL_ENABLED_ARIADNE
+            value: veles
+          - name: OTEL_ENABLED_VELES
             value: "false"

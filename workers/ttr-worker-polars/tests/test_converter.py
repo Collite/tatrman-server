@@ -6,15 +6,15 @@ import polars as pl
 import pytest
 from org.tatrman.plan.v1 import plan_pb2
 
-from workers_steropes.config import WorkspaceConfig
-from workers_steropes.converter import (
+from workers_polars.config import WorkspaceConfig
+from workers_polars.converter import (
     PlanToPolars,
     UnsupportedExpression,
     UnsupportedTableScan,
     WorkspaceNotFound,
     convert_expr,
 )
-from workers_steropes.workspace import WorkspaceStore
+from workers_polars.workspace import WorkspaceStore
 
 
 def _cfg() -> WorkspaceConfig:

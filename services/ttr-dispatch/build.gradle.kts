@@ -47,7 +47,7 @@ jib {
         }
     }
     to {
-        image = "kyklop:dev"
+        image = "dispatch:dev"
     }
     container {
         mainClass = "org.tatrman.dispatch.ApplicationKt"
