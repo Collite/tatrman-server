@@ -780,7 +780,7 @@ message SearchRequest {
 message SearchResponse {
   repeated SearchResult items = 1;
   PageInfo page_info = 2;
-  string algorithm_used = 3;                                // fuzzyes the algorithm that produced these results
+  string algorithm_used = 3;                                // echoes the algorithm that produced these results
   repeated org.tatrman.common.v1.ResponseMessage messages = 99;
   reserved 100 to 104;
 }

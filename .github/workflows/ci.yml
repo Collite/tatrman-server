@@ -60,7 +60,7 @@ jobs:
           # `prometheus` (Micrometer's PrometheusMeterRegistry / the real monitoring
           # system) — those legitimate hits are excluded below; genuine persona
           # instances (the Echo/fuzzy service, the "Prometheus LLM gateway") are renamed.
-          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|arges|brontes|steropes|echo\b|kadmos|prometheus' \
+          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|\barges\b|brontes|steropes|echo\b|kadmos|prometheus' \
             --include='*.proto' --include='*.kt' --include='*.kts' --include='*.py' --include='*.conf' \
             --include='*.yaml' --include='*.toml' . \
             | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|_to_delete' \

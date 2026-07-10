@@ -56,7 +56,7 @@ class MetadataServiceFixtureSpec :
             val r = service().getModel(GetModelRequest.newBuilder().addPackages("fixture-model").build())
             r.model.packageVersionsList.isEmpty() shouldBe false
             r.model.entitiesList.size shouldBeGreaterThan 0
-            // M3: lock down the PackageVersion shape — name fuzzyed, hash is a real sha256 hex.
+            // M3: lock down the PackageVersion shape — name echoed, hash is a real sha256 hex.
             r.model.packageVersionsList[0].packageName shouldBe "fixture-model"
             r.model.packageVersionsList[0]
                 .contentHash.length shouldBe 64
