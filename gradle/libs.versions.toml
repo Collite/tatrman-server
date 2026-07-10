@@ -1,0 +1,424 @@
+# Version catalog — single source of truth for dependency versions.
+# Module build.gradle.kts files MUST reference these via libs.* — never hardcode versions.
+# https://docs.gradle.org/current/userguide/version_catalogs.html
+
+[versions]
+tatrman-modeler           = "0.8.6"
+tatrman-ttr-metadata      = "0.8.6"
+tatrman-translator        = "0.8.5"
+
+# Kotlin / coroutines / serialization
+kotlin                    = "2.3.0"
+kotlinx-coroutines        = "1.9.0"
+kotlinx-serialization     = "1.10.0"
+
+# Ktor
+ktor                      = "3.2.3"
+
+# Agent + MCP frameworks
+koog                      = "0.8.0"
+kotlin-mcp-sdk            = "0.12.0"
+
+# Protobuf
+protobuf                  = "4.33.4"
+protobuf-plugin           = "0.9.5"
+
+# Logging
+slf4j                     = "2.0.17"
+logback                   = "1.5.26"
+logstash                  = "8.0"
+kotlin-logging            = "7.0.0"
+
+# Config (HOCON)
+typesafe-config           = "1.4.3"
+
+# YAML / Jackson
+# Held at 2.18.1: ai-platform moved to Jackson 3.0.4, but 3.0 also relocated
+# `jackson-module-kotlin` to group `tools.jackson.module` and reorganises
+# databind/yaml under `tools.jackson.*`. Bumping the version alone would break
+# the module coordinates below — treat as a separate migration decision.
+jackson                   = "2.18.1"
+
+# Test stack
+kotest                    = "6.1.2"
+mockk                     = "1.14.9"
+wiremock                  = "3.13.2"
+testcontainers            = "2.0.3"
+# fabric8 k8s client — READ-ONLY cluster status reads for the integration
+# readiness gate (testing arc Phase 2 Stage 2.1). No apply/delete on the
+# kantheon side; all bring-up/teardown is olymp's (testing architecture §3).
+fabric8                   = "7.7.0"
+
+# OTel (kept lean; full stack pulled via ai-platform.otel.config)
+otel                      = "1.58.0"
+otel-semconv              = "1.38.0"
+# Used by otel-logback-appender-1.0; align with ktor-otel 2.18.1-alpha transitively.
+otel-instrumentation-base = "2.18.1-alpha"
+# Aligns opentelemetry-ktor-3.0 with ai-platform.
+ktor-otel                 = "2.18.1-alpha"
+
+# Caches
+caffeine                  = "3.2.3"
+
+# Algorithm — used by Echo (Stage 2.2) for the LEVENSHTEIN / JARO_WINKLER /
+# DAMERAU_LEVENSHTEIN branches of the cascade (TATRMAN is in-house).
+java-string-similarity    = "2.0.0"
+
+# Build / deploy
+jib                       = "3.4.4"
+ktlint-plugin             = "14.0.1"
+
+# Engine
+calcite                   = "1.41.0"
+exposed                   = "1.0.0"
+hikaricp                  = "7.0.2"
+pgsql                    = "42.7.9"
+mssql                    = "13.2.1.jre11"
+arrow-java                = "18.3.0"
+apache-poi                = "5.5.1"
+apache-parquet            = "1.14.3"
+hadoop                    = "3.3.6"
+
+# Charon (Stage 1.1 P1 — services/charon). AWS SDK S3 + Lettuce for the
+# Seaweed/Redis object-store movers (P1). ADBC + arrow-jdbc land in P2
+# Stage 2.1 (charon/plan.md §2.1 T3 spike gate decides ADBC-JDBC vs
+# `arrow-jdbc` per dialect); pinned at that stage, not here. Arrow IPC
+# classes (ArrowStreamReader/Writer, ArrowFileReader/Writer) ship INSIDE
+# `arrow-vector` in 18.x (no separate `arrow-ipc` artifact), so they're
+# already on the classpath via the existing `arrow-vector` pin.
+aws-sdk-s3                = "2.32.5"
+lettuce                   = "6.8.0.RELEASE"
+
+# gRPC — kantheon v1 prefers MCP over gRPC for new services, but `logging-config`
+# carries gRPC interceptors for cross-service reuse. Only the kotlin-stub is exposed
+# in the catalog; full netty/protobuf/grpc transitives are added by the gRPC-using
+# service modules themselves.
+grpc                                 = "1.78.0"
+grpc-kotlin                          = "1.5.0"
+
+# Algorithm + graph + VCS — ariadne (Stage 2.1) uses jgrapht for the model graph + jgit for the GitArchiveStorage backend.
+jgrapht                              = "1.5.2"
+jgit                                 = "6.8.0.202311291450-r"
+apache-commons-compress              = "1.24.0"
+micrometer                           = "1.16.2"
+
+# (fork Stage 2.6) The last ai-platform Maven coordinate — cz.dfpartner:shared-proto
+# (Themis's residual nlp.v1) — was removed here. Themis now consumes only in-repo
+# protos via :shared:proto. No cz.dfpartner Maven artifact remains.
+
+# Prometheus (LLM gateway, Spring Boot) — fork Stage 2.5. The repo's only
+# Spring module; resolved from mavenCentral (incl. Spring AI 2.0.0-M2, as
+# ai-platform did — no milestone repo needed).
+spring-boot               = "4.0.2"
+spring-dep                = "1.1.7"
+spring-ai                 = "2.0.0-M2"
+spring-grpc               = "1.0.1"
+springdoc                 = "3.0.1"
+kaml                      = "0.61.0"
+flyway                    = "11.20.3"
+nats                      = "0.6.2+3.5"
+h2                        = "2.4.240"
+otel-instrumentation-bom  = "2.25.0"
+
+# ── Hebe (P1 Stage 1.1 — gradle merge) ───────────────────────────────────────
+# Hebe-only pins. Conflicting keys (kotlin, coroutines, serialization, koog,
+# ktor, kotest, mockk, flyway, otel, logback, logstash, kotlin-logging, jgit,
+# ktlint) resolve through kantheon's existing pins — kantheon wins (arch §4.2;
+# see docs/implementation/v1/hebe/notes/s1.1-catalog-conflicts.md). detekt is
+# added here but applied **scoped to the Hebe subtree** (root build, T4).
+datetime                  = "0.7.1"
+kotlinx-io                = "0.8.2"
+sqliteJdbc                = "3.53.0.0"
+sqliteVec                 = "0.1.8"
+telegram                  = "9.6.0"
+bouncycastle              = "1.84"
+pf4j                      = "3.15.0"
+oras                      = "0.6.0"
+tomlj                     = "1.1.1"
+clikt                     = "5.0.0"
+jline                     = "4.1.0"
+junit                     = "5.11.0"
+detekt                    = "1.23.8"
+shadow                    = "9.4.1"
+
+# ── Kleio / DocWH (P1 Stage 1.1 — services/kallimachos + services/pinakes) ────
+# Ingestion parsers ported from ~/Dev/doc-store (faithful versions — the
+# doc-store test corpus is the parity oracle, so the parser versions match).
+jsoup                     = "1.17.2"     # HTML → DocNode (html handler)
+flexmark                  = "0.64.8"     # Markdown → DocNode (md handler)
+pdfbox                    = "3.0.2"      # PDF text extraction (pdf handler)
+# pgvector Java helper — VECTOR plane binding. Wired P2 Stage 2.1; pinned now
+# (catalog drift is a planning bug, AGENTS.md §5). pgvector dim N is set by the
+# pipeline EmbedConfig.dimensions (contracts §10), not here.
+pgvector                  = "0.1.6"
+# AGE plane (P2 Stage 2.2) rides the existing `postgresql` JDBC pin via the
+# `cypher()` SQL function — Apache AGE ships NO separate JVM driver; openCypher
+# is issued as SQL over the standard pgsql driver. Recorded here so the P2
+# adapter doesn't reach for a phantom coordinate. `vector` + `age` themselves
+# are PG *extensions* (infra), not JVM deps.
+
+
+[libraries]
+# Kotlin
+kotlin-stdlib                       = { module = "org.jetbrains.kotlin:kotlin-stdlib",                    version.ref = "kotlin" }
+kotlin-reflect                      = { module = "org.jetbrains.kotlin:kotlin-reflect",                   version.ref = "kotlin" }
+kotlinx-coroutines-core             = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",         version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test             = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test",         version.ref = "kotlinx-coroutines" }
+kotlinx-serialization-json          = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json",      version.ref = "kotlinx-serialization" }
+
+# Ktor server
+ktor-server-core                    = { module = "io.ktor:ktor-server-core-jvm",                          version.ref = "ktor" }
+ktor-server-cio                     = { module = "io.ktor:ktor-server-cio-jvm",                           version.ref = "ktor" }
+ktor-server-netty                   = { module = "io.ktor:ktor-server-netty-jvm",                         version.ref = "ktor" }
+ktor-server-content-negotiation     = { module = "io.ktor:ktor-server-content-negotiation-jvm",           version.ref = "ktor" }
+ktor-serialization-kotlinx-json     = { module = "io.ktor:ktor-serialization-kotlinx-json-jvm",           version.ref = "ktor" }
+ktor-server-status-pages            = { module = "io.ktor:ktor-server-status-pages-jvm",                  version.ref = "ktor" }
+ktor-server-call-logging            = { module = "io.ktor:ktor-server-call-logging-jvm",                  version.ref = "ktor" }
+ktor-server-test-host               = { module = "io.ktor:ktor-server-test-host-jvm",                     version.ref = "ktor" }
+ktor-server-cors                    = { module = "io.ktor:ktor-server-cors-jvm",                           version.ref = "ktor" }
+ktor-server-sse                     = { module = "io.ktor:ktor-server-sse-jvm",                            version.ref = "ktor" }
+ktor-server-forwarded-header        = { module = "io.ktor:ktor-server-forwarded-header-jvm",               version.ref = "ktor" }
+ktor-opentelemetry                  = { module = "io.opentelemetry.instrumentation:opentelemetry-ktor-3.0", version.ref = "ktor-otel" }
+
+# Ktor client
+ktor-client-core                    = { module = "io.ktor:ktor-client-core-jvm",                          version.ref = "ktor" }
+ktor-client-apache                  = { module = "io.ktor:ktor-client-apache-jvm",                        version.ref = "ktor" }
+ktor-client-cio                     = { module = "io.ktor:ktor-client-cio-jvm",                           version.ref = "ktor" }
+ktor-client-content-negotiation     = { module = "io.ktor:ktor-client-content-negotiation",               version.ref = "ktor" }
+ktor-client-auth                    = { module = "io.ktor:ktor-client-auth-jvm",                          version.ref = "ktor" }
+ktor-client-mock                    = { module = "io.ktor:ktor-client-mock-jvm",                          version.ref = "ktor" }
+
+# Config
+typesafe-config                     = { module = "com.typesafe:config",                                   version.ref = "typesafe-config" }
+
+# Logging
+slf4j-api                           = { module = "org.slf4j:slf4j-api",                                   version.ref = "slf4j" }
+logback-classic                     = { module = "ch.qos.logback:logback-classic",                        version.ref = "logback" }
+logstash-logback-encoder            = { module = "net.logstash.logback:logstash-logback-encoder",         version.ref = "logstash" }
+kotlin-logging                      = { module = "io.github.oshai:kotlin-logging-jvm",                    version.ref = "kotlin-logging" }
+
+# Protobuf
+protobuf-java                       = { module = "com.google.protobuf:protobuf-java",                     version.ref = "protobuf" }
+protobuf-java-util                  = { module = "com.google.protobuf:protobuf-java-util",                version.ref = "protobuf" }
+protobuf-kotlin                     = { module = "com.google.protobuf:protobuf-kotlin",                   version.ref = "protobuf" }
+protobuf-protoc                     = { module = "com.google.protobuf:protoc",                            version.ref = "protobuf" }
+
+# gRPC — kantheon v1 prefers MCP over gRPC for new services, but `logging-config`
+# carries gRPC interceptors for cross-service reuse. Only the kotlin-stub is exposed
+# in the catalog; full netty/protobuf/grpc transitives are added by the gRPC-using
+# service modules themselves.
+grpc-stub                            = { module = "io.grpc:grpc-stub",                                     version.ref = "grpc" }
+grpc-protobuf                        = { module = "io.grpc:grpc-protobuf",                                 version.ref = "grpc" }
+grpc-kotlin-stub                     = { module = "io.grpc:grpc-kotlin-stub",                              version.ref = "grpc-kotlin" }
+grpc-netty-shaded                    = { module = "io.grpc:grpc-netty-shaded",                             version.ref = "grpc" }
+grpc-services                        = { module = "io.grpc:grpc-services",                                 version.ref = "grpc" }
+grpc-inprocess                        = { module = "io.grpc:grpc-inprocess",                               version.ref = "grpc" }
+
+# Algorithm + graph + VCS
+jgrapht-core                         = { module = "org.jgrapht:jgrapht-core",                               version.ref = "jgrapht" }
+jgit                                 = { module = "org.eclipse.jgit:org.eclipse.jgit",                     version.ref = "jgit" }
+apache-commons-compress              = { module = "org.apache.commons:commons-compress",                   version.ref = "apache-commons-compress" }
+micrometer-registry-prometheus       = { module = "io.micrometer:micrometer-registry-prometheus",          version.ref = "micrometer" }
+java-string-similarity               = { module = "info.debatty:java-string-similarity",                   version.ref = "java-string-similarity" }
+
+# Jackson YAML — used by capabilities-mcp ManifestYamlLoader
+jackson-databind                    = { module = "com.fasterxml.jackson.core:jackson-databind",           version.ref = "jackson" }
+jackson-module-kotlin               = { module = "com.fasterxml.jackson.module:jackson-module-kotlin",    version.ref = "jackson" }
+jackson-dataformat-yaml             = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
+
+# Kotlin MCP SDK
+kotlin-mcp-sdk                      = { module = "io.modelcontextprotocol:kotlin-sdk",                    version.ref = "kotlin-mcp-sdk" }
+
+# Koog (declared so Phase 2 picks it up without further catalog churn).
+# Only the umbrella `koog-agents-jvm` artifact is published at 0.8.0; core + tools come transitively.
+# See agents/_koog-spike/docs/koog-spike-report.md §T1 for the discovery.
+koog-agents                         = { module = "ai.koog:koog-agents-jvm",                               version.ref = "koog" }
+# Test-only — provides `getMockExecutor` (DSL for mocking PromptExecutor). Used by T3 to
+# exercise StructureFixingParser without a Wiremock HTTP layer; matches Koog's own
+# StructureFixingParserTest idiom. Not pulled by the umbrella artifact.
+koog-agents-test                    = { module = "ai.koog:agents-test-jvm",                               version.ref = "koog" }
+
+# OTel
+opentelemetry-api                   = { module = "io.opentelemetry:opentelemetry-api",                    version.ref = "otel" }
+opentelemetry-sdk                   = { module = "io.opentelemetry:opentelemetry-sdk",                    version.ref = "otel" }
+opentelemetry-sdk-extension-autoconfigure = { module = "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure", version.ref = "otel" }
+opentelemetry-exporter-otlp         = { module = "io.opentelemetry:opentelemetry-exporter-otlp",          version.ref = "otel" }
+opentelemetry-semconv               = { module = "io.opentelemetry.semconv:opentelemetry-semconv",        version.ref = "otel-semconv" }
+# Coroutine-aware OTel context propagation (Span.asContextElement) — used by the otel-config withSpan helper.
+opentelemetry-extension-kotlin      = { module = "io.opentelemetry:opentelemetry-extension-kotlin",       version.ref = "otel" }
+# In-memory span exporter for span-emission/nesting component tests.
+opentelemetry-sdk-testing           = { module = "io.opentelemetry:opentelemetry-sdk-testing",            version.ref = "otel" }
+otel-logback-appender               = { module = "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0", version.ref = "otel-instrumentation-base" }
+
+# Caches — Caffeine. Used by themis ResolverCache; central pin matches ai-platform.
+caffeine                            = { module = "com.github.ben-manes.caffeine:caffeine",                version.ref = "caffeine" }
+
+# Tests
+kotest-runner-junit5                = { module = "io.kotest:kotest-runner-junit5",                        version.ref = "kotest" }
+kotest-assertions-core              = { module = "io.kotest:kotest-assertions-core",                      version.ref = "kotest" }
+kotest-property                     = { module = "io.kotest:kotest-property",                             version.ref = "kotest" }
+mockk                               = { module = "io.mockk:mockk",                                        version.ref = "mockk" }
+wiremock                            = { module = "org.wiremock:wiremock",                                 version.ref = "wiremock" }
+testcontainers                      = { module = "org.testcontainers:testcontainers",                    version.ref = "testcontainers" }
+# Testcontainers 2.x DB modules (note the `testcontainers-` artifact prefix +
+# `org.testcontainers.<db>` package, new in 2.0). Component tier — Stage 1.2.
+# Postgres is native multi-arch; the MSSQL *image* is amd64-only (CI-gated spec).
+testcontainers-mssqlserver          = { module = "org.testcontainers:testcontainers-mssqlserver",        version.ref = "testcontainers" }
+testcontainers-postgresql           = { module = "org.testcontainers:testcontainers-postgresql",         version.ref = "testcontainers" }
+# Read-only k8s status reads for the integration readiness gate (Stage 2.1).
+fabric8-kubernetes-client           = { module = "io.fabric8:kubernetes-client",                          version.ref = "fabric8" }
+
+# (fork Stage 2.6) cz.dfpartner:shared-proto removed — Themis retargeted to
+# in-repo protos (:shared:proto). No ai-platform Maven coordinate remains.
+
+# Engine
+calcite-core                        = { module = "org.apache.calcite:calcite-core",                        version.ref = "calcite" }
+
+# Modeler — TTR parser/writer/semantics (third-party Maven artifacts).
+tatrman-ttr-parser                  = { module = "org.tatrman:ttr-parser",                                version.ref = "tatrman-modeler" }
+tatrman-ttr-writer                  = { module = "org.tatrman:ttr-writer",                                version.ref = "tatrman-modeler" }
+tatrman-ttr-semantics               = { module = "org.tatrman:ttr-semantics",                            version.ref = "tatrman-modeler" }
+tatrman-ttr-metadata                = { module = "org.tatrman:ttr-metadata",                              version.ref = "tatrman-ttr-metadata" }
+tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",                          version.ref = "tatrman-ttr-metadata" }
+tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                            version.ref = "tatrman-translator" }
+tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version.ref = "tatrman-translator" }
+exposed-core                        = { module = "org.jetbrains.exposed:exposed-core",                    version.ref = "exposed" }
+exposed-jdbc                        = { module = "org.jetbrains.exposed:exposed-jdbc",                    version.ref = "exposed" }
+exposed-java-time                   = { module = "org.jetbrains.exposed:exposed-java-time",               version.ref = "exposed" }
+# JSON/JSONB column types — iris-bff (Stage 1.2) JSONB columns, raw-string serialize.
+exposed-json                        = { module = "org.jetbrains.exposed:exposed-json",                    version.ref = "exposed" }
+hikaricp                            = { module = "com.zaxxer:HikariCP",                                  version.ref = "hikaricp" }
+postgresql                          = { module = "org.postgresql:postgresql",                            version.ref = "pgsql" }
+mssql-jdbc                          = { module = "com.microsoft.sqlserver:mssql-jdbc",                   version.ref = "mssql" }
+
+# Kleio / DocWH ingestion parsers (services/kallimachos, P1 Stage 1.1 — ported
+# from doc-store). pgvector helper is the VECTOR-plane binding (P2 Stage 2.1).
+jsoup                               = { module = "org.jsoup:jsoup",                                      version.ref = "jsoup" }
+flexmark                            = { module = "com.vladsch.flexmark:flexmark",                        version.ref = "flexmark" }
+pdfbox                              = { module = "org.apache.pdfbox:pdfbox",                             version.ref = "pdfbox" }
+pgvector                            = { module = "com.pgvector:pgvector",                                version.ref = "pgvector" }
+
+# Apache Arrow Java — workers/MSSQL JDBC ResultSet → Arrow IPC; Charon's
+# `services/charon` `MovePlanner` → `ArrowPipe` (P1 Stage 1.2) uses
+# `arrow-vector` + `arrow-memory-netty`. The IPC reader/writer classes
+# (ArrowStreamReader/Writer, ArrowFileReader/Writer) ship INSIDE
+# `arrow-vector` in 18.x — no separate `arrow-ipc` artifact exists at this
+# major (it was a separate jar pre-15.x; merged upstream). Version stays in
+# lockstep with `arrow-java` (18.3.0) so the schema-fingerprint bytes are
+# stable across the move pipe and the worker (workers/polars
+# `_schema_fingerprint` reference impl — charon/contracts.md §6). P2 Stage 2.1
+# adds `arrow-jdbc` + the ADBC drivers when the spike gate runs.
+arrow-vector                        = { module = "org.apache.arrow:arrow-vector",                         version.ref = "arrow-java" }
+arrow-memory-netty                  = { module = "org.apache.arrow:arrow-memory-netty",                   version.ref = "arrow-java" }
+
+# AWS SDK v2 S3 client — Charon's SeaweedEndpoint (P1 Stage 1.2) talks to
+# SeaweedFS S3 gateway at `data-seaweedfs:8333` (architecture §2). SeaweedFS is
+# S3-API-compatible; no custom protocol code.
+aws-sdk-s3                          = { module = "software.amazon.awssdk:s3",                             version.ref = "aws-sdk-s3" }
+
+# Lettuce — Charon's RedisEndpoint (P1 Stage 1.3) — binary-safe value access
+# for Arrow IPC bytes. Matches the platform Redis (architecture §2).
+lettuce-core                        = { module = "io.lettuce:lettuce-core",                              version.ref = "lettuce" }
+
+# Apache POI / Parquet / Hadoop — data-formatter XLSX + Parquet output
+apache-poi-ooxml                    = { module = "org.apache.poi:poi-ooxml",                              version.ref = "apache-poi" }
+apache-parquet-avro                 = { module = "org.apache.parquet:parquet-avro",                       version.ref = "apache-parquet" }
+apache-parquet-hadoop               = { module = "org.apache.parquet:parquet-hadoop",                     version.ref = "apache-parquet" }
+hadoop-common                       = { module = "org.apache.hadoop:hadoop-common",                       version.ref = "hadoop" }
+hadoop-mapreduce-client-core        = { module = "org.apache.hadoop:hadoop-mapreduce-client-core",        version.ref = "hadoop" }
+
+# Prometheus (LLM gateway, Spring Boot) — fork Stage 2.5.
+boot-starter-web                    = { module = "org.springframework.boot:spring-boot-starter-web",                       version.ref = "spring-boot" }
+boot-starter-actuator               = { module = "org.springframework.boot:spring-boot-starter-actuator",                  version.ref = "spring-boot" }
+boot-starter-data-jdbc              = { module = "org.springframework.boot:spring-boot-starter-data-jdbc",                 version.ref = "spring-boot" }
+boot-starter-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-oauth2-resource-server",    version.ref = "spring-boot" }
+boot-starter-security               = { module = "org.springframework.boot:spring-boot-starter-security",                  version.ref = "spring-boot" }
+boot-starter-data-redis             = { module = "org.springframework.boot:spring-boot-starter-data-redis",                version.ref = "spring-boot" }
+boot-starter-flyway                 = { module = "org.springframework.boot:spring-boot-starter-flyway",                    version.ref = "spring-boot" }
+ai-starter-model-anthropic          = { module = "org.springframework.ai:spring-ai-starter-model-anthropic",               version.ref = "spring-ai" }
+ai-starter-model-azure-openai       = { module = "org.springframework.ai:spring-ai-starter-model-azure-openai",            version.ref = "spring-ai" }
+boot-starter-grpc                   = { module = "org.springframework.grpc:spring-grpc-spring-boot-starter",               version.ref = "spring-grpc" }
+spring-grpc-server-web-spring-boot-starter = { module = "org.springframework.grpc:spring-grpc-server-web-spring-boot-starter", version.ref = "spring-grpc" }
+springdoc-openapi-api               = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api",                     version.ref = "springdoc" }
+kaml                                = { module = "com.charleskorn.kaml:kaml",                                              version.ref = "kaml" }
+flyway-core                         = { module = "org.flywaydb:flyway-core",                                               version.ref = "flyway" }
+flyway-pgsql                        = { module = "org.flywaydb:flyway-database-postgresql",                                version.ref = "flyway" }
+h2                                  = { module = "com.h2database:h2",                                                      version.ref = "h2" }
+nats                                = { module = "io.nats:nats-spring",                                                    version.ref = "nats" }
+opentelemetry-instrumentation-bom   = { module = "io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom",     version.ref = "otel-instrumentation-bom" }
+
+
+# ── Hebe (P1 Stage 1.1 — gradle merge) ───────────────────────────────────────
+# Hebe alias names, added so the 21 Hebe module build files keep their existing
+# `libs.*` references unchanged. Where Hebe and kantheon share an artifact, the
+# Hebe alias points at the same module/version-ref kantheon already uses.
+kotlinx-datetime                    = { module = "org.jetbrains.kotlinx:kotlinx-datetime",                  version.ref = "datetime" }
+kotlinx-io                          = { module = "org.jetbrains.kotlinx:kotlinx-io-core-jvm",               version.ref = "kotlinx-io" }
+koog-utils                          = { module = "ai.koog:utils-jvm",                                       version.ref = "koog" }
+koog-utils-common                   = { module = "ai.koog:utils",                                           version.ref = "koog" }
+mcp-kotlin-sdk                      = { module = "io.modelcontextprotocol:kotlin-sdk",                      version.ref = "kotlin-mcp-sdk" }
+# Hebe ktor aliases (the non-`-jvm` names Hebe's build files use → the `-jvm`
+# platform artifacts, matching kantheon's existing ktor entries).
+ktor-serialization-json             = { module = "io.ktor:ktor-serialization-kotlinx-json-jvm",             version.ref = "ktor" }
+ktor-server-cnegot                  = { module = "io.ktor:ktor-server-content-negotiation-jvm",             version.ref = "ktor" }
+ktor-server-websockets              = { module = "io.ktor:ktor-server-websockets-jvm",                      version.ref = "ktor" }
+ktor-server-auth                    = { module = "io.ktor:ktor-server-auth-jvm",                            version.ref = "ktor" }
+ktor-client-logging                 = { module = "io.ktor:ktor-client-logging-jvm",                         version.ref = "ktor" }
+sqlite-jdbc                         = { module = "org.xerial:sqlite-jdbc",                                  version.ref = "sqliteJdbc" }
+telegrambots-longpolling            = { module = "org.telegram:telegrambots-longpolling",                  version.ref = "telegram" }
+telegrambots-client-jetty           = { module = "org.telegram:telegrambots-client-jetty-adapter",         version.ref = "telegram" }
+bouncycastle                        = { module = "org.bouncycastle:bcprov-jdk18on",                         version.ref = "bouncycastle" }
+pf4j                                = { module = "org.pf4j:pf4j",                                           version.ref = "pf4j" }
+oras-sdk                            = { module = "land.oras:oras-java-sdk",                                 version.ref = "oras" }
+tomlj                               = { module = "org.tomlj:tomlj",                                         version.ref = "tomlj" }
+clikt                               = { module = "com.github.ajalt.clikt:clikt",                            version.ref = "clikt" }
+jline                               = { module = "org.jline:jline",                                         version.ref = "jline" }
+otel-api                            = { module = "io.opentelemetry:opentelemetry-api",                      version.ref = "otel" }
+otel-sdk                            = { module = "io.opentelemetry:opentelemetry-sdk",                      version.ref = "otel" }
+otel-exporter-otlp                  = { module = "io.opentelemetry:opentelemetry-exporter-otlp",            version.ref = "otel" }
+otel-autoconfigure                  = { module = "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure", version.ref = "otel" }
+junit-jupiter                       = { module = "org.junit.jupiter:junit-jupiter",                         version.ref = "junit" }
+junit-platform-launcher             = { module = "org.junit.platform:junit-platform-launcher" }
+kotest-assertions                   = { module = "io.kotest:kotest-assertions-core",                        version.ref = "kotest" }
+kotest-framework-engine             = { module = "io.kotest:kotest-framework-engine",                       version.ref = "kotest" }
+kotest-junit-platform-runner        = { module = "io.kotest:kotest-runner-junit5-jvm",                      version.ref = "kotest" }
+detekt-api                          = { module = "io.gitlab.arturbosch.detekt:detekt-api",                  version.ref = "detekt" }
+detekt-test                         = { module = "io.gitlab.arturbosch.detekt:detekt-test",                version.ref = "detekt" }
+
+
+[bundles]
+kotest      = ["kotest-runner-junit5", "kotest-assertions-core", "kotest-property"]
+
+# ── Hebe (P1 Stage 1.1 — gradle merge) ───────────────────────────────────────
+ktor-server = [
+    "ktor-server-core",
+    "ktor-server-netty",
+    "ktor-server-cnegot",
+    "ktor-server-sse",
+    "ktor-server-websockets",
+    "ktor-server-auth",
+    "ktor-server-cors",
+    "ktor-server-test-host",
+    "ktor-serialization-json",
+]
+ktor-client = ["ktor-client-core", "ktor-client-cio", "ktor-client-content-negotiation", "ktor-client-logging", "ktor-serialization-json"]
+logging     = ["kotlin-logging", "logback-classic"]
+testing     = ["junit-jupiter", "kotest-assertions", "kotest-property", "mockk"]
+
+
+[plugins]
+kotlin-jvm                = { id = "org.jetbrains.kotlin.jvm",                  version.ref = "kotlin" }
+kotlin-serialization      = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+protobuf                  = { id = "com.google.protobuf",                       version.ref = "protobuf-plugin" }
+jib                       = { id = "com.google.cloud.tools.jib",                version.ref = "jib" }
+ktlint                    = { id = "org.jlleitschuh.gradle.ktlint",             version.ref = "ktlint-plugin" }
+ktor                      = { id = "io.ktor.plugin",                            version.ref = "ktor" }
+
+# Prometheus (LLM gateway, Spring Boot) — fork Stage 2.5.
+kotlin-spring             = { id = "org.jetbrains.kotlin.plugin.spring",        version.ref = "kotlin" }
+spring-boot               = { id = "org.springframework.boot",                  version.ref = "spring-boot" }
+spring-dep                = { id = "io.spring.dependency-management",           version.ref = "spring-dep" }
+
+# ── Hebe (P1 Stage 1.1 — gradle merge) ───────────────────────────────────────
+detekt                    = { id = "io.gitlab.arturbosch.detekt",               version.ref = "detekt" }
+shadow                    = { id = "com.gradleup.shadow",                       version.ref = "shadow" }
