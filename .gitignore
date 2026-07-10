@@ -1,0 +1,61 @@
+# Gradle
+.gradle/
+build/
+**/build/
+**/bin/
+
+# IntelliJ / IDEA
+.idea/
+*.iml
+out/
+.run/
+
+# Kotlin / JVM
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+# Hebe plugins-module test fixture: a built `hello-plugin` PF4J jar the plugin
+# load/isolation specs read from the classpath (P1 Stage 1.1). Regenerated from
+# `agents/hebe/plugin-template` (and at Stage 1.2 after the package rename).
+!agents/hebe/modules/plugins/src/test/resources/hello-plugin.jar
+*.war
+*.ear
+.kotlin/
+
+# JavaScript / Vue (frontends/iris)
+**/dist/
+**/node_modules/
+.eslintcache
+/.npm-cache/
+
+# Python
+**/__pycache__/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Secrets — never commit
+**/*.secrets.env
+**/*.private.env.json
+*.kv.env
+
+# Generated proto outputs are under build/; covered above.
+
+# Local working files
+/.output.txt
+/graphify-out/
+/debugging/
+
+# Generated eval reports (routing + resolution harnesses)
+agents/themis/eval/results/
+
+# Backup files
+*.bak
+*.orig
+
+# Helm: vendored library-chart deps are rebuilt by `just validate-charts`
+**/k8s/charts/
+**/k8s/Chart.lock
