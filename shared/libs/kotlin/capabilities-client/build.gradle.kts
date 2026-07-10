@@ -1,6 +1,5 @@
 plugins {
     `java-library`
-    `maven-publish`
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktlint)
@@ -27,28 +26,8 @@ dependencies {
     testImplementation(libs.mockk)
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-            groupId = "org.tatrman"
-            artifactId = "capabilities-client"
-            version = project.version.toString()
-        }
-    }
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/Tatrman/kantheon")
-            credentials {
-                username = providers.gradleProperty("gpr.user").orNull
-                    ?: System.getenv("GITHUB_ACTOR")
-                password = providers.gradleProperty("gpr.token").orNull
-                    ?: System.getenv("GITHUB_TOKEN")
-            }
-        }
-    }
-}
+// Publishing is handled by the root build's publishing convention (S5): publishes
+// org.tatrman:capabilities-client:0.0.1-LOCAL to Maven Local for kantheon to consume.
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
