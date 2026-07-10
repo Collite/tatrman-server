@@ -22,7 +22,7 @@ import org.apache.arrow.vector.types.pojo.Schema
  * 18.0.0 emit different flatbuffer bytes for the *same logical schema*, and
  * pyarrow is not even self-consistent across a read/re-serialise round-trip.
  * Since the fingerprint is the cross-engine schema-identity check (a schema
- * Charon stages must verify equal to what a Polars/Steropes worker computes for
+ * Charon stages must verify equal to what a Polars/Polars worker computes for
  * the same schema), the digest must be derived from the **logical** schema, not
  * any one library's wire encoding.
  *
@@ -39,7 +39,7 @@ import org.apache.arrow.vector.types.pojo.Schema
  *   - field/schema **metadata is excluded** (it is provenance, not identity);
  *   - SHA-256 of the UTF-8 bytes of that string, lowercase hex.
  *
- * Steropes (`workers/steropes/.../fingerprint.py`) and Brontes
+ * Polars (`workers/polars/.../fingerprint.py`) and Mssql
  * (`ArrowIpcSerializer.fingerprintFor`) implement the byte-identical algorithm
  * (fork Stage 3.4). The reference impl + regeneration command live at
  * `services/charon/src/test/resources/fixtures/integrity/regenerate.py`, and

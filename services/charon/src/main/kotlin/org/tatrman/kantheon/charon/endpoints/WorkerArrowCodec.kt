@@ -15,9 +15,9 @@ import org.apache.arrow.vector.types.pojo.Schema
  * **Chunk convention (mocked-suite contract, Stage 3.1):** each worker chunk's
  * `ipc_payload` (Metis `ArrowChunk.ipc_payload` / worker `ResultBatch.arrow_ipc`)
  * is a **self-contained** Arrow IPC stream — schema + one record batch + EOS —
- * matching the Steropes `_serialize_record_batch` convention the explore
+ * matching the Polars `_serialize_record_batch` convention the explore
  * confirmed. Charon reads each payload standalone and re-assembles. The exact
- * runtime convention against the live Metis/Steropes pods is reconciled in the
+ * runtime convention against the live Metis/Polars pods is reconciled in the
  * integration suite (testing policy §4); the Charon-side wiring is what these
  * helpers verify.
  */

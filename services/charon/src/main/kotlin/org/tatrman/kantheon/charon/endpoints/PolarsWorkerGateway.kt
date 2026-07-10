@@ -29,7 +29,7 @@ import org.tatrman.worker.v1.ImportHeader
 import org.tatrman.worker.v1.WorkerServiceGrpcKt
 
 /**
- * The POLARS / Steropes worker gateway (charon/plan.md §5 Stage 3.1) over
+ * The POLARS / Polars worker gateway (charon/plan.md §5 Stage 3.1) over
  * `org.tatrman.worker.v1.WorkerService`. Full parity with the METIS path since
  * the worker-arc `ImportDataFrame`/`DropWorkspaceEntry` RPCs landed (Charon
  * Stage 3.1 closeout, 2026-06-26):

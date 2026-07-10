@@ -26,7 +26,7 @@ import org.tatrman.worker.v1.WorkerServiceGrpcKt
 /*
  * In-process gRPC fixture workers for the Stage 3.1 mocked suite. They store
  * workspace DataFrames as lists of standalone IPC-stream payloads, keyed
- * (session_id, df_name) — exactly the Steropes/Metis keying. The live pods are
+ * (session_id, df_name) — exactly the Polars/Metis keying. The live pods are
  * the integration suite (testing policy §4); these prove the Charon-side wiring.
  */
 
@@ -43,7 +43,7 @@ class FixtureMetisWorker : MetisServiceGrpcKt.MetisServiceCoroutineImplBase() {
         val chunks = requests.toList()
         val header = chunks.first().header
         // A df named "__cap__" simulates the workspace cap → RESOURCE_EXHAUSTED
-        // (Steropes `workspace_cap_exceeded`).
+        // (Polars `workspace_cap_exceeded`).
         if (header.dfName == "__cap__") {
             throw StatusException(Status.RESOURCE_EXHAUSTED.withDescription("workspace_cap_exceeded"))
         }
@@ -74,7 +74,7 @@ class FixtureMetisWorker : MetisServiceGrpcKt.MetisServiceCoroutineImplBase() {
 
 /** A POLARS/worker fixture: `ImportDataFrame` stages a DF in, `Execute` over a
  *  `WorkspaceRef` reads it back out, `DropWorkspaceEntry` drops it — the full
- *  workspace surface Steropes now exposes (worker-arc closeout 2026-06-26). */
+ *  workspace surface Polars now exposes (worker-arc closeout 2026-06-26). */
 class FixturePolarsWorker : WorkerServiceGrpcKt.WorkerServiceCoroutineImplBase() {
     private val store = ConcurrentHashMap<String, List<ByteArray>>()
 

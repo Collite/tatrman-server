@@ -90,7 +90,7 @@ dependencies {
     implementation(libs.logback.classic)
 
     // gRPC — kantheon idiom: NettyServerBuilder direct (charon/architecture.md §2 +
-    // ariadne Application.kt precedent). gRPC-Java + gRPC-Kotlin are both
+    // veles Application.kt precedent). gRPC-Java + gRPC-Kotlin are both
     // available via the proto module's `grpc-stub` / `grpc-kotlin-stub` transitives.
     implementation(libs.grpc.stub)
     implementation(libs.grpc.protobuf)

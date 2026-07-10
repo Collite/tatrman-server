@@ -20,7 +20,7 @@ import java.security.MessageDigest
 /**
  * The unit suite for the [Integrity] primitives. The load-bearing test is the
  * **cross-engine fingerprint** check: Charon reads the SAME shared Arrow IPC
- * fixtures (`shared/testdata/fingerprints/`) that Steropes (pyarrow) and Brontes
+ * fixtures (`shared/testdata/fingerprints/`) that Polars (pyarrow) and Mssql
  * (Arrow Java) read, recomputes the canonical fingerprint with its own
  * [Integrity] implementation, and asserts equality with the pinned
  * `fingerprints.json`. Same algorithm, three implementations, must agree;
@@ -61,7 +61,7 @@ class IntegritySpec :
 
         // --- Cross-engine fingerprint: agreement with the shared anchor ---
         // shared/testdata/fingerprints/{reference,scalars,list,map}.arrow +
-        // fingerprints.json — the one anchor Charon, Brontes, and Steropes all
+        // fingerprints.json — the one anchor Charon, Mssql, and Polars all
         // verify against (fork Stage 3.4; Charon closeout P1 S1.4 T2).
 
         val fixtureDir = locateFixtureDir()
