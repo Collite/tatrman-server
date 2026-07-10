@@ -38,7 +38,7 @@ jib {
         }
     }
     to {
-        image = "kadmos-mcp:latest"
+        image = "nlp-mcp:latest"
     }
     container {
         mainClass = "org.tatrman.nlp.mcp.ApplicationKt"
@@ -75,7 +75,7 @@ dependencies {
 
     // Load the manifest YAMLs for capabilities-mcp registration. We don't
     // depend on `:tools:capabilities-mcp` (peers), so we parse the manifests
-    // directly with Jackson (same as ariadne-mcp / echo-mcp).
+    // directly with Jackson (same as veles-mcp / fuzzy-mcp).
     implementation(libs.jackson.databind)
     implementation(libs.jackson.module.kotlin)
     implementation(libs.jackson.dataformat.yaml)
@@ -86,8 +86,8 @@ dependencies {
     implementation(project(":shared:libs:kotlin:logging-config"))
     implementation(project(":shared:libs:kotlin:capabilities-client"))
 
-    // Kadmos is HTTP-only at v1: no gRPC, no `:services:ttr-nlp` project dep
-    // (that's a Python module). The wrapper speaks JSON to kadmos:7270.
+    // Nlp is HTTP-only at v1: no gRPC, no `:services:ttr-nlp` project dep
+    // (that's a Python module). The wrapper speaks JSON to nlp:7270.
     implementation(libs.ktor.opentelemetry)
     implementation(libs.micrometer.registry.prometheus)
 

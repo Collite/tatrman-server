@@ -51,7 +51,7 @@ class RequiresContextExtensionSpec :
 
             // A reader that would blow up if used — proves the mismatched context never touches it.
             val reader = mockk<ClusterReader>()
-            System.setProperty("context", "theseus-runquery")
+            System.setProperty("context", "query-runquery")
             try {
                 val fake = OtherCtxFake()
                 runBlocking { RequiresContextExtension { reader }.beforeSpec(fake) }
@@ -62,16 +62,16 @@ class RequiresContextExtensionSpec :
         }
 
         "runs the gate when -Pcontext matches the spec's @RequiresContext" {
-            @RequiresContext("theseus-runquery")
+            @RequiresContext("query-runquery")
             class MatchCtxFake : StringSpec()
 
             val reader = mockk<ClusterReader>()
-            every { reader.resolveNamespace("theseus-runquery") } returns "ns-y"
+            every { reader.resolveNamespace("query-runquery") } returns "ns-y"
             every { reader.readinessChecks("ns-y") } returns
                 listOf(ReadinessCheck(ReadinessCheck.Kind.DEPLOYMENT, "d"))
             every { reader.isReady("ns-y", any()) } returns true
 
-            System.setProperty("context", "theseus-runquery")
+            System.setProperty("context", "query-runquery")
             try {
                 val fake = MatchCtxFake()
                 runBlocking { RequiresContextExtension { reader }.beforeSpec(fake) }

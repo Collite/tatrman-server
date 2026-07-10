@@ -18,7 +18,7 @@ data class FuzzyTarget(
 )
 
 /**
- * Thin gRPC client over Ariadne (`VelesService`, the metadata service) for the
+ * Thin gRPC client over Veles (`VelesService`, the metadata service) for the
  * fuzzy loader. The channel is owned by the caller (`Application.module`); this
  * class never builds or shuts it.
  *
@@ -48,7 +48,7 @@ class MetadataServiceClient(
     fun listFuzzyColumns(): List<FuzzyTarget> {
         val schemaCode =
             parseSchemaCode(schema)
-                ?: error("Unknown schema code in echo.metadata.schema: '$schema' (expected db|er|cnc)")
+                ?: error("Unknown schema code in fuzzy.metadata.schema: '$schema' (expected db|er|cnc)")
 
         val baseRequest =
             ListObjectsRequest

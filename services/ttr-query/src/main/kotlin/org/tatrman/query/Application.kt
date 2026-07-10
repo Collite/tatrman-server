@@ -40,26 +40,26 @@ private val log = LoggerFactory.getLogger("org.tatrman.query.Application")
 
 fun main() {
     val config = ConfigFactory.load()
-    val serverConfig = KtorConfigFactory.fromConfig(config, "theseus", 7305)
+    val serverConfig = KtorConfigFactory.fromConfig(config, "query", 7305)
     KtorServerBootstrap.createServer(serverConfig) { module(config) }.start(wait = true)
 }
 
 fun Application.module(config: Config) {
-    installKtorServerBase(KtorConfigFactory.fromConfig(config, "theseus", 7305))
+    installKtorServerBase(KtorConfigFactory.fromConfig(config, "query", 7305))
 
     // OTel SDK init: configures OTLP trace/metric/log exporters AND installs the bridge
     // into the Logback OpenTelemetryAppender so all SLF4J logs are forwarded to OTLP → Alloy → Loki.
     // The instance is also handed to QueryServiceImpl so its orchestration spans
-    // (theseus.run → parse/validate/dispatch) export on the same SDK (Stage 4.1 T3).
+    // (query.run → parse/validate/dispatch) export on the same SDK (Stage 4.1 T3).
     val openTelemetry =
         createOpenTelemetrySdk(
             OtelEndpointConfig(
-                serviceName = "theseus",
-                protocol = System.getenv("THESEUS_OTEL_PROTOCOL") ?: "grpc",
+                serviceName = "query",
+                protocol = System.getenv("QUERY_OTEL_PROTOCOL") ?: "grpc",
             ),
         )
 
-    val useFixture = config.hasPath("theseus.use-fixture") && config.getBoolean("theseus.use-fixture")
+    val useFixture = config.hasPath("query.use-fixture") && config.getBoolean("query.use-fixture")
 
     val cache =
         CompiledPlanCache(
@@ -114,7 +114,7 @@ fun Application.module(config: Config) {
 
     launch {
         grpcServer.start()
-        log.info("Theseus gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
+        log.info("Query gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
         grpcServer.awaitTermination()
     }
 
@@ -135,7 +135,7 @@ fun Application.module(config: Config) {
             val stats = cache.stats()
             call.respond(
                 buildJsonObject {
-                    put("service", "theseus")
+                    put("service", "query")
                     put("grpc_port", grpcPort)
                     put("active_runs", service.activeRunCount)
                     putJsonObject("cache") {
@@ -166,7 +166,7 @@ fun Application.module(config: Config) {
     }
 
     monitor.subscribe(ApplicationStopping) {
-        log.info("Shutting down Theseus")
+        log.info("Shutting down Query")
         grpcServer.shutdown()
         if (translatorClient is AutoCloseable) runCatching { translatorClient.close() }
         if (validatorClient is AutoCloseable) runCatching { validatorClient.close() }
@@ -179,7 +179,7 @@ private fun pickTranslatorClient(
     useFixture: Boolean,
 ): TranslatorClient {
     if (useFixture) {
-        log.warn("Theseus booting with fixture clients (theseus.use-fixture = true).")
+        log.warn("Query booting with fixture clients (query.use-fixture = true).")
         return object : TranslatorClient, TranslatorDetectClient, TranslatorTranslateClient {
             override suspend fun parse(request: org.tatrman.translate.v1.ParseRequest) =
                 org.tatrman.translate.v1
@@ -205,9 +205,9 @@ private fun pickTranslatorClient(
         }
     }
     return GrpcTranslatorClient(
-        host = config.getString("proteus.host"),
-        port = config.getInt("proteus.port"),
-        deadlineSeconds = config.getLong("proteus.deadline-seconds"),
+        host = config.getString("translate.host"),
+        port = config.getInt("translate.port"),
+        deadlineSeconds = config.getLong("translate.deadline-seconds"),
     )
 }
 
@@ -226,9 +226,9 @@ private fun pickValidatorClient(
         }
     }
     return GrpcValidatorClient(
-        host = config.getString("argos.host"),
-        port = config.getInt("argos.port"),
-        deadlineSeconds = config.getLong("argos.deadline-seconds"),
+        host = config.getString("validate.host"),
+        port = config.getInt("validate.port"),
+        deadlineSeconds = config.getLong("validate.deadline-seconds"),
     )
 }
 
@@ -250,7 +250,7 @@ private fun pickDispatcherClient(
         }
     }
     return GrpcDispatcherClient(
-        host = config.getString("kyklop.host"),
-        port = config.getInt("kyklop.port"),
+        host = config.getString("dispatch.host"),
+        port = config.getInt("dispatch.port"),
     )
 }

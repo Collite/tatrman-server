@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ariadne
+  name: veles
   namespace: kantheon
   labels:
-    app: ariadne
+    app: veles
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ariadne
+      app: veles
   template:
     metadata:
       labels:
-        app: ariadne
+        app: veles
     spec:
       containers:
-        - name: ariadne
-          image: ariadne:dev
+        - name: veles
+          image: veles:dev
           ports:
             - name: http
               containerPort: 7260
             - name: grpc
               containerPort: 7261
           env:
-            - name: ARIADNE_HTTP_PORT
+            - name: VELES_HTTP_PORT
               value: "7260"
-            - name: ARIADNE_GRPC_PORT
+            - name: VELES_GRPC_PORT
               value: "7261"
             - name: METADATA_GIT_REMOTE_URI
               value: "https://github.com/Tatrman/ai-models.git"
@@ -34,20 +34,20 @@ spec:
             - name: METADATA_GIT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: ariadne-github-pat
+                  name: veles-github-pat
                   key: token
                   optional: true
             - name: PROMPTS_GIT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: ariadne-github-pat
+                  name: veles-github-pat
                   key: token
                   optional: true
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://alloy.observability.svc.cluster.local:4317
             - name: OTEL_SERVICE_NAME
-              value: ariadne
-            - name: OTEL_ENABLED_ARIADNE
+              value: veles
+            - name: OTEL_ENABLED_VELES
               value: "true"
           readinessProbe:
             httpGet:
@@ -73,13 +73,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ariadne
+  name: veles
   namespace: kantheon
   labels:
-    app: ariadne
+    app: veles
 spec:
   selector:
-    app: ariadne
+    app: veles
   ports:
     - name: http
       port: 7260

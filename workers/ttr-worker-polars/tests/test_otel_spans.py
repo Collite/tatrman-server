@@ -20,22 +20,22 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from org.tatrman.plan.v1 import context_pb2, plan_pb2
 from org.tatrman.worker.v1 import worker_pb2
 
-from workers_steropes.config import (
+from workers_polars.config import (
     CapabilityConfig,
     GrpcConfig,
     HttpConfig,
     LimitsConfig,
     MetadataConfig,
     TelemetryConfig,
-    WorkersSteropesConfig,
+    WorkersPolarsConfig,
     WorkspaceConfig,
 )
-from workers_steropes.grpc_service import WorkerService
-from workers_steropes.workspace import WorkspaceStore
+from workers_polars.grpc_service import WorkerService
+from workers_polars.workspace import WorkspaceStore
 
 
-def _cfg() -> WorkersSteropesConfig:
-    return WorkersSteropesConfig(
+def _cfg() -> WorkersPolarsConfig:
+    return WorkersPolarsConfig(
         grpc=GrpcConfig(host="0", port=7501, max_message_bytes=33554432),
         http=HttpConfig(host="0", port=7502),
         workspace=WorkspaceConfig(
@@ -113,12 +113,12 @@ async def test_execute_emits_expected_span_hierarchy(otel_exporter: InMemorySpan
 
     spans = otel_exporter.get_finished_spans()
     names = [s.name for s in spans]
-    assert "workers-steropes.Execute" in names
-    assert "workers-steropes.convert" in names
-    assert "workers-steropes.collect" in names
-    assert "workers-steropes.serialize" in names
+    assert "workers-polars.Execute" in names
+    assert "workers-polars.convert" in names
+    assert "workers-polars.collect" in names
+    assert "workers-polars.serialize" in names
 
-    root = next(s for s in spans if s.name == "workers-steropes.Execute")
+    root = next(s for s in spans if s.name == "workers-polars.Execute")
     attrs = dict(root.attributes or {})
     assert attrs.get("engine") == "polars"
     assert attrs.get("workspace.session_id") == "s1"
@@ -128,7 +128,7 @@ async def test_execute_emits_expected_span_hierarchy(otel_exporter: InMemorySpan
     assert "error.code" not in attrs
 
     # Sub-spans share the same trace context as the root.
-    convert = next(s for s in spans if s.name == "workers-steropes.convert")
+    convert = next(s for s in spans if s.name == "workers-polars.convert")
     assert convert.context.trace_id == root.context.trace_id
 
 
@@ -144,5 +144,5 @@ async def test_execute_error_path_records_error_code_on_root_span(otel_exporter:
     batches = await _drain(service.execute(request, context=None))
     assert batches[0].messages[0].code == "workspace_requires_session"
 
-    root = next(s for s in otel_exporter.get_finished_spans() if s.name == "workers-steropes.Execute")
+    root = next(s for s in otel_exporter.get_finished_spans() if s.name == "workers-polars.Execute")
     assert dict(root.attributes or {}).get("error.code") == "workspace_requires_session"

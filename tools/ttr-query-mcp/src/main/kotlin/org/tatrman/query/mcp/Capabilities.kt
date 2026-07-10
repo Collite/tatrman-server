@@ -14,15 +14,15 @@ import org.tatrman.capabilities.v1.CostHints
 import org.tatrman.capabilities.v1.ToolCapability
 import java.io.File
 
-private val log = LoggerFactory.getLogger("theseus-mcp.capabilities")
+private val log = LoggerFactory.getLogger("query-mcp.capabilities")
 
 /**
- * Stage 3.5 T5 — load theseus-mcp's `ToolCapability` manifests
+ * Stage 3.5 T5 — load query-mcp's `ToolCapability` manifests
  * (the `src/main/resources/manifests/tools` YAML dir) and register each with
  * capabilities-mcp (warn-and-continue). The tool vocabulary forks as-is
  * (contracts §2): the MCP tool names stay `query` / `compile`; the registry
- * capability ids are `theseus.query:v1` / `theseus.compile:v1`. Mirrors the
- * ariadne-mcp pattern (each tool registered independently; the shared
+ * capability ids are `query.query:v1` / `query.compile:v1`. Mirrors the
+ * veles-mcp pattern (each tool registered independently; the shared
  * `ManifestYamlLoader` lives in the peer `:tools:capabilities-mcp`, which a
  * wrapper must not depend on, so the simple manifest shape is parsed here).
  */
@@ -112,7 +112,7 @@ internal class ManifestLoader {
 }
 
 /**
- * Register theseus-mcp's capabilities with capabilities-mcp at startup
+ * Register query-mcp's capabilities with capabilities-mcp at startup
  * (warn-and-continue). When the registry is unreachable the call still returns;
  * the background retry loop re-attempts with backoff. Opt in with
  * `CAPABILITIES_MCP_URL=http://capabilities-mcp:7501` (or `capabilities-mcp.url`).
@@ -123,12 +123,12 @@ internal fun registerWithCapabilities(config: Config) {
             ?: if (config.hasPath("capabilities-mcp.url")) config.getString("capabilities-mcp.url") else ""
     val capabilities = ManifestLoader().loadAll()
     if (capabilities.isEmpty()) {
-        log.info("No theseus-mcp capabilities to register (manifests dir empty or missing).")
+        log.info("No query-mcp capabilities to register (manifests dir empty or missing).")
         return
     }
     if (endpoint.isBlank()) {
         log.info(
-            "CAPABILITIES_MCP_URL not set — {} theseus-mcp capabilities are not registered.",
+            "CAPABILITIES_MCP_URL not set — {} query-mcp capabilities are not registered.",
             capabilities.size,
         )
         return
@@ -144,14 +144,14 @@ internal fun registerWithCapabilities(config: Config) {
             )
         if (handle.registrationId != null) {
             registered++
-            log.info("theseus-mcp registered '{}' with capabilities-mcp at {}", id, endpoint)
+            log.info("query-mcp registered '{}' with capabilities-mcp at {}", id, endpoint)
         } else {
             log.warn(
-                "theseus-mcp startup register for '{}' at {} not yet complete; background retry will continue.",
+                "query-mcp startup register for '{}' at {} not yet complete; background retry will continue.",
                 id,
                 endpoint,
             )
         }
     }
-    log.info("theseus-mcp: {}/{} capabilities registered", registered, capabilities.size)
+    log.info("query-mcp: {}/{} capabilities registered", registered, capabilities.size)
 }

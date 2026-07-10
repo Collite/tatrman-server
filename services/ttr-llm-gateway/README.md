@@ -6,13 +6,13 @@
 **Prometheus** is the **LLM gateway** for kantheon — it centralizes and manages access to Large
 Language Models (Azure OpenAI, Anthropic, …) for every other service and agent. It is the repo's
 **only Spring Boot module** (a documented exception — every other JVM module is Ktor; forked as-is,
-no Ktor rewrite). HTTP port **7280**, gRPC 9090. Proto: `org.tatrman.prometheus.v1` /
+no Ktor rewrite). HTTP port **7280**, gRPC 9090. Proto: `org.tatrman.llm.v1` /
 `PrometheusService` (was `ChatService`); Kotlin root `org.tatrman.prometheus.*`.
 
 **Test policy:** mocked unit tests only live here (kotest + mockk). The integration suite
 (Testcontainers / WireMock-backed upstreams / SpringBootTest) is designed and run separately
 (fork Stage 2.5 T4), so those test deps and the WireMock fixtures are intentionally not in this
-module. Upstream LLM API keys come from the sealed `prometheus-secrets` k8s Secret.
+module. Upstream LLM API keys come from the sealed `llm-gateway-secrets` k8s Secret.
 
 ## Architecture Overview
 

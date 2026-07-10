@@ -80,7 +80,7 @@ class UpstreamClientsSpec :
             }
         }
 
-        "ValidatorClient.validate echoes context" {
+        "ValidatorClient.validate fuzzyes context" {
             val client =
                 object : ValidatorClient {
                     override suspend fun validate(request: ValidateRequest): ValidateResponse =

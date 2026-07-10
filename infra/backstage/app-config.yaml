@@ -108,7 +108,7 @@ catalog:
         -   allow: [ Component, System, API, Resource, Location, Template, Group, User ]
     locations:
         # The Kantheon constellation catalog (fork Phase 5 Stage 5.5) — the pantheon entities
-        # (agents, platform services, the Kyklops workers, MCP wrappers, technical-wave infra).
+        # (agents, platform services, the Dispatchs workers, MCP wrappers, technical-wave infra).
         # Replaces the upstream example catalog. Path is relative to the backend CWD.
         -   type: file
             target: ../../examples/kantheon-catalog.yaml

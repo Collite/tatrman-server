@@ -11,7 +11,7 @@ class WorkerConfigLoaderSpec :
             val cfg =
                 ConfigFactory.parseString(
                     """
-                    kyklop.workers = [
+                    dispatch.workers = [
                         { endpoint = "workers-mssql:7401",  role-hint = "mssql" }
                         { endpoint = "workers-polars:7501", role-hint = "polars" }
                     ]
@@ -29,7 +29,7 @@ class WorkerConfigLoaderSpec :
             val cfg =
                 ConfigFactory.parseString(
                     """
-                    kyklop.workers = [
+                    dispatch.workers = [
                         { endpoint = "", role-hint = "mssql" }
                         { endpoint = "workers-polars:7501", role-hint = "polars" }
                     ]
@@ -38,7 +38,7 @@ class WorkerConfigLoaderSpec :
             WorkerConfigLoader.load(cfg) shouldBe listOf(WorkerSlot("workers-polars:7501", "polars"))
         }
 
-        "absent kyklop.workers → empty list" {
+        "absent dispatch.workers → empty list" {
             WorkerConfigLoader.load(ConfigFactory.parseString("")) shouldBe emptyList()
         }
 
@@ -46,7 +46,7 @@ class WorkerConfigLoaderSpec :
             val cfg =
                 ConfigFactory.parseString(
                     """
-                    kyklop.workers = [
+                    dispatch.workers = [
                         { endpoint = "workers-mssql:7401" }
                     ]
                     """.trimIndent(),
@@ -58,7 +58,7 @@ class WorkerConfigLoaderSpec :
             val cfg =
                 ConfigFactory.parseString(
                     """
-                    kyklop.workers = [
+                    dispatch.workers = [
                         { endpoint = "  workers-mssql:7401  ", role-hint = "mssql" }
                     ]
                     """.trimIndent(),

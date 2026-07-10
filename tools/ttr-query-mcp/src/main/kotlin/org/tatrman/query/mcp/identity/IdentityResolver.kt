@@ -20,10 +20,10 @@ import java.util.Base64
  *
  * **v1 limitation.** This decodes the JWT *without verifying its signature*.
  * Production deployments are expected to terminate inbound auth at an
- * ingress / sidecar that validates the token before it reaches theseus-mcp;
+ * ingress / sidecar that validates the token before it reaches query-mcp;
  * this resolver only extracts claims for downstream context-passing.
  * Signature validation lives outside this service. Documented in
- * tools/theseus-mcp/docs/technical/theseus-mcp-service.md.
+ * tools/query-mcp/docs/technical/query-mcp-service.md.
  */
 object IdentityResolver {
     private val parser =

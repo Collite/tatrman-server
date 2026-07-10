@@ -50,65 +50,65 @@ import shared.otel.createOpenTelemetrySdk
 private val log = LoggerFactory.getLogger("org.tatrman.validate.Application")
 
 fun main() {
-    val config = loadArgosConfig()
-    val serverConfig = KtorConfigFactory.fromConfig(config, "argos", 7285)
+    val config = loadValidateConfig()
+    val serverConfig = KtorConfigFactory.fromConfig(config, "validate", 7285)
     KtorServerBootstrap.createServer(serverConfig) { module(config) }.start(wait = true)
 }
 
 /**
  * Base config (application.conf, which includes `policies/policies.conf`) with an optional
- * external policy override: when `ARGOS_POLICIES_FILE` points at a readable HOCON file (e.g. a
- * k8s ConfigMap mount), its `argos.policies` replaces the built-in default set — no rebuild.
+ * external policy override: when `VALIDATE_POLICIES_FILE` points at a readable HOCON file (e.g. a
+ * k8s ConfigMap mount), its `validate.policies` replaces the built-in default set — no rebuild.
  */
-private fun loadArgosConfig(): Config {
+private fun loadValidateConfig(): Config {
     val base = ConfigFactory.load()
-    val override = System.getenv("ARGOS_POLICIES_FILE")?.trim().orEmpty()
+    val override = System.getenv("VALIDATE_POLICIES_FILE")?.trim().orEmpty()
     if (override.isEmpty()) return base
     val file = java.io.File(override)
     if (!file.isFile) {
-        log.warn("ARGOS_POLICIES_FILE='{}' is not a readable file — using built-in policies", override)
+        log.warn("VALIDATE_POLICIES_FILE='{}' is not a readable file — using built-in policies", override)
         return base
     }
-    log.info("Loading external Argos policies from {}", override)
+    log.info("Loading external Validate policies from {}", override)
     return ConfigFactory.parseFile(file).withFallback(base).resolve()
 }
 
 fun Application.module(config: Config) {
-    installKtorServerBase(KtorConfigFactory.fromConfig(config, "argos", 7285))
+    installKtorServerBase(KtorConfigFactory.fromConfig(config, "validate", 7285))
 
     // OTel SDK init: configures OTLP trace/metric/log exporters AND installs the bridge
     // into the Logback OpenTelemetryAppender so all SLF4J logs are forwarded to OTLP → Alloy → Loki.
     createOpenTelemetrySdk(
         OtelEndpointConfig(
-            serviceName = "argos",
-            protocol = System.getenv("ARGOS_OTEL_PROTOCOL") ?: "grpc",
+            serviceName = "validate",
+            protocol = System.getenv("VALIDATE_OTEL_PROTOCOL") ?: "grpc",
         ),
         enabled = config.hasPath("telemetry.enabled") && config.getBoolean("telemetry.enabled"),
     )
 
     val useFixture =
-        config.hasPath("argos.use-fixture-model") &&
-            config.getBoolean("argos.use-fixture-model")
+        config.hasPath("validate.use-fixture-model") &&
+            config.getBoolean("validate.use-fixture-model")
 
     val securityClient = pickSecurityClient(config, useFixture)
     val metadataClient = pickMetadataClient(config, useFixture)
 
     val securityApplier = SecurityApplier(securityClient)
-    val defaultTopN = config.getInt("argos.default-top-n")
+    val defaultTopN = config.getInt("validate.default-top-n")
     val ruleEnforcer = RuleEnforcer(serviceDefault = defaultTopN)
-    val llmGuardEnabled = config.getBoolean("argos.llm-guard.enabled")
+    val llmGuardEnabled = config.getBoolean("validate.llm-guard.enabled")
     val llmGuardGateway = buildLlmGatewayClient(config)
     val llmGuardModel =
-        if (config.hasPath("argos.llm-guard.model")) {
-            config.getString("argos.llm-guard.model")
+        if (config.hasPath("validate.llm-guard.model")) {
+            config.getString("validate.llm-guard.model")
         } else {
             LlmGuard.DEFAULT_MODEL
         }
     val llmGuardFailurePosture =
-        if (config.hasPath("argos.llm-guard.failure-posture")) {
+        if (config.hasPath("validate.llm-guard.failure-posture")) {
             runCatching {
                 LlmGuard.FailurePosture.valueOf(
-                    config.getString("argos.llm-guard.failure-posture").uppercase(),
+                    config.getString("validate.llm-guard.failure-posture").uppercase(),
                 )
             }.getOrElse { LlmGuard.FailurePosture.FAIL_CLOSED }
         } else {
@@ -123,36 +123,36 @@ fun Application.module(config: Config) {
         )
 
     val adminRole =
-        if (config.hasPath("argos.security-bypass.admin-role")) {
-            config.getString("argos.security-bypass.admin-role")
+        if (config.hasPath("validate.security-bypass.admin-role")) {
+            config.getString("validate.security-bypass.admin-role")
         } else {
             "query-platform-admin"
         }
     // Fork Stage 5.3 — role source: `bearer` (default; Phase-3 posture, no whois dependency) or
     // `whois` (opt-in ERP role-hierarchy enrichment). Identity stays bearer-only at the
-    // theseus-mcp edge either way; whois only widens the role set, never asserts identity.
+    // query-mcp edge either way; whois only widens the role set, never asserts identity.
     val roleSourceMode =
-        if (config.hasPath("argos.roleSource")) config.getString("argos.roleSource").lowercase() else "bearer"
+        if (config.hasPath("validate.roleSource")) config.getString("validate.roleSource").lowercase() else "bearer"
     val roleSource: RoleSource =
         when (roleSourceMode) {
             "whois" -> {
                 val whoisBaseUrl =
                     config
-                        .takeIf { it.hasPath("argos.whois.baseUrl") }
-                        ?.getString("argos.whois.baseUrl") ?: "http://whois:7110"
+                        .takeIf { it.hasPath("validate.whois.baseUrl") }
+                        ?.getString("validate.whois.baseUrl") ?: "http://whois:7110"
                 val ttl =
                     config
-                        .takeIf { it.hasPath("argos.whois.cacheTtlSeconds") }
-                        ?.getLong("argos.whois.cacheTtlSeconds") ?: 300L
-                log.info("Argos role source = whois (enrichment baseUrl={}, cacheTtl={}s)", whoisBaseUrl, ttl)
+                        .takeIf { it.hasPath("validate.whois.cacheTtlSeconds") }
+                        ?.getLong("validate.whois.cacheTtlSeconds") ?: 300L
+                log.info("Validate role source = whois (enrichment baseUrl={}, cacheTtl={}s)", whoisBaseUrl, ttl)
                 WhoisRoleSource(KtorWhoisRoleLookup(whoisBaseUrl), cacheTtlSeconds = ttl)
             }
             else -> {
-                log.info("Argos role source = bearer (default; no whois dependency)")
+                log.info("Validate role source = bearer (default; no whois dependency)")
                 BearerRoleSource()
             }
         }
-    val argosService =
+    val validateService =
         ValidateServiceImpl(
             securityApplier = securityApplier,
             ruleEnforcer = ruleEnforcer,
@@ -174,19 +174,19 @@ fun Application.module(config: Config) {
             .permitKeepAliveWithoutCalls(true)
             .maxInboundMessageSize(maxMessageSize)
             .intercept(IncomingCallLoggingInterceptor())
-            .addService(argosService)
+            .addService(validateService)
             .apply { if (reflectionEnabled) addService(ProtoReflectionServiceV1.newInstance()) }
             .build()
 
     launch {
         grpcServer.start()
-        log.info("Argos gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
+        log.info("Validate gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
         grpcServer.awaitTermination()
     }
 
-    // Readiness gate: Ariadne (model graph) is the one hard dependency — policy evaluation is
+    // Readiness gate: Veles (model graph) is the one hard dependency — policy evaluation is
     // in-process since the 3.2 fold, so there is no sql-security hop to probe. The monitor probes
-    // Ariadne on a background scope with exponential backoff and drives /ready so K8s holds traffic
+    // Veles on a background scope with exponential backoff and drives /ready so K8s holds traffic
     // until it recovers. Fixture boots have no channel, so the probe reports ready immediately.
     val dependencyMonitor = buildDependencyMonitor(config, metadataClient)
     val monitorScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -211,7 +211,7 @@ fun Application.module(config: Config) {
             val version = runCatching { metadataClient.currentVersion() }.getOrDefault("")
             call.respond(
                 buildJsonObject {
-                    put("service", "argos")
+                    put("service", "validate")
                     put("grpc_port", grpcPort)
                     put("metadata_version", version)
                     put("llm_guard_enabled", llmGuardEnabled)
@@ -226,7 +226,7 @@ fun Application.module(config: Config) {
     }
 
     monitor.subscribe(io.ktor.server.application.ApplicationStopping) {
-        log.info("Shutting down Argos gRPC server")
+        log.info("Shutting down Validate gRPC server")
         monitorScope.cancel()
         grpcServer.shutdown()
         if (securityClient is AutoCloseable) securityClient.close()
@@ -244,16 +244,16 @@ private fun buildDependencyMonitor(
         default: Long,
     ): Long = if (config.hasPath(path)) config.getLong(path) else default
 
-    val pollIntervalMs = longOr("argos.dependency-monitor.poll-interval-seconds", 30L) * 1000
-    val backoffBaseMs = longOr("argos.dependency-monitor.backoff-base-ms", 1_000L)
-    val backoffMaxMs = longOr("argos.dependency-monitor.backoff-max-ms", 60_000L)
-    // Ariadne (model graph) is the only hard readiness dependency. Since the
+    val pollIntervalMs = longOr("validate.dependency-monitor.poll-interval-seconds", 30L) * 1000
+    val backoffBaseMs = longOr("validate.dependency-monitor.backoff-base-ms", 1_000L)
+    val backoffMaxMs = longOr("validate.dependency-monitor.backoff-max-ms", 60_000L)
+    // Veles (model graph) is the only hard readiness dependency. Since the
     // Stage 3.2 fold, the policy engine runs in-process (no sql-security service
     // to probe), so there is no security dependency in the gate.
     return DependencyMonitor(
         dependencies =
             listOf(
-                DependencyMonitor.Dependency("ariadne") { metadataClient.probeReady() },
+                DependencyMonitor.Dependency("veles") { metadataClient.probeReady() },
             ),
         pollIntervalMs = pollIntervalMs,
         backoffBaseMs = backoffBaseMs,
@@ -262,18 +262,18 @@ private fun buildDependencyMonitor(
 }
 
 private fun buildLlmGatewayClient(config: Config): LlmGatewayClient? {
-    if (!config.hasPath("argos.llm-guard.gateway-url")) return null
-    val baseUrl = config.getString("argos.llm-guard.gateway-url").trim()
+    if (!config.hasPath("validate.llm-guard.gateway-url")) return null
+    val baseUrl = config.getString("validate.llm-guard.gateway-url").trim()
     if (baseUrl.isEmpty()) return null
     val timeoutMs =
-        if (config.hasPath("argos.llm-guard.timeout-ms")) {
-            config.getLong("argos.llm-guard.timeout-ms")
+        if (config.hasPath("validate.llm-guard.timeout-ms")) {
+            config.getLong("validate.llm-guard.timeout-ms")
         } else {
             10_000L
         }
     val apiKey =
-        if (config.hasPath("argos.llm-guard.api-key")) {
-            config.getString("argos.llm-guard.api-key").takeIf { it.isNotBlank() }
+        if (config.hasPath("validate.llm-guard.api-key")) {
+            config.getString("validate.llm-guard.api-key").takeIf { it.isNotBlank() }
         } else {
             null
         }
@@ -287,7 +287,7 @@ private fun pickSecurityClient(
 ): SecurityClient {
     if (useFixture) {
         log.warn(
-            "Argos booting with fixture policy client (argos.use-fixture-model = true) — no row-level " +
+            "Validate booting with fixture policy client (validate.use-fixture-model = true) — no row-level " +
                 "policies applied. Production deployments leave this false.",
         )
         return SecurityClient { req ->
@@ -299,14 +299,14 @@ private fun pickSecurityClient(
         }
     }
     // Stage 3.2 fold: policy evaluation is in-process. Load policies from HOCON
-    // (argos.policies) and key on the bearer roles carried in the request context.
+    // (validate.policies) and key on the bearer roles carried in the request context.
     val registry = PolicyRegistry(PolicyConfigLoader.load(config))
     val policyMetadata =
         GrpcPolicyMetadataClient(
-            host = config.getString("ariadne.host"),
-            port = config.getInt("ariadne.port"),
+            host = config.getString("veles.host"),
+            port = config.getInt("veles.port"),
         )
-    log.info("Argos policy engine loaded {} in-process policies", registry.size())
+    log.info("Validate policy engine loaded {} in-process policies", registry.size())
     return LocalPolicyClient(PolicyEngine(registry, policyMetadata))
 }
 
@@ -318,14 +318,14 @@ private fun pickMetadataClient(
         return StaticMetadataClient(version = "boot-fixture-v0")
     }
     val deadlineSeconds =
-        if (config.hasPath("ariadne.deadline-seconds")) {
-            config.getLong("ariadne.deadline-seconds")
+        if (config.hasPath("veles.deadline-seconds")) {
+            config.getLong("veles.deadline-seconds")
         } else {
             30L
         }
     return GrpcMetadataClient(
-        host = config.getString("ariadne.host"),
-        port = config.getInt("ariadne.port"),
+        host = config.getString("veles.host"),
+        port = config.getInt("veles.port"),
         deadlineSeconds = deadlineSeconds,
     )
 }

@@ -1,7 +1,7 @@
 package org.tatrman.query.mcp.identity
 
 /**
- * The OBO identity gate for the theseus-mcp edge (fork Stage 3.5; kantheon-security
+ * The OBO identity gate for the query-mcp edge (fork Stage 3.5; kantheon-security
  * §2 / §2.1). A pure decision over the three identity sources so the security-critical
  * fail-closed behavior is unit-testable, independent of the MCP transport plumbing.
  *

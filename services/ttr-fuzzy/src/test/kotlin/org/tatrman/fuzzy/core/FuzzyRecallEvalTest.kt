@@ -212,7 +212,7 @@ class FuzzyRecallEvalTest :
 
             val pos = cases.count { it.expected != null }
             val neg = cases.count { it.expected == null }
-            println("=== echo recall/score eval ($pos positives, $neg negatives) ===")
+            println("=== fuzzy recall/score eval ($pos positives, $neg negatives) ===")
             println(
                 "NFD-only   : recall@1=${"%.3f".format(nfd.recallAt1)}  recall@5=${"%.3f".format(nfd.recallAt5)}" +
                     "  meanInflectedTop1=${"%.3f".format(

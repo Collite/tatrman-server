@@ -529,7 +529,7 @@ class Tools(
     // ---------------------------------------------------------------------
     // Golem P4 S4.2 — resolve a subject `area` to its package set. A Golem Shem
     // declaring `areas: [accounting]` resolves it here to the concrete packages
-    // it must pull (via get_model). Zero-logic wrapper over ariadne's
+    // it must pull (via get_model). Zero-logic wrapper over veles's
     // ResolveArea RPC.
     // ---------------------------------------------------------------------
 
@@ -539,7 +539,7 @@ class Tools(
             description =
                 "Resolve a subject area (e.g. 'accounting') to the package set it spans, plus its " +
                     "description and tags. A Golem Shem uses this to expand its `areas: [...]` list " +
-                    "into the concrete Ariadne packages to fetch via get_model. " +
+                    "into the concrete Veles packages to fetch via get_model. " +
                     "`found=false` when the area is unknown.",
             inputSchema =
                 ToolSchema(
@@ -596,10 +596,10 @@ class Tools(
                 resp.found,
                 resp.packagesList.size,
             )
-            // Surface ariadne-side warnings (e.g. area_not_found) as MCP text so callers can log them.
+            // Surface veles-side warnings (e.g. area_not_found) as MCP text so callers can log them.
             val warningText =
                 if (resp.messagesList.isNotEmpty()) {
-                    "\n\n[ariadne messages] " +
+                    "\n\n[veles messages] " +
                         resp.messagesList.joinToString("; ") { "[${it.code}] ${it.humanMessage}" }
                 } else {
                     ""

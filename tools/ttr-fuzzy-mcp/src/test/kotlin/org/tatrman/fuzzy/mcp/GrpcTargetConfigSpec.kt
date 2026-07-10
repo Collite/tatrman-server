@@ -7,51 +7,51 @@ import io.kotest.matchers.shouldNotBe
 import io.mockk.mockk
 
 /**
- * Stage 2.2 R2.3 — the gRPC target is sourced from `echo.client.*` HOCON
+ * Stage 2.2 R2.3 — the gRPC target is sourced from `fuzzy.client.*` HOCON
  * (NOT from legacy `FUZZY_MATCHER_*` env vars). Verifies:
  *  - a representative HOCON yields the right gRPC host/port
  *  - a blank host returns `null` (warn-and-continue, not crash)
  *
  * Review-004 R2 lesson (Stage 2.1): the dev inlined the config read in
- * the test and never exercised the production [buildEchoClient]. Here we
+ * the test and never exercised the production [buildFuzzyClient]. Here we
  * call the production function on a synthetic HOCON with a mocked
  * telemetry — that is the wiring the k8s pod will follow in production.
  */
 class GrpcTargetConfigSpec :
     StringSpec({
-        "buildEchoClient reads gRPC target from echo.client.* HOCON" {
+        "buildFuzzyClient reads gRPC target from fuzzy.client.* HOCON" {
             val hocon =
                 """
-                echo.client.protocol = "gRPC"
-                echo.client.host = "echo.production"
-                echo.client.grpc.port = "7266"
+                fuzzy.client.protocol = "gRPC"
+                fuzzy.client.host = "fuzzy.production"
+                fuzzy.client.grpc.port = "7266"
                 """.trimIndent()
             val config = ConfigFactory.parseString(hocon)
-            val client = buildEchoClient(config, mockk(relaxed = true))
+            val client = buildFuzzyClient(config, mockk(relaxed = true))
             client shouldNotBe null
         }
 
-        "buildEchoClient returns null on blank host (local no-backend mode)" {
+        "buildFuzzyClient returns null on blank host (local no-backend mode)" {
             val hocon =
                 """
-                echo.client.protocol = "gRPC"
-                echo.client.host = ""
-                echo.client.grpc.port = "7266"
+                fuzzy.client.protocol = "gRPC"
+                fuzzy.client.host = ""
+                fuzzy.client.grpc.port = "7266"
                 """.trimIndent()
             val config = ConfigFactory.parseString(hocon)
-            val client = buildEchoClient(config, mockk(relaxed = true))
+            val client = buildFuzzyClient(config, mockk(relaxed = true))
             client shouldBe null
         }
 
-        "buildEchoClient falls back to REST when protocol is not gRPC" {
+        "buildFuzzyClient falls back to REST when protocol is not gRPC" {
             val hocon =
                 """
-                echo.client.protocol = "REST"
-                echo.client.host = "echo.production"
-                echo.client.rest.port = "7265"
+                fuzzy.client.protocol = "REST"
+                fuzzy.client.host = "fuzzy.production"
+                fuzzy.client.rest.port = "7265"
                 """.trimIndent()
             val config = ConfigFactory.parseString(hocon)
-            val client = buildEchoClient(config, mockk(relaxed = true))
+            val client = buildFuzzyClient(config, mockk(relaxed = true))
             client shouldNotBe null
         }
     })

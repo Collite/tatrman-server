@@ -21,7 +21,7 @@ import java.sql.Connection
  * Runs the actual vendored `tpcds.sql` (all 25 CREATE TABLEs — also proving it's valid
  * PostgreSQL DDL) on a Testcontainers Postgres, then loads a tiny `reason` fixture and
  * asserts exact row + column fidelity, including the empty-last-column → NULL case.
- * Postgres is native multi-arch, so no CiOnly gate (unlike the Brontes/MSSQL specs).
+ * Postgres is native multi-arch, so no CiOnly gate (unlike the Mssql/MSSQL specs).
  */
 @Tags("component")
 class TpcdsLoadComponentSpec :

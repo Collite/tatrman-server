@@ -16,7 +16,7 @@ jib {
         image = "eclipse-temurin:21-jre"
     }
     to {
-        image = "ariadne:dev"
+        image = "veles:dev"
     }
     container {
         mainClass = "org.tatrman.veles.ApplicationKt"
@@ -32,14 +32,14 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// AriadneModelLoadComponentSpec reconciles the real bundled model tree through the live
-// ttr-metadata reconciler (LocalFsStorage → a real directory). The suite carries Ariadne on its
+// VelesModelLoadComponentSpec reconciles the real bundled model tree through the live
+// ttr-metadata reconciler (LocalFsStorage → a real directory). The suite carries Veles on its
 // runtime classpath as a JAR, so the spec cannot resolve the model dir from a classpath resource
 // URI (that would be a `jar:` URI → FileSystemNotFoundException). Hand it the authored resources
 // dir on disk instead.
 tasks.named<Test>("componentTest") {
     systemProperty(
-        "ariadne.modelRoot",
+        "veles.modelRoot",
         layout.projectDirectory
             .dir("src/main/resources/model-ttr")
             .asFile.absolutePath,
@@ -51,14 +51,14 @@ tasks.named<Test>("componentTest") {
 // recipe no longer applies; the legacy YAML dir stays in tree as a one-time reference.)
 
 dependencies {
-    // TTR metadata library (third-party, Collite/tatrman) — Ariadne runs on this
+    // TTR metadata library (third-party, Collite/tatrman) — Veles runs on this
     // after the M4.1 swap (MD2): typed model, sources, reconcile, resolve, graph,
     // search, registry, refresher mechanism, world resolution. It re-exports
     // ttr-parser/writer/semantics as `api`, so those three are NOT declared here
     // (MetadataExportRoutes still imports them — they arrive transitively).
     implementation(libs.tatrman.ttr.metadata)
     // GitArchiveStorage (jgit) behind the ModelStorage SPI (MD3) — jgit +
-    // commons-compress ride this transitively; Ariadne must not re-declare them.
+    // commons-compress ride this transitively; Veles must not re-declare them.
     implementation(libs.tatrman.ttr.metadata.git)
     // `erp-sql-metadata` was a declared-but-unused dep in the ai-platform build (no `shared.erp.*`
     // imports in any source). Dropped from the kantheon fork.
@@ -75,7 +75,7 @@ dependencies {
     implementation(libs.grpc.services)
 
     // jgrapht (ModelGraph) rides ttr-metadata transitively; jgit/commons-compress
-    // ride ttr-metadata-git (MD3). Ariadne no longer declares any of them directly.
+    // ride ttr-metadata-git (MD3). Veles no longer declares any of them directly.
 
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)

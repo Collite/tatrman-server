@@ -31,7 +31,7 @@ import org.tatrman.fuzzy.config.MetadataConfig
 import org.tatrman.fuzzy.config.PostgresConfig
 import org.tatrman.fuzzy.core.Candidate
 import org.tatrman.fuzzy.core.StringRepository
-import org.tatrman.fuzzy.telemetry.EchoTelemetry
+import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import java.util.UUID
@@ -137,7 +137,7 @@ class MetadataLoaderSourceComponentTest :
         }
 
         fun harness(timeoutMs: Long = 2_000): TestHarness {
-            val name = "echo-loader-it-${UUID.randomUUID()}"
+            val name = "fuzzy-loader-it-${UUID.randomUUID()}"
             val stub = StubVelesService()
             val server =
                 InProcessServerBuilder
@@ -360,7 +360,7 @@ class MetadataLoaderSourceComponentTest :
                         dialect = PostgresConfig("h", 1, "db", "u", "p"),
                         sourceNamespace = "",
                         fetchCandidates = { _ -> listOf(Candidate.fromValues("1", "x")) },
-                        telemetry = EchoTelemetry(),
+                        telemetry = FuzzyTelemetry(),
                     )
 
                 runBlocking { loader.loadNextCache() }.shouldBeNull()

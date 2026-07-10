@@ -10,24 +10,24 @@ import pytest
 from org.tatrman.plan.v1 import context_pb2, plan_pb2
 from org.tatrman.worker.v1 import worker_pb2
 
-from workers_steropes.config import WorkspaceConfig
-from workers_steropes.grpc_service import WorkerService
-from workers_steropes.workspace import WorkspaceStore
+from workers_polars.config import WorkspaceConfig
+from workers_polars.grpc_service import WorkerService
+from workers_polars.workspace import WorkspaceStore
 
 
 def _cfg_full():
-    """Minimal full WorkersSteropesConfig with realistic limits."""
-    from workers_steropes.config import (
+    """Minimal full WorkersPolarsConfig with realistic limits."""
+    from workers_polars.config import (
         CapabilityConfig,
         GrpcConfig,
         HttpConfig,
         LimitsConfig,
         MetadataConfig,
         TelemetryConfig,
-        WorkersSteropesConfig,
+        WorkersPolarsConfig,
     )
 
-    return WorkersSteropesConfig(
+    return WorkersPolarsConfig(
         grpc=GrpcConfig(host="0", port=7501, max_message_bytes=33554432),
         http=HttpConfig(host="0", port=7502),
         workspace=WorkspaceConfig(

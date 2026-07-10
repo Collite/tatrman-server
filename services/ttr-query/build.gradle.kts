@@ -47,7 +47,7 @@ jib {
         }
     }
     to {
-        image = "theseus:dev"
+        image = "query:dev"
     }
     container {
         mainClass = "org.tatrman.query.ApplicationKt"

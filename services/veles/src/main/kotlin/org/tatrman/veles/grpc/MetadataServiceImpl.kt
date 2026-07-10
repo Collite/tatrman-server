@@ -894,7 +894,7 @@ class MetadataServiceImpl(
     /**
      * Golem P4 S4.2 — resolve a subject area (`def area accounting { ... }`) to its
      * package set + description + tags. A Golem Shem with `areas: [accounting]` calls
-     * this to discover which Ariadne packages it must pull (via GetModel) for the area.
+     * this to discover which Veles packages it must pull (via GetModel) for the area.
      *
      * Unknown area → `found = false`, empty packages, plus a Rule-6 WARNING
      * (`area_not_found`) — never a gRPC error. Referenced packages are returned

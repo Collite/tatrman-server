@@ -13,16 +13,16 @@ import java.io.File
 /**
  * Stage 2.2 T6 — load the `ToolCapability` manifests under
  * `src/main/resources/manifests/tools/` and build one [Capability] per
- * manifest. Same pattern as ariadne-mcp (Review-004 R5.1).
+ * manifest. Same pattern as veles-mcp (Review-004 R5.1).
  *
  * The shared `ManifestYamlLoader` lives in `:tools:capabilities-mcp` —
- * a peer module that echo-mcp must not depend on (and vice-versa), so we
+ * a peer module that fuzzy-mcp must not depend on (and vice-versa), so we
  * parse the manifests directly. The shapes are simple: a top-level
  * `ToolCapability` with `capability_id` + `category` + `version` +
  * `description` + `service_endpoint` + `search_tags` + `cost_hints`.
  *
  * For Stage 2.2 there's a single manifest: `match.yaml` → capability_id
- * `echo.match:v1`. The cascade is exposed as tool args (not separate tools)
+ * `fuzzy.match:v1`. The cascade is exposed as tool args (not separate tools)
  * per contracts §2, so one capability covers the whole `match` surface.
  */
 class ManifestLoader {

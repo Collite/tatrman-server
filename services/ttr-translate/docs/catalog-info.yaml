@@ -1,8 +1,8 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: proteus
-  description: Proteus — thin gRPC wrapper around the query-translator (Calcite/RelNode) library; lang ↔ RelNode ↔ SQL
+  name: translate
+  description: Translate — thin gRPC wrapper around the query-translator (Calcite/RelNode) library; lang ↔ RelNode ↔ SQL
   annotations:
     backstage.io/techdocs-ref: dir:.
   tags:

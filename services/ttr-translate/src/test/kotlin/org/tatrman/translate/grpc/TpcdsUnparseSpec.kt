@@ -18,16 +18,16 @@ import org.tatrman.translator.framework.ModelTable
 import org.tatrman.translator.framework.SurfaceType
 
 /**
- * WS-T2 T4 — Proteus emits valid PostgreSQL for the four TPC-DS curated shapes
+ * WS-T2 T4 — Translate emits valid PostgreSQL for the four TPC-DS curated shapes
  * (join+group-by, join+agg+ORDER/LIMIT, window function, CTE+UNION ALL). Parses each
  * against a tpcds DB-schema model, then unparses the plan to PostgreSQL (the dialect
- * Arges asks for) and asserts the dialect (double-quoted identifiers, no MSSQL
+ * Postgres asks for) and asserts the dialect (double-quoted identifiers, no MSSQL
  * brackets) plus the shape-defining SQL of each query.
  *
  * The CTE/UNION shape exercises the `plan.v1` `Union` op added in tatrman
  * ttr-plan-proto/ttr-translator 0.8.1 (consumed via the ttr-translator Phase B swap);
  * the window shape exercises the OVER/PARTITION unparse. `{year}` is inlined as a
- * literal here (the Proteus parameter-bridge is covered elsewhere).
+ * literal here (the Translate parameter-bridge is covered elsewhere).
  */
 class TpcdsUnparseSpec :
     StringSpec({

@@ -132,7 +132,7 @@ class TranslatorServiceImpl(
                 // Replace the context's parameters with the positional (one-per-`?`) sequence the
                 // worker binds 1:1 — a name used twice yields two `?` but a single named binding, so
                 // the distinct list would leave the later position unset. Empty (non-SQL target /
-                // param-less query) → echo the context unchanged.
+                // param-less query) → fuzzy the context unchanged.
                 val context =
                     if (result.parameters.isEmpty()) {
                         request.context

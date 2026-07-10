@@ -17,32 +17,32 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import org.tatrman.capabilities.client.CapabilitiesClient
-import org.tatrman.fuzzy.mcp.client.EchoClient
-import org.tatrman.fuzzy.mcp.client.EchoGrpcClient
-import org.tatrman.fuzzy.mcp.client.EchoRestClient
-import org.tatrman.fuzzy.mcp.telemetry.EchoMcpTelemetry
+import org.tatrman.fuzzy.mcp.client.FuzzyClient
+import org.tatrman.fuzzy.mcp.client.FuzzyGrpcClient
+import org.tatrman.fuzzy.mcp.client.FuzzyRestClient
+import org.tatrman.fuzzy.mcp.telemetry.FuzzyMcpTelemetry
 import shared.ktor.mcp.McpKtorConfig
 import shared.ktor.mcp.installMcpKtorBase
 import shared.ktor.mcp.safeMcpTool
 
-val logger = LoggerFactory.getLogger("echo-mcp")
+val logger = LoggerFactory.getLogger("fuzzy-mcp")
 
 fun main(): Unit =
     runBlocking {
-        logger.info("Starting echo-mcp")
+        logger.info("Starting fuzzy-mcp")
 
         val config = ConfigFactory.load()
-        val telemetry = EchoMcpTelemetry()
+        val telemetry = FuzzyMcpTelemetry()
         val serverPort = config.getString("server.port").toInt()
 
-        // All match calls go over gRPC to the echo service (REST is opt-in
-        // via `echo.client.protocol=REST`). The target is read from
-        // `echo.client.{host,port}` (HOCON resolves the ECHO_GRPC_* env
+        // All match calls go over gRPC to the fuzzy service (REST is opt-in
+        // via `fuzzy.client.protocol=REST`). The target is read from
+        // `fuzzy.client.{host,port}` (HOCON resolves the FUZZY_GRPC_* env
         // overrides the k8s manifest sets). A blank host → `null` and the
         // tools surface a "not wired" error rather than crashing boot —
         // local-without-cluster mode.
-        val echoClient: EchoClient? = buildEchoClient(config, telemetry)
-        val tools = Tools(echoClient, telemetry)
+        val fuzzyClient: FuzzyClient? = buildFuzzyClient(config, telemetry)
+        val tools = Tools(fuzzyClient, telemetry)
 
         // Stage 2.2 T6 — register with capabilities-mcp (warn-and-continue).
         // The `capabilities-mcp` endpoint is empty by default — opt in with
@@ -53,7 +53,7 @@ fun main(): Unit =
 
         val mcpKtorConfig =
             McpKtorConfig(
-                serviceName = "echo-mcp",
+                serviceName = "fuzzy-mcp",
                 serverPort = serverPort,
                 callLoggingConfig =
                     McpKtorConfig.CallLoggingConfig(
@@ -68,7 +68,7 @@ fun main(): Unit =
                     ),
             )
 
-        println("echo-mcp listening on port $serverPort")
+        println("fuzzy-mcp listening on port $serverPort")
 
         val appConfig =
             serverConfig {
@@ -77,7 +77,7 @@ fun main(): Unit =
 
                     mcpStreamableHttp {
                         Server(
-                            serverInfo = Implementation(name = "echo-mcp", version = "0.1.0"),
+                            serverInfo = Implementation(name = "fuzzy-mcp", version = "0.1.0"),
                             options =
                                 io.modelcontextprotocol.kotlin.sdk.server.ServerOptions(
                                     capabilities =
@@ -120,33 +120,33 @@ fun main(): Unit =
 
 /**
  * Builds the gRPC client (default) or REST client (opt-in) from the
- * `echo.client.*` HOCON block. Returns `null` when the gRPC host is blank
+ * `fuzzy.client.*` HOCON block. Returns `null` when the gRPC host is blank
  * (local no-backend mode) — the [Tools] then surfaces a "not wired" error
- * on every invocation rather than crashing boot. Mirrors the ariadne-mcp
+ * on every invocation rather than crashing boot. Mirrors the veles-mcp
  * pattern (Stage 2.1 R2 re-review, 2026-06-13).
  */
-internal fun buildEchoClient(
+internal fun buildFuzzyClient(
     config: Config,
-    telemetry: EchoMcpTelemetry,
-): EchoClient? {
-    val protocol = config.getString("echo.client.protocol").lowercase()
+    telemetry: FuzzyMcpTelemetry,
+): FuzzyClient? {
+    val protocol = config.getString("fuzzy.client.protocol").lowercase()
     return if (protocol == "grpc") {
-        val host = config.getString("echo.client.host")
+        val host = config.getString("fuzzy.client.host")
         if (host.isBlank()) {
-            logger.warn("echo.client.host is blank — gRPC client disabled; tools will surface 'not wired'")
+            logger.warn("fuzzy.client.host is blank — gRPC client disabled; tools will surface 'not wired'")
             null
         } else {
-            val port = config.getString("echo.client.grpc.port").toInt()
-            EchoGrpcClient(host, port, telemetry)
+            val port = config.getString("fuzzy.client.grpc.port").toInt()
+            FuzzyGrpcClient(host, port, telemetry)
         }
     } else {
-        val host = config.getString("echo.client.host")
+        val host = config.getString("fuzzy.client.host")
         if (host.isBlank()) {
-            logger.warn("echo.client.host is blank — REST client disabled; tools will surface 'not wired'")
+            logger.warn("fuzzy.client.host is blank — REST client disabled; tools will surface 'not wired'")
             null
         } else {
-            val url = "http://$host:${config.getString("echo.client.rest.port")}"
-            EchoRestClient(url, telemetry)
+            val url = "http://$host:${config.getString("fuzzy.client.rest.port")}"
+            FuzzyRestClient(url, telemetry)
         }
     }
 }

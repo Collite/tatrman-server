@@ -34,19 +34,19 @@ private val log = LoggerFactory.getLogger("org.tatrman.worker.postgres.Applicati
 
 fun main() {
     val config = ConfigFactory.load()
-    val serverConfig = KtorConfigFactory.fromConfig(config, "arges", 7302)
+    val serverConfig = KtorConfigFactory.fromConfig(config, "postgres", 7302)
     KtorServerBootstrap.createServer(serverConfig) { module(config) }.start(wait = true)
 }
 
 fun Application.module(config: Config) {
-    installKtorServerBase(KtorConfigFactory.fromConfig(config, "arges", 7302))
+    installKtorServerBase(KtorConfigFactory.fromConfig(config, "postgres", 7302))
 
     // OTel SDK init: configures OTLP trace/metric/log exporters AND installs the bridge
     // into the Logback OpenTelemetryAppender so all SLF4J logs are forwarded to OTLP → Alloy → Loki.
     createOpenTelemetrySdk(
         OtelEndpointConfig(
-            serviceName = "arges",
-            protocol = System.getenv("ARGES_OTEL_PROTOCOL") ?: "grpc",
+            serviceName = "postgres",
+            protocol = System.getenv("POSTGRES_OTEL_PROTOCOL") ?: "grpc",
         ),
         enabled = config.hasPath("telemetry.enabled") && config.getBoolean("telemetry.enabled"),
     )
@@ -101,7 +101,11 @@ fun Application.module(config: Config) {
 
     launch {
         grpcServer.start()
-        log.info("Arges (Postgres worker) gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
+        log.info(
+            "Postgres (Postgres worker) gRPC server started on port {} (reflection={})",
+            grpcPort,
+            reflectionEnabled,
+        )
         grpcServer.awaitTermination()
     }
 
@@ -129,7 +133,7 @@ fun Application.module(config: Config) {
         get("/status") {
             call.respond(
                 buildJsonObject {
-                    put("service", "arges")
+                    put("service", "postgres")
                     put("engine", config.getString("worker.engine"))
                     put("engine_version", config.getString("worker.engine-version"))
                     put("grpc_port", grpcPort)
@@ -151,7 +155,7 @@ fun Application.module(config: Config) {
     }
 
     monitor.subscribe(ApplicationStopping) {
-        log.info("Shutting down Arges")
+        log.info("Shutting down Postgres")
         grpcServer.shutdown()
         runCatching { pool.close() }
         if (translatorRaw is AutoCloseable) runCatching { translatorRaw.close() }
@@ -203,7 +207,7 @@ private fun pickTranslator(
 ): TranslatorClient {
     if (useFixture) {
         log.warn(
-            "Arges booting in fixture mode (worker.use-fixture = true). " +
+            "Postgres booting in fixture mode (worker.use-fixture = true). " +
                 "Translator client is a no-op stub; production deployments must flip this to false.",
         )
         return object : TranslatorClient {
@@ -219,8 +223,8 @@ private fun pickTranslator(
         }
     }
     return GrpcTranslatorClient(
-        host = config.getString("proteus.host"),
-        port = config.getInt("proteus.port"),
-        timeoutSeconds = config.getLong("proteus.timeout-seconds"),
+        host = config.getString("translate.host"),
+        port = config.getInt("translate.port"),
+        timeoutSeconds = config.getLong("translate.timeout-seconds"),
     )
 }

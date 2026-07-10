@@ -2,7 +2,7 @@ syntax = "proto3";
 
 // Forked from ai-platform@kantheon-fork-point
 //   (shared/proto/src/main/proto/org/tatrman/llmgateway/v1/llm_gateway_chat.proto).
-// Fork Stage 2.5 (Prometheus). Package org.tatrman.llmgateway.grpc →
+// Fork Stage 2.5 (LLM gateway). Package org.tatrman.llmgateway.grpc →
 // org.tatrman.llm.v1; service ChatService → LlmGatewayService (persona
 // consistency, contracts §1). Wire shapes otherwise unchanged.
 
@@ -28,7 +28,7 @@ service LlmGatewayService {
 
   // Embeddings (additive — Kleio/DocWH P2 pre-flight; kleio/contracts.md §10).
   // One multilingual model for the whole corpus (a conformed dimension); the
-  // Kallimachos EmbeddingsPort calls this. The Prometheus service impl wires the
+  // An embeddings consumer calls this. The LLM-gateway service impl wires the
   // model egress; an unimplemented stub is harmless until then (the Kleio client
   // is Wiremock-tested against the REST mirror).
   rpc EmbedText (EmbedRequest) returns (EmbedResponse);

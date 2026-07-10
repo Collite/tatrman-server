@@ -106,43 +106,43 @@ private suspend fun warmUpCalcite() {
 
 fun main() {
     val config = ConfigFactory.load()
-    val serverConfig = KtorConfigFactory.fromConfig(config, "proteus", 7275)
+    val serverConfig = KtorConfigFactory.fromConfig(config, "translate", 7275)
     KtorServerBootstrap.createServer(serverConfig) { module(config) }.start(wait = true)
 }
 
 fun Application.module(config: Config) {
-    installKtorServerBase(KtorConfigFactory.fromConfig(config, "proteus", 7275))
+    installKtorServerBase(KtorConfigFactory.fromConfig(config, "translate", 7275))
 
     // OTel SDK init: configures OTLP trace/metric/log exporters AND installs the bridge
     // into the Logback OpenTelemetryAppender so all SLF4J logs are forwarded to OTLP → Alloy → Loki.
     createOpenTelemetrySdk(
         OtelEndpointConfig(
-            serviceName = "proteus",
-            protocol = System.getenv("PROTEUS_OTEL_PROTOCOL") ?: "grpc",
+            serviceName = "translate",
+            protocol = System.getenv("TRANSLATE_OTEL_PROTOCOL") ?: "grpc",
         ),
     )
 
     val useFixture =
-        config.hasPath("proteus.use-fixture-model") && config.getBoolean("proteus.use-fixture-model")
+        config.hasPath("translate.use-fixture-model") && config.getBoolean("translate.use-fixture-model")
 
     // Production: a MetadataServiceModelHandleProvider polling the metadata service's GetSnapshot
     // (ETag-skip; first fetch swaps in the real model, boot fixture used until then). Tests / no
-    // Ariadne reachable: the static boot fixture (proteus.use-fixture-model = true).
+    // Veles reachable: the static boot fixture (translate.use-fixture-model = true).
     var metadataChannel: ManagedChannel? = null
     var getQueryFn: (suspend (GetQueryRequest) -> GetQueryResponse)? = null
     val modelProvider: ModelHandleProvider =
         if (useFixture) {
-            log.warn("Proteus booting with fixture model (proteus.use-fixture-model = true)")
+            log.warn("Translate booting with fixture model (translate.use-fixture-model = true)")
             StaticModelHandleProvider(BootFixtureModel.handle())
         } else {
-            val host = config.getString("ariadne.host")
-            val port = config.getInt("ariadne.port")
+            val host = config.getString("veles.host")
+            val port = config.getInt("veles.port")
             val pollSeconds =
                 if (config.hasPath(
-                        "ariadne.poll-interval-seconds",
+                        "veles.poll-interval-seconds",
                     )
                 ) {
-                    config.getInt("ariadne.poll-interval-seconds")
+                    config.getInt("veles.poll-interval-seconds")
                 } else {
                     600
                 }
@@ -157,21 +157,21 @@ fun Application.module(config: Config) {
                     .build()
             metadataChannel = channel
             val snapshotDeadlineSeconds =
-                if (config.hasPath("ariadne.snapshot-deadline-seconds")) {
-                    config.getInt("ariadne.snapshot-deadline-seconds")
+                if (config.hasPath("veles.snapshot-deadline-seconds")) {
+                    config.getInt("veles.snapshot-deadline-seconds")
                 } else {
                     30
                 }
             val initialRetrySeconds =
-                if (config.hasPath("ariadne.initial-retry-seconds")) {
-                    config.getInt("ariadne.initial-retry-seconds")
+                if (config.hasPath("veles.initial-retry-seconds")) {
+                    config.getInt("veles.initial-retry-seconds")
                 } else {
                     5
                 }
             val stub = VelesServiceGrpcKt.VelesServiceCoroutineStub(channel)
             getQueryFn = { req: GetQueryRequest -> stub.withDeadlineAfter(10, TimeUnit.SECONDS).getQuery(req) }
             log.info(
-                "Proteus using Ariadne at {}:{} (poll every {}s, snapshot deadline {}s, initial retry {}s)",
+                "Translate using Veles at {}:{} (poll every {}s, snapshot deadline {}s, initial retry {}s)",
                 host,
                 port,
                 pollSeconds,
@@ -208,7 +208,7 @@ fun Application.module(config: Config) {
 
     launch {
         grpcServer.start()
-        log.info("Proteus gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
+        log.info("Translate gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
         grpcServer.awaitTermination()
     }
 
@@ -246,7 +246,7 @@ fun Application.module(config: Config) {
             val lastRefreshTs = (modelProvider as? MetadataServiceModelHandleProvider)?.lastSuccessfulRefreshTimestamp()
             call.respond(
                 buildJsonObject {
-                    put("service", JsonPrimitive("proteus"))
+                    put("service", JsonPrimitive("translate"))
                     put("model_version", JsonPrimitive(handle.currentVersion()))
                     put("grpc_port", JsonPrimitive(grpcPort))
                     put("er_entity_count", JsonPrimitive(erEntityCount))
@@ -299,7 +299,7 @@ fun Application.module(config: Config) {
     }
 
     monitor.subscribe(ApplicationStopping) {
-        log.info("Shutting down proteus gRPC server")
+        log.info("Shutting down translate gRPC server")
         (modelProvider as? MetadataServiceModelHandleProvider)?.stop()
         metadataChannel?.shutdown()?.awaitTermination(5, TimeUnit.SECONDS)
         grpcServer.shutdown()

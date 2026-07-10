@@ -4,21 +4,21 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from workers_steropes.config import (
+from workers_polars.config import (
     CapabilityConfig,
     GrpcConfig,
     HttpConfig,
     LimitsConfig,
     MetadataConfig,
     TelemetryConfig,
-    WorkersSteropesConfig,
+    WorkersPolarsConfig,
     WorkspaceConfig,
 )
-from workers_steropes.probes import make_probes_app
+from workers_polars.probes import make_probes_app
 
 
-def _cfg() -> WorkersSteropesConfig:
-    return WorkersSteropesConfig(
+def _cfg() -> WorkersPolarsConfig:
+    return WorkersPolarsConfig(
         grpc=GrpcConfig(host="0", port=7501, max_message_bytes=33554432),
         http=HttpConfig(host="0", port=7502),
         workspace=WorkspaceConfig(

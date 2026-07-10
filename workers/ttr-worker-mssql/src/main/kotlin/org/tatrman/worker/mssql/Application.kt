@@ -34,19 +34,19 @@ private val log = LoggerFactory.getLogger("org.tatrman.worker.mssql.Application"
 
 fun main() {
     val config = ConfigFactory.load()
-    val serverConfig = KtorConfigFactory.fromConfig(config, "brontes", 7295)
+    val serverConfig = KtorConfigFactory.fromConfig(config, "mssql", 7295)
     KtorServerBootstrap.createServer(serverConfig) { module(config) }.start(wait = true)
 }
 
 fun Application.module(config: Config) {
-    installKtorServerBase(KtorConfigFactory.fromConfig(config, "brontes", 7295))
+    installKtorServerBase(KtorConfigFactory.fromConfig(config, "mssql", 7295))
 
     // OTel SDK init: configures OTLP trace/metric/log exporters AND installs the bridge
     // into the Logback OpenTelemetryAppender so all SLF4J logs are forwarded to OTLP → Alloy → Loki.
     createOpenTelemetrySdk(
         OtelEndpointConfig(
-            serviceName = "brontes",
-            protocol = System.getenv("BRONTES_OTEL_PROTOCOL") ?: "grpc",
+            serviceName = "mssql",
+            protocol = System.getenv("MSSQL_OTEL_PROTOCOL") ?: "grpc",
         ),
         enabled = config.hasPath("telemetry.enabled") && config.getBoolean("telemetry.enabled"),
     )
@@ -101,7 +101,7 @@ fun Application.module(config: Config) {
 
     launch {
         grpcServer.start()
-        log.info("Brontes (MSSQL worker) gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
+        log.info("Mssql (MSSQL worker) gRPC server started on port {} (reflection={})", grpcPort, reflectionEnabled)
         grpcServer.awaitTermination()
     }
 
@@ -129,7 +129,7 @@ fun Application.module(config: Config) {
         get("/status") {
             call.respond(
                 buildJsonObject {
-                    put("service", "brontes")
+                    put("service", "mssql")
                     put("engine", config.getString("worker.engine"))
                     put("engine_version", config.getString("worker.engine-version"))
                     put("grpc_port", grpcPort)
@@ -151,7 +151,7 @@ fun Application.module(config: Config) {
     }
 
     monitor.subscribe(ApplicationStopping) {
-        log.info("Shutting down Brontes")
+        log.info("Shutting down Mssql")
         grpcServer.shutdown()
         runCatching { pool.close() }
         if (translatorRaw is AutoCloseable) runCatching { translatorRaw.close() }
@@ -203,7 +203,7 @@ private fun pickTranslator(
 ): TranslatorClient {
     if (useFixture) {
         log.warn(
-            "Brontes booting in fixture mode (worker.use-fixture = true). " +
+            "Mssql booting in fixture mode (worker.use-fixture = true). " +
                 "Translator client is a no-op stub; production deployments must flip this to false.",
         )
         return object : TranslatorClient {
@@ -219,9 +219,9 @@ private fun pickTranslator(
         }
     }
     return GrpcTranslatorClient(
-        host = config.getString("proteus.host"),
-        port = config.getInt("proteus.port"),
+        host = config.getString("translate.host"),
+        port = config.getInt("translate.port"),
         // Was defaulting to the client's hardcoded 30s — the conf value was never wired.
-        timeoutSeconds = config.getLong("proteus.timeout-seconds"),
+        timeoutSeconds = config.getLong("translate.timeout-seconds"),
     )
 }

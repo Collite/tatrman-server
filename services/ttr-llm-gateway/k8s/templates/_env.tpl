@@ -1,5 +1,5 @@
-{{/* prometheus container env — lifted verbatim from the pre-library chart (D1). */}}
-{{- define "prometheus.env" -}}
+{{/* llm-gateway container env — lifted verbatim from the pre-library chart (D1). */}}
+{{- define "llm-gateway.env" -}}
 - name: PROMETHEUS_SERVER_PORT
   value: {{ .Values.ports.http | quote }}
 - name: POSTGRESQL_HOST

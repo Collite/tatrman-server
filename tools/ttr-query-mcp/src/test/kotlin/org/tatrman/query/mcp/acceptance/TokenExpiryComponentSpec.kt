@@ -49,12 +49,12 @@ import java.nio.channels.Channels
 import java.util.Base64
 
 /**
- * Fork Stage 3.6 T4 — token-expiry behavior at the theseus-mcp layer
+ * Fork Stage 3.6 T4 — token-expiry behavior at the query-mcp layer
  * (kantheon-security §2.1).
  *
  * Two facts, made explicit:
  *
- *  1. **The trust boundary.** theseus-mcp's IdentityResolver decodes claims but
+ *  1. **The trust boundary.** query-mcp's IdentityResolver decodes claims but
  *     does NOT verify the token (signature *or* `exp`) — that is the ingress /
  *     sidecar's job (IdentityResolver KDoc). So a well-formed token with an `exp`
  *     in the past still resolves to an identity *here*; expired tokens are meant
@@ -66,7 +66,7 @@ import java.util.Base64
  *     tool surfaces a **clean typed error**: `ok=false`, an error-severity
  *     message, **no partial results** (any batch already streamed is discarded),
  *     no rows leaked. The §2.1 "session expired — resume to continue" park/resume
- *     is the *agent* layer's job (Pythia); theseus-mcp's contribution is this
+ *     is the *agent* layer's job (Pythia); query-mcp's contribution is this
  *     clean error with no partial/stale data.
  *
  * Live short-TTL-token expiry against a running Keycloak + stack is deferred to
@@ -141,10 +141,10 @@ class TokenExpiryComponentSpec :
                     ),
                 ).build()
 
-        // A Theseus whose worker call streams one batch and THEN fails the data
+        // A Query whose worker call streams one batch and THEN fails the data
         // call with UNAUTHENTICATED — the shape a post-expiry call takes once the
         // upstream rejects it. Proves the partial batch is not surfaced.
-        fun theseusFailingMidStream(): QueryServiceImpl {
+        fun queryFailingMidStream(): QueryServiceImpl {
             val detect =
                 TranslatorDetectClient {
                     org.tatrman.translate.v1.DetectSchemaResponse
@@ -204,11 +204,11 @@ class TokenExpiryComponentSpec :
             )
         }
 
-        fun runnerOver(theseus: QueryServiceImpl): QueryRunnerClient =
+        fun runnerOver(query: QueryServiceImpl): QueryRunnerClient =
             object : QueryRunnerClient {
-                override fun run(request: RunRequest): Flow<ResultBatch> = theseus.run(request)
+                override fun run(request: RunRequest): Flow<ResultBatch> = query.run(request)
 
-                override suspend fun compile(request: RunRequest): CompileResponse = theseus.compile(request)
+                override suspend fun compile(request: RunRequest): CompileResponse = query.compile(request)
             }
 
         fun callToolRequest(): CallToolRequest =
@@ -226,7 +226,7 @@ class TokenExpiryComponentSpec :
 
         "a data-call auth failure mid-session → clean typed error, no partial results" {
             runBlocking {
-                val tool = QueryTool(cfg, runnerOver(theseusFailingMidStream()), fakeMetadata)
+                val tool = QueryTool(cfg, runnerOver(queryFailingMidStream()), fakeMetadata)
                 val identity =
                     UserIdentity(
                         id = "alice",
@@ -244,7 +244,7 @@ class TokenExpiryComponentSpec :
             }
         }
 
-        "trust boundary — theseus-mcp does not enforce token expiry (delegated to the ingress)" {
+        "trust boundary — query-mcp does not enforce token expiry (delegated to the ingress)" {
             // A well-formed token whose `exp` is far in the past. The edge still
             // resolves claims (signature + expiry are validated upstream); this pins
             // the documented trust boundary so the edge is not mistaken for the

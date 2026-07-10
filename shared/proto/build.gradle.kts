@@ -51,7 +51,7 @@ protobuf {
         artifact = "com.google.protobuf:protoc:$protobufVersion"
     }
     plugins {
-        // Phase 2.1 — gRPC Java + Kotlin codegen so service modules (ariadne, dispatcher,
+        // Phase 2.1 — gRPC Java + Kotlin codegen so service modules (veles, dispatcher,
         // worker, etc.) get `*ServiceGrpcKt` base classes from the in-repo protos. Aligned
         // to ai-platform's protoc-gen-grpc-java 1.78.0 / protoc-gen-grpc-kotlin 1.5.0.
         id("grpc") {
@@ -66,7 +66,7 @@ protobuf {
             task.builtins {
                 id("kotlin") { }
                 // Phase 1.2 T4 — Python codegen for the shared-proto tree so the
-                // Python lane (Kadmos, Steropes, Metis) can `import` generated
+                // Python lane (Nlp, Polars, Metis) can `import` generated
                 // `org.tatrman.*` types. See `AGENTS.md` §4.1 ("Imports come
                 // from the generated shared-proto package only").
                 id("python") { }

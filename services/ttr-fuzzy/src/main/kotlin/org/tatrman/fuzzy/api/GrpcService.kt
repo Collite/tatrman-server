@@ -2,9 +2,9 @@ package org.tatrman.fuzzy.api
 
 import org.tatrman.fuzzy.core.AlgorithmType
 import org.tatrman.fuzzy.core.CascadeStep
-import org.tatrman.fuzzy.core.EchoMatcher
+import org.tatrman.fuzzy.core.FuzzyMatcher
 import org.tatrman.fuzzy.core.cascadeFrom
-import org.tatrman.fuzzy.telemetry.EchoTelemetry
+import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import org.tatrman.fuzzy.v1.FuzzyMatch
 import org.tatrman.fuzzy.v1.FuzzyMatchResponse
 import org.tatrman.fuzzy.v1.FuzzyServiceGrpcKt
@@ -12,8 +12,8 @@ import org.tatrman.fuzzy.v1.MatchRequest
 import org.slf4j.LoggerFactory
 
 class GrpcService(
-    private val fuzzyMatcher: EchoMatcher,
-    private val telemetry: EchoTelemetry? = null,
+    private val fuzzyMatcher: FuzzyMatcher,
+    private val telemetry: FuzzyTelemetry? = null,
 ) : FuzzyServiceGrpcKt.FuzzyServiceCoroutineImplBase() {
     private val logger = LoggerFactory.getLogger(GrpcService::class.java)
 

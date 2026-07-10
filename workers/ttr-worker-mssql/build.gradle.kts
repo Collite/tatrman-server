@@ -69,7 +69,7 @@ jib {
         }
     }
     to {
-        image = "brontes:dev"
+        image = "mssql:dev"
     }
     container {
         mainClass = "org.tatrman.worker.mssql.ApplicationKt"
@@ -124,12 +124,12 @@ dependencies {
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
     // Stage 3.3 T5 — pins the worker → data-formatter Arrow IPC contract:
-    // the formatter must round-trip whatever Brontes emits.
+    // the formatter must round-trip whatever Mssql emits.
     testImplementation(project(":shared:libs:kotlin:data-formatter"))
 
     // Component tier (testing arc Stage 1.2) — real MSSQL via Testcontainers.
     // The convention's `componentTest` suite already brings kotest + the base
-    // testcontainers + `project()` (brontes main, exposing mssql-jdbc on the
+    // testcontainers + `project()` (mssql main, exposing mssql-jdbc on the
     // runtime classpath). These add what the spec compiles against directly:
     // the testkit (mssql() factory + CI gate + seed runner), the protos, the
     // Arrow reader for result deserialization, and coroutines for the flow.

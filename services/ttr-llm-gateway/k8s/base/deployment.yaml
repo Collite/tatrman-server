@@ -1,48 +1,48 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: prometheus
+  name: llm-gateway
   namespace: kantheon
   labels:
-    app: prometheus
+    app: llm-gateway
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: prometheus
+      app: llm-gateway
   template:
     metadata:
       labels:
-        app: prometheus
+        app: llm-gateway
     spec:
       containers:
-        - name: prometheus
-          image: prometheus:dev
+        - name: llm-gateway
+          image: llm-gateway:dev
           ports:
             - name: http
               containerPort: 7280
             - name: grpc
               containerPort: 9090
           env:
-            - name: PROMETHEUS_SERVER_PORT
+            - name: LLM_GATEWAY_SERVER_PORT
               value: "7280"
             # Postgres (the default profile). Point at the Kantheon PG.
             - name: POSTGRESQL_HOST
               value: postgres
             - name: POSTGRESQL_PORT
               value: "5432"
-            # Upstream LLM secrets — sealed-secret `prometheus-secrets` (authored
+            # Upstream LLM secrets — sealed-secret `llm-gateway-secrets` (authored
             # in the deploy/integration track, fork Stage 2.5 T4).
             - name: AZURE_OPENAI_API_KEY
               valueFrom:
-                secretKeyRef: { name: prometheus-secrets, key: azure-openai-api-key }
+                secretKeyRef: { name: llm-gateway-secrets, key: azure-openai-api-key }
             - name: ANTHROPIC_API_KEY
               valueFrom:
-                secretKeyRef: { name: prometheus-secrets, key: anthropic-api-key }
+                secretKeyRef: { name: llm-gateway-secrets, key: anthropic-api-key }
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://alloy.observability.svc.cluster.local:4317
             - name: OTEL_SERVICE_NAME
-              value: prometheus
+              value: llm-gateway
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -67,13 +67,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: prometheus
+  name: llm-gateway
   namespace: kantheon
   labels:
-    app: prometheus
+    app: llm-gateway
 spec:
   selector:
-    app: prometheus
+    app: llm-gateway
   ports:
     - name: http
       port: 7280

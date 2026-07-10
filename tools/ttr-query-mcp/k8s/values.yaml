@@ -1,18 +1,18 @@
-# Default values for theseus-mcp. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# Default values for query-mcp. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
 # environments (Olymp cluster values, or test-context values) override image, telemetry,
 # identity, and the downstream wiring in extraEnv.
 
 replicaCount: 1
 
 image:
-  repository: theseus-mcp
+  repository: query-mcp
   # Defaults to .Chart.appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
 
-# theseus-mcp serves the MCP `query` tool over StreamableHTTP on a single HTTP port — the
+# query-mcp serves the MCP `query` tool over StreamableHTTP on a single HTTP port — the
 # container port AND the service port AND the probe target.
 ports:
   http: 7307
@@ -33,23 +33,23 @@ resources:
 # this on to exercise the fail-closed discipline end-to-end.
 requireIdentity: true
 
-# OpenTelemetry. Reads OTEL_EXPORTER_OTLP_ENDPOINT + the per-service OTEL_ENABLED_THESEUS_MCP
+# OpenTelemetry. Reads OTEL_EXPORTER_OTLP_ENDPOINT + the per-service OTEL_ENABLED_QUERY_MCP
 # flag. Point `endpoint` at a collector and set enabled; leave disabled where none exists
 # (e.g. test runs).
 telemetry:
   enabled: false
   # e.g. http://alloy.observability.svc.cluster.local:4317
   endpoint: ""
-  serviceName: theseus-mcp
+  serviceName: query-mcp
 
 # Downstream constellation wiring + any other env. Defaults match the constellation's stable
 # in-cluster service names (env-agnostic — every cluster names them the same). A deploying env
 # REPLACES this list to retarget. Set CAPABILITIES_MCP_URL here to opt into registration.
 extraEnv:
-  - { name: THESEUS_SERVER, value: "theseus" }
-  - { name: PROTEUS_SERVER, value: "proteus" }
-  - { name: ARGOS_SERVER, value: "argos" }
-  - { name: ARIADNE_SERVER, value: "ariadne" }
+  - { name: QUERY_SERVER, value: "query" }
+  - { name: TRANSLATE_SERVER, value: "translate" }
+  - { name: VALIDATE_SERVER, value: "validate" }
+  - { name: VELES_SERVER, value: "veles" }
 
 # Probes (HTTP on the http port).
 readinessProbe:

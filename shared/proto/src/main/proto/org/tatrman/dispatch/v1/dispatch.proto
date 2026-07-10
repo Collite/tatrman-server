@@ -1,31 +1,31 @@
 // =============================================================================
-// Kantheon — Kyklop service (the worker dispatcher)
+// Kantheon — Dispatch service (the worker dispatcher)
 //
 // Forked from ai-platform `com/tatrman/dispatcher/v1/dispatcher.proto`
 // (ai-platform@2575b923, tag kantheon-fork-point) at fork Stage 3.3. Renamed
-// into the constellation: DispatcherService -> DispatchService. Kyklop is the
-// genus carried by the dispatcher; the workers it routes to are the Kyklops
-// (Brontes the MSSQL worker, Steropes the Polars worker).
+// into the constellation: DispatcherService -> DispatchService. Dispatch is the
+// genus carried by the dispatcher; the workers it routes to are the Dispatchs
+// (Mssql the MSSQL worker, Polars the Polars worker).
 //
-// Kyklop routes a validated PlanNode to a capable worker and pipes the Arrow
+// Dispatch routes a validated PlanNode to a capable worker and pipes the Arrow
 // IPC result stream back upstream. v1 has one worker per engine (single MSSQL
-// worker, Brontes), so routing is degenerate; Kyklop exists at v1 to lock the
+// worker, Mssql), so routing is degenerate; Dispatch exists at v1 to lock the
 // long-term contract per the No-Op-stubs principle.
 //
 // Per Round 6 decisions (inherited from the source):
-//   - Caller may supply an optional `connection_id`; if absent, Kyklop
+//   - Caller may supply an optional `connection_id`; if absent, Dispatch
 //     derives it by walking the plan's TableScan qnames against the World
-//     config. If present, Kyklop uses it authoritatively (with a warning if
+//     config. If present, Dispatch uses it authoritatively (with a warning if
 //     it disagrees with the derived value).
 //   - Plans with no TableScans (Values-only) route to the configured
-//     `default_connection`. Kyklop does not police query content.
+//     `default_connection`. Dispatch does not police query content.
 //   - Sticky routing is gated on the selected worker's
 //     `supports_stateful_sessions = true` capability.
 //   - Cross-database queries (PlanNode touches > 1 connection_id) are
 //     rejected with code "cross_database_not_supported".
 //
 // HOCON config shape (informational — not part of the proto):
-//   kyklop {
+//   dispatch {
 //     workers = [ { endpoint = "...", role-hint = "mssql" }, ... ]
 //     default-connection = "df-test-main"
 //     capability-refresh {
@@ -62,10 +62,10 @@ service DispatchService {
   // if absent, derived from the plan + World config.
   rpc Dispatch(DispatchRequest) returns (stream org.tatrman.worker.v1.ResultBatch);
 
-  // Diagnostics: which workers does this Kyklop know about, what state.
+  // Diagnostics: which workers does this Dispatch know about, what state.
   rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
 
-  // Service-level status (mirrors ariadne / worker shape).
+  // Service-level status (mirrors veles / worker shape).
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
 }
 
@@ -94,8 +94,8 @@ message DispatchRequest {
 }
 
 // Response is `stream org.tatrman.worker.v1.ResultBatch` — defined in worker.proto.
-// Kyklop does not wrap or transform worker batches; it pipes them through.
-// The first batch's PipelineContext may carry additional Warnings Kyklop
+// Dispatch does not wrap or transform worker batches; it pipes them through.
+// The first batch's PipelineContext may carry additional Warnings Dispatch
 // contributed (routing decision, sticky session match, fallback selection,
 // connection_id override).
 
@@ -118,7 +118,7 @@ message WorkerInfo {
   WorkerHealthStatus health = 4;
   string last_polled = 5;                                         // ISO-8601
   int32 consecutive_capability_failures = 6;
-  int32 active_sticky_sessions = 7;                              // count this Kyklop has stickied here
+  int32 active_sticky_sessions = 7;                              // count this Dispatch has stickied here
   reserved 8 to 12;
 }
 

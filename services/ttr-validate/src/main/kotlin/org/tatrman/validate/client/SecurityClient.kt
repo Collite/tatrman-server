@@ -9,7 +9,7 @@ import org.tatrman.security.v1.EvaluatePoliciesResponse
  *
  * The SecurityApplier stage depends on this interface — never on a concrete engine —
  * so unit tests can pass a stub implementation. Since fork Stage 3.2 the production
- * wiring is [LocalPolicyClient]: policy evaluation runs **in-process** inside Argos
+ * wiring is [LocalPolicyClient]: policy evaluation runs **in-process** inside Validate
  * (the sql-security gRPC service was folded in; contracts §1). The former
  * `GrpcSecurityClient` + its remote channel are gone.
  */
@@ -19,7 +19,7 @@ fun interface SecurityClient {
 
 /**
  * In-process [SecurityClient] backed by the folded [PolicyEngine]. No network hop:
- * Argos evaluates row-level predicates + column rules itself, keying on the bearer
+ * Validate evaluates row-level predicates + column rules itself, keying on the bearer
  * roles carried in `EvaluatePoliciesRequest.context.auth_roles`.
  */
 class LocalPolicyClient(

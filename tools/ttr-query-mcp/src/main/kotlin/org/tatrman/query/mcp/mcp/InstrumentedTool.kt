@@ -21,9 +21,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * and per-tool durations around an underlying [McpTool].
  *
  * Metric names:
- *   * `theseus_mcp_tool_calls_total{tool, outcome}` — outcome ∈ ok | error
- *   * `theseus_mcp_tool_call_duration_seconds{tool}` — timer
- *   * `theseus_mcp_tool_errors_total{tool, code}` — error-code breakdown
+ *   * `query_mcp_tool_calls_total{tool, outcome}` — outcome ∈ ok | error
+ *   * `query_mcp_tool_call_duration_seconds{tool}` — timer
+ *   * `query_mcp_tool_errors_total{tool, code}` — error-code breakdown
  */
 class InstrumentedTool(
     private val delegate: McpTool,
@@ -31,13 +31,13 @@ class InstrumentedTool(
     private val metrics: MeterRegistry,
     openTelemetry: OpenTelemetry = GlobalOpenTelemetry.get(),
 ) : McpTool by delegate {
-    private val logger = LoggerFactory.getLogger("theseus-mcp.tool.${delegate.name}")
+    private val logger = LoggerFactory.getLogger("query-mcp.tool.${delegate.name}")
 
     // Root span for the tool call — the head of the in-process run_query trace.
-    // Theseus's orchestration spans (theseus.run → parse/validate/dispatch) nest
+    // Query's orchestration spans (query.run → parse/validate/dispatch) nest
     // under it via OTel context propagation; cross-pod they nest via gRPC
     // auto-instrumentation (Stage 4.1 T3).
-    private val tracer = openTelemetry.getTracer("theseus-mcp")
+    private val tracer = openTelemetry.getTracer("query-mcp")
 
     // Pre-register name-bound counters / timers; tag values may differ.
     override val name: String get() = delegate.name
@@ -67,13 +67,13 @@ class InstrumentedTool(
                 val durationNanos = System.nanoTime() - start
                 metrics
                     .timer(
-                        "theseus_mcp_tool_call_duration_seconds",
+                        "query_mcp_tool_call_duration_seconds",
                         "tool",
                         delegate.name,
                     ).record(durationNanos, TimeUnit.NANOSECONDS)
                 metrics
                     .counter(
-                        "theseus_mcp_tool_calls_total",
+                        "query_mcp_tool_calls_total",
                         "tool",
                         delegate.name,
                         "outcome",
@@ -82,7 +82,7 @@ class InstrumentedTool(
                 if (outcome == "error" && errorCode != null) {
                     metrics
                         .counter(
-                            "theseus_mcp_tool_errors_total",
+                            "query_mcp_tool_errors_total",
                             "tool",
                             delegate.name,
                             "code",

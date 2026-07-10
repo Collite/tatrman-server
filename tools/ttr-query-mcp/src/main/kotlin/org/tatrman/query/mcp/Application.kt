@@ -40,7 +40,7 @@ import org.tatrman.query.mcp.upstream.GrpcTranslatorClient
 import org.tatrman.query.mcp.upstream.GrpcValidatorClient
 import java.util.concurrent.atomic.AtomicInteger
 
-private val logger = LoggerFactory.getLogger("theseus-mcp")
+private val logger = LoggerFactory.getLogger("query-mcp")
 
 /**
  * Boot order: load config → OTEL → gRPC clients → tool registry → Ktor server.
@@ -50,16 +50,16 @@ fun main(): Unit =
     runBlocking {
         val rawConfig = ConfigFactory.load()
         val cfg = QueryMcpConfig.load(rawConfig)
-        val mcpServerConfig = loadMcpServerConfig(rawConfig, "theseus-mcp", 7307)
+        val mcpServerConfig = loadMcpServerConfig(rawConfig, "query-mcp", 7307)
 
         logger.info(
-            "Starting theseus-mcp on port {} → {} (transport={})",
+            "Starting query-mcp on port {} → {} (transport={})",
             cfg.serverPort,
             cfg.mcpPath,
             cfg.mcpTransport,
         )
 
-        val telemetry = McpTelemetry("theseus-mcp", mcpServerConfig.telemetryOtlpProtocol ?: "grpc")
+        val telemetry = McpTelemetry("query-mcp", mcpServerConfig.telemetryOtlpProtocol ?: "grpc")
 
         val queryRunner = GrpcQueryRunnerClient(cfg.upstream.queryRunner, cfg.limits.maxMessageBytes)
         val translator = GrpcTranslatorClient(cfg.upstream.translator, cfg.limits.maxMessageBytes)
@@ -82,7 +82,7 @@ fun main(): Unit =
 
         val activeRequests = AtomicInteger(0)
         val metrics = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-        metrics.gauge("theseus_mcp_active_requests", activeRequests) { it.get().toDouble() }
+        metrics.gauge("query_mcp_active_requests", activeRequests) { it.get().toDouble() }
 
         val registry =
             ToolRegistry(
@@ -109,7 +109,7 @@ fun main(): Unit =
 
         val readinessProbe: () -> Boolean = {
             // Metadata is best-effort for the side-channel decorator (Phase 2.2);
-            // we do NOT require it to be READY for theseus-mcp to be ready.
+            // we do NOT require it to be READY for query-mcp to be ready.
             val states =
                 listOf(
                     queryRunner.connectivityState(),
@@ -121,7 +121,7 @@ fun main(): Unit =
 
         val mcpKtorConfig =
             McpKtorConfig(
-                serviceName = "theseus-mcp",
+                serviceName = "query-mcp",
                 serverPort = cfg.serverPort,
                 corsAllowedHosts = mcpServerConfig.corsAllowedHosts,
                 callLoggingConfig =
@@ -165,7 +165,7 @@ fun main(): Unit =
                                 }
                             val body =
                                 buildJsonObject {
-                                    put("service", JsonPrimitive("theseus-mcp"))
+                                    put("service", JsonPrimitive("query-mcp"))
                                     put("version", JsonPrimitive("0.1.0"))
                                     put("port", JsonPrimitive(cfg.serverPort))
                                     put("mcp_path", JsonPrimitive(cfg.mcpPath))

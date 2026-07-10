@@ -466,7 +466,7 @@ private fun buildSourceFromConfig(
         "ttr" -> FileBasedSource(sourceId = id, priority = priority, storage = storage)
         // Phase 2.1 (fork) — `yaml-legacy` source kind removed: kantheon is TTR-only
         // (`org.tatrman.ttr.*` modeler artifacts, no erp-sql legacy YAML parse path).
-        // See docs/implementation/v1/fork/tasks-p2-s2.1-ariadne.md T2 note.
+        // See docs/implementation/v1/fork/tasks-p2-s2.1-veles.md T2 note.
         else -> {
             log.warn("Unknown source kind '{}' for '{}' — skipping", kind, id)
             null

@@ -12,7 +12,7 @@ import shared.otel.OtelEndpointConfig
 import shared.otel.createOpenTelemetrySdk
 import java.util.concurrent.atomic.AtomicInteger
 
-class EchoTelemetry {
+class FuzzyTelemetry {
     val openTelemetry: OpenTelemetry
     val tracer: Tracer
     val meterRegistry: MeterRegistry
@@ -24,12 +24,12 @@ class EchoTelemetry {
         val otelSdk =
             createOpenTelemetrySdk(
                 OtelEndpointConfig(
-                    serviceName = "echo",
+                    serviceName = "fuzzy",
                     protocol = protocol,
                 ),
             )
         openTelemetry = otelSdk
-        tracer = otelSdk.getTracer("echo")
+        tracer = otelSdk.getTracer("fuzzy")
         meterRegistry = io.micrometer.core.instrument.Metrics.globalRegistry
         registerGauges()
     }

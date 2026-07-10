@@ -212,7 +212,7 @@ class ExecutePipelineSpec :
                                 .build(),
                         ).toList()
 
-                // The worker asked Proteus for PostgreSQL.
+                // The worker asked Translate for PostgreSQL.
                 requestedDialect shouldBe SqlDialect.POSTGRESQL
 
                 // First batch carries the schema + fingerprint + the data; tail batch closes the stream.

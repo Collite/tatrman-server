@@ -29,7 +29,7 @@ class MatchToolSpec :
         }
 
         "matchCallback surfaces structured content (matches[]) on success" {
-            val mockClient = mockk<org.tatrman.fuzzy.mcp.client.EchoClient>()
+            val mockClient = mockk<org.tatrman.fuzzy.mcp.client.FuzzyClient>()
             coEvery { mockClient.match(any(), any(), any(), any()) } returns
                 FuzzyMatchResponse(
                     matches =
@@ -67,8 +67,8 @@ class MatchToolSpec :
         }
 
         "matchCallback passes through category / name / algorithm / limit args" {
-            // EchoClient.match signature: (category, name, algorithm, limit)
-            val mockClient = mockk<org.tatrman.fuzzy.mcp.client.EchoClient>()
+            // FuzzyClient.match signature: (category, name, algorithm, limit)
+            val mockClient = mockk<org.tatrman.fuzzy.mcp.client.FuzzyClient>()
             var capturedCategory = ""
             var capturedName = ""
             var capturedAlgorithm = ""

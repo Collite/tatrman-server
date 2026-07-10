@@ -1,5 +1,5 @@
-capability_id: "kadmos.analyze:v1"
-category: "kadmos"
+capability_id: "nlp.analyze:v1"
+category: "nlp"
 version: "1.0.0"
 description: |
   Run NLP analysis on input text — tokenization, sentence split,
@@ -7,9 +7,9 @@ description: |
   detection. Czech-aware: cs is routed through the UFAL stack
   (MorphoDiTa for tag/lemma, NameTag for NER), en through Stanza/spaCy.
   Ops are selected via the `ops` argument; `mode=COMPARE` runs all engines.
-service_endpoint: "http://kadmos-mcp.kantheon.svc.cluster.local:7272"
+service_endpoint: "http://nlp-mcp.kantheon.svc.cluster.local:7272"
 search_tags:
-  - kadmos
+  - nlp
   - nlp
   - lemmatize
   - tokenize

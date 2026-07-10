@@ -98,7 +98,7 @@ class CapabilitiesClientSpec :
 
             val handle =
                 CapabilitiesClient.startupRegister(
-                    capability = toolCap("theseus.query:v1"),
+                    capability = toolCap("query.query:v1"),
                     endpoint = "http://localhost:${wm.port()}",
                     heartbeatIntervalMs = 50,
                 )
@@ -172,7 +172,7 @@ class CapabilitiesClientSpec :
 
             val handle =
                 CapabilitiesClient.startupRegister(
-                    capability = toolCap("theseus.query:v1"),
+                    capability = toolCap("query.query:v1"),
                     endpoint = "http://localhost:${wm.port()}",
                     heartbeatIntervalMs = 1_000,
                     backoffSequence = longArrayOf(50, 100, 200),

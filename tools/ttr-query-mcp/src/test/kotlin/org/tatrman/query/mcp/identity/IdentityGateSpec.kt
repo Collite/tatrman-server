@@ -7,7 +7,7 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import java.util.Base64
 
 /**
- * Fork Stage 3.5 T4 — the OBO identity gate at the theseus-mcp edge
+ * Fork Stage 3.5 T4 — the OBO identity gate at the query-mcp edge
  * (kantheon-security §2 / §2.1). Agents must call with the user's OBO token;
  * the gate fails closed on missing identity and on token-vs-arg spoofing.
  */

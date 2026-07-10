@@ -39,7 +39,7 @@ object DataFormatter {
      * Phase 08 D5 / DF-Q02 — multi-batch entry point. Each element of [arrowBatches] is a
      * self-contained Arrow IPC stream (the shape the worker emits per gRPC message); this method
      * decodes each in turn and concatenates their rows into a single [RowIterable] before
-     * formatting. Useful for streaming consumers (`tools/theseus-mcp`) that need to render results
+     * formatting. Useful for streaming consumers (`tools/query-mcp`) that need to render results
      * spanning more than one worker batch without re-encoding to a single Arrow stream.
      *
      * Schema check: the first non-empty batch's column list is canonical; subsequent batches must

@@ -55,10 +55,19 @@ jobs:
       - uses: actions/checkout@v5
       - name: report retired personas on wire/build surfaces
         run: |
+          # Detect RETIRED persona strings (naming ledger §3). Refined per the
+          # 2026-07-10 decision: the regex over-matched `echo` (English verb) and
+          # `prometheus` (Micrometer's PrometheusMeterRegistry / the real monitoring
+          # system) — those legitimate hits are excluded below; genuine persona
+          # instances (the Echo/fuzzy service, the "Prometheus LLM gateway") are renamed.
           matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|arges|brontes|steropes|echo\b|kadmos|prometheus' \
             --include='*.proto' --include='*.kt' --include='*.kts' --include='*.py' --include='*.conf' \
             --include='*.yaml' --include='*.toml' . \
-            | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|_to_delete' || true)
+            | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|_to_delete' \
+            | grep -viE 'PrometheusMeterRegistry|PrometheusConfig|PrometheusHealthCheck|prometheus\.io|:9090|/metrics|actuator|micrometer|registry.prometheus|MeterRegistry|prometheus (meter|call|scrape|registry|endpoint)|monitoring|include:.*prometheus' \
+            | grep -viE 'prometheusUrl|hasPath\("prometheus|getConfig\("prometheus|config\.prometheus|"prometheus" ->|prometheus \{|PromQL|prometheus-client|prometheus_client|prometheus-jvm|prometheus - Prom' \
+            | grep -viE '"prometheus",|Prometheus (metrics|exposition)|the fabric-infra estate' \
+            || true)
           if [ -n "$matches" ]; then
             echo "::warning::retired persona strings still present (expected pre-S4-sweep):"
             echo "$matches" | head -50

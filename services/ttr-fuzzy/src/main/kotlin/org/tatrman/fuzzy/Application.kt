@@ -18,17 +18,17 @@ import org.tatrman.fuzzy.api.GrpcService
 import org.tatrman.fuzzy.api.configureRoutes
 import org.tatrman.fuzzy.config.ConfigLoader
 import org.tatrman.fuzzy.core.Candidate
-import org.tatrman.fuzzy.core.EchoMatcher
+import org.tatrman.fuzzy.core.FuzzyMatcher
 import org.tatrman.fuzzy.core.Lemmatizer
 import org.tatrman.fuzzy.core.NoopLemmatizer
 import org.tatrman.fuzzy.core.StringRepository
 import org.tatrman.fuzzy.db.DatabaseFactory
-import org.tatrman.fuzzy.loader.EchoCatalog
+import org.tatrman.fuzzy.loader.FuzzyCatalog
 import org.tatrman.fuzzy.loader.LoaderSource
 import org.tatrman.fuzzy.loader.MetadataLoaderSource
 import org.tatrman.fuzzy.loader.MetadataServiceClient
 import org.tatrman.fuzzy.loader.StaticLoaderSource
-import org.tatrman.fuzzy.telemetry.EchoTelemetry
+import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 import shared.ktor.KtorConfigFactory
@@ -41,7 +41,7 @@ private val log = LoggerFactory.getLogger("org.tatrman.fuzzy.Application")
 
 fun main() {
     val config = ConfigFactory.load()
-    val serverConfig = KtorConfigFactory.fromConfig(config, "echo", 8080)
+    val serverConfig = KtorConfigFactory.fromConfig(config, "fuzzy", 8080)
     KtorServerBootstrap.createServer(serverConfig) { module(serverConfig) }.start(wait = true)
 }
 
@@ -65,7 +65,7 @@ private fun fetchSqlCandidates(sql: String): List<Candidate> {
 fun Application.module(serverConfig: KtorServerConfig) {
     installKtorServerBase(serverConfig)
 
-    val telemetry = EchoTelemetry()
+    val telemetry = FuzzyTelemetry()
 
     install(io.opentelemetry.instrumentation.ktor.v3_0.KtorServerTelemetry) {
         setOpenTelemetry(telemetry.openTelemetry)
@@ -78,7 +78,7 @@ fun Application.module(serverConfig: KtorServerConfig) {
             .load()
     configureSecurity(typesafeConfig)
 
-    // Czech lemmatisation via Kadmos (Phase 2.3). Disabled at v1 → folded-
+    // Czech lemmatisation via Nlp (Phase 2.3). Disabled at v1 → folded-
     // surface matching only. The HTTP client is built only when `nlp.enabled`
     // is true (off in the default config).
     val nlpHttpClient: io.ktor.client.HttpClient? =
@@ -95,7 +95,7 @@ fun Application.module(serverConfig: KtorServerConfig) {
         }
     val lemmatizer: Lemmatizer =
         if (nlpHttpClient != null) {
-            log.info("Czech lemmatisation enabled via Kadmos at ${config.nlp.baseUrl} (lang=${config.nlp.lang})")
+            log.info("Czech lemmatisation enabled via Nlp at ${config.nlp.baseUrl} (lang=${config.nlp.lang})")
             org.tatrman.fuzzy.core
                 .NlpLemmatizer(nlpHttpClient, config.nlp.baseUrl, config.nlp.lang)
         } else {
@@ -104,10 +104,10 @@ fun Application.module(serverConfig: KtorServerConfig) {
 
     // Loader source selection.
     //   static   (default): read the in-repo JSON catalog — no DB, local/CI-friendly.
-    //   metadata          : the full ai-platform behaviour — ask Ariadne for the
+    //   metadata          : the full ai-platform behaviour — ask Veles for the
     //                       fuzzy columns, compose `SELECT pk, col FROM table`,
     //                       query the warehouse, populate the catalog. Opens a DB
-    //                       pool + an Ariadne gRPC channel, both owned here and
+    //                       pool + an Veles gRPC channel, both owned here and
     //                       torn down in ApplicationStopping.
     val metadataChannel: io.grpc.ManagedChannel? =
         if (config.loaderSource.source == "metadata") {
@@ -124,12 +124,12 @@ fun Application.module(serverConfig: KtorServerConfig) {
             val database =
                 config.database
                     ?: error(
-                        "echo.loader.source=metadata requires a warehouse connection " +
-                            "(set echo.type=postgres|mssql + echo.<type>.*); none configured",
+                        "fuzzy.loader.source=metadata requires a warehouse connection " +
+                            "(set fuzzy.type=postgres|mssql + fuzzy.<type>.*); none configured",
                     )
             DatabaseFactory.connect(database)
             log.info(
-                "Loader source: metadata — ariadne at {}:{} schema={} sourceNamespace='{}' (fuzzy column indexing)",
+                "Loader source: metadata — veles at {}:{} schema={} sourceNamespace='{}' (fuzzy column indexing)",
                 config.metadata.host,
                 config.metadata.port,
                 config.metadata.schema,
@@ -144,15 +144,15 @@ fun Application.module(serverConfig: KtorServerConfig) {
                 telemetry = telemetry,
             )
         } else {
-            val catalog: Map<String, List<Candidate>> = EchoCatalog.fromResource("/echo-catalog.json")
+            val catalog: Map<String, List<Candidate>> = FuzzyCatalog.fromResource("/fuzzy-catalog.json")
             log.info("Loader source: static (in-repo catalog, ${catalog.size} categories)")
             StaticLoaderSource(catalog)
         }
 
     val repository = StringRepository(config, loaderSource, telemetry, lemmatizer)
-    val echoMatcher =
-        EchoMatcher(repository, telemetry, lemmatizer, idfEnabled = config.tokenBasedConfig.idfEnabled)
-    val grpcService = GrpcService(echoMatcher, telemetry)
+    val fuzzyMatcher =
+        FuzzyMatcher(repository, telemetry, lemmatizer, idfEnabled = config.tokenBasedConfig.idfEnabled)
+    val grpcService = GrpcService(fuzzyMatcher, telemetry)
 
     // Tolerate clients' keepalive (30s pings, incl. idle) instead of GOAWAY too_many_pings.
     val grpcServer =
@@ -174,7 +174,7 @@ fun Application.module(serverConfig: KtorServerConfig) {
         grpcServer.awaitTermination()
     }
 
-    configureRoutes(echoMatcher, repository, telemetry, typesafeConfig)
+    configureRoutes(fuzzyMatcher, repository, telemetry, typesafeConfig)
 
     routing {
         get("/health") {

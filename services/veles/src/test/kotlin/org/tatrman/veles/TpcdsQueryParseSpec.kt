@@ -17,7 +17,7 @@ import java.nio.file.Path
 /**
  * WS-T2 T3 — the four TPC-DS curated queries parse to a RelNode plan against the
  * `tpcds` model. Reconciles the real `model-ttr` tree, applies the `{name}` → `?`
- * parameter bridge (the rewrite Proteus's orchestrator performs before parse —
+ * parameter bridge (the rewrite Translate's orchestrator performs before parse —
  * `TranslatorServiceImpl` §432; the raw `QueryParseWorker` leaves parameterised
  * queries FAILED because Calcite can't parse `{year}`), then parses each via the
  * same [Translator] the service uses.
@@ -39,7 +39,7 @@ class TpcdsQueryParseSpec :
                 "channel_revenue_cte",
             )
 
-        // The Proteus parameter bridge: `{name}` → positional `?`.
+        // The Translate parameter bridge: `{name}` → positional `?`.
         val paramPlaceholder = Regex("""\{[A-Za-z_][A-Za-z0-9_]*}""")
 
         fun reconciledModel() =

@@ -8,7 +8,7 @@ import org.tatrman.capabilities.v1.ToolCapability
 /**
  * Stage 2.2 T6 — capability-mcp registration asserts that the
  * `manifests/tools` tree (containing match.yaml) loads cleanly and
- * yields one Capability per authored manifest. Echo v1 has a single
+ * yields one Capability per authored manifest. Fuzzy v1 has a single
  * match manifest (the cascade is exposed as tool args, not separate
  * tools per contracts §2).
  */
@@ -26,21 +26,21 @@ class CapabilitiesRegistrationSpec :
             val tool = cap.tool
             (tool is ToolCapability) shouldBe true
             tool as ToolCapability
-            tool.capabilityId shouldBe "echo.match:v1"
-            tool.category shouldBe "echo"
+            tool.capabilityId shouldBe "fuzzy.match:v1"
+            tool.category shouldBe "fuzzy"
             tool.version shouldBe "1.0.0"
         }
 
         "the match capability advertises the in-cluster service endpoint" {
             val caps = ManifestLoader().loadAll()
             val tool = caps.single().tool as ToolCapability
-            tool.serviceEndpoint shouldBe "http://echo-mcp.kantheon.svc.cluster.local:7267"
+            tool.serviceEndpoint shouldBe "http://fuzzy-mcp.kantheon.svc.cluster.local:7267"
         }
 
         "the match capability carries cascade + fuzzy search tags" {
             val caps = ManifestLoader().loadAll()
             val tool = caps.single().tool as ToolCapability
-            tool.searchTagsList shouldBe listOf("echo", "fuzzy", "match", "cascade")
+            tool.searchTagsList shouldBe listOf("fuzzy", "fuzzy", "match", "cascade")
         }
 
         "the match capability declares idempotency + concurrency cost hints" {

@@ -1,8 +1,8 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: steropes
-  description: Python/Polars worker for stateful workspace execution; supports `from_workspace` materialised dataframes within a session, sticky-routed via Kyklop
+  name: polars
+  description: Python/Polars worker for stateful workspace execution; supports `from_workspace` materialised dataframes within a session, sticky-routed via Dispatch
   annotations:
     backstage.io/techdocs-ref: dir:.
   tags:

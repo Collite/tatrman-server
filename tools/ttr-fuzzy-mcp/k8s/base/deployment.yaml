@@ -1,38 +1,38 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: echo-mcp
+  name: fuzzy-mcp
   namespace: kantheon
   labels:
-    app: echo-mcp
+    app: fuzzy-mcp
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: echo-mcp
+      app: fuzzy-mcp
   template:
     metadata:
       labels:
-        app: echo-mcp
+        app: fuzzy-mcp
     spec:
       containers:
-        - name: echo-mcp
-          image: echo-mcp:dev
+        - name: fuzzy-mcp
+          image: fuzzy-mcp:dev
           ports:
             - containerPort: 7267
           env:
-            - name: MCP_ECHO_SERVER_PORT
+            - name: MCP_FUZZY_SERVER_PORT
               value: "7267"
-            # gRPC channel target → echo service (contracts §7 ports 7265/7266).
-            - name: ECHO_GRPC_HOST
-              value: echo
-            - name: ECHO_GRPC_PORT
+            # gRPC channel target → fuzzy service (contracts §7 ports 7265/7266).
+            - name: FUZZY_GRPC_HOST
+              value: fuzzy
+            - name: FUZZY_GRPC_PORT
               value: "7266"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://alloy.observability.svc.cluster.local:4317
             - name: OTEL_SERVICE_NAME
-              value: echo-mcp
-            - name: OTEL_ENABLED_ECHO_MCP
+              value: fuzzy-mcp
+            - name: OTEL_ENABLED_FUZZY_MCP
               value: "true"
           readinessProbe:
             httpGet:
@@ -58,13 +58,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: echo-mcp
+  name: fuzzy-mcp
   namespace: kantheon
   labels:
-    app: echo-mcp
+    app: fuzzy-mcp
 spec:
   selector:
-    app: echo-mcp
+    app: fuzzy-mcp
   ports:
     - name: http
       port: 7267

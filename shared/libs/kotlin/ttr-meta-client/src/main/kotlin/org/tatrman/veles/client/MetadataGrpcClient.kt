@@ -27,8 +27,8 @@ import java.util.concurrent.TimeUnit
 private const val PAGE_SIZE = 1000
 
 /**
- * Suspend client over the Ariadne model-graph gRPC service. Shared across the
- * constellation (ariadne-mcp, Golem `PackageContext`/`PromptStore`, Pythia).
+ * Suspend client over the Veles model-graph gRPC service. Shared across the
+ * constellation (veles-mcp, Golem `PackageContext`/`PromptStore`, Pythia).
  * Callers do their own caching on top of the model `content_hash` / prompt
  * `tree_hash`; this client is a thin, stateless RPC bridge.
  */

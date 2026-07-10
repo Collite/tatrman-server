@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kadmos
+  name: nlp
   namespace: kantheon
   labels:
-    app: kadmos
+    app: nlp
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kadmos
+      app: nlp
   template:
     metadata:
       labels:
-        app: kadmos
+        app: nlp
     spec:
       containers:
-        - name: kadmos
-          image: kadmos:dev
+        - name: nlp
+          image: nlp:dev
           ports:
             - name: http
               containerPort: 7270
@@ -25,13 +25,13 @@ spec:
             # The Dockerfile CMD binds uvicorn to UVICORN_PORT (default 7270).
             - name: UVICORN_PORT
               value: "7270"
-            - name: KADMOS_SERVICE_PORT
+            - name: NLP_SERVICE_PORT
               value: "7270"
             - name: OTEL_EXPORTER_OTLP_HOST
               value: alloy.observability.svc.cluster.local
             - name: OTEL_EXPORTER_OTLP_GRPC_PORT
               value: "4317"
-            - name: KADMOS_SERVICE_OTEL_PROTOCOL
+            - name: NLP_SERVICE_OTEL_PROTOCOL
               value: grpc
           readinessProbe:
             httpGet:
@@ -57,13 +57,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: kadmos
+  name: nlp
   namespace: kantheon
   labels:
-    app: kadmos
+    app: nlp
 spec:
   selector:
-    app: kadmos
+    app: nlp
   ports:
     - name: http
       port: 7270

@@ -314,7 +314,7 @@ message ModelBundle {
   // Drill mappings. Always includes explicit TTR-declared ones; auto-overlap
   // ones included only if include_drill_map = true.
   repeated DrillMapDetail drill_maps = 8;
-  // Echoed packages with their content hashes (for cache invalidation).
+  // Fuzzyed packages with their content hashes (for cache invalidation).
   // content_hash = sha256 of concatenated source-file bytes in deterministic file-name order.
   // See OQ-01.B.
   repeated PackageVersion package_versions = 9;
@@ -780,7 +780,7 @@ message SearchRequest {
 message SearchResponse {
   repeated SearchResult items = 1;
   PageInfo page_info = 2;
-  string algorithm_used = 3;                                // echoes the algorithm that produced these results
+  string algorithm_used = 3;                                // fuzzyes the algorithm that produced these results
   repeated org.tatrman.common.v1.ResponseMessage messages = 99;
   reserved 100 to 104;
 }

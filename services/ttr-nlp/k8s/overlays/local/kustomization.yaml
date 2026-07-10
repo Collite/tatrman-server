@@ -9,7 +9,7 @@ resources:
 patches:
   - target:
       kind: Deployment
-      name: kadmos
+      name: nlp
     patch: |
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy
@@ -19,7 +19,7 @@ patches:
         value:
           - name: UVICORN_PORT
             value: "7270"
-          - name: KADMOS_SERVICE_PORT
+          - name: NLP_SERVICE_PORT
             value: "7270"
           # Local cluster: no Alloy collector — disable OTel export to avoid
           # connection-refused noise (standard OTel kill-switch).

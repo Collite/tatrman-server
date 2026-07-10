@@ -1,4 +1,4 @@
-# Kadmos (NLP) Service Configuration
+# Nlp (NLP) Service Configuration
 # Engine plugin architecture with per-op-per-language routing
 
 service:

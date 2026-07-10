@@ -95,7 +95,7 @@ data class LocalizedString(
  * [DataFormatter] merges into [ColumnMeta] before the writers run.
  *
  * The decorator pattern keeps the worker dumb: the worker emits raw Arrow
- * IPC; `theseus-mcp` (or any other library consumer) builds a
+ * IPC; `query-mcp` (or any other library consumer) builds a
  * `Map<columnName, ColumnDecoration>` from a fresh metadata-service lookup
  * and passes it via [FormatOptions.columnMetadata].
  */

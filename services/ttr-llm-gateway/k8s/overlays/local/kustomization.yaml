@@ -9,7 +9,7 @@ resources:
 patches:
   - target:
       kind: Deployment
-      name: prometheus
+      name: llm-gateway
     patch: |
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy
@@ -17,7 +17,7 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env
         value:
-          - name: PROMETHEUS_SERVER_PORT
+          - name: LLM_GATEWAY_SERVER_PORT
             value: "7280"
           # Local cluster: the `test` profile uses in-memory H2 (no Postgres
           # needed) so the pod boots standalone. Upstream LLM calls hit the
@@ -30,4 +30,4 @@ patches:
           - name: ANTHROPIC_API_KEY
             value: anthropic-placeholder
           - name: OTEL_SERVICE_NAME
-            value: prometheus
+            value: llm-gateway

@@ -49,8 +49,8 @@ object ArrowIpcSerializer {
      * Cross-engine schema fingerprint = SHA-256 over the **canonical,
      * implementation-independent** logical-schema string (fork Stage 3.4 T2,
      * review-006 R3). NOT the raw IPC `serializeAsMessage()` bytes — those are
-     * not byte-stable across Arrow implementations/versions, so Brontes (Arrow
-     * Java) and Steropes (pyarrow) would have disagreed for the same schema.
+     * not byte-stable across Arrow implementations/versions, so Mssql (Arrow
+     * Java) and Polars (pyarrow) would have disagreed for the same schema.
      *
      * The algorithm is byte-identical to Charon's `Integrity.canonicalSchemaString`
      * and the Python reference; the shared fixture set
@@ -99,7 +99,7 @@ object ArrowIpcSerializer {
             is ArrowType.FixedSizeList -> "fixed_size_list_" + type.listSize
             is ArrowType.Struct -> "struct"
             is ArrowType.Map -> "map_" + if (type.keysSorted) "sorted" else "unsorted"
-            else -> error("Brontes fingerprint: unsupported Arrow type $type")
+            else -> error("Mssql fingerprint: unsupported Arrow type $type")
         }
 
     private fun fpToken(p: FloatingPointPrecision): String =

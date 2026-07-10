@@ -16,13 +16,13 @@ import java.sql.ResultSetMetaData
 /**
  * Fork Stage 3.3 T5 — the worker → data-formatter Arrow IPC contract.
  *
- * Drives Brontes's *real* Arrow path against a mocked JDBC driver: a fixture
+ * Drives Mssql's *real* Arrow path against a mocked JDBC driver: a fixture
  * ResultSet → [ResultSetToArrow] → [ArrowIpcSerializer.serializeBatch] produces
- * the exact `ResultBatch.arrow_ipc` bytes Brontes streams. We then decode those
+ * the exact `ResultBatch.arrow_ipc` bytes Mssql streams. We then decode those
  * bytes with `shared/libs/kotlin/data-formatter` (`DataFormatter.fromArrow`) and
  * assert a full round-trip — schema (names + order), row count, and a value probe.
  *
- * This pins the worker ↔ formatter boundary before Theseus (the query orchestrator)
+ * This pins the worker ↔ formatter boundary before Query (the query orchestrator)
  * arrives, so a divergence in either the worker's encoder or the formatter's
  * decoder is caught at unit level. Real-MSSQL confirmation lives in the separate
  * integration-test suite.
@@ -30,7 +30,7 @@ import java.sql.ResultSetMetaData
 class ArrowIpcFormatterContractSpec :
     StringSpec({
 
-        "Brontes Arrow IPC round-trips through data-formatter (schema + rows + value)" {
+        "Mssql Arrow IPC round-trips through data-formatter (schema + rows + value)" {
             RootAllocator(Long.MAX_VALUE).use { allocator ->
                 // --- fixture ResultSet: two columns (id INT, name VARCHAR), two rows ---
                 val meta =
@@ -59,10 +59,10 @@ class ArrowIpcFormatterContractSpec :
                         every { next() } returnsMany listOf(true, true, false)
                         every { getInt(1) } returnsMany listOf(1, 2)
                         every { wasNull() } returnsMany listOf(false, false)
-                        every { getObject(2) } returnsMany listOf("Brontes-alpha", "Brontes-beta")
+                        every { getObject(2) } returnsMany listOf("Mssql-alpha", "Mssql-beta")
                     }
 
-                // --- worker path: ResultSet → Arrow → IPC bytes (what Brontes emits) ---
+                // --- worker path: ResultSet → Arrow → IPC bytes (what Mssql emits) ---
                 val converter =
                     ResultSetToArrow(allocator = allocator, batchRows = 1024, maxBlobBytesPerCell = 8_388_608)
                 val batches = converter.convert(rs).toList()
@@ -78,8 +78,8 @@ class ArrowIpcFormatterContractSpec :
                 decoded.rowCount shouldBe 2
                 decoded.columnCount shouldBe 2
                 decoded.columns.map { it.name } shouldContainExactly listOf("id", "name")
-                String(decoded.bytes) shouldContain "Brontes-alpha"
-                String(decoded.bytes) shouldContain "Brontes-beta"
+                String(decoded.bytes) shouldContain "Mssql-alpha"
+                String(decoded.bytes) shouldContain "Mssql-beta"
             }
         }
     })

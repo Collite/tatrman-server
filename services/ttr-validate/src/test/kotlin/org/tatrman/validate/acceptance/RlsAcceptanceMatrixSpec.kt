@@ -30,8 +30,8 @@ import org.tatrman.plan.v1.TableScanNode
  *
  * The same `customers` scan is validated for several modelled bearers (identity +
  * roles arriving as they would post-fork: `user_id` + `auth_roles` on
- * [PipelineContext], populated by theseus-mcp's IdentityResolver from the JWT —
- * Stage 3.5). Argos runs its real in-process validator + folded policy engine
+ * [PipelineContext], populated by query-mcp's IdentityResolver from the JWT —
+ * Stage 3.5). Validate runs its real in-process validator + folded policy engine
  * (no gRPC, no whois). We then apply the *injected* security predicate to a tiny
  * mocked data source so the row sets are concrete, proving:
  *
@@ -115,7 +115,7 @@ class RlsAcceptanceMatrixSpec :
                     ).build(),
             )
 
-        // Apply the security predicate Argos injected (if any) to the mock dataset.
+        // Apply the security predicate Validate injected (if any) to the mock dataset.
         fun matches(
             cond: Expression,
             row: Map<String, String>,

@@ -27,14 +27,14 @@ import org.tatrman.veles.client.MetadataGrpcClient
 import org.tatrman.capabilities.client.CapabilitiesClient
 import org.tatrman.capabilities.v1.Capability
 
-val logger = LoggerFactory.getLogger("ariadne-mcp")
+val logger = LoggerFactory.getLogger("veles-mcp")
 
 fun main(args: Array<String>): Unit =
     runBlocking {
-        logger.info("Starting ariadne-mcp")
+        logger.info("Starting veles-mcp")
 
         val config = ConfigFactory.load()
-        val telemetry = McpTelemetry("ariadne-mcp", "grpc")
+        val telemetry = McpTelemetry("veles-mcp", "grpc")
         val serverPort = config.getString("server.port").toInt()
 
         // All metadata reads go over gRPC to the metadata service (the service exposes no REST
@@ -54,7 +54,7 @@ fun main(args: Array<String>): Unit =
 
         val mcpConfig =
             McpKtorConfig(
-                serviceName = "ariadne-mcp",
+                serviceName = "veles-mcp",
                 serverPort = serverPort,
                 shutdownUrlPath = "/shutdown",
                 connectionIdleTimeoutSeconds = 120,
@@ -79,7 +79,7 @@ fun main(args: Array<String>): Unit =
                     mcpStreamableHttp {
                         val server =
                             Server(
-                                serverInfo = Implementation(name = "ariadne-mcp", version = "0.1.0"),
+                                serverInfo = Implementation(name = "veles-mcp", version = "0.1.0"),
                                 options =
                                     ServerOptions(
                                         capabilities =
@@ -231,7 +231,7 @@ fun main(args: Array<String>): Unit =
                             }(request)
                         }
 
-                        // Golem P4 S4.2 — resolve_area tool (zero-logic wrapper over ariadne's
+                        // Golem P4 S4.2 — resolve_area tool (zero-logic wrapper over veles's
                         // ResolveArea RPC; resolves a Shem's `areas: [...]` to package sets).
                         server.addTool(
                             name = tools.resolveAreaTool.name,
@@ -248,7 +248,7 @@ fun main(args: Array<String>): Unit =
                 }
             }
 
-        println("ariadne-mcp server running and listening on port $serverPort")
+        println("veles-mcp server running and listening on port $serverPort")
 
         embeddedServer(
             factory = CIO,
@@ -270,14 +270,14 @@ fun main(args: Array<String>): Unit =
 // =============================================================================
 
 /**
- * Review-004 R2 — resolve the ariadne gRPC client target from the
+ * Review-004 R2 — resolve the veles gRPC client target from the
  * `metadata{}` block in `application.conf`. `metadata.host` / `metadata.port`
- * default to `"ariadne"` / `7261` and are overridden by the `ARIADNE_GRPC_HOST`
- * / `ARIADNE_GRPC_PORT` env vars (HOCON `${?…}` substitution) — the exact env
+ * default to `"veles"` / `7261` and are overridden by the `VELES_GRPC_HOST`
+ * / `VELES_GRPC_PORT` env vars (HOCON `${?…}` substitution) — the exact env
  * vars the k8s deployment sets.
  *
  * A blank host returns `null` so the tools report "not wired" rather than the
- * process crashing — the local no-backend mode (`ARIADNE_GRPC_HOST=""`).
+ * process crashing — the local no-backend mode (`VELES_GRPC_HOST=""`).
  *
  * The previous bug read `METADATA_GRPC_HOST` / `METADATA_GRPC_PORT` (which
  * nothing sets) with a stale `7204` default, so the in-cluster pod never
@@ -304,7 +304,7 @@ internal fun buildGrpcClient(config: com.typesafe.config.Config): MetadataGrpcCl
  * Review-004 R5.1 — load the authored `ToolCapability` manifests from
  * `src/main/resources/manifests/tools/` (the per-tool YAML dir) and build one [Capability]
  * per manifest. The previous code shipped a single [Capability] shim
- * that impersonated `ariadne.get_model:v1` and folded the other tools
+ * that impersonated `veles.get_model:v1` and folded the other tools
  * into `search_tags` — the registry saw 1 capability instead of one per
  * manifest, and each tool was undiscoverable by its own id.
  *
@@ -313,7 +313,7 @@ internal fun buildGrpcClient(config: com.typesafe.config.Config): MetadataGrpcCl
  * `CapabilitiesClientHandle` and the background heartbeat loop runs
  * per-handle. Failures on any one tool don't block the others.
  */
-private fun ariadneMcpCapabilities(): List<Capability> {
+private fun velesMcpCapabilities(): List<Capability> {
     val loader = ManifestLoader()
     return loader.loadAll()
 }
@@ -333,17 +333,17 @@ internal fun registerWithCapabilities(config: com.typesafe.config.Config) {
     val endpoint =
         System.getenv("CAPABILITIES_MCP_URL")
             ?: config.getString("capabilities-mcp.url")
-    val capabilities = ariadneMcpCapabilities()
+    val capabilities = velesMcpCapabilities()
     if (capabilities.isEmpty()) {
         logger.info(
-            "No ariadne-mcp capabilities to register (manifests dir empty or missing). " +
+            "No veles-mcp capabilities to register (manifests dir empty or missing). " +
                 "If you expected capabilities here, check the build's classpath for the manifests/ tree.",
         )
         return
     }
     if (endpoint.isBlank()) {
         logger.info(
-            "CAPABILITIES_MCP_URL not set — {} ariadne-mcp capabilities are not registered " +
+            "CAPABILITIES_MCP_URL not set — {} veles-mcp capabilities are not registered " +
                 "with capabilities-mcp. The registry search will not find them until registration is configured.",
             capabilities.size,
         )
@@ -360,15 +360,15 @@ internal fun registerWithCapabilities(config: com.typesafe.config.Config) {
             )
         if (handle.registrationId != null) {
             registered++
-            logger.info("ariadne-mcp registered '{}' with capabilities-mcp at {}", id, endpoint)
+            logger.info("veles-mcp registered '{}' with capabilities-mcp at {}", id, endpoint)
         } else {
             logger.warn(
-                "ariadne-mcp startup register for '{}' at {} not yet complete (registry may be " +
+                "veles-mcp startup register for '{}' at {} not yet complete (registry may be " +
                     "unreachable); background retry will continue.",
                 id,
                 endpoint,
             )
         }
     }
-    logger.info("ariadne-mcp: {}/{} capabilities registered", registered, capabilities.size)
+    logger.info("veles-mcp: {}/{} capabilities registered", registered, capabilities.size)
 }

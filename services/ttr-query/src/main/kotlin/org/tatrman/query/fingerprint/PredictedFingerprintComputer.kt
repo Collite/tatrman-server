@@ -9,7 +9,7 @@ import java.security.MessageDigest
 
 /**
  * Computes a predicted Arrow IPC schema fingerprint from a post-Translator
- * `PlanNode`. Theseus returns this on `Compile` and uses it to
+ * `PlanNode`. Query returns this on `Compile` and uses it to
  * cross-check the actual fingerprint that arrives on the first
  * `ResultBatch` from the Worker.
  *

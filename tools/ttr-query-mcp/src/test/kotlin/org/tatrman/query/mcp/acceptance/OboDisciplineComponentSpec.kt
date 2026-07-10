@@ -51,18 +51,18 @@ import java.util.Base64
  * Fork Stage 3.6 T3 — OBO discipline (mocked component test).
  *
  * Composes the real OBO gate ([IdentityGate], the same decision `McpTransport`
- * switches on) with the real `run_query` chain (QueryTool → in-process Theseus →
- * mocked Proteus/Argos/Kyklop → real Arrow → JSON). The Argos stub records the
+ * switches on) with the real `run_query` chain (QueryTool → in-process Query →
+ * mocked Translate/Validate/Dispatch → real Arrow → JSON). The Validate stub records the
  * roles it is asked to validate, so we can prove the **negative paths never reach
- * Argos** (kantheon-security §2): the gate fails closed *before* execution.
+ * Validate** (kantheon-security §2): the gate fails closed *before* execution.
  *
- *   - valid user bearer → allowed; rows return; Argos sees the user's roles.
- *   - no token (identity required) → fail-closed `missing_user_identity`; Argos
+ *   - valid user bearer → allowed; rows return; Validate sees the user's roles.
+ *   - no token (identity required) → fail-closed `missing_user_identity`; Validate
  *     never called (no roleless request reaches it).
- *   - service-identity token (no user claim) → rejected; Argos never called.
- *   - credential hygiene: the rejection surface never echoes the bearer token.
+ *   - service-identity token (no user claim) → rejected; Validate never called.
+ *   - credential hygiene: the rejection surface never fuzzyes the bearer token.
  *
- * Live theseus-mcp OBO e2e (real HTTP transport + Keycloak) is deferred to the
+ * Live query-mcp OBO e2e (real HTTP transport + Keycloak) is deferred to the
  * separate integration-test suite (planning-conventions §4).
  */
 class OboDisciplineComponentSpec :
@@ -135,8 +135,8 @@ class OboDisciplineComponentSpec :
                     ),
                 ).build()
 
-        // Real in-process Theseus; the Argos (validator) stub records the roles it sees.
-        fun theseusWithCapture(seenRoles: MutableList<List<String>>): QueryServiceImpl {
+        // Real in-process Query; the Validate (validator) stub records the roles it sees.
+        fun queryWithCapture(seenRoles: MutableList<List<String>>): QueryServiceImpl {
             val detect =
                 TranslatorDetectClient {
                     org.tatrman.translate.v1.DetectSchemaResponse
@@ -193,11 +193,11 @@ class OboDisciplineComponentSpec :
             )
         }
 
-        fun runnerOver(theseus: QueryServiceImpl): QueryRunnerClient =
+        fun runnerOver(query: QueryServiceImpl): QueryRunnerClient =
             object : QueryRunnerClient {
-                override fun run(request: RunRequest): Flow<ResultBatch> = theseus.run(request)
+                override fun run(request: RunRequest): Flow<ResultBatch> = query.run(request)
 
-                override suspend fun compile(request: RunRequest): CompileResponse = theseus.compile(request)
+                override suspend fun compile(request: RunRequest): CompileResponse = query.compile(request)
             }
 
         fun callToolRequest(): CallToolRequest =
@@ -215,7 +215,7 @@ class OboDisciplineComponentSpec :
 
         // Mirror McpTransport's gate: Reject → no execution (transport returns Rule-6);
         // Allow → execute the tool with the resolved identity. Returns the reject code
-        // (or null) so a test can assert the gate short-circuited before Argos.
+        // (or null) so a test can assert the gate short-circuited before Validate.
         suspend fun gatedExecute(
             tool: QueryTool,
             authHeader: String?,
@@ -225,10 +225,10 @@ class OboDisciplineComponentSpec :
                 is IdentityGate.Decision.Allow -> null to tool.execute(callToolRequest(), d.identity)
             }
 
-        "valid user bearer → allowed; rows return; Argos sees the user's roles" {
+        "valid user bearer → allowed; rows return; Validate sees the user's roles" {
             runBlocking {
                 val seenRoles = mutableListOf<List<String>>()
-                val tool = QueryTool(cfg, runnerOver(theseusWithCapture(seenRoles)), fakeMetadata)
+                val tool = QueryTool(cfg, runnerOver(queryWithCapture(seenRoles)), fakeMetadata)
                 val token = makeJwt("""{"preferred_username":"alice","realm_access":{"roles":["analyst"]}}""")
 
                 val (rejectCode, result) = gatedExecute(tool, "Bearer $token")
@@ -236,30 +236,30 @@ class OboDisciplineComponentSpec :
                 rejectCode shouldBe null
                 result!!.isError shouldBe false
                 (result.structuredContent!!["rowCount"] as JsonPrimitive).content shouldBe "2"
-                // The OBO roles travelled to Argos.
+                // The OBO roles travelled to Validate.
                 seenRoles.isNotEmpty() shouldBe true
                 seenRoles.last() shouldContain "analyst"
             }
         }
 
-        "no token → fail-closed missing_user_identity; Argos is never called" {
+        "no token → fail-closed missing_user_identity; Validate is never called" {
             runBlocking {
                 val seenRoles = mutableListOf<List<String>>()
-                val tool = QueryTool(cfg, runnerOver(theseusWithCapture(seenRoles)), fakeMetadata)
+                val tool = QueryTool(cfg, runnerOver(queryWithCapture(seenRoles)), fakeMetadata)
 
                 val (rejectCode, result) = gatedExecute(tool, authHeader = null)
 
                 rejectCode shouldBe "missing_user_identity"
                 result shouldBe null
-                // No roleless request reached Argos — the gate short-circuited.
+                // No roleless request reached Validate — the gate short-circuited.
                 seenRoles.isEmpty() shouldBe true
             }
         }
 
-        "service-identity token (no user claim) → rejected; Argos is never called" {
+        "service-identity token (no user claim) → rejected; Validate is never called" {
             runBlocking {
                 val seenRoles = mutableListOf<List<String>>()
-                val tool = QueryTool(cfg, runnerOver(theseusWithCapture(seenRoles)), fakeMetadata)
+                val tool = QueryTool(cfg, runnerOver(queryWithCapture(seenRoles)), fakeMetadata)
                 val svcToken = makeJwt("""{"clientId":"svc-pythia","typ":"Bearer","azp":"svc-pythia"}""")
 
                 val (rejectCode, result) = gatedExecute(tool, "Bearer $svcToken")
@@ -267,7 +267,7 @@ class OboDisciplineComponentSpec :
                 rejectCode shouldBe "missing_user_identity"
                 result shouldBe null
                 seenRoles.isEmpty() shouldBe true
-                // Credential hygiene: the rejection surface never echoes the bearer token.
+                // Credential hygiene: the rejection surface never fuzzyes the bearer token.
                 val reject =
                     IdentityGate.decide("Bearer $svcToken", null, null, true) as IdentityGate.Decision.Reject
                 reject.message shouldNotContain svcToken

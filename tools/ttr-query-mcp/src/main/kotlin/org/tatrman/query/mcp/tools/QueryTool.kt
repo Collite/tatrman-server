@@ -45,11 +45,11 @@ import java.util.UUID
 import java.util.regex.PatternSyntaxException
 
 /**
- * MCP `query` tool — submits a query to Theseus, accumulates Arrow
+ * MCP `query` tool — submits a query to Query, accumulates Arrow
  * results, formats via data-formatter, returns text + structured envelope.
  *
  * v1 strategy: read the first ResultBatch only. Worker default batch is
- * 10 000 rows (workers/mssql application.conf), max 100 000; theseus-mcp's
+ * 10 000 rows (workers/mssql application.conf), max 100 000; query-mcp's
  * row-limit-max is 5 000 — so a single batch always covers the result set
  * in normal config. is_last=false on the first batch surfaces a
  * `partial_results_truncated` message.
@@ -247,7 +247,7 @@ class QueryTool(
             return buildErrorResult(name, collected.errorCode, collected.errorText ?: collected.errorCode)
         }
 
-        // Theseus signals an internally-caught failure (e.g. a validate/parse failure,
+        // Query signals an internally-caught failure (e.g. a validate/parse failure,
         // or a dispatch failure mid-stream) as an errorBatch carrying an ERROR-severity
         // Rule-6 message rather than a gRPC status. Honor that contract: fail closed with
         // a clean typed error and DROP any rows already collected — never surface partial

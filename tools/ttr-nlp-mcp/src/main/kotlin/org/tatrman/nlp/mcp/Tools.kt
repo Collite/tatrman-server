@@ -13,26 +13,26 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import org.slf4j.LoggerFactory
-import org.tatrman.nlp.mcp.client.KadmosAnalyzeResult
-import org.tatrman.nlp.mcp.client.KadmosClient
-import org.tatrman.nlp.mcp.client.KadmosClientException
-import org.tatrman.nlp.mcp.telemetry.KadmosMcpTelemetry
+import org.tatrman.nlp.mcp.client.NlpAnalyzeResult
+import org.tatrman.nlp.mcp.client.NlpClient
+import org.tatrman.nlp.mcp.client.NlpClientException
+import org.tatrman.nlp.mcp.telemetry.NlpMcpTelemetry
 
 /**
  * The single `analyze` MCP tool — a zero-logic wrapper translating MCP tool
- * calls into `POST /v1/analyze` on the Kadmos service (contracts §2: kadmos-mcp
+ * calls into `POST /v1/analyze` on the Nlp service (contracts §2: nlp-mcp
  * exposes `Analyze` only; the ai-platform `parse` convenience shorthand is
  * dropped in the lean fork). [client] is nullable: a blank backend host →
  * `null` and every invocation surfaces a "not wired" error rather than crashing
- * boot (local-without-cluster mode, mirroring ariadne-mcp / echo-mcp).
+ * boot (local-without-cluster mode, mirroring veles-mcp / fuzzy-mcp).
  */
 class Tools(
-    private val client: KadmosClient?,
-    private val telemetry: KadmosMcpTelemetry,
+    private val client: NlpClient?,
+    private val telemetry: NlpMcpTelemetry,
 ) {
     private val logger = LoggerFactory.getLogger(Tools::class.java)
 
-    private fun formatAnalyzeResultAsText(result: KadmosAnalyzeResult): String {
+    private fun formatAnalyzeResultAsText(result: NlpAnalyzeResult): String {
         val sb = StringBuilder()
         sb.appendLine("=== NLP Analysis Results ===")
         sb.appendLine("Language: ${result.language} (confidence: ${result.languageConfidence})")
@@ -160,7 +160,7 @@ class Tools(
             logger.info("analyze completed | client not wired | isError=true")
             return CallToolResult(
                 isError = true,
-                content = listOf(TextContent(text = "Error: kadmos service not wired (kadmos.host is blank)")),
+                content = listOf(TextContent(text = "Error: nlp service not wired (nlp.host is blank)")),
             )
         }
 
@@ -191,7 +191,7 @@ class Tools(
             CallToolResult(
                 content = listOf(TextContent(text = output)),
             )
-        } catch (e: KadmosClientException) {
+        } catch (e: NlpClientException) {
             logger.error("Error in analyze tool: {}", e.message)
             logger.info("analyze completed | error | isError=true")
             CallToolResult(

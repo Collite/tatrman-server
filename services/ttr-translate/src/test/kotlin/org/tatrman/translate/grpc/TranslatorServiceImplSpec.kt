@@ -117,11 +117,11 @@ class TranslatorServiceImplSpec :
             unparseResp.output shouldNotContain "[db]."
         }
 
-        "End-to-end parse+unparse: ER SQL → PostgreSQL via the produkt model (the Arges contract)" {
-            // The Postgres worker (Arges) calls UnparseFromRelNode with SqlDialect.POSTGRESQL.
+        "End-to-end parse+unparse: ER SQL → PostgreSQL via the produkt model (the Postgres contract)" {
+            // The Postgres worker (Postgres) calls UnparseFromRelNode with SqlDialect.POSTGRESQL.
             // Pins that contract: the same PlanNode that renders to MSSQL above must render to
             // valid PostgreSQL — double-quoted identifiers, no MSSQL brackets, no `[db].` prefix.
-            // (docs/implementation/v1/arges/plan.md Stage 1.2 T1 — Proteus PG-unparse audit.)
+            // (docs/implementation/v1/postgres/plan.md Stage 1.2 T1 — Translate PG-unparse audit.)
             val produktModel = buildProduktErModel()
             val produktService = TranslatorServiceImpl(StaticModelHandleProvider(produktModel))
             val parseResp =
@@ -377,7 +377,7 @@ class TranslatorServiceImplSpec :
 
         // ---- T7 parameter-bridge restoration (master-plan §7) ---------------------------
         // The gRPC edge must thread `context.parameters` into parse (so `{name}` → `?`) and
-        // emit the positional binding list on unparse (so Brontes binds JDBC positions 1:1).
+        // emit the positional binding list on unparse (so Mssql binds JDBC positions 1:1).
 
         "ParseToRelNode + UnparseFromRelNode round-trip a named {name} via context.parameters" {
             val context =

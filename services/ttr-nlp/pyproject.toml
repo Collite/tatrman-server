@@ -1,7 +1,7 @@
 [project]
-name = "kadmos-service"
+name = "nlp-service"
 version = "0.1.0"
-description = "Kadmos — NLP foundation service - multi-engine analysis (Stanza, spaCy, NameTag, langid)"
+description = "NLP — NLP foundation service - multi-engine analysis (Stanza, spaCy, NameTag, langid)"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -32,18 +32,18 @@ dev = [
 
 [tool.uv]
 # Not an installable package (no build-system); deps-only project, like the
-# other Python services. Tests import `kadmos_service` via the pytest `pythonpath`
+# other Python services. Tests import `nlp_service` via the pytest `pythonpath`
 # below rather than from an installed wheel.
 package = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# `src/` layout: put it on sys.path so `from kadmos_service...` resolves under
+# `src/` layout: put it on sys.path so `from nlp_service...` resolves under
 # `uv run pytest` (the package is intentionally not installed — see above).
 pythonpath = ["src"]
 # Component tier (testing arc Phase 1 Stage 1.1) — mirrors the Kotlin
 # `componentTest` source set. Real-dep specs (testcontainers-python) carry
-# `@pytest.mark.component`; select with `just test-py services/kadmos -m component`.
+# `@pytest.mark.component`; select with `just test-py services/ttr-nlp -m component`.
 markers = [
     "component: real-dependency component tier (testcontainers-python; no cluster)",
 ]

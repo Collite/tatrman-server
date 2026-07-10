@@ -9,7 +9,7 @@ resources:
 patches:
   - target:
       kind: Deployment
-      name: echo
+      name: fuzzy
     patch: |
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy
@@ -17,11 +17,11 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env
         value:
-          - name: ECHO_HTTP_PORT
+          - name: FUZZY_HTTP_PORT
             value: "7265"
-          - name: ECHO_GRPC_PORT
+          - name: FUZZY_GRPC_PORT
             value: "7266"
           - name: OTEL_SERVICE_NAME
-            value: echo
-          - name: OTEL_ENABLED_ECHO
+            value: fuzzy
+          - name: OTEL_ENABLED_FUZZY
             value: "false"

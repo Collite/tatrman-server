@@ -10,7 +10,7 @@ import javax.sql.DataSource
 
 /**
  * Opens the Exposed connection the `metadata` loader runs `SELECT pk, col`
- * against. Only invoked when `echo.loader.source = "metadata"`; the `static`
+ * against. Only invoked when `fuzzy.loader.source = "metadata"`; the `static`
  * (in-repo JSON catalog) source never touches the DB.
  *
  * Forked from ai-platform `fuzzy-matcher` (lean carve-out re-added 2026-06-14):

@@ -17,7 +17,7 @@ import kotlinx.serialization.json.buildJsonObject
  * **Severity.** The current `Warning` proto (org.tatrman.plan.v1.Warning)
  * does not carry a severity field; the 2.1.B plan assumed it did. Until the
  * proto evolves we derive severity from a small known-codes table and
- * default to `warn`. Documented in tools/theseus-mcp/docs/technical/error-codes.md.
+ * default to `warn`. Documented in tools/query-mcp/docs/technical/error-codes.md.
  *
  * **Metadata.** The proto has no metadata map either. We surface `source_stage`
  * via `metadata.sourceStage` — the only structured side-channel the proto

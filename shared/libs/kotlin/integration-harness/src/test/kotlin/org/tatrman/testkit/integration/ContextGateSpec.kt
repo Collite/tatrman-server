@@ -17,8 +17,8 @@ import io.mockk.verify
  */
 class ContextGateSpec :
     StringSpec({
-        val ctx = "theseus-runquery"
-        val dep = ReadinessCheck(ReadinessCheck.Kind.DEPLOYMENT, "theseus")
+        val ctx = "query-runquery"
+        val dep = ReadinessCheck(ReadinessCheck.Kind.DEPLOYMENT, "query")
 
         "opens a handle when the namespace resolves and all checks are ready" {
             val reader = mockk<ClusterReader>()
@@ -47,7 +47,7 @@ class ContextGateSpec :
             every { reader.isReady("ns-1", dep) } returns false
 
             val ex = shouldThrow<ContextNotReadyException> { ContextGate(reader).open(ctx) }
-            ex.message!! shouldContain "DEPLOYMENT/theseus"
+            ex.message!! shouldContain "DEPLOYMENT/query"
         }
 
         "fails fast when the namespace declares no readiness checks" {

@@ -1,15 +1,15 @@
 // =============================================================================
-// Kantheon — Proteus (translator) service
+// Kantheon — Translate (translator) service
 //
 // Forked from ai-platform@kantheon-fork-point
 //   (shared/proto/src/main/proto/com/tatrman/translator/v1/translator.proto).
-// Fork Stage 2.4 (Proteus). Package com.tatrman.translator.v1 →
+// Fork Stage 2.4 (Translate). Package com.tatrman.translator.v1 →
 // org.tatrman.translate.v1; service TranslatorService → TranslateService (RPC names
 // kept); plan/context refs → org.tatrman.plan.v1; the Rule-6 messages=99 field
 // re-targeted to org.tatrman.common.v1.ResponseMessage. Wire shapes
 // otherwise unchanged.
 //
-// The Proteus service exposes the translator entry points. It is a
+// The Translate service exposes the translator entry points. It is a
 // thin gRPC wrapper around the shared/libs/kotlin/query-translator/ library
 // (which JVM consumers may also embed directly).
 //

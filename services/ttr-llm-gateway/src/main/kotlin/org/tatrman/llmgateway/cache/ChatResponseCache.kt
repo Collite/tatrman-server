@@ -13,7 +13,7 @@ import java.security.MessageDigest
 import java.time.Duration
 
 /**
- * Phase 09 A3 / DF-A3-CACHE — Redis-backed response cache for the Prometheus chat endpoint.
+ * Phase 09 A3 / DF-A3-CACHE — Redis-backed response cache for the LLM-gateway chat endpoint.
  *
  * Pythia and other consumers see the same response twice (same model + messages + options) → no
  * point re-paying the provider. The cache key is a SHA-256 of a deterministic JSON projection
@@ -37,7 +37,7 @@ import java.time.Duration
 class ChatResponseCache(
     private val redis: StringRedisTemplate,
     @Value("\${llm.cache.ttl-seconds:3600}") private val ttlSeconds: Long,
-    @Value("\${llm.cache.key-prefix:prometheus:chat:}") private val keyPrefix: String,
+    @Value("\${llm.cache.key-prefix:llm-gateway:chat:}") private val keyPrefix: String,
 ) {
     private val logger = LoggerFactory.getLogger(ChatResponseCache::class.java)
     private val json =

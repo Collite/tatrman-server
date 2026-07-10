@@ -17,7 +17,7 @@ class SecurityColumnRulesSpec :
 
         val hoconWithColumnRules =
             """
-            argos.policies = [
+            validate.policies = [
               {
                 id = "pii_protection"
                 match { type = "namespace", schema = "db", namespace = "dbo" }
@@ -105,7 +105,7 @@ class SecurityColumnRulesSpec :
 
         "unknown column-rule action → PolicyConfigException" {
             val bad =
-                """argos.policies = [ { id = "p", match { type = "all" }, predicate { type = "eq", column = "x", value { kind = "literal", value = 1 } }, column-rules = [ { column = "y", action = "redact" } ] } ]"""
+                """validate.policies = [ { id = "p", match { type = "all" }, predicate { type = "eq", column = "x", value { kind = "literal", value = 1 } }, column-rules = [ { column = "y", action = "redact" } ] } ]"""
             io.kotest.assertions.throwables.shouldThrow<PolicyConfigException> {
                 PolicyConfigLoader.load(ConfigFactory.parseString(bad))
             }

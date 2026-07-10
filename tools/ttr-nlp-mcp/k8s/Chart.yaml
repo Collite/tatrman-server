@@ -1,10 +1,10 @@
 apiVersion: v2
-name: kadmos-mcp
+name: nlp-mcp
 description: |
-  The Kantheon kadmos-mcp wrapper — the MCP edge over Kadmos (the NLP foundation). Env-agnostic
+  The Kantheon nlp-mcp wrapper — the MCP edge over Nlp (the NLP foundation). Env-agnostic
   Helm chart: image, replicas, resources, telemetry endpoint and the downstream HTTP wiring to
-  Kadmos are all values. Per-environment values live in the deploying repo. Converted from the
-  kustomize base/overlays, mirroring theseus-mcp (D2).
+  Nlp are all values. Per-environment values live in the deploying repo. Converted from the
+  kustomize base/overlays, mirroring query-mcp (D2).
 type: application
 # Chart version: the packaging. appVersion tracks the default image tag.
 version: 0.1.0
