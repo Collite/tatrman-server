@@ -27,7 +27,7 @@ import org.tatrman.query.client.TranslatorClient
 import org.tatrman.query.client.TranslatorDetectClient
 import org.tatrman.query.client.TranslatorTranslateClient
 import org.tatrman.query.client.ValidatorClient
-import org.tatrman.query.grpc.TheseusServiceImpl
+import org.tatrman.query.grpc.QueryServiceImpl
 import org.tatrman.query.mcp.QueryMcpConfig
 import org.tatrman.query.mcp.identity.IdentityGate
 import org.tatrman.query.mcp.identity.UserIdentity
@@ -144,7 +144,7 @@ class TokenExpiryComponentSpec :
         // A Theseus whose worker call streams one batch and THEN fails the data
         // call with UNAUTHENTICATED — the shape a post-expiry call takes once the
         // upstream rejects it. Proves the partial batch is not surfaced.
-        fun theseusFailingMidStream(): TheseusServiceImpl {
+        fun theseusFailingMidStream(): QueryServiceImpl {
             val detect =
                 TranslatorDetectClient {
                     org.tatrman.translate.v1.DetectSchemaResponse
@@ -193,7 +193,7 @@ class TokenExpiryComponentSpec :
                         throw StatusException(Status.UNAUTHENTICATED.withDescription("access token expired"))
                     }
                 }
-            return TheseusServiceImpl(
+            return QueryServiceImpl(
                 parse,
                 detect,
                 translate,
@@ -204,7 +204,7 @@ class TokenExpiryComponentSpec :
             )
         }
 
-        fun runnerOver(theseus: TheseusServiceImpl): QueryRunnerClient =
+        fun runnerOver(theseus: QueryServiceImpl): QueryRunnerClient =
             object : QueryRunnerClient {
                 override fun run(request: RunRequest): Flow<ResultBatch> = theseus.run(request)
 

@@ -7,7 +7,7 @@ import org.tatrman.validate.v1.ValidateRequest
 import org.tatrman.validate.v1.ValidationOptions
 import org.tatrman.validate.client.LocalPolicyClient
 import org.tatrman.validate.client.StaticMetadataClient
-import org.tatrman.validate.grpc.ArgosServiceImpl
+import org.tatrman.validate.grpc.ValidateServiceImpl
 import org.tatrman.validate.stages.LlmGuard
 import org.tatrman.validate.stages.RuleEnforcer
 import org.tatrman.validate.stages.SecurityApplier
@@ -25,7 +25,7 @@ import org.tatrman.plan.v1.TableScanNode
 class ArgosPolicyFoldComponentSpec :
     StringSpec({
         val service =
-            ArgosServiceImpl(
+            ValidateServiceImpl(
                 securityApplier =
                     SecurityApplier(
                         LocalPolicyClient(PolicyEngine(PolicyRegistry(DefaultPolicies.core))),

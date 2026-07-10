@@ -285,7 +285,10 @@ tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",
 # the 0.9.x public line at SV-P1 gate 2. The 0.8.5 published artifact still carries the
 # old proteus/v1 path, so it can't back the renamed translate service protos here.
 tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                            version = "0.0.1-LOCAL" }
-tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version.ref = "tatrman-translator" }
+# SV-P0 interim: the translate.v1-renamed ttr-translator from mavenLocal (S2). Its
+# API exposes org.tatrman.translate.v1.{Language,SqlDialect}; the 0.8.5 published
+# artifact still exposes proteus.v1, which mismatches the renamed service protos.
+tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version = "0.0.1-LOCAL" }
 exposed-core                        = { module = "org.jetbrains.exposed:exposed-core",                    version.ref = "exposed" }
 exposed-jdbc                        = { module = "org.jetbrains.exposed:exposed-jdbc",                    version.ref = "exposed" }
 exposed-java-time                   = { module = "org.jetbrains.exposed:exposed-java-time",               version.ref = "exposed" }

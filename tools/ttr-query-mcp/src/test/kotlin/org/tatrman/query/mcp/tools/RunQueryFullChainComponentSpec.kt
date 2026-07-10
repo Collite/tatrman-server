@@ -25,7 +25,7 @@ import org.tatrman.query.client.TranslatorClient
 import org.tatrman.query.client.TranslatorDetectClient
 import org.tatrman.query.client.TranslatorTranslateClient
 import org.tatrman.query.client.ValidatorClient
-import org.tatrman.query.grpc.TheseusServiceImpl
+import org.tatrman.query.grpc.QueryServiceImpl
 import org.tatrman.query.mcp.QueryMcpConfig
 import org.tatrman.query.mcp.identity.IdentitySource
 import org.tatrman.query.mcp.identity.UserIdentity
@@ -46,7 +46,7 @@ import java.nio.channels.Channels
 
 /**
  * Fork Stage 3.5 T6 — full-chain component smoke. `run_query` via theseus-mcp's
- * QueryTool → a real in-process **Theseus** (TheseusServiceImpl) → mocked Proteus
+ * QueryTool → a real in-process **Theseus** (QueryServiceImpl) → mocked Proteus
  * (parse) → mocked Argos (validate) → mocked Kyklop (dispatch) → a mocked worker
  * emitting real Arrow IPC → decoded to JSON rows in the MCP response.
  *
@@ -121,7 +121,7 @@ class RunQueryFullChainComponentSpec :
                 ).build()
 
         // Build a real Theseus wired to mocked downstreams; capture the roles Argos sees.
-        fun theseusWithCapture(seenRoles: MutableList<List<String>>): TheseusServiceImpl {
+        fun theseusWithCapture(seenRoles: MutableList<List<String>>): QueryServiceImpl {
             val detect =
                 TranslatorDetectClient {
                     org.tatrman.translate.v1.DetectSchemaResponse
@@ -167,7 +167,7 @@ class RunQueryFullChainComponentSpec :
                             .build(),
                     )
                 }
-            return TheseusServiceImpl(
+            return QueryServiceImpl(
                 parse,
                 detect,
                 translate,
@@ -178,7 +178,7 @@ class RunQueryFullChainComponentSpec :
             )
         }
 
-        fun runnerOver(theseus: TheseusServiceImpl): QueryRunnerClient =
+        fun runnerOver(theseus: QueryServiceImpl): QueryRunnerClient =
             object : QueryRunnerClient {
                 override fun run(request: RunRequest): Flow<ResultBatch> = theseus.run(request)
 

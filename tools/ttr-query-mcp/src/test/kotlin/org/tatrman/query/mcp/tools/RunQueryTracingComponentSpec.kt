@@ -30,7 +30,7 @@ import org.tatrman.query.client.TranslatorClient
 import org.tatrman.query.client.TranslatorDetectClient
 import org.tatrman.query.client.TranslatorTranslateClient
 import org.tatrman.query.client.ValidatorClient
-import org.tatrman.query.grpc.TheseusServiceImpl
+import org.tatrman.query.grpc.QueryServiceImpl
 import org.tatrman.query.mcp.QueryMcpConfig
 import org.tatrman.query.mcp.identity.IdentitySource
 import org.tatrman.query.mcp.identity.UserIdentity
@@ -59,7 +59,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * `theseus.run`.
  *
  * Both the theseus-mcp [InstrumentedTool] root span and the in-process
- * [TheseusServiceImpl] orchestration spans export to the **same** SDK (an
+ * [QueryServiceImpl] orchestration spans export to the **same** SDK (an
  * in-memory exporter), so the in-process seam is captured end-to-end. Across
  * pods the same nesting is delivered by gRPC auto-instrumentation, verified in
  * the separate integration-test suite (planning-conventions §4).
@@ -126,7 +126,7 @@ class RunQueryTracingComponentSpec :
                     ),
                 ).build()
 
-        fun theseus(sdk: OpenTelemetrySdk): TheseusServiceImpl {
+        fun theseus(sdk: OpenTelemetrySdk): QueryServiceImpl {
             val detect =
                 TranslatorDetectClient {
                     org.tatrman.translate.v1.DetectSchemaResponse
@@ -171,7 +171,7 @@ class RunQueryTracingComponentSpec :
                             .build(),
                     )
                 }
-            return TheseusServiceImpl(
+            return QueryServiceImpl(
                 parse,
                 detect,
                 translate,
@@ -183,7 +183,7 @@ class RunQueryTracingComponentSpec :
             )
         }
 
-        fun runnerOver(theseus: TheseusServiceImpl): QueryRunnerClient =
+        fun runnerOver(theseus: QueryServiceImpl): QueryRunnerClient =
             object : QueryRunnerClient {
                 override fun run(request: RunRequest): Flow<ResultBatch> = theseus.run(request)
 

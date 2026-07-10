@@ -31,7 +31,7 @@ import org.tatrman.dispatch.registry.WorkerRegistry
 import org.tatrman.dispatch.sticky.StickyRegistry
 import org.tatrman.dispatch.world.WorldConfig
 
-class KyklopServiceImplSpec :
+class DispatchServiceImplSpec :
     StringSpec({
         val finCustomers = qname("db", "dbo", "QHDOK_FAKTURY")
         val crmSubject = qname("db", "dbo", "QSUBJEKT_KLIENT")
@@ -54,7 +54,7 @@ class KyklopServiceImplSpec :
             stateful: Boolean = false,
             connections: List<String> = listOf("df-fin"),
             execute: (ExecuteRequest) -> Flow<ResultBatch> = { defaultStream() },
-        ): Pair<KyklopServiceImpl, StickyRegistry> {
+        ): Pair<DispatchServiceImpl, StickyRegistry> {
             val client = StubClient(connections = connections, supportsStateful = stateful, execute = execute)
             val registry = WorkerRegistry()
             registry.seed(
@@ -71,10 +71,10 @@ class KyklopServiceImplSpec :
                 ),
             )
             val sticky = StickyRegistry()
-            return KyklopServiceImpl(registry, sticky, world) to sticky
+            return DispatchServiceImpl(registry, sticky, world) to sticky
         }
 
-        fun fixtureWithFailover(): Pair<KyklopServiceImpl, StickyRegistry> {
+        fun fixtureWithFailover(): Pair<DispatchServiceImpl, StickyRegistry> {
             val client =
                 StubClient(
                     connections = listOf("df-fin"),
@@ -96,7 +96,7 @@ class KyklopServiceImplSpec :
                 ),
             )
             val sticky = StickyRegistry()
-            return KyklopServiceImpl(
+            return DispatchServiceImpl(
                 registry = registry,
                 sticky = sticky,
                 world = world,
@@ -263,7 +263,7 @@ class KyklopServiceImplSpec :
             val loadTracker =
                 org.tatrman.dispatch.routing
                     .LoadTracker(mapOf("w-a:9000" to 5))
-            val svc = KyklopServiceImpl(reg, StickyRegistry(), world, loadTracker = loadTracker)
+            val svc = DispatchServiceImpl(reg, StickyRegistry(), world, loadTracker = loadTracker)
 
             val req =
                 DispatchRequest
@@ -291,7 +291,7 @@ class KyklopServiceImplSpec :
             )
             // Both idle (load 0). Endpoint order in the registry puts w-b first, but tie-break
             // by endpoint string should pick w-a:9000.
-            val svc = KyklopServiceImpl(reg, StickyRegistry(), world)
+            val svc = DispatchServiceImpl(reg, StickyRegistry(), world)
             val req =
                 DispatchRequest
                     .newBuilder()
@@ -312,7 +312,7 @@ class KyklopServiceImplSpec :
             // pick the same pod for the same session across cold starts (i.e. across DispatcherImpl
             // instances). We verify by constructing the dispatcher twice and confirming the chosen
             // pod (recorded into sticky on first dispatch) matches.
-            fun twoWorkerFixture(): Pair<KyklopServiceImpl, StickyRegistry> {
+            fun twoWorkerFixture(): Pair<DispatchServiceImpl, StickyRegistry> {
                 val a = StubClient(connections = listOf("df-fin"), supportsStateful = true) { defaultStream() }
                 val b = StubClient(connections = listOf("df-fin"), supportsStateful = true) { defaultStream() }
                 val reg = WorkerRegistry()
@@ -323,7 +323,7 @@ class KyklopServiceImplSpec :
                     ),
                 )
                 val s = StickyRegistry()
-                return KyklopServiceImpl(reg, s, world) to s
+                return DispatchServiceImpl(reg, s, world) to s
             }
 
             val (svc1, sticky1) = twoWorkerFixture()
@@ -472,7 +472,7 @@ class KyklopServiceImplSpec :
                     ),
                 ),
             )
-            val svc = KyklopServiceImpl(registry, StickyRegistry(), world)
+            val svc = DispatchServiceImpl(registry, StickyRegistry(), world)
 
             val out =
                 svc
@@ -550,7 +550,7 @@ class KyklopServiceImplSpec :
                     ),
                 ),
             )
-            val svc = KyklopServiceImpl(registry, StickyRegistry(), world)
+            val svc = DispatchServiceImpl(registry, StickyRegistry(), world)
 
             val emptyNs = qname("db", "", "QHDOK_FAKTURY")
             svc
@@ -604,7 +604,7 @@ class KyklopServiceImplSpec :
                     ),
                 ),
             )
-            val svc = KyklopServiceImpl(registry, StickyRegistry(), world)
+            val svc = DispatchServiceImpl(registry, StickyRegistry(), world)
 
             val out =
                 svc
@@ -648,7 +648,7 @@ class KyklopServiceImplSpec :
                     ),
                 ),
             )
-            val svc = KyklopServiceImpl(registry, StickyRegistry(), world)
+            val svc = DispatchServiceImpl(registry, StickyRegistry(), world)
 
             val emptyNs = qname("db", "", "QHDOK_FAKTURY")
             val out =

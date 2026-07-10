@@ -8,7 +8,7 @@ import org.tatrman.validate.v1.ValidateResponse
 import org.tatrman.validate.v1.ValidationOptions
 import org.tatrman.validate.client.LocalPolicyClient
 import org.tatrman.validate.client.StaticMetadataClient
-import org.tatrman.validate.grpc.ArgosServiceImpl
+import org.tatrman.validate.grpc.ValidateServiceImpl
 import org.tatrman.validate.policy.Policy
 import org.tatrman.validate.policy.PolicyEngine
 import org.tatrman.validate.policy.PolicyPredicate
@@ -59,7 +59,7 @@ class RlsAcceptanceMatrixSpec :
             )
 
         val service =
-            ArgosServiceImpl(
+            ValidateServiceImpl(
                 securityApplier =
                     SecurityApplier(
                         LocalPolicyClient(PolicyEngine(PolicyRegistry(listOf(tenantIsolation)))),

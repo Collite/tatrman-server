@@ -85,8 +85,8 @@ dependencies {
     implementation(project(":shared:libs:kotlin:otel-config"))
     implementation(libs.micrometer.registry.prometheus)
 
-    // gRPC — :shared:proto generates the EchoService coroutine base class
-    // and the AriadneService stub the metadata loader calls.
+    // gRPC — :shared:proto generates the FuzzyService coroutine base class
+    // and the VelesService stub the metadata loader calls.
     implementation(project(":shared:proto"))
     implementation(libs.grpc.kotlin.stub)
     implementation(libs.grpc.netty.shaded)

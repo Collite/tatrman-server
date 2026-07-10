@@ -27,7 +27,7 @@ import org.tatrman.validate.client.LocalPolicyClient
 import org.tatrman.validate.client.MetadataClient
 import org.tatrman.validate.client.SecurityClient
 import org.tatrman.validate.client.StaticMetadataClient
-import org.tatrman.validate.grpc.ArgosServiceImpl
+import org.tatrman.validate.grpc.ValidateServiceImpl
 import org.tatrman.validate.health.DependencyMonitor
 import org.tatrman.validate.policy.GrpcPolicyMetadataClient
 import org.tatrman.validate.policy.PolicyConfigLoader
@@ -153,7 +153,7 @@ fun Application.module(config: Config) {
             }
         }
     val argosService =
-        ArgosServiceImpl(
+        ValidateServiceImpl(
             securityApplier = securityApplier,
             ruleEnforcer = ruleEnforcer,
             llmGuard = llmGuard,

@@ -2,7 +2,7 @@ package org.tatrman.fuzzy.loader
 
 import io.grpc.Channel
 import org.slf4j.LoggerFactory
-import org.tatrman.meta.v1.AriadneServiceGrpc
+import org.tatrman.meta.v1.VelesServiceGrpc
 import org.tatrman.meta.v1.DbTableDetail
 import org.tatrman.meta.v1.GetObjectRequest
 import org.tatrman.meta.v1.ListObjectsRequest
@@ -18,7 +18,7 @@ data class FuzzyTarget(
 )
 
 /**
- * Thin gRPC client over Ariadne (`AriadneService`, the metadata service) for the
+ * Thin gRPC client over Ariadne (`VelesService`, the metadata service) for the
  * fuzzy loader. The channel is owned by the caller (`Application.module`); this
  * class never builds or shuts it.
  *
@@ -29,7 +29,7 @@ data class FuzzyTarget(
  *
  * Forked from ai-platform `fuzzy-matcher.MetadataServiceClient` (2026-06-14):
  * `cz.dfpartner.metadata.v1` → `org.tatrman.meta.v1`, `MetadataServiceGrpc`
- * → `AriadneServiceGrpc`. The wire calls (`ListObjects` fuzzy-only + `GetObject`)
+ * → `VelesServiceGrpc`. The wire calls (`ListObjects` fuzzy-only + `GetObject`)
  * are unchanged.
  */
 class MetadataServiceClient(
@@ -39,10 +39,10 @@ class MetadataServiceClient(
 ) {
     private val logger = LoggerFactory.getLogger(MetadataServiceClient::class.java)
 
-    private val stub: AriadneServiceGrpc.AriadneServiceBlockingStub =
-        AriadneServiceGrpc.newBlockingStub(channel)
+    private val stub: VelesServiceGrpc.VelesServiceBlockingStub =
+        VelesServiceGrpc.newBlockingStub(channel)
 
-    private fun deadlined(): AriadneServiceGrpc.AriadneServiceBlockingStub =
+    private fun deadlined(): VelesServiceGrpc.VelesServiceBlockingStub =
         stub.withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)
 
     fun listFuzzyColumns(): List<FuzzyTarget> {

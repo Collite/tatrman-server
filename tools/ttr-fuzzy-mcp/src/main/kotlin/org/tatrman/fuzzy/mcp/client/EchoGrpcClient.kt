@@ -1,6 +1,6 @@
 package org.tatrman.fuzzy.mcp.client
 
-import org.tatrman.fuzzy.v1.EchoServiceGrpcKt
+import org.tatrman.fuzzy.v1.FuzzyServiceGrpcKt
 import org.tatrman.fuzzy.v1.MatchRequest
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
@@ -26,7 +26,7 @@ class EchoGrpcClient(
             .keepAliveWithoutCalls(true)
             .build()
 
-    private val stub = EchoServiceGrpcKt.EchoServiceCoroutineStub(channel)
+    private val stub = FuzzyServiceGrpcKt.FuzzyServiceCoroutineStub(channel)
 
     override suspend fun match(
         category: String,

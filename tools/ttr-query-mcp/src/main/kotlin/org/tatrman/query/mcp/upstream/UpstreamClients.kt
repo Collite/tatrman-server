@@ -2,21 +2,21 @@ package org.tatrman.query.mcp.upstream
 
 import org.tatrman.meta.v1.GetSnapshotRequest
 import org.tatrman.meta.v1.GetSnapshotResponse
-import org.tatrman.meta.v1.AriadneServiceGrpcKt
+import org.tatrman.meta.v1.VelesServiceGrpcKt
 import org.tatrman.meta.v1.ObjectEntry
 import org.tatrman.query.v1.CompileResponse
-import org.tatrman.query.v1.TheseusServiceGrpcKt
+import org.tatrman.query.v1.QueryServiceGrpcKt
 import org.tatrman.query.v1.RunRequest
 import org.tatrman.translate.v1.ParseRequest
 import org.tatrman.translate.v1.ParseResponse
 import org.tatrman.translate.v1.TranslateRequest
 import org.tatrman.translate.v1.TranslateResponse
-import org.tatrman.translate.v1.ProteusServiceGrpcKt
+import org.tatrman.translate.v1.TranslateServiceGrpcKt
 import org.tatrman.translate.v1.UnparseRequest
 import org.tatrman.translate.v1.UnparseResponse
 import org.tatrman.validate.v1.ValidateRequest
 import org.tatrman.validate.v1.ValidateResponse
-import org.tatrman.validate.v1.ArgosServiceGrpcKt
+import org.tatrman.validate.v1.ValidateServiceGrpcKt
 import org.tatrman.worker.v1.ResultBatch
 import io.grpc.ConnectivityState
 import io.grpc.ManagedChannel
@@ -80,7 +80,7 @@ class GrpcQueryRunnerClient(
 ) : QueryRunnerClient,
     AutoCloseable {
     private val channel: ManagedChannel = openChannel(cfg.host, cfg.port, maxMessageBytes)
-    private val stub = TheseusServiceGrpcKt.TheseusServiceCoroutineStub(channel)
+    private val stub = QueryServiceGrpcKt.QueryServiceCoroutineStub(channel)
 
     /**
      * Server-streaming Run. We do *not* set a per-call deadline because the
@@ -105,7 +105,7 @@ class GrpcTranslatorClient(
 ) : TranslatorClient,
     AutoCloseable {
     private val channel: ManagedChannel = openChannel(cfg.host, cfg.port, maxMessageBytes)
-    private val stub = ProteusServiceGrpcKt.ProteusServiceCoroutineStub(channel)
+    private val stub = TranslateServiceGrpcKt.TranslateServiceCoroutineStub(channel)
 
     override suspend fun parseToRelNode(request: ParseRequest): ParseResponse =
         stub.withDeadlineAfter(cfg.deadlineSeconds, TimeUnit.SECONDS).parseToRelNode(request)
@@ -129,7 +129,7 @@ class GrpcValidatorClient(
 ) : ValidatorClient,
     AutoCloseable {
     private val channel: ManagedChannel = openChannel(cfg.host, cfg.port, maxMessageBytes)
-    private val stub = ArgosServiceGrpcKt.ArgosServiceCoroutineStub(channel)
+    private val stub = ValidateServiceGrpcKt.ValidateServiceCoroutineStub(channel)
 
     override suspend fun validate(request: ValidateRequest): ValidateResponse =
         stub.withDeadlineAfter(cfg.deadlineSeconds, TimeUnit.SECONDS).validate(request)
@@ -149,7 +149,7 @@ class GrpcMetadataClient(
 ) : MetadataServiceClient,
     AutoCloseable {
     private val channel: ManagedChannel = openChannel(cfg.host, cfg.port, maxMessageBytes)
-    private val stub = AriadneServiceGrpcKt.AriadneServiceCoroutineStub(channel)
+    private val stub = VelesServiceGrpcKt.VelesServiceCoroutineStub(channel)
 
     private val cache: MetadataDecorationCache =
         MetadataDecorationCache(
