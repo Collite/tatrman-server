@@ -60,7 +60,7 @@ import java.util.Base64
  *   - no token (identity required) → fail-closed `missing_user_identity`; Validate
  *     never called (no roleless request reaches it).
  *   - service-identity token (no user claim) → rejected; Validate never called.
- *   - credential hygiene: the rejection surface never fuzzyes the bearer token.
+ *   - credential hygiene: the rejection surface never echoes the bearer token.
  *
  * Live query-mcp OBO e2e (real HTTP transport + Keycloak) is deferred to the
  * separate integration-test suite (planning-conventions §4).
@@ -267,7 +267,7 @@ class OboDisciplineComponentSpec :
                 rejectCode shouldBe "missing_user_identity"
                 result shouldBe null
                 seenRoles.isEmpty() shouldBe true
-                // Credential hygiene: the rejection surface never fuzzyes the bearer token.
+                // Credential hygiene: the rejection surface never echoes the bearer token.
                 val reject =
                     IdentityGate.decide("Bearer $svcToken", null, null, true) as IdentityGate.Decision.Reject
                 reject.message shouldNotContain svcToken
