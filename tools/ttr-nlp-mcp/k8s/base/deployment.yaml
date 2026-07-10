@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kadmos-mcp
+  namespace: kantheon
+  labels:
+    app: kadmos-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kadmos-mcp
+  template:
+    metadata:
+      labels:
+        app: kadmos-mcp
+    spec:
+      containers:
+        - name: kadmos-mcp
+          image: kadmos-mcp:dev
+          ports:
+            - containerPort: 7272
+          env:
+            - name: MCP_KADMOS_SERVER_PORT
+              value: "7272"
+            # HTTP target → kadmos service (contracts §7 port 7270).
+            - name: KADMOS_HTTP_HOST
+              value: kadmos
+            - name: KADMOS_HTTP_PORT
+              value: "7270"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://alloy.observability.svc.cluster.local:4317
+            - name: OTEL_SERVICE_NAME
+              value: kadmos-mcp
+            - name: OTEL_ENABLED_KADMOS_MCP
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7272
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7272
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kadmos-mcp
+  namespace: kantheon
+  labels:
+    app: kadmos-mcp
+spec:
+  selector:
+    app: kadmos-mcp
+  ports:
+    - name: http
+      port: 7272
+      targetPort: 7272

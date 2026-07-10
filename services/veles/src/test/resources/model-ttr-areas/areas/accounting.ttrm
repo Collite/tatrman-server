@@ -1,0 +1,6 @@
+def area accounting {
+    description: "Účetnictví a navazující obchodní doklady",
+    tags: ["finance"],
+    packages: [obchodni_doklady, ucetnictvi],
+    entities: [ucetnictvi.hodnota],
+}

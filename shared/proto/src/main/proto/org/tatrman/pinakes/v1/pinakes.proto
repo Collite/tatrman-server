@@ -1,0 +1,112 @@
+// =============================================================================
+// Pinakes — pipeline manager + asset catalogue + lineage + the LLM wiki-compile.
+//
+// Kleio/DocWH arc, P1 Stage 1.1. Source of truth: docs/architecture/kleio/contracts.md §2.
+// Platform-service convention: proto root `org.tatrman.pinakes.v1` (AGENTS.md §4).
+// Fourth non-`kantheon.*` proto root after ariadne/charon/kallimachos; the Kotlin
+// source root mirrors it (`org.tatrman.pinakes.*`).
+//
+// The WRITE path — stage raw assets, run pipelines, track lineage. Operator/
+// loader-driven at v1 (no MCP; gRPC/HTTP for operators).
+//
+// Wire-format rules inherited platform-wide (AGENTS.md §6):
+//   - Rule 6 — every response carries `repeated ResponseMessage messages = 99`.
+//   - Rule 7 — stage params ride as JSON string (`config_json`; camelCase keys).
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.pinakes.v1;
+
+import "org/tatrman/kantheon/common/v1/response_message.proto";
+
+option java_package = "org.tatrman.pinakes.v1";
+option java_multiple_files = true;
+
+service PinakesService {
+  // Stage
+  rpc RegisterAsset (RegisterAssetRequest) returns (Asset);   // upload/record a raw asset in Seaweed
+  rpc ListAssets    (ListAssetsRequest)    returns (ListAssetsResponse);
+  // Pipelines
+  rpc ListPipelines (ListPipelinesRequest) returns (ListPipelinesResponse);
+  rpc GetPipeline   (GetPipelineRequest)   returns (Pipeline);
+  rpc RunPipeline   (RunPipelineRequest)   returns (PipelineRun);   // ingest asset(s) through a pipeline
+  rpc GetRun        (GetRunRequest)        returns (PipelineRun);
+  // Lineage / catalogue
+  rpc GetLineage    (GetLineageRequest)    returns (Lineage);       // asset → run → corpus entries
+}
+
+message Asset {
+  string id          = 1;
+  string asset_ref   = 2;               // Seaweed key (data-seaweedfs)
+  string source_feed = 3;               // logical feed the asset belongs to (binds the pipeline)
+  string mime_type   = 4;
+  string original_name = 5;
+  string staged_at   = 6;
+}
+
+message Pipeline {
+  string id          = 1;
+  string display_name = 2;
+  string source_feed = 3;               // per-source binding (architecture §7)
+  repeated Stage stages = 4;            // ordered DAG; head varies, tail conformed
+  EmbedConfig embed  = 5;               // CONFORMED across pipelines feeding one corpus (§ below)
+}
+message Stage {
+  string id   = 1;
+  StageKind kind = 2;
+  string config_json = 3;               // Rule 7 — stage-specific params (chunker size, prompt ref, …)
+}
+enum StageKind {
+  STAGE_KIND_UNSPECIFIED = 0;
+  EXTRACT  = 1;   // raw asset → text (parsers)            [head]
+  CLASSIFY = 2;   // detect type/branch                    [head]
+  CHUNK    = 3;   // parts (per-type strategy)             [head]
+  EMBED    = 4;   // one model, conformed                  [tail]
+  COMPILE  = 5;   // LLM: entity/concept pages + synthesis [tail]
+  LINK     = 6;   // cross-references → wiki edges          [tail]
+  RESOLVE  = 7;   // GLOBAL entity resolution               [tail]
+  LOAD     = 8;   // Kallimachos LoadApi                    [tail]
+}
+// The embedding model is a CONFORMED CORPUS DIMENSION: declared per pipeline,
+// but all pipelines feeding one corpus MUST agree (architecture §11). Disagreement
+// is a config error at registration, not two coexisting spaces.
+message EmbedConfig { string model_id = 1; int32 dimensions = 2; string model_version = 3; }
+
+message PipelineRun {
+  string id          = 1;
+  string pipeline_id = 2;
+  repeated string asset_ids = 3;
+  RunStatus status   = 4;
+  repeated StageRecord stage_records = 5;
+  string started_at  = 6; string finished_at = 7;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;
+}
+enum RunStatus { RUN_STATUS_UNSPECIFIED = 0; RUNNING = 1; SUCCEEDED = 2; FAILED = 3; PARTIAL = 4; }
+message StageRecord { string stage_id = 1; StageKind kind = 2; string status = 3;
+                      int64 items_in = 4; int64 items_out = 5; int64 latency_ms = 6; double cost_usd = 7; optional string error = 8; }
+
+message Lineage {                        // catalogue: what came from where, via which run
+  string asset_id = 1;
+  repeated string run_ids = 2;
+  repeated int64 source_ids = 3;        // Kallimachos Sources produced
+  repeated int64 page_ids = 4;          // wiki Pages touched
+}
+
+// ── RPC request/response envelopes ──────────────────────────────────────────
+message RegisterAssetRequest {
+  string source_feed   = 1;
+  string mime_type     = 2;
+  string original_name = 3;
+  bytes  content       = 4;             // raw asset bytes → staged to Seaweed
+}
+message ListAssetsRequest  { string source_feed = 1; int32 limit = 2; }
+message ListAssetsResponse { repeated Asset assets = 1;
+                             repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99; }
+message ListPipelinesRequest  { string source_feed = 1; }
+message ListPipelinesResponse { repeated Pipeline pipelines = 1;
+                                repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99; }
+message GetPipelineRequest { string pipeline_id = 1; }
+message RunPipelineRequest { string pipeline_id = 1; repeated string asset_ids = 2; }
+message GetRunRequest      { string run_id = 1; }
+message GetLineageRequest  { string asset_id = 1; }

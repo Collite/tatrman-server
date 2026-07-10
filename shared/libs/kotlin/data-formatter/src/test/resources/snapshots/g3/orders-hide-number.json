@@ -1,0 +1,1 @@
+[{"#":1,"customer":"Alice","amount":12.50,"ordered_at":"2026-05-04T00:00:00"},{"#":2,"customer":"Bob","amount":99.99,"ordered_at":"2026-05-04T00:00:01"},{"#":3,"customer":null,"amount":0.10,"ordered_at":"2026-05-04T00:00:02"},{"#":4,"customer":"Diana","amount":100.00,"ordered_at":"2026-05-04T00:00:03"},{"#":5,"customer":"Eve","amount":null,"ordered_at":null}]

@@ -1,0 +1,50 @@
+{
+  "id": "nescafe-maggi-001",
+  "status": "STATUS_DONE",
+  "resolution": {
+    "resolvedIntent": {
+      "kind": "INTENT_PROCEDURAL",
+      "entities": [
+        { "entityType": "brand", "entityId": "412", "displayLabel": "Nescafe" },
+        { "entityType": "brand", "entityId": "507", "displayLabel": "Maggi" }
+      ],
+      "resolvedParamsJson": "{\"period\":\"last 12mo\"}",
+      "relevantQueryRefs": ["returnsByCustomerForBrandInPeriod", "revenueByCustomerByBrandByQuarter"]
+    }
+  },
+  "plan": {
+    "hypotheses": [
+      { "id": "H0", "statement": "the data exists for this question", "status": "HYP_SUPPORTED", "confidence": 1.0, "displayPriority": "DISPLAY_HIDDEN" }
+    ],
+    "nodes": [
+      { "nodeId": "N1", "testsHypIds": ["H0"], "query": { "queryRef": "returnsByCustomerForBrandInPeriod", "paramsJson": "{\"brand\":412,\"period\":\"last 12mo\"}" } },
+      { "nodeId": "N2", "testsHypIds": ["H0"], "query": { "queryRef": "revenueByCustomerByBrandByQuarter", "paramsJson": "{\"brand\":507}" } },
+      { "nodeId": "N4", "render": { "kind": "RENDER_TABLE", "blockRole": "PRIMARY", "caption": "Customers with Maggi revenue decline" } }
+    ],
+    "edges": [
+      { "fromNodeId": "N1", "toNodeId": "N2", "binding": "N2.params.customerIds = N1.output.customerId" }
+    ],
+    "rationale": "fetch returners, join revenue decline, render",
+    "revision": 0
+  },
+  "steps": [
+    { "id": "S1", "nodeId": "N1", "status": "STEP_COMPLETED", "attempts": 1, "cost": { "usd": 0.03, "latencyMs": 2100, "tierUsed": "" } },
+    { "id": "S2", "nodeId": "N2", "status": "STEP_COMPLETED", "attempts": 1, "cost": { "usd": 0.05, "latencyMs": 3400, "tierUsed": "" } }
+  ],
+  "hypotheses": [
+    { "id": "H0", "statement": "the data exists for this question", "status": "HYP_SUPPORTED", "confidence": 1.0, "displayPriority": "DISPLAY_HIDDEN" }
+  ],
+  "conclusion": {
+    "primary": {
+      "blocks": [
+        { "blockId": "b0", "role": "PRIMARY", "text": "Found 23 customers matching the criteria." },
+        { "blockId": "b1", "role": "EVIDENCE", "caption": "Customers with Maggi revenue decline" }
+      ]
+    },
+    "stopReason": "STOP_GOAL_REACHED",
+    "budgetTruncated": false
+  },
+  "resourceUsage": { "totalUsd": 0.18, "totalQueryCount": 2, "totalLatencyMs": 8200 },
+  "createdAt": "2026-06-26T09:00:00Z",
+  "finalisedAt": "2026-06-26T09:00:09Z"
+}

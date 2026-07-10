@@ -1,0 +1,59 @@
+[project]
+name = "workers-steropes"
+version = "0.1.0"
+description = "Steropes — the Polars worker (DataFrame engine) for kantheon. Stateful, session-scoped workspace store; implements org.tatrman.worker.v1.WorkerService. Forked from ai-platform workers/polars."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "grpcio>=1.66",
+    "grpcio-tools>=1.66",
+    "polars>=1.13",
+    "pyarrow>=18.0",
+    "fastapi[standard]>=0.128.0",
+    "uvicorn>=0.40.0",
+    "prometheus-client>=0.21",
+    "pyhocon>=0.3.61",
+    "shared-proto",
+    "otel-config",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "opentelemetry-instrumentation-grpc>=0.40b0",
+    "opentelemetry-instrumentation-fastapi>=0.40b0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/workers_steropes"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.9.4",
+]
+
+[tool.uv.sources]
+shared-proto = { path = "../../shared/proto/build/python-package", editable = true }
+otel-config = { path = "../../shared/libs/python/otel-config", editable = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# Component tier (testing arc Phase 1 Stage 1.1) — mirrors the Kotlin
+# `componentTest` source set. Real-dep specs (testcontainers-python) carry
+# `@pytest.mark.component`; select with `just test-py workers/steropes -m component`.
+markers = [
+    "component: real-dependency component tier (testcontainers-python; no cluster)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]

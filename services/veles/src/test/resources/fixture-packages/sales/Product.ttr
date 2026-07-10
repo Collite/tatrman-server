@@ -1,0 +1,11 @@
+package sales
+
+model er schema sales
+def entity Product {
+    description: "Product entity (the cross-package resolution target)"
+    nameAttribute: product_name
+    attributes: [
+        def attribute product_id { type: int, isKey: true },
+        def attribute product_name { type: text }
+    ]
+}

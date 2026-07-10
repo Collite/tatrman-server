@@ -1,0 +1,84 @@
+// common/v1 — typed cross-agent context handoff (PD-1 resolution, 2026-06-12).
+//
+// One message family, three uses:
+//   1. Iris-BFF → Themis: the (formerly undefined) `themis_prior_context` —
+//      coreference ("it", "they") resolves against `entities`.
+//   2. Iris-BFF → routed agent: every dispatch carries the previous turn's
+//      handoff; agents use or ignore. Pythia seeds investigations from it.
+//   3. Golem/Iris escalation: `InvestigateChip` carries a HandoffContext;
+//      chip click re-issues the turn with routing_hint=pythia + this payload.
+//
+// Assembly rule: Iris-BFF builds HandoffContext from the previous TurnPointer
+// + EntityContext + the view provenance echoed by the producing agent.
+// Inline payload by design (v1) — `source_turn_ref` / `envelope_ref` keep the
+// door open for a peer artifact-read API later without re-contracting.
+syntax = "proto3";
+
+package org.tatrman.kantheon.common.v1;
+
+option java_multiple_files = true;
+option java_package = "org.tatrman.kantheon.common.v1";
+
+// Agent identifier. MOVED here from themis/v1 (cohesion review 2026-06-12, D2):
+// envelope/v1 references it (RoutingPickChip.agent_id) and must import only
+// common/v1 — a themis/v1 import would transitively drag cz.dfpartner.nlp/
+// metadata protos into every envelope consumer (incl. the FE's envelope-ts).
+message AgentId {
+  string value = 1;  // "pythia" | "golem-erp" | "hebe-bora" | ...
+}
+
+// A resolved entity binding. Defined once here; reused as:
+//  - HandoffContext.entities (PD-1)
+//  - the `applied_context` echo on agent responses (PD-4): agents return the
+//    bindings they actually applied; Iris compares with what it sent and
+//    renders scope indicators / mismatch warnings.
+message EntityBinding {
+  string entity_type   = 1;  // "customer", "product", ...
+  string entity_id     = 2;  // resolved id in the domain model
+  string display_label = 3;  // "Kaufland ČR v.o.s."
+  double confidence    = 4;
+  string source        = 5;  // "user_pick" | "fuzzy" | "carryover"
+}
+
+// "What the user is looking at" — field-for-field from new-golem v2's
+// CurrentView (ai-platform agents/golem state_v2.CurrentView; ownership rule:
+// current_view is agent-owned, Iris snapshots it per turn into TurnPointer).
+// Also the single provenance shape reused by PD-9 (Block-level provenance).
+message ViewProvenance {
+  string pattern_id = 1;  // query/pattern id when the plan source was a pattern; empty for free SQL
+  string args_json  = 2;  // Rule 7: args as JSON string, camelCase keys
+  string sql        = 3;  // the executed SQL behind the displayed result
+  string bubble_id  = 4;  // anchors to the envelope bubble the user sees
+  int64  total_rows = 5;
+}
+
+// PD-9 (2026-06-12): per-block provenance — the "how was this computed" record.
+// Attached as `optional BlockProvenance provenance` on envelope/v1.Block
+// (envelope imports common — deliberate layering; common is the bottom package).
+// All fields optional; agents populate what they know — absence renders as
+// "provenance unavailable", never an error. Stamped uniformly at format time
+// by the envelope-render lib (view + agent id); Pythia adds step/hypothesis/model;
+// source_tables copies cz.dfpartner.plan.v1 PipelineContext.used_objects.
+// Same object feeds the iris_audit payload and the FE "ⓘ" popover (SQL behind a
+// collapsed "technical details" expander, visible to all in v1 — no role gating).
+message BlockProvenance {
+  ViewProvenance view           = 1;
+  string producing_agent_id     = 2;
+  string step_id                = 3;  // Pythia: StepRecord that produced this block
+  string hypothesis_id          = 4;  // Pythia: hypothesis this block evidences (links to PD-2 tree pane)
+  string model_ref              = 5;  // Metis: fitted-model workspace ref
+  repeated string source_tables = 6;  // physical objects touched (PipelineContext.used_objects)
+  string model_version          = 7;  // metadata model-graph snapshot version
+  string computed_at            = 8;
+}
+
+message HandoffContext {
+  string source_agent_id          = 1;  // "golem-erp"
+  string source_turn_ref          = 2;  // TurnPointer.artifact_ref of the anchoring turn
+  string user_question            = 3;  // the question that produced the anchor turn
+  string domain                   = 4;  // Shem domain name (empty if source is not a Golem)
+  repeated EntityBinding entities = 5;  // typed bindings in scope at the anchor turn
+  ViewProvenance view             = 6;  // what the user is looking at
+  string envelope_ref             = 7;  // the rendered envelope id
+  string suggested_focus          = 8;  // free text; filled by the emitter on escalation
+}

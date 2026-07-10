@@ -1,0 +1,67 @@
+models:
+  - name: gpt-4o
+    fullName: gpt-4o
+    provider: azure
+    type: chat
+    tags: ["smart", "complex", "coding"]
+    cost: 10
+  - name: gpt-4o-mini
+    provider: azure
+    type: chat
+    tags: ["fast", "cheap", "chat"]
+    cost: 1
+  - name: ada-002
+    fullName: text-embedding-ada-002
+    provider: azure
+    type: embedding
+    tags: ["embedding"]
+    cost: 1
+  - name: gpt-4.1
+    fullName: dfpartner-gpt-4.1
+    provider: azure
+    type: chat
+    tags: ["dfpartner"]
+    cost: 10
+  # Gap 10 Stage A — Anthropic Claude models. fullName is the Anthropic API id (used as the
+  # AnthropicChatOptions.model() value). provider="anthropic" routes through the Anthropic
+  # ChatClient registered in ModelService.clientMap.
+  - name: claude-opus-4-7
+    fullName: claude-opus-4-7
+    provider: anthropic
+    type: chat
+    tags: ["smart", "complex", "coding", "frontier"]
+    cost: 15
+  - name: claude-sonnet-4-6
+    fullName: claude-sonnet-4-6
+    provider: anthropic
+    type: chat
+    tags: ["balanced", "default"]
+    cost: 3
+  - name: claude-haiku-4-5
+    fullName: claude-haiku-4-5
+    provider: anthropic
+    type: chat
+    tags: ["fast", "cheap"]
+    cost: 1
+  # Tier aliases — the constellation's LlmGatewayClient sends abstract tier ids (Themis: "haiku"
+  # CHEAP / "sonnet" FAST; Golem's GolemModels.Cheap: "claude-haiku"). findByName is an EXACT match,
+  # so without these the request falls through to the Azure default (gpt-4.1) — wrong provider. Map
+  # each tier to its concrete Anthropic model (fullName = the AnthropicChatOptions.model() id).
+  - name: haiku
+    fullName: claude-haiku-4-5
+    provider: anthropic
+    type: chat
+    tags: ["fast", "cheap"]
+    cost: 1
+  - name: claude-haiku
+    fullName: claude-haiku-4-5
+    provider: anthropic
+    type: chat
+    tags: ["fast", "cheap"]
+    cost: 1
+  - name: sonnet
+    fullName: claude-sonnet-4-6
+    provider: anthropic
+    type: chat
+    tags: ["balanced", "default"]
+    cost: 3

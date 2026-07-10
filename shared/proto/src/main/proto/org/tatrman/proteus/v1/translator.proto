@@ -1,0 +1,37 @@
+// =============================================================================
+// Proteus v1 — translator library types (forked from ai-platform translator.proto)
+//
+// Library-only proto: the engine enums consumed by `:shared:libs:kotlin:query-translator`.
+// The full gRPC service surface (ParseRequest/Response, TranslateRequest, etc.) lands in
+// fork Phase 2 Stage 2.4 (Proteus) and re-uses these enums.
+//
+// Forked 2026-06-13 from `ai-platform@2575b923` (`cz/dfpartner/translator/v1/translator.proto`).
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.proteus.v1;
+
+option java_package = "org.tatrman.proteus.v1";
+option java_multiple_files = true;
+
+// Source language for the translator.
+enum Language {
+    LANGUAGE_UNSPECIFIED = 0;
+    SQL                  = 1;
+    TRANSFORMATION_DSL   = 2;
+    DATAFRAME_DSL        = 3;
+    REL_NODE             = 4;
+}
+
+// SQL dialects. v1 emits MS SQL by default; POSTGRESQL / MYSQL_MARIADB / DUCKDB are wired
+// through `Dialects.byCode` and the unparser (Phase 08 A3 / DF-T04 in the ai-platform history).
+enum SqlDialect {
+    SQL_DIALECT_UNSPECIFIED = 0;
+    MSSQL                   = 1;
+    POSTGRESQL              = 2;
+    MYSQL_MARIADB           = 3;
+    DUCKDB                  = 4;
+    // SQLITE reserved
+    reserved 5 to 10;
+}

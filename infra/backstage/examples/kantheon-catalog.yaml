@@ -1,0 +1,180 @@
+---
+# The Kantheon constellation, as a Backstage software catalog. Replaces the upstream example
+# catalog (fork Phase 5 Stage 5.5). Components describe the pantheon — the speaking-god agents,
+# the platform services that serve them, the Kyklops workers, the MCP wrappers, and the
+# off-constellation technical-wave infrastructure. Owned by the `kantheon` group.
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: kantheon
+  description: The Kantheon constellation team.
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: kantheon
+  description: The Kantheon constellation — the agent constellation and platform.
+spec:
+  owner: kantheon
+---
+# ── Agents (the speaking gods) ──────────────────────────────────────────────────────────────
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: iris-bff
+  description: Dispatch BFF — conversation state, Themis dispatch, stream multiplex (Kotlin/Ktor).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: themis
+  description: Question understanding + agent routing (Kotlin/Koog).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: golem
+  description: Per-domain Q&A template — one pod per Shem (Kotlin/Koog).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: pythia
+  description: Autonomous analytical investigator — RCA / forecast / simulation (Kotlin/Koog).
+spec: { type: service, lifecycle: experimental, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: hebe
+  description: Personal autonomous agent — per-user instances (Kotlin/Koog).
+spec: { type: service, lifecycle: experimental, owner: kantheon, system: kantheon }
+---
+# ── Platform services (the figures who serve the gods) ──────────────────────────────────────
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ariadne
+  description: Model graph / metadata + prompt serving (Kotlin).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: theseus
+  description: Query orchestrator + plan cache (Kotlin).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: echo
+  description: Czech-aware fuzzy matcher (Kotlin).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: kadmos
+  description: NLP foundation (Python — spaCy / Stanza / MorphoDiTa).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: proteus
+  description: lang ↔ RelNode ↔ SQL translator (Kotlin / Calcite).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: kyklop
+  description: Worker dispatcher (Kotlin).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: argos
+  description: Validator + RLS policy engine (Kotlin; sql-security folded in).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: prometheus
+  description: LLM gateway (Spring Boot).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: charon
+  description: Arrow data mover — Seaweed / Redis / worker sessions / DB tables (Kotlin).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: metis
+  description: Model estimation — SARIMAX / Prophet / linear (Python).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+# ── Workers (the Kyklops) ───────────────────────────────────────────────────────────────────
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: brontes
+  description: MSSQL worker (Kotlin).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: steropes
+  description: Polars worker (Python).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: arges
+  description: Postgres worker — per-tenant RLS (Kotlin).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+# ── MCP wrappers (tools) ────────────────────────────────────────────────────────────────────
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: capabilities-mcp
+  description: Unified tool + agent capability registry (Kotlin/Ktor + MCP SDK).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+# ── Technical wave (off-constellation infrastructure, no personas) ──────────────────────────
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: whois
+  description: User/role directory + OPA bundle server (Kotlin/Ktor; own Postgres).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: health
+  description: Cluster health-check aggregator (Kotlin/Ktor).
+spec: { type: service, lifecycle: production, owner: kantheon, system: kantheon }
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: landing
+  description: Multilingual cluster landing page / service dispatcher (Vue 3 + Nginx).
+spec: { type: website, lifecycle: production, owner: kantheon, system: kantheon }

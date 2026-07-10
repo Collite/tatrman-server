@@ -1,0 +1,36 @@
+// Kantheon-local stand-in for the cross-platform `ResponseMessage` referenced by
+// AGENTS.md §6.1 / Rule 6. ai-platform defines a `ResponseMessage` inside
+// `cz.dfpartner.metadata.v1` that carries a metadata-domain `ObjectRef`, so it
+// is not portable to non-metadata services.
+//
+// TODO(cross-repo): when ai-platform extracts a domain-free
+// `cz.dfpartner.common.v1.ResponseMessage`, swap kantheon imports to use it
+// and delete this file.
+syntax = "proto3";
+
+package org.tatrman.kantheon.common.v1;
+
+option java_multiple_files = true;
+option java_package = "org.tatrman.kantheon.common.v1";
+
+// Application-layer outcome carried on every response message at field 99.
+// Used for warnings, hints, non-fatal errors, and pipeline diagnostics.
+message ResponseMessage {
+  Severity severity     = 1;
+  string code           = 2;          // machine token, e.g. "object_not_found"
+  string human_message  = 3;          // safe to show in UI
+  // Optional, platform-generic source-attribution channel: the file path / URI
+  // of the input that produced this message, when one applies (e.g. a model /
+  // config / fixture file a loader raised a warning against). Domain-neutral on
+  // purpose — any file-loading service may set it; empty when there is no source.
+  // Kept as a typed field (not folded into human_message) so UIs can render the
+  // offending path distinctly. First consumer: Ariadne source-load warnings (2.1).
+  string source_file    = 4;
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  INFO    = 1;
+  WARNING = 2;
+  ERROR   = 3;
+}

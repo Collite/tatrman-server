@@ -1,0 +1,70 @@
+syntax = "proto3";
+package org.tatrman.kantheon.hebe.v1;
+
+import "google/protobuf/timestamp.proto";
+import "org/tatrman/kantheon/common/v1/response_message.proto";
+
+option java_multiple_files = true;
+option java_package = "org.tatrman.kantheon.hebe.v1";
+
+// Hebe arc Phase 4 (contracts §1.2). Minimal in v1 — only the types that cross a
+// boundary (routine semantics shared between scheduler, console, and receipts).
+// Hebe is an agent, so it takes the constellation proto root (CLAUDE.md §4).
+
+// A scheduled routine. Mirrors the `routines` table row.
+message Routine {
+  string routine_id                     = 1;
+  string name                           = 2;
+  string cron                           = 3;   // 5-field cron, instance-local TZ
+  RoutineBody body                      = 4;
+  bool enabled                          = 5;
+  google.protobuf.Timestamp last_run_at = 6;
+  google.protobuf.Timestamp next_run_at = 7;
+}
+
+message RoutineBody {
+  oneof kind {
+    SkillBody skill               = 1;  // standalone-era: local skill
+    ToolBody tool                 = 2;  // standalone-era: direct tool call
+    KantheonQuestionBody kantheon = 3;  // NEW: a turn dispatched via iris-bff
+  }
+}
+
+message SkillBody { string skill_name = 1; string args_json = 2; }   // Rule 7: argsJson
+message ToolBody  { string tool_name  = 1; string args_json = 2; }
+
+// "Run this question through the constellation and deliver the result."
+message KantheonQuestionBody {
+  string question                   = 1;   // natural-language; routed by Themis like any turn
+  string session_ref                = 2;   // stable per-routine Iris session (created on first run)
+  repeated string delivery_channels = 3;   // "telegram" | "web" — where Hebe pushes the conclusion
+  string routing_hint               = 4;   // optional; honoured by Themis Layer 0
+}
+
+// One execution of a routine. Mirrors a `jobs` row of kind=routine + delivery outcome.
+message RoutineRun {
+  string run_id                        = 1;
+  string routine_id                    = 2;
+  RunStatus status                     = 3;
+  google.protobuf.Timestamp started_at = 4;
+  google.protobuf.Timestamp ended_at   = 5;
+  string turn_ref                      = 6;   // iris-bff turn id (kantheon bodies only)
+  string error                         = 7;
+  repeated DeliveryRecord deliveries   = 8;
+  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;  // Rule 6
+}
+
+enum RunStatus {
+  RUN_STATUS_UNSPECIFIED = 0;
+  RUNNING                = 1;
+  AWAITING_AGENT         = 2;   // constellation turn paused (e.g. Pythia AWAITING_*)
+  DELIVERED              = 3;
+  FAILED                 = 4;
+  CANCELLED              = 5;
+}
+
+message DeliveryRecord {
+  string channel                         = 1;
+  google.protobuf.Timestamp delivered_at = 2;
+  bool ok                                = 3;
+}

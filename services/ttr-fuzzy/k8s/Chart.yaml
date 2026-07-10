@@ -1,0 +1,15 @@
+apiVersion: v2
+name: echo
+description: |
+  The Kantheon echo service (Czech-aware fuzzy matcher) — an env-agnostic Helm chart. Holds no
+  cluster knowledge: image, replicas, resources, telemetry endpoint are all values. Per-environment
+  values live in the deploying repo (Olymp clusters via ArgoCD multi-source D3'; test contexts via
+  the Olymp scripted harness). Converted from the kustomize base/overlays, mirroring services/theseus/k8s.
+type: application
+version: 0.1.0
+appVersion: "dev"
+# Common Deployment/Service shape from the kantheon-service library chart (D1).
+dependencies:
+  - name: kantheon-service
+    version: 0.1.0
+    repository: "file://../../../shared/charts/kantheon-service"

@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-mcp
+  namespace: kantheon
+  labels:
+    app: echo-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo-mcp
+  template:
+    metadata:
+      labels:
+        app: echo-mcp
+    spec:
+      containers:
+        - name: echo-mcp
+          image: echo-mcp:dev
+          ports:
+            - containerPort: 7267
+          env:
+            - name: MCP_ECHO_SERVER_PORT
+              value: "7267"
+            # gRPC channel target → echo service (contracts §7 ports 7265/7266).
+            - name: ECHO_GRPC_HOST
+              value: echo
+            - name: ECHO_GRPC_PORT
+              value: "7266"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://alloy.observability.svc.cluster.local:4317
+            - name: OTEL_SERVICE_NAME
+              value: echo-mcp
+            - name: OTEL_ENABLED_ECHO_MCP
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7267
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7267
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-mcp
+  namespace: kantheon
+  labels:
+    app: echo-mcp
+spec:
+  selector:
+    app: echo-mcp
+  ports:
+    - name: http
+      port: 7267
+      targetPort: 7267

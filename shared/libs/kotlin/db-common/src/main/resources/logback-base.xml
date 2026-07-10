@@ -1,0 +1,31 @@
+<included>
+    <!--
+        Shared base logback configuration for all Kotlin services using db-common.
+        Include this file from your service's logback.xml:
+            <include resource="logback-base.xml"/>
+        Then set your root level:
+            <root level="DEBUG">
+                <appender-ref ref="JSON_CONSOLE"/>
+                <appender-ref ref="OTEL"/>
+            </root>
+    -->
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <!-- Limit stack traces to 5 frames to keep logs concise -->
+            <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                <maxDepthPerThrowable>5</maxDepthPerThrowable>
+                <maxLength>4096</maxLength>
+                <rootCauseFirst>true</rootCauseFirst>
+            </throwableConverter>
+        </encoder>
+    </appender>
+
+    <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <captureExperimentalAttributes>true</captureExperimentalAttributes>
+        <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
+        <captureLoggerContext>true</captureLoggerContext>
+        <captureMdcAttributes>*</captureMdcAttributes>
+    </appender>
+</included>

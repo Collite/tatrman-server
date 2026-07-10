@@ -1,0 +1,24 @@
+capability_id: "kadmos.analyze:v1"
+category: "kadmos"
+version: "1.0.0"
+description: |
+  Run NLP analysis on input text — tokenization, sentence split,
+  lemmatization, POS tagging, dependency parsing, NER, and language
+  detection. Czech-aware: cs is routed through the UFAL stack
+  (MorphoDiTa for tag/lemma, NameTag for NER), en through Stanza/spaCy.
+  Ops are selected via the `ops` argument; `mode=COMPARE` runs all engines.
+service_endpoint: "http://kadmos-mcp.kantheon.svc.cluster.local:7272"
+search_tags:
+  - kadmos
+  - nlp
+  - lemmatize
+  - tokenize
+  - ner
+  - pos
+  - dependency-parse
+  - language-detect
+cost_hints:
+  typical_latency_ms: 150
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 16

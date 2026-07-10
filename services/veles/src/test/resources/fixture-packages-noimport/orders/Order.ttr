@@ -1,0 +1,10 @@
+model er schema orders
+def entity OrderWithBadRole {
+    description: "Order that references Product without an import"
+    nameAttribute: id
+    roles: [Product]
+    attributes: [
+        def attribute id { type: int, isKey: true },
+        def attribute product_ref { type: int }
+    ]
+}

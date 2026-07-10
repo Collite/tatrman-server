@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: mssql-worker
+  description: Kotlin/JDBC worker that runs validated PlanNodes against MS SQL Server; streams Arrow IPC results back via gRPC
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - kotlin
+    - worker
+    - mssql
+    - jdbc
+    - v1
+spec:
+  type: service
+  lifecycle: production
+  owner: df-platform
+  system: ai-platform
