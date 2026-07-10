@@ -2,7 +2,7 @@
 // (GetModel / GetPrompts / list*). Extracted from tools/ariadne-mcp (2026-06-18,
 // Golem Stage 2.2) so Golem's PackageContext + PromptStore and Pythia consume one
 // client, not per-module copies. Depends only on :shared:proto (which generates the
-// grpc + grpckt stubs) + the netty transport — NOT on :services:ariadne (the server).
+// grpc + grpckt stubs) + the netty transport — NOT on :services:veles (the server).
 plugins {
     base
     alias(libs.plugins.kotlin.jvm)
@@ -19,7 +19,7 @@ tasks.test {
 }
 
 dependencies {
-    // Ariadne protos + generated grpc/grpckt coroutine stubs (org.tatrman.ariadne.v1).
+    // Ariadne protos + generated grpc/grpckt coroutine stubs (org.tatrman.meta.v1).
     api(project(":shared:proto"))
     implementation(libs.grpc.netty.shaded)
     implementation(libs.kotlinx.coroutines.core)

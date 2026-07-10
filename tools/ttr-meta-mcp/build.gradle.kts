@@ -9,7 +9,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.ariadne.mcp.ApplicationKt")
+    mainClass.set("org.tatrman.veles.mcp.ApplicationKt")
 }
 
 val osArch = System.getProperty("os.arch").lowercase()
@@ -41,7 +41,7 @@ jib {
         image = "ariadne-mcp:latest"
     }
     container {
-        mainClass = "org.tatrman.kantheon.ariadne.mcp.ApplicationKt"
+        mainClass = "org.tatrman.veles.mcp.ApplicationKt"
         ports = listOf("7154")
     }
     dockerClient {
@@ -92,8 +92,8 @@ dependencies {
     // ariadne-client lib (extracted 2026-06-18, Golem Stage 2.2); it carries the
     // grpc-kotlin-stub + netty transport transitively, so they're dropped here.
     implementation(project(":shared:proto"))
-    implementation(project(":services:ariadne"))
-    implementation(project(":shared:libs:kotlin:ariadne-client"))
+    implementation(project(":services:veles"))
+    implementation(project(":shared:libs:kotlin:ttr-meta-client"))
 
     implementation(libs.ktor.opentelemetry)
     implementation(libs.micrometer.registry.prometheus)

@@ -17,8 +17,8 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.ipc as ipc
 from opentelemetry import trace
-from org.tatrman.ariadne.v1 import ariadne_pb2
-from org.tatrman.kantheon.common.v1 import response_message_pb2
+from org.tatrman.meta.v1 import ariadne_pb2
+from org.tatrman.common.v1 import response_message_pb2
 from org.tatrman.worker.v1 import worker_pb2
 
 from workers_steropes.config import WorkersSteropesConfig

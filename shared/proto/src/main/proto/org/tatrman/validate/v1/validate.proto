@@ -1,0 +1,116 @@
+// =============================================================================
+// Kantheon — Argos (validator) service
+//
+// Forked from ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4 (tag kantheon-fork-point)
+//   (shared/proto/src/main/proto/com/tatrman/validator/v1/validator.proto).
+// Fork Stage 3.1 (Argos). Package com.tatrman.validator.v1 →
+// org.tatrman.validate.v1; service ValidatorService → ValidateService (RPC name kept);
+// plan/context refs → org.tatrman.plan.v1; the Rule-6 messages=99 field
+// re-targeted to org.tatrman.common.v1.ResponseMessage. Wire shapes
+// otherwise unchanged. Roles arrive in PipelineContext.auth_roles (populated
+// upstream at the theseus-mcp edge from the JWT's realm_access.roles) — Argos
+// trusts the context; it does not parse the bearer (contracts §3).
+//
+// The Argos service is the single mandatory checkpoint between "what the
+// user wanted" and "what runs against data". It receives a PlanNode in the
+// physical schema (post-Proteus MAP_TO_PHYSICAL), applies row-level
+// security predicates, enforces structural rules (TopN, allow/deny columns),
+// and optionally runs an LLM-as-judge guard. Output is the augmented
+// PlanNode plus an audit record of what was applied.
+//
+// Security is NOT an opt-out flag on the Translator; it lives in this
+// separate service so the bypass isn't structurally expressible. The
+// Theseus orchestrator always calls Argos between Proteus and Kyklop.
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.validate.v1;
+
+import "org/tatrman/plan/v1/plan.proto";
+import "org/tatrman/plan/v1/context.proto";
+import "org/tatrman/common/v1/response_message.proto";   // for ResponseMessage — applied universally to v1 service responses
+
+option java_package = "org.tatrman.validate.v1";
+option java_multiple_files = true;
+option java_outer_classname = "ValidateProto";
+
+// -----------------------------------------------------------------------------
+// Service
+// -----------------------------------------------------------------------------
+
+service ValidateService {
+  // Validate and augment a PlanNode. Output PlanNode may have additional
+  // Filter ops wrapping TableScans (security predicates), additional
+  // LimitOffset wrappers (TopN enforcement), and rewritten Project ops
+  // (allow/deny column enforcement).
+  rpc Validate(ValidateRequest) returns (ValidateResponse);
+}
+
+// -----------------------------------------------------------------------------
+// Request
+// -----------------------------------------------------------------------------
+
+message ValidateRequest {
+  org.tatrman.plan.v1.PlanNode plan = 1;
+
+  // Identity drives security: context.user_id is required when
+  // options.apply_security is true (the default). The Validator may reject
+  // requests without an identity unless an explicit anonymous policy is
+  // configured.
+  org.tatrman.plan.v1.PipelineContext context = 2;
+
+  ValidationOptions options = 3;
+  reserved 4 to 8;
+}
+
+message ValidationOptions {
+  // Apply row-level security predicates from the policy engine. Default true.
+  // Only an admin / service-account caller may set this to false; Argos
+  // enforces this server-side based on the caller's auth_roles.
+  bool apply_security = 1;
+
+  // Enforce a row limit (TopN) wrapper. Default true.
+  bool enforce_top_n = 2;
+  // Default top-N to apply when caller hasn't specified one. Typically 30.
+  int32 default_top_n = 3;
+
+  // Run an optional LLM-as-judge for semantic safety review. Off by default;
+  // adds latency and LLM cost.
+  bool llm_guard = 4;
+
+  // Phase 08 C1 / DF-V06 — strict-mode: reject queries with implicit type-widening that the DB
+  // would silently coerce (e.g. int <-> varchar comparisons). Off by default (back-compat);
+  // when on, Argos emits `strict_coercion_rejected` ERRORs.
+  bool strict_coercion = 5;
+  reserved 6 to 9;
+}
+
+// -----------------------------------------------------------------------------
+// Response
+// -----------------------------------------------------------------------------
+
+message ValidateResponse {
+  // The validated PlanNode with security predicates and rule enforcement
+  // applied. Same shape as the input, possibly augmented.
+  org.tatrman.plan.v1.PlanNode plan = 1;
+
+  org.tatrman.plan.v1.PipelineContext context = 2;
+
+  // Audit record of which security rules were applied. Useful for compliance
+  // logging and for debug surfaces that show the user "your query had these
+  // additional filters applied because of your role".
+  repeated SecurityRuleApplied security_applied = 3;
+
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message SecurityRuleApplied {
+  // Stable identifier of the rule (from the policy catalog).
+  string rule_id = 1;
+  // Human-readable summary of the predicate that was added. Safe for UI.
+  // Example: "WHERE customer_id IN (subset visible to your tenant)".
+  string predicate_summary = 2;
+  reserved 3 to 7;
+}

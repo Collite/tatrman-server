@@ -10,7 +10,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.argos.ApplicationKt")
+    mainClass.set("org.tatrman.validate.ApplicationKt")
 }
 
 tasks.test {
@@ -46,7 +46,7 @@ jib {
         image = "argos:dev"
     }
     container {
-        mainClass = "org.tatrman.kantheon.argos.ApplicationKt"
+        mainClass = "org.tatrman.validate.ApplicationKt"
         ports = listOf("7285", "7286")
     }
     dockerClient {

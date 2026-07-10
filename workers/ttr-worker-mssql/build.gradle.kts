@@ -10,7 +10,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.brontes.ApplicationKt")
+    mainClass.set("org.tatrman.worker.mssql.ApplicationKt")
 }
 
 kotlin {
@@ -27,7 +27,7 @@ tasks.test {
 }
 
 // Fork Stage 4.1 T4 — on-demand throughput bench (NOT in the CI gate).
-// `src/bench/kotlin` is compiled against main; run with `:workers:brontes:benchThroughput`.
+// `src/bench/kotlin` is compiled against main; run with `:workers:ttr-worker-mssql:benchThroughput`.
 val bench: SourceSet by sourceSets.creating
 configurations["benchImplementation"].extendsFrom(configurations["implementation"])
 dependencies { "benchImplementation"(sourceSets["main"].output) }
@@ -35,7 +35,7 @@ dependencies { "benchImplementation"(sourceSets["main"].output) }
 tasks.register<JavaExec>("benchThroughput") {
     group = "verification"
     description = "Arrow IPC read-out throughput baseline (Fork Stage 4.1 T4)."
-    mainClass.set("org.tatrman.kantheon.brontes.bench.ThroughputBenchKt")
+    mainClass.set("org.tatrman.worker.mssql.bench.ThroughputBenchKt")
     classpath = bench.runtimeClasspath
     jvmArgs(
         "--add-opens=java.base/java.nio=ALL-UNNAMED",
@@ -72,7 +72,7 @@ jib {
         image = "brontes:dev"
     }
     container {
-        mainClass = "org.tatrman.kantheon.brontes.ApplicationKt"
+        mainClass = "org.tatrman.worker.mssql.ApplicationKt"
         ports = listOf("7295", "7296")
         // Arrow needs these on JDK 21.
         jvmFlags =

@@ -280,7 +280,11 @@ tatrman-ttr-writer                  = { module = "org.tatrman:ttr-writer",      
 tatrman-ttr-semantics               = { module = "org.tatrman:ttr-semantics",                            version.ref = "tatrman-modeler" }
 tatrman-ttr-metadata                = { module = "org.tatrman:ttr-metadata",                              version.ref = "tatrman-ttr-metadata" }
 tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",                          version.ref = "tatrman-ttr-metadata" }
-tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                            version.ref = "tatrman-translator" }
+# SV-P0 interim: consume the translate.v1-renamed ttr-plan-proto from mavenLocal
+# (S2 published 0.0.1-LOCAL with org/tatrman/translate/v1/translator.proto). Moves to
+# the 0.9.x public line at SV-P1 gate 2. The 0.8.5 published artifact still carries the
+# old proteus/v1 path, so it can't back the renamed translate service protos here.
+tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                            version = "0.0.1-LOCAL" }
 tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version.ref = "tatrman-translator" }
 exposed-core                        = { module = "org.jetbrains.exposed:exposed-core",                    version.ref = "exposed" }
 exposed-jdbc                        = { module = "org.jetbrains.exposed:exposed-jdbc",                    version.ref = "exposed" }

@@ -10,7 +10,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.whois.ApplicationKt")
+    mainClass.set("org.tatrman.identity.ApplicationKt")
 }
 
 tasks.test {
@@ -46,7 +46,7 @@ jib {
         image = "whois:dev"
     }
     container {
-        mainClass = "org.tatrman.whois.ApplicationKt"
+        mainClass = "org.tatrman.identity.ApplicationKt"
         ports = listOf("7110")
     }
     dockerClient {

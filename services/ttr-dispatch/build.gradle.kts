@@ -10,7 +10,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.kyklop.ApplicationKt")
+    mainClass.set("org.tatrman.dispatch.ApplicationKt")
 }
 
 kotlin {
@@ -50,7 +50,7 @@ jib {
         image = "kyklop:dev"
     }
     container {
-        mainClass = "org.tatrman.kantheon.kyklop.ApplicationKt"
+        mainClass = "org.tatrman.dispatch.ApplicationKt"
         ports = listOf("7290", "7291")
     }
     dockerClient {

@@ -9,7 +9,7 @@ plugins {
 }
 
 application {
-    mainClass.set("org.tatrman.kantheon.echo.mcp.ApplicationKt")
+    mainClass.set("org.tatrman.fuzzy.mcp.ApplicationKt")
 }
 
 val osArch = System.getProperty("os.arch").lowercase()
@@ -41,7 +41,7 @@ jib {
         image = "echo-mcp:latest"
     }
     container {
-        mainClass = "org.tatrman.kantheon.echo.mcp.ApplicationKt"
+        mainClass = "org.tatrman.fuzzy.mcp.ApplicationKt"
         ports = listOf("7267")
     }
     dockerClient {
@@ -90,7 +90,7 @@ dependencies {
 
     // gRPC client to the echo service.
     implementation(project(":shared:proto"))
-    implementation(project(":services:echo"))
+    implementation(project(":services:ttr-fuzzy"))
     implementation(libs.grpc.kotlin.stub)
     implementation(libs.grpc.netty.shaded)
 

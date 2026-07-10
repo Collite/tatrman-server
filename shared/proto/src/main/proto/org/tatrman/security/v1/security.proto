@@ -21,7 +21,7 @@ package org.tatrman.security.v1;
 
 import "org/tatrman/plan/v1/plan.proto";
 import "org/tatrman/plan/v1/context.proto";
-import "org/tatrman/kantheon/common/v1/response_message.proto";   // for ResponseMessage — applied universally to v1 service responses
+import "org/tatrman/common/v1/response_message.proto";   // for ResponseMessage — applied universally to v1 service responses
 
 option java_package = "org.tatrman.security.v1";
 option java_multiple_files = true;
@@ -61,7 +61,7 @@ message EvaluatePoliciesResponse {
   // column set against this list (deny → reject; mask → rewrite).
   repeated ColumnRule column_rules = 3;
 
-  repeated org.tatrman.kantheon.common.v1.ResponseMessage messages = 99;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
   reserved 100 to 104;
 }
 
