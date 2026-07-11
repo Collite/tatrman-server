@@ -1,4 +1,4 @@
-# whois
+# ttr-identity
 
 > **forked-from:** `ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4` (`infra/whois/`), tag `kantheon-fork-point`, forked 2026-06-24 (fork Phase 5 Stage 5.1).
 > Maintained independently since the fork; do not assume parity with the ai-platform original.
@@ -8,19 +8,19 @@ in the `infra/` tree. It syncs users + roles from upstream sources (Keycloak adm
 into its **own Postgres** and serves:
 
 - `GET /whois?internal_id= | ?user_id=&user_id_type= | ?email= | ?id=` → `UserRecord` JSON
-  (the shape `whois-common` defines; the one Argos's optional `WhoisRoleSource` consumes — Stage 5.3).
+  (the shape `whois-common` defines; the one ttr-validate's optional `WhoisRoleSource` consumes — Stage 5.3).
 - `GET /bundle/{type}/roles.tar.gz` → an OPA policy bundle (merged `data.json` + `.rego` policies + `.manifest`).
 - `GET /health`, `GET /ready` → probes.
 
-Identity discipline (fork §6): whois is **never an identity authority** — it is an optional
-*role-enrichment* source. Kantheon resolves identity from the bearer at the theseus-mcp edge;
-Argos calls whois (when `argos.roleSource = whois`) only to expand the ERP role hierarchy the
+Identity discipline (fork §6): ttr-identity is **never an identity authority** — it is an optional
+*role-enrichment* source. Kantheon resolves identity from the bearer at the ttr-query-mcp edge;
+ttr-validate calls ttr-identity (when `ttr-validate`'s `roleSource = whois`) only to expand the ERP role hierarchy the
 Keycloak token does not carry.
 
 ## Package root
 
-`org.tatrman.whois.*` (swept off `infra.whois.*`). Domain records live in the `whois-common`
-lib (`org.tatrman.whois.domain`); the Keycloak token provider in the `keycloak-auth` lib
+`org.tatrman.identity.*` (swept off `infra.whois.*`). Domain records live in the `whois-common`
+lib (`org.tatrman.identity.domain`); the Keycloak token provider in the `keycloak-auth` lib
 (`org.tatrman.keycloak.auth`) — both forked in Stage 5.0.
 
 ## Port
@@ -37,6 +37,6 @@ HTTP **7110** (`WHOIS_SERVER_PORT`, kept from ai-platform). No gRPC, no MCP wrap
 ## Run
 
 ```
-just deploy-kt infra/whois          # Jib image + Helm deploy (CI/cluster; Jib build is CI-gated on Rancher)
-./gradlew :infra:whois:test         # mocked unit/component suite
+just deploy-kt infra/ttr-identity   # Jib image + Helm deploy (CI/cluster; Jib build is CI-gated on Rancher)
+./gradlew :infra:ttr-identity:test  # mocked unit/component suite
 ```

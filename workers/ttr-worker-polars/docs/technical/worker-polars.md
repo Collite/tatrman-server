@@ -34,7 +34,7 @@ agents can build derivations step by step.
 | `GET /status`       | HTTP     | JSON: engine, capability, workspace stats.   |
 | `GET /metrics`      | HTTP     | Prometheus exposition.                        |
 
-Default ports: gRPC 7501, HTTP 7502.
+Default ports: gRPC 7301, HTTP 7300.
 
 ## Plan-to-Polars conversion
 
@@ -111,7 +111,7 @@ All errors travel through the structured-message channel
   route to Polars. Phase 2.5+ may add a workspace-exchange protocol.
 * Polars accessing the ERP database directly — no JDBC/ODBC bridge.
 * Worker writing `display_label` / `value_labels` into Arrow schema field
-  metadata. Phase 2.4 confirmation: workers stay dumb. `theseus-mcp`'s
+  metadata. Phase 2.4 confirmation: workers stay dumb. `ttr-query-mcp`'s
   side-channel (Phase 2.2) decorates output for both engines uniformly.
 
 ## Operations notes

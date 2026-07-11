@@ -1,8 +1,9 @@
-# Kadmos NLP Evaluation
+# ttr-nlp Evaluation
 
-This directory contains the evaluation infrastructure for the Kadmos NLP service
-(forked from ai-platform `infra/nlp/eval`, unchanged — same harness + corpus, so
-the kantheon results equal the ai-platform original's at the fork point).
+This directory contains the evaluation infrastructure for the ttr-nlp NLP service
+(formerly Kadmos; forked from ai-platform `infra/nlp/eval`, unchanged — same
+harness + corpus, so the kantheon results equal the ai-platform original's at the
+fork point).
 
 ## Corpus
 
@@ -18,8 +19,8 @@ parses and entity bindings), carried over verbatim from the ai-platform original
 ## Running Evaluation
 
 ```bash
-# Against local K3s deployment (port-forwards the kadmos pod on 7270)
-just eval-kadmos
+# Against local K3s deployment (port-forwards the nlp pod on 7270)
+just eval-nlp
 
 # Against a specific URL (e.g. a local `uv run` instance on 7270)
 uv run python eval/run_eval.py --url http://localhost:7270

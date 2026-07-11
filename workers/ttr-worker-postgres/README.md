@@ -1,21 +1,21 @@
-# arges
+# ttr-worker-postgres
 
-**Arges** — the PostgreSQL worker for kantheon, the third of the Kyklops (the
-individually-named workers Kyklop dispatches to), alongside **Brontes** (MSSQL) and
-**Steropes** (Polars). A stateless per-engine query executor: it receives a validated
-`PlanNode` from Kyklop, asks **Proteus** (the translator) to unparse it to PostgreSQL,
+**ttr-worker-postgres** — the PostgreSQL worker for kantheon, the third of the
+workers the dispatcher dispatches to, alongside **ttr-worker-mssql** (MSSQL) and
+**ttr-worker-polars** (Polars). A stateless per-engine query executor: it receives a validated
+`PlanNode` from the dispatcher, asks **Translate** (the translator) to unparse it to PostgreSQL,
 runs it over JDBC **read-only under per-tenant row-level security**, and streams the
-result as Arrow IPC batches back through Kyklop.
+result as Arrow IPC batches back through the dispatcher.
 
-Arges is **born in-repo** by mirroring Brontes — it forks the never-built ai-platform
+ttr-worker-postgres is **born in-repo** by mirroring ttr-worker-mssql — it forks the never-built ai-platform
 `workers/postgres` brief, not ai-platform code, so it carries **no `forked-from`
-provenance header** (AGENTS.md §12.1; same as Charon/Metis). Brontes is the structural
+provenance header** (AGENTS.md §12.1; same as Charon/Metis). ttr-worker-mssql is the structural
 template; the deltas are the Postgres driver/URL, the `PostgresArrowTypeMapper`, and the
 one genuinely new thing — the RLS session contract. See
-[`docs/architecture/arges/architecture.md`](../../docs/architecture/arges/architecture.md).
+[`docs/architecture/postgres/architecture.md`](../../docs/architecture/postgres/architecture.md).
 
-Arges implements the generic `org.tatrman.worker.v1.WorkerService` contract
-(`Execute` / `GetCapabilities` / `GetStatus`) — no Arges-specific proto. It advertises
+ttr-worker-postgres implements the generic `org.tatrman.worker.v1.WorkerService` contract
+(`Execute` / `GetCapabilities` / `GetStatus`) — no worker-specific proto. It advertises
 `engine_name = "postgres"`, `supported_dialects = ["POSTGRESQL"]`,
 `supports_stateful_sessions = false`, and the `connection_id`s it can serve.
 
@@ -24,7 +24,7 @@ Arges implements the generic `org.tatrman.worker.v1.WorkerService` contract
 JDBC connections are declared per `connection_id` in the `connections {}` HOCON block
 (charon/architecture §6 pattern). Credentials are **never** in the request and **never**
 hardcoded in-repo — they arrive via env vars from K8s sealed secrets. An empty
-`connections` block boots Arges with zero connections (Ready only in fixture mode); an
+`connections` block boots ttr-worker-postgres with zero connections (Ready only in fixture mode); an
 overlay activates a connection by setting its env vars. The v1 connection is `pg-midas`
 — the Midas operational Postgres, read through the non-owner `midas_app_readonly` role so
 RLS policies apply.
@@ -40,12 +40,12 @@ Missing/invalid tenant → `tenant_id_required` (**fails closed**, nothing runs)
 failure → `rls_set_failed` + rollback. `SET LOCAL` is transaction-scoped, so no tenant bleeds
 across pooled borrows. The role is a non-owner, so RLS is enforced (owners bypass RLS unless
 `FORCE ROW LEVEL SECURITY`). See
-[`docs/architecture/arges/contracts.md`](../../docs/architecture/arges/contracts.md) §2.1.
+[`docs/architecture/postgres/contracts.md`](../../docs/architecture/postgres/contracts.md) §2.1.
 
 ## Arrow IPC
 
 The execute pipeline streams a JDBC `ResultSet` → Arrow `VectorSchemaRoot` → Arrow IPC
-bytes (`ResultSetToArrow` + `ArrowIpcSerializer`, engine-agnostic copies from Brontes); the
+bytes (`ResultSetToArrow` + `ArrowIpcSerializer`, engine-agnostic copies from ttr-worker-mssql); the
 first batch carries the schema + `schema_fingerprint` (SHA-256, the canonical cross-engine
 string). `PostgresArrowTypeMapper` maps Postgres native types to Arrow per contracts §3
 (`NUMERIC(20,4)→Decimal128(20,4)`, `timestamptz`→UTC, `uuid`/`json(b)`→VARCHAR+metadata,
@@ -53,8 +53,8 @@ ranges/arrays→opaque VARBINARY + `unsupported_type_as_binary` warning).
 
 ## Translator
 
-Arges calls **Proteus** (`org.tatrman.proteus.v1` / `ProteusService`,
-`UnparseFromRelNode`, gRPC 7276) via `proteus.{host,port}` with target dialect
+ttr-worker-postgres calls **Translate** (`org.tatrman.translate.v1` / `TranslateService`,
+`UnparseFromRelNode`, gRPC 7276) via `translate.{host,port}` with target dialect
 `POSTGRESQL`. In fixture mode the translator client is a no-op stub.
 
 ## Tests
@@ -70,8 +70,8 @@ rows through the worker, plus the fail-closed path. Component specs run in CI
 
 Ports: HTTP **7302** (health/ready/status) · gRPC **7303** (`Execute`/`GetCapabilities`/
 `GetStatus`). `Execute` runs the full pipeline (unparse to PostgreSQL → `SET LOCAL`
-tenant bind → JDBC → Arrow IPC) under the RLS session contract. Kyklop registers Arges as a
-third worker slot via `KYKLOP_WORKER_ARGES_ENDPOINT` (`role-hint="postgres"`). The Helm chart
-deploys image `arges:dev`. **Remaining post-merge ship:** deploy to bp-dsk + the live
+tenant bind → JDBC → Arrow IPC) under the RLS session contract. The dispatcher registers ttr-worker-postgres as a
+third worker slot via `DISPATCH_WORKER_POSTGRES_ENDPOINT` (`role-hint="postgres"`). The Helm chart
+deploys image `postgres:dev`. **Remaining post-merge ship:** deploy to bp-dsk + the live
 `pg-midas` path (needs the Midas-side `midas_app_readonly` role migration, contracts §6) +
-tag `arges/v0.1.0`.
+tag `ttr-worker-postgres/v0.1.0`.

@@ -4,7 +4,7 @@
 > Maintained independently since the fork; do not assume parity with the ai-platform original. The fork is a **rebrand + catalog re-point** — the Backstage app source is unchanged; `organization.name`, `app.title`, baseUrls and the **software catalog** move to Kantheon.
 
 The Kantheon developer portal — a technical-wave (no-persona) Backstage app in `infra/`. Own Node +
-Yarn toolchain (a documented build exception, like Prometheus's Spring Boot), its own backend on
+Yarn toolchain (a documented build exception, like ttr-llm-gateway's Spring Boot), its own backend on
 **port 7007**, TechDocs + scaffolder.
 
 ## Rebrand surface (Stage 5.5)
@@ -12,8 +12,8 @@ Yarn toolchain (a documented build exception, like Prometheus's Spring Boot), it
 - `app-config.yaml`: `organization.name` → **Kantheon**; `app.title` → **Kantheon Developer Portal**.
 - `examples/kantheon-catalog.yaml` (new): the constellation as a Backstage catalog — a `kantheon`
   System + Group and a `Component` per pantheon citizen (agents Iris-BFF/Themis/Golem/Pythia/Hebe;
-  platform services Ariadne/Theseus/Echo/Kadmos/Proteus/Kyklop/Argos/Prometheus/Charon/Metis;
-  workers Brontes/Steropes/Arges; `capabilities-mcp`; technical wave whois/health/landing). Wired as
+  platform services Veles/ttr-query/ttr-fuzzy/ttr-nlp/ttr-translate/ttr-dispatch/ttr-validate/ttr-llm-gateway/Charon/Metis;
+  workers ttr-worker-mssql/ttr-worker-polars/ttr-worker-postgres; `capabilities-mcp`; technical wave ttr-identity/health/landing). Wired as
   a `catalog.locations` file entry; replaces ai-platform's example catalog.
 - `docs/catalog-info.yaml`, `templates/agent-starter/template.yaml`, `app-config.local.yaml`
   (`doc.aip.localhost` → `doc.kantheon.localhost`), the OIDC username-transform comment in
