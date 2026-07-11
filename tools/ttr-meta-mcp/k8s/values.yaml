@@ -45,7 +45,7 @@ extraEnv:
   # capabilities-mcp registration endpoint (the query-path registry). For the three wrappers whose
   # application.conf lacks a capabilities-mcp{} default block, this env is REQUIRED — without it
   # registerWithCapabilities() throws ConfigException at boot.
-  - { name: CAPABILITIES_MCP_URL, value: "http://capabilities-mcp:7501" }
+  - { name: CAPABILITIES_MCP_URL, value: "http://capabilities-mcp.kantheon:7501" }
 
 # Probes (HTTP on the http port).
 readinessProbe:
