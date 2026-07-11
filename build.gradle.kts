@@ -2,6 +2,10 @@ plugins {
     base
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.ktlint) apply false
+    // SV-P1 S4 — vanniktech on the root classpath (`apply false`) so the shared
+    // MavenCentralBuildService registers once for the whole build; each published
+    // lib applies it for real in the publishing convention below.
+    alias(libs.plugins.maven.publish.vanniktech) apply false
 }
 
 allprojects {
@@ -110,36 +114,79 @@ val publishableLibs =
         // (kantheon keeps its own copy; nothing published depends on it). Publishing it
         // would be a maintenance promise with no taker — re-add here if a consumer appears.
     )
+// SV-P1 S4 — Maven Central coordinates need a per-artifact name + description
+// (the GH Packages POM did not). artifactId = project.name except `:shared:proto`
+// → `ttr-server-proto` (a bare "proto" coordinate is too generic).
+val pomMeta: Map<String, Triple<String, String, String>> =
+    mapOf(
+        // path to Triple(artifactId, POM name, POM description)
+        ":shared:proto" to Triple("ttr-server-proto", "TTR Server Proto", "gRPC/protobuf wire contracts for the TTR read-spine services (meta.v1, query.v1, translate.v1, validate.v1, dispatch.v1, worker.v1, …)."),
+        ":shared:libs:kotlin:otel-config" to Triple("otel-config", "TTR Server OTel Config", "OpenTelemetry bootstrap shared by the TTR read-spine services."),
+        ":shared:libs:kotlin:logging-config" to Triple("logging-config", "TTR Server Logging Config", "Logback/structured-logging bootstrap shared by the TTR read-spine services."),
+        ":shared:libs:kotlin:ktor-configurator" to Triple("ktor-configurator", "TTR Server Ktor Configurator", "Shared Ktor server bootstrap (routing, health, OTel, error handling) for the TTR read-spine services."),
+        ":shared:libs:kotlin:db-common" to Triple("db-common", "TTR Server DB Common", "Shared JDBC/connection-pool helpers for the TTR worker services."),
+        ":shared:libs:kotlin:data-formatter" to Triple("data-formatter", "TTR Server Data Formatter", "Shared result/value formatting for the TTR read-spine services."),
+        ":shared:libs:kotlin:fuzzy-common" to Triple("fuzzy-common", "TTR Server Fuzzy Common", "Shared fuzzy-matching types for the TTR services."),
+        ":shared:libs:kotlin:whois-common" to Triple("whois-common", "TTR Server Whois Common", "Shared identity/role-source (roleSource: bearer|whois) types for the TTR services."),
+        ":shared:libs:kotlin:keycloak-auth" to Triple("keycloak-auth", "TTR Server Keycloak Auth", "Shared Keycloak/OBO bearer-auth helpers for the TTR services."),
+        ":shared:libs:kotlin:ttr-meta-client" to Triple("ttr-meta-client", "TTR Meta Client", "gRPC client for the Veles metadata service (meta.v1)."),
+        ":shared:libs:kotlin:ttr-llm-client" to Triple("ttr-llm-client", "TTR LLM Client", "Client for the ttr-llm-gateway service (llm.v1)."),
+    )
+
 subprojects {
     if (path !in publishableLibs) return@subprojects
-    apply(plugin = "maven-publish")
-    afterEvaluate {
-        extensions.configure<org.gradle.api.publish.PublishingExtension> {
-            publications {
-                create<org.gradle.api.publish.maven.MavenPublication>("maven") {
-                    from(components["java"])
-                    // group inherited (org.tatrman); version inherited; artifactId = project.name,
-                    // except shared/proto whose bare name "proto" is too generic a coordinate.
-                    if (project.path == ":shared:proto") artifactId = "ttr-server-proto"
-                    pom {
-                        url.set("https://github.com/Collite/tatrman-server")
-                        licenses {
-                            license {
-                                name.set("Apache-2.0")
-                                url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                            }
-                        }
-                    }
+    // vanniktech owns the publication (adds the sources + javadoc jars Central
+    // requires) and the Central Portal target; the GH Packages block below stays
+    // the pre-release staging lane (RO-17: Central is the public registry).
+    apply(plugin = "com.vanniktech.maven.publish")
+    val (artifact, pomName, pomDescription) =
+        pomMeta[path] ?: error("publishableLibs entry $path has no pomMeta (name/description) — Central requires both")
+    extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
+        publishToMavenCentral()
+        // Central requires signatures; the Central CI lane supplies the key. Local
+        // builds + the GH Packages staging lane don't sign — gate on the key so
+        // signAllPublications() doesn't hard-fail those (it fails a non-SNAPSHOT
+        // version when unkeyed).
+        if (providers.environmentVariable("ORG_GRADLE_PROJECT_signingInMemoryKey").isPresent ||
+            providers.gradleProperty("signingInMemoryKey").isPresent
+        ) {
+            signAllPublications()
+        }
+        coordinates("org.tatrman", artifact, version.toString())
+        pom {
+            name.set(pomName)
+            description.set(pomDescription)
+            inceptionYear.set("2025")
+            url.set("https://github.com/Collite/tatrman-server")
+            licenses {
+                license {
+                    name.set("The Apache License, Version 2.0")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                    distribution.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
                 }
             }
-            repositories {
-                maven {
-                    name = "GitHubPackages"
-                    url = uri("https://maven.pkg.github.com/Collite/tatrman-server")
-                    credentials {
-                        username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
-                        password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
-                    }
+            developers {
+                developer {
+                    id.set("collite")
+                    name.set("Collite")
+                    url.set("https://github.com/Collite")
+                }
+            }
+            scm {
+                connection.set("scm:git:https://github.com/Collite/tatrman-server.git")
+                developerConnection.set("scm:git:git@github.com:Collite/tatrman-server.git")
+                url.set("https://github.com/Collite/tatrman-server")
+            }
+        }
+    }
+    extensions.configure<org.gradle.api.publish.PublishingExtension> {
+        repositories {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/Collite/tatrman-server")
+                credentials {
+                    username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                    password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
                 }
             }
         }
