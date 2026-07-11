@@ -6,6 +6,8 @@
 tatrman-modeler           = "0.8.6"
 tatrman-ttr-metadata      = "0.8.6"
 tatrman-translator        = "0.8.5"
+# SV-P1 S4 — Maven Central publishing via the Central Portal.
+vanniktech-publish        = "0.36.0"
 
 # Kotlin / coroutines / serialization
 kotlin                    = "2.3.0"
@@ -416,6 +418,7 @@ protobuf                  = { id = "com.google.protobuf",                       
 jib                       = { id = "com.google.cloud.tools.jib",                version.ref = "jib" }
 ktlint                    = { id = "org.jlleitschuh.gradle.ktlint",             version.ref = "ktlint-plugin" }
 ktor                      = { id = "io.ktor.plugin",                            version.ref = "ktor" }
+maven-publish-vanniktech  = { id = "com.vanniktech.maven.publish",              version.ref = "vanniktech-publish" }
 
 # LLM gateway (Spring Boot) — fork Stage 2.5.
 kotlin-spring             = { id = "org.jetbrains.kotlin.plugin.spring",        version.ref = "kotlin" }
