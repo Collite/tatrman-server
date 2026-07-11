@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: enforce no retired personas on wire/build surfaces
         run: |
-          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|\barges\b|brontes|steropes|echo\b|kadmos|prometheus' \
+          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos|kyklop|\barges|brontes|steropes|echo\b|kadmos|prometheus' \
             --include='*.proto' --include='*.kt' --include='*.kts' --include='*.py' --include='*.conf' \
             --include='*.yaml' --include='*.toml' --include='Dockerfile*' --include='*.tpl' --include='logback.xml' . \
             | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|formerly|_to_delete' \
