@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: polars
+  description: Python/Polars worker for stateful workspace execution; supports `from_workspace` materialised dataframes within a session, sticky-routed via Dispatch
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - python
+    - polars
+    - worker
+    - stateful
+    - v1
+spec:
+  type: service
+  lifecycle: production
+  owner: df-platform
+  system: kantheon

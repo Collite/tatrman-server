@@ -1,0 +1,1022 @@
+// =============================================================================
+// AI Platform v1 — Metadata service
+//
+// Promoted in Phase 1.0 from docs/v1/protos/ — this is the canonical location.
+//
+// The metadata service owns the in-memory model graph and serves it to all
+// other v1 services (Translator, Validator, query-runner, agents). It is
+// read-only from the consumer's perspective in v1; authoring happens via
+// external DSL files + Git workflow.
+//
+// One model per service instance. Model identity is a deployment-time
+// configuration value, not a URL parameter (Round 3.5 decision).
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.meta.v1;
+
+import "org/tatrman/plan/v1/plan.proto";
+import "org/tatrman/plan/v1/parameters.proto";
+import "org/tatrman/common/v1/response_message.proto";
+
+option java_package = "org.tatrman.meta.v1";
+option java_multiple_files = true;
+
+// =============================================================================
+// Service
+// =============================================================================
+
+service VelesService {
+  // -------- Model overview --------
+  rpc GetModel(GetModelRequest) returns (GetModelResponse);
+
+  // -------- Areas (subject-area → packages; Golem P4 S4.2, 2026-06-25) --------
+  // Resolve a subject area to its member packages (+ description/tags), loaded
+  // from `model-ttr/areas/*.ttrm`. Areas are an authoring/registry concept that
+  // is NOT part of the object graph; Golem assembles a Shem by resolving its
+  // `areas` → packages → GetModel. See docs/architecture/fork/contracts.md §1.1.
+  rpc ResolveArea(ResolveAreaRequest) returns (ResolveAreaResponse);
+
+  // -------- Object reads --------
+  rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);
+  rpc GetObject(GetObjectRequest) returns (GetObjectResponse);
+
+  // -------- Queries (cross-cutting; their own dedicated RPCs) --------
+  rpc ListQueries(ListQueriesRequest) returns (ListQueriesResponse);
+  rpc GetQuery(GetQueryRequest) returns (GetQueryResponse);
+
+  // -------- Graph traversal --------
+  rpc TraverseEdges(TraverseEdgesRequest) returns (TraverseEdgesResponse);
+
+  // -------- Search --------
+  rpc Search(SearchRequest) returns (SearchResponse);
+
+  // -------- Snapshot export (ETag-supported) --------
+  rpc GetSnapshot(GetSnapshotRequest) returns (GetSnapshotResponse);
+
+  // -------- Service status --------
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+
+  // -------- Admin (Keycloak admin role required) --------
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+  rpc ValidateModel(ValidateModelRequest) returns (ValidateModelResponse);
+
+  // -------- Phase 2.2 — conceptual roles --------
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
+  rpc GetRolesForEntity(GetRolesForEntityRequest) returns (GetRolesForEntityResponse);
+}
+
+// =============================================================================
+// Common types
+// =============================================================================
+
+// Per-language string map keyed by BCP-47 language tag.
+//
+// Used for human-facing localised text — Czech / English column headers,
+// value-label substitutions ("1" → "Aktivní" / "Active"), role labels.
+//
+// Conventions:
+//   * `cs` is the canonical fallback for the analytical agent.
+//   * `en` is the canonical fallback otherwise.
+//   * Empty map is valid; consumers fall back to bare qname / local name.
+//   * Keys are BCP-47 lower-case (e.g. `cs`, `en`, `de`, `sk`, `hu`,
+//     `pt-br`). Consumers do case-insensitive lookup.
+message LocalizedString {
+  map<string, string> by_language = 1;
+}
+
+// Search feature — a flat list of strings. Wraps `repeated string` so it can
+// nest inside a proto3 `map`, which doesn't accept `repeated` value types.
+message StringList {
+  repeated string values = 1;
+}
+
+// Search feature — per-language list of strings. Mirrors LocalizedString but
+// each language's value is a list of tokens / phrases instead of a single string.
+message LocalizedStringList {
+  map<string, StringList> by_language = 1;                  // BCP-47 codes
+}
+
+// Search feature — material attached to a model object so the search algorithms
+// can route user input to it. Lives on QueryDetail, EntityDetail, AttributeDetail,
+// RoleDetail. All fields are optional; an empty SearchHints is a no-op.
+message SearchHints {
+  LocalizedStringList keywords = 1;                         // per-language whole-word tokens
+  repeated string patterns = 2;                             // regex templates with {name} / @name placeholders
+  LocalizedStringList descriptions = 3;                     // per-language multi-paragraph alt descriptions
+  repeated string examples = 4;                             // representative user phrasings
+  repeated string aliases = 5;                              // synonyms / alternative names
+  bool fuzzy = 6;                                           // true → column/value is indexed for fuzzy matching
+  bool searchable = 7;                                      // true → column/value participates in full-text / keyword search
+}
+
+// Search feature — surfaced via GetStatusResponse so operators can see which
+// patterns failed to compile during the latest model rebuild.
+message CompileError {
+  ObjectDescriptor object = 1;
+  string field = 2;                                         // e.g. "patterns[2]"
+  string message = 3;
+}
+
+// Mirror of the Kotlin DescriptiveRecord. Returned by every read endpoint.
+message ObjectDescriptor {
+  string internal_id = 1;                                   // ULID, snapshot-scoped
+  org.tatrman.plan.v1.QualifiedName qualified_name = 2;
+  string local_name = 3;
+  string description = 4;
+  repeated string tags = 5;
+  org.tatrman.plan.v1.SchemaCode schema_code = 6;
+  string kind = 7;                                          // "table", "column", "entity", "attribute", ...
+  string source_file = 8;                                   // empty for db-introspected objects
+  string last_modified = 9;                                 // ISO-8601
+  Binding binding = 10;
+  reserved 11 to 15;
+}
+
+// Bound state of a model object. v0's "synthetic" concept made first-class.
+message Binding {
+  BindingType type = 1;
+  string reason = 2;                                        // empty for BOUND_REAL
+  reserved 3 to 7;
+}
+
+enum BindingType {
+  BINDING_TYPE_UNSPECIFIED = 0;
+  BOUND_REAL = 1;                                           // present in source
+  BOUND_SYNTHETIC = 2;                                      // generated to fill a gap
+  UNBOUND = 3;                                              // declared but missing target
+}
+
+// AIP-158 pagination
+message PageRequest {
+  int32 page_size = 1;                                      // 0 = server default (100); server caps at 1000
+  string page_token = 2;                                    // empty = first page
+  reserved 3 to 7;
+}
+
+message PageInfo {
+  string next_page_token = 1;                               // empty = last page
+  int32 total_count = 2;                                    // -1 if unknown / not computed
+  reserved 3 to 7;
+}
+
+// Application-layer message attached to responses.
+//
+// Per the v1 platform rule on response semantics: gRPC status codes describe
+// transport-level outcomes only (NOT_FOUND for missing RPC, PERMISSION_DENIED
+// for unable-to-call, etc.). Application-level outcomes — object missing in
+// the model, row-level policy denied access, deprecated alias was followed,
+// computed empty result — return OK with a populated `messages` field on the
+// response. Consumers check `messages` whenever a response slot may legitimately
+// be empty.
+//
+// Fork note (2026-06-13, kantheon-fork-point → org.tatrman.meta.v1):
+// the original `message ResponseMessage` + `enum Severity` that lived here
+// have been deleted; the kantheon-local stand-in at
+// `org.tatrman.common.v1.ResponseMessage` (with `Severity` inline) is
+// the single source of truth for the platform-wide Rule-6 type. See
+// `docs/architecture/fork/contracts.md` §4.
+
+// Model identity + summary
+message ModelDescriptor {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string tags = 4;
+  string version = 5;                                       // current ModelVersion.value (ULID)
+  string version_swapped_at = 6;                            // ISO-8601
+  map<string, int32> object_counts = 7;                     // "db.table" → 35, "er.entity" → 12, ...
+  reserved 8 to 12;
+}
+
+// =============================================================================
+// GetModel (session-bootstrap)
+// =============================================================================
+
+message GetModelRequest {
+  // Package names to include (e.g. ["ucetnictvi"]). Empty = error
+  // (caller must opt in to a domain explicitly; bulk-all is not supported).
+  repeated string packages = 1;
+
+  // Optional locale for localized labels. Empty = return all locales.
+  string locale = 2;
+
+  // If true, include search/fuzzy hints on attributes and columns.
+  bool include_search_hints = 3;
+
+  // If true, include conceptual roles for each entity.
+  bool include_roles = 4;
+
+  // If true, include drill mappings (explicit TTR-declared + auto-derived).
+  // Callers (Golem) typically want this true.
+  bool include_drill_map = 5;
+}
+
+// PF-1 / A1 — wrapper so ModelBundle can carry per-row ObjectDescriptor without
+// modifying the original DbTableDetail / DbViewDetail (which would break wire
+// compatibility for GetObjectResponse.table / .view consumers).
+message ModelBundleTable {
+  ObjectDescriptor object_descriptor = 1;
+  DbTableDetail detail = 2;
+  reserved 3 to 7;
+}
+
+message ModelBundleView {
+  ObjectDescriptor object_descriptor = 1;
+  DbViewDetail detail = 2;
+  reserved 3 to 7;
+}
+
+// new-golem Stage 04 — wrap EntityDetail with its ObjectDescriptor so callers
+// (Golem's PackageContext) can key entities by qname without re-deriving it.
+// EntityDetail itself omits qname (it ships unwrapped via GetObjectResponse.entity).
+//
+// `attributes` is the new-golem-testing addition: per-attribute details
+// inlined as ModelBundleAttribute wrappers so callers don't need a second
+// GetObject round-trip per field and Golem's PackageContext.fields can be
+// populated. AttributeDetail on its own only carries the parent entity
+// qname (not the attribute's own local name), so we ship the ObjectDescriptor
+// alongside via the wrapper.
+message ModelBundleEntity {
+  ObjectDescriptor object_descriptor = 1;
+  EntityDetail detail = 2;
+  repeated ModelBundleAttribute attributes = 3;
+  reserved 4 to 7;
+}
+
+// Companion to ModelBundleEntity — pairs an attribute's ObjectDescriptor
+// (which carries the local_name) with its AttributeDetail (type, key,
+// nullable, value_labels, search hints). Mirrors the wrapper pattern used
+// by ModelBundleEntity / ModelBundleQuery.
+message ModelBundleAttribute {
+  ObjectDescriptor object_descriptor = 1;
+  AttributeDetail detail = 2;
+  reserved 3 to 7;
+}
+
+// new-golem Stage 04 — full query carrier for ModelBundle. The bare
+// QueryDescriptor only exposes parameter_count + search; PackageContext needs
+// the actual SQL template + parameter defs to plan a turn without re-fetching.
+message ModelBundleQuery {
+  ObjectDescriptor object_descriptor = 1;
+  // Renamed from `descriptor` to avoid Message.getDescriptor() collision in the
+  // generated Java sources (same pattern QueryDescriptor itself uses for its
+  // ObjectDescriptor field).
+  QueryDescriptor query_descriptor = 2;
+  Language source_language = 3;
+  string source_text = 4;
+  repeated QueryParameterDef parameters = 5;
+  reserved 6 to 9;
+}
+
+message GetModelResponse {
+  ModelBundle model = 1;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// -------- ResolveArea (Golem P4 S4.2) --------
+message ResolveAreaRequest {
+  string area = 1;   // subject-area name, e.g. "accounting"
+}
+
+message ResolveAreaResponse {
+  // Member packages of the area, e.g. ["obchodni_doklady", "ucetnictvi"]. Empty
+  // when `found` is false. Feed straight into GetModel(packages=...).
+  repeated string packages = 1;
+  string description       = 2;   // area description (may be empty); seeds Golem's description_for_router
+  repeated string tags     = 3;   // area tags, e.g. ["finance"]
+  bool found               = 4;   // false when the area name is unknown
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;  // Rule 6
+}
+
+message ModelBundle {
+  // Entities in scope. Wrapped with ObjectDescriptor + AttributeDetails so callers
+  // (Golem PackageContext) can index by qname and read fields without a second
+  // GetObject round-trip. Was `repeated EntityDetail` in Phase 01 — widened in
+  // new-golem Stage 04 (the old field stayed unused outside the bundle).
+  repeated ModelBundleEntity entities = 1;
+  repeated RelationDetail relations = 2;
+  // Physical tables/views/columns; ALL tables/views declared in the package's db.ttr,
+  // regardless of whether an in-scope entity is bound to them (PF-1: free-SQL planner
+  // needs the full physical schema to write SQL beyond what the patterns cover).
+  repeated ModelBundleTable tables = 3;
+  repeated ModelBundleView views = 4;
+  // All pattern queries (search.patterns + examples + sql template + parameters).
+  // Widened from QueryDescriptor in new-golem Stage 04 — now carries source_text +
+  // parameters in a single ModelBundleQuery wrapper.
+  repeated ModelBundleQuery pattern_queries = 5;
+  // Non-pattern predefined queries (named SQL, parameterised).
+  repeated ModelBundleQuery named_queries = 6;
+  // Conceptual roles attached to entities, if include_roles = true.
+  repeated RoleDetail roles = 7;
+  // Drill mappings. Always includes explicit TTR-declared ones; auto-overlap
+  // ones included only if include_drill_map = true.
+  repeated DrillMapDetail drill_maps = 8;
+  // Fuzzyed packages with their content hashes (for cache invalidation).
+  // content_hash = sha256 of concatenated source-file bytes in deterministic file-name order.
+  // See OQ-01.B.
+  repeated PackageVersion package_versions = 9;
+}
+
+message PackageVersion {
+  string package_name = 1;
+  string content_hash = 2;
+  string loaded_at = 3;                                      // ISO-8601
+}
+
+message DrillMapDetail {
+  // Logical name (e.g. "agg_strediska_na_doklad"). Optional.
+  string name = 1;
+
+  // The "from" pattern this drill applies to.
+  org.tatrman.plan.v1.QualifiedName from_pattern = 2;
+
+  // The "to" pattern this drill produces.
+  org.tatrman.plan.v1.QualifiedName to_pattern = 3;
+
+  // Argument mapping: target_param_name -> source expression
+  // (column name from "from" result, or literal).
+  map<string, string> arg_mapping = 4;
+
+  // True = declared explicitly in TTR; False = auto-derived from entity overlap.
+  bool explicit = 5;
+
+  // If explicit && true, suppresses auto-derived drills with the same target.
+  bool override_auto = 6;
+
+  // Optional user-facing label for the drill chip (e.g. "Detail dokladu").
+  LocalizedString display = 7;
+
+  // Source TTR file (debug).
+  string source_file = 8;
+}
+
+// =============================================================================
+// ListObjects
+// =============================================================================
+
+message ListObjectsRequest {
+  org.tatrman.plan.v1.SchemaCode schema = 1;
+  string kind = 2;                                          // "table", "column", "entity", ...
+  PageRequest page = 3;
+
+  // Filters — AND-ed together
+  repeated string tags = 4;                                 // any-of within the list
+  BindingFilter binding = 5;                                // 0 = any
+  string source_file_prefix = 6;                            // empty = no filter
+  reserved 7 to 11;
+  // When true, only return objects whose SearchHints.fuzzy == true.
+  // Cross-kind: applies to whichever kinds carry SearchHints (column, entity,
+  // attribute, role, query). v1 callers query only `kind="column"`.
+  bool fuzzy_only = 12;
+  // Filter by package name (e.g. "ucetnictvi"). Empty = no filter.
+  // AND-ed with other filters. Matches when descriptor.source_file contains
+  // "/<package>/" as a path segment.
+  string package = 13;
+}
+
+enum BindingFilter {
+  BINDING_FILTER_UNSPECIFIED = 0;                           // any
+  BINDING_FILTER_BOUND_REAL = 1;
+  BINDING_FILTER_BOUND_SYNTHETIC = 2;
+  BINDING_FILTER_UNBOUND = 3;
+}
+
+message ListObjectsResponse {
+  repeated ObjectDescriptor items = 1;
+  PageInfo page_info = 2;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// =============================================================================
+// GetObject
+// =============================================================================
+
+message GetObjectRequest {
+  org.tatrman.plan.v1.QualifiedName qualified_name = 1;
+  reserved 2 to 6;
+}
+
+// Returns the descriptor plus a kind-specific content message.
+// Consumers dispatch on (descriptor.schema_code, descriptor.kind).
+//
+// On not-found / denied / etc.: descriptor unset, content unset, messages
+// populated with the explanation. Consumers check `messages` first.
+message GetObjectResponse {
+  ObjectDescriptor object_descriptor = 1;  // renamed from `descriptor` to avoid Message.getDescriptor() collision
+
+  oneof content {
+    DbTableDetail              table = 10;
+    DbViewDetail               view = 11;
+    DbColumnDetail             column = 12;
+    DbProcedureDetail          procedure = 13;
+    DbForeignKeyDetail         foreign_key = 14;
+
+    EntityDetail               entity = 20;
+    AttributeDetail            attribute = 21;
+    RelationDetail             relation = 22;
+
+    Er2DbEntityMappingDetail   er2db_entity_mapping = 30;
+    Er2DbAttributeMappingDetail er2db_attribute_mapping = 31;
+    Er2DbRelationMappingDetail er2db_relation_mapping = 32;
+
+    RoleDetail                 role = 50;                  // Phase 2.2 — cnc.role.*
+    Er2CncRoleMappingDetail    er2cnc_role_mapping = 51;   // Phase 2.2
+  }
+
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// -- DB schema details --
+
+message DbTableDetail {
+  repeated DbColumnSummary columns = 1;
+  repeated string primary_key = 2;
+  reserved 3 to 7;
+}
+
+message DbViewDetail {
+  repeated DbColumnSummary columns = 1;
+  string definition_sql = 2;
+  reserved 3 to 7;
+}
+
+message DbColumnSummary {
+  string name = 1;
+  string data_type = 2;                                     // raw SQL type
+  bool nullable = 3;
+  Binding binding = 4;
+  reserved 5 to 9;
+}
+
+message DbColumnDetail {
+  org.tatrman.plan.v1.QualifiedName table = 1;
+  string data_type = 2;
+  bool nullable = 3;
+  bool is_primary_key = 4;
+  bool is_foreign_key = 5;
+  reserved 6 to 10;
+  SearchHints search = 11;                                   // search feature
+}
+
+message DbProcedureDetail {
+  repeated ProcedureParameter parameters = 1;
+  repeated DbColumnSummary result_columns = 2;              // empty if unknowable
+  reserved 3 to 7;
+}
+
+message ProcedureParameter {
+  string name = 1;
+  string data_type = 2;
+  ParameterDirection direction = 3;
+  org.tatrman.plan.v1.Value default_value = 4;
+  reserved 5 to 9;
+}
+
+enum ParameterDirection {
+  PARAMETER_DIRECTION_UNSPECIFIED = 0;
+  IN = 1;
+  OUT = 2;
+  INOUT = 3;
+}
+
+message DbForeignKeyDetail {
+  repeated org.tatrman.plan.v1.QualifiedName from_columns = 1;
+  repeated org.tatrman.plan.v1.QualifiedName to_columns = 2;
+  reserved 3 to 7;
+}
+
+// -- ER schema details --
+
+message EntityDetail {
+  string label_plural = 1;
+  string name_attribute = 2;                                // attribute local name used as display
+  string code_attribute = 3;
+  repeated string aliases = 4;
+  LocalizedString display_label = 5;                        // Phase 2.2 (G5) — per-language entity name
+  SearchHints search = 6;                                   // search feature
+  reserved 7 to 9;
+}
+
+message AttributeDetail {
+  org.tatrman.plan.v1.QualifiedName entity = 1;
+  string type = 2;                                          // DSL surface type
+  bool is_key = 3;
+  bool nullable = 4;
+  // Phase 2.2 (G4) — string code → localised label (e.g. "1" → {cs:"Aktivní", en:"Active"}).
+  // Codes are typed as strings on the wire so numeric and string codes share a uniform shape.
+  map<string, LocalizedString> value_labels = 6;
+  // Phase 2.2 (G5) — per-language attribute display name.
+  LocalizedString display_label = 7;
+  SearchHints search = 8;                                   // search feature
+  reserved 5;                                               // was `search_hint` — replaced by structured `search` block (field 8)
+  reserved "search_hint";
+  reserved 9 to 10;
+}
+
+message RelationDetail {
+  org.tatrman.plan.v1.QualifiedName from_entity = 1;
+  org.tatrman.plan.v1.QualifiedName to_entity = 2;
+  Cardinality cardinality = 3;
+  repeated AttributeJoinPair join_pairs = 4;
+  reserved 5 to 9;
+}
+
+message Cardinality {
+  int32 from_min = 1;
+  int32 from_max = 2;                                       // -1 = unbounded
+  int32 to_min = 3;
+  int32 to_max = 4;                                         // -1 = unbounded
+  reserved 5 to 9;
+}
+
+message AttributeJoinPair {
+  org.tatrman.plan.v1.QualifiedName from_attr = 1;
+  org.tatrman.plan.v1.QualifiedName to_attr = 2;
+  reserved 3 to 7;
+}
+
+// -- Mapping details --
+
+message Er2DbEntityMappingDetail {
+  org.tatrman.plan.v1.QualifiedName entity = 1;
+
+  oneof target {
+    org.tatrman.plan.v1.QualifiedName table = 2;
+    org.tatrman.plan.v1.QualifiedName view = 3;
+    org.tatrman.plan.v1.QualifiedName sql_query = 4;
+  }
+
+  org.tatrman.plan.v1.Expression where_filter = 5;         // optional structured WHERE
+  reserved 6 to 10;
+}
+
+message Er2DbAttributeMappingDetail {
+  org.tatrman.plan.v1.QualifiedName attribute = 1;
+
+  oneof target {
+    org.tatrman.plan.v1.QualifiedName column = 2;
+    org.tatrman.plan.v1.Expression expression = 3;          // for denormalised display columns
+  }
+  reserved 4 to 8;
+}
+
+message Er2DbRelationMappingDetail {
+  org.tatrman.plan.v1.QualifiedName relation = 1;
+  org.tatrman.plan.v1.QualifiedName foreign_key = 2;
+  reserved 3 to 7;
+}
+
+// -- CNC schema details (Phase 2.2) --
+
+// Conceptual role assigned to ER entities (e.g. fact / dimension / master).
+//
+// Stock vocabulary {fact, dimension, structural, master, transaction, bridge}
+// is auto-loaded by the metadata service before user sources; user `.ttr`
+// files extend this vocabulary by adding new roles, but cannot redefine
+// stock qnames (`cnc.role.fact`, …).
+//
+// The role's qname lives on the surrounding `ObjectDescriptor`, matching
+// the convention used by every other `*Detail` message.
+message RoleDetail {
+  LocalizedString label = 1;
+  string description = 2;
+  SearchHints search = 3;                                   // search feature
+  reserved 4 to 7;
+}
+
+// Mapping that says "this ER entity plays this conceptual role".
+//
+// Authored either via the `def er2cnc_role` long form or the
+// `roles: [fact, dimension]` shorthand on `def entity` blocks (the
+// shorthand desugars to one mapping per listed role).
+message Er2CncRoleMappingDetail {
+  org.tatrman.plan.v1.QualifiedName entity = 1;            // er.entity.*
+  org.tatrman.plan.v1.QualifiedName role = 2;              // cnc.role.*
+  reserved 3 to 7;
+}
+
+// =============================================================================
+// ListQueries / GetQuery — queries are cross-cutting and have async parse state
+// =============================================================================
+
+message ListQueriesRequest {
+  PageRequest page = 1;
+
+  // Filters
+  repeated string tags = 2;
+  Language language_filter = 3;                             // 0 = any
+  ParseStatusFilter parse_status_filter = 4;                // 0 = any
+  reserved 5 to 9;
+  // Filter by package name. Empty = no filter.
+  string package = 10;
+}
+
+enum Language {
+  LANGUAGE_UNSPECIFIED = 0;
+  SQL = 1;
+  TRANSFORMATION_DSL = 2;
+  DATAFRAME_DSL = 3;
+  REL_NODE = 4;
+}
+
+enum ParseStatusFilter {
+  PARSE_STATUS_FILTER_UNSPECIFIED = 0;                      // any
+  PARSE_STATUS_FILTER_PARSED = 1;
+  PARSE_STATUS_FILTER_PENDING = 2;
+  PARSE_STATUS_FILTER_FAILED = 3;
+}
+
+message ListQueriesResponse {
+  repeated QueryDescriptor items = 1;
+  PageInfo page_info = 2;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message QueryDescriptor {
+  ObjectDescriptor object_descriptor = 1;  // renamed from `descriptor` to avoid Message.getDescriptor() collision
+  Language source_language = 2;
+  ParseStatus parse_status = 3;
+  int32 parameter_count = 4;
+  SearchHints search = 5;                                   // search feature — patterns, examples, keywords, etc.
+  // Render-kind hint for the Golem format node (`PatternQueryDesc.result_kind_hint`,
+  // S3.1 §10 Δ5): "chart" | "table" | … . Highest precedence in kind inference
+  // (pattern hint > amend-on-compare > table). Empty leaves inference to the heuristics.
+  string result_kind_hint = 6;
+  reserved 7 to 9;
+}
+
+enum ParseStatus {
+  PARSE_STATUS_UNSPECIFIED = 0;
+  PARSE_STATUS_PARSED = 1;
+  PARSE_STATUS_PENDING = 2;                                 // queued for async parse
+  PARSE_STATUS_FAILED = 3;
+}
+
+message GetQueryRequest {
+  org.tatrman.plan.v1.QualifiedName qualified_name = 1;
+  bool include_canonical_form = 2;                          // default false; canonical_form can be large
+  reserved 3 to 7;
+}
+
+message GetQueryResponse {
+  ObjectDescriptor object_descriptor = 1;  // renamed from `descriptor` to avoid Message.getDescriptor() collision
+  Language source_language = 2;
+  string source_text = 3;
+  repeated QueryParameterDef parameters = 4;
+
+  ParseStatus parse_status = 5;
+  string parse_error_message = 6;                           // populated if FAILED
+  string parse_error_location = 7;                          // populated if FAILED and location known
+
+  org.tatrman.plan.v1.PlanNode canonical_form = 8;         // populated only if include_canonical_form && PARSED
+  repeated org.tatrman.plan.v1.ObjectRef uses = 9;
+
+  SearchHints search = 10;                                  // search feature — patterns, examples, keywords, etc.
+
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message QueryParameterDef {
+  string name = 1;
+  string type = 2;                                          // DSL surface type
+  org.tatrman.plan.v1.Value default_value = 3;             // optional
+  string label = 4;
+  // True when the parameter may be omitted without clarifying — drives the
+  // parametrization rail's missing-required detection (Golem S2.4 §10 Δ1). A
+  // param with optional=false absent from the args is surfaced as a param_fill
+  // clarification; optional=true is simply left unbound.
+  bool optional = 5;
+  reserved 6 to 9;
+}
+
+// =============================================================================
+// TraverseEdges — graph traversal from a starting node
+// =============================================================================
+
+message TraverseEdgesRequest {
+  org.tatrman.plan.v1.QualifiedName from_qualified_name = 1;
+
+  repeated EdgeType edge_types = 2;                         // empty = all types
+  Direction direction = 3;                                  // 0 = OUTGOING by default
+  int32 max_depth = 4;                                      // default 1; server caps at 10
+  repeated string kind_filter = 5;                          // restrict target kinds
+  reserved 6 to 10;
+}
+
+enum EdgeType {
+  EDGE_TYPE_UNSPECIFIED = 0;
+  DEFINES = 1;                                              // column → table, attribute → entity
+  REFERENCES = 2;                                           // FK → target column
+  MAPS_TO = 3;                                              // er2db.* → physical
+  USES = 4;                                                 // query → object referenced (or another query)
+}
+
+enum Direction {
+  DIRECTION_UNSPECIFIED = 0;                                // OUTGOING by default
+  OUTGOING = 1;
+  INCOMING = 2;
+  BOTH = 3;
+}
+
+message TraverseEdgesResponse {
+  repeated EdgeResult edges = 1;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;                   // empty edges may mean "no edges" or "starting object missing" — check messages
+  reserved 100 to 104;
+}
+
+message EdgeResult {
+  EdgeType type = 1;
+  int32 depth = 2;                                          // 1 = direct neighbour
+  ObjectDescriptor source = 3;
+  ObjectDescriptor target = 4;
+  reserved 5 to 9;
+}
+
+// =============================================================================
+// Search — substring match against names, descriptions, tags, aliases
+// =============================================================================
+
+message SearchRequest {
+  string query = 1;
+  repeated string kinds = 2;                                // restrict to these kinds; empty = all
+  PageRequest page = 3;
+
+  // Algorithm selection — strategy pattern, mirrors fuzzy-matcher's API.
+  // Empty = server default (currently "substring"). Algorithms supported
+  // by this server are listed in GetStatusResponse.supported_search_algorithms.
+  // Unsupported algorithm returns 200 OK + empty items + a ResponseMessage
+  // with code "algorithm_not_supported".
+  //
+  // Built-in: "substring", "keyword", "regex", "all" (default = "all").
+  // Later: "fuzzy" (Levenshtein/token-based; may delegate to fuzzy-matcher),
+  //        "nlp" (TF-IDF over descriptions), "semantic" (vector embeddings).
+  string algorithm = 4;
+
+  // Search feature — per-language matching (BCP-47). Empty defaults to "cs"
+  // server-side. Selects which side of LocalizedStringList the keyword and
+  // descriptions algorithms read.
+  string language = 5;
+
+  // Search feature — when true, regex matches return their named-capture-group
+  // bindings in SearchResult.extracted_parameters. Has effect only when the
+  // matched object is a Query with declared parameters; non-Query owners
+  // always return an empty extracted_parameters map regardless of this flag.
+  bool include_extracted_parameters = 6;
+
+  // Search feature — drop results whose relevance_score is below this value.
+  // Range 0.0 — 1.0; default 0.0 = no threshold. The agent's chip-flow uses
+  // 0.6 in combination with page.limit = 3.
+  float result_threshold = 7;
+  reserved 8 to 9;
+}
+
+message SearchResponse {
+  repeated SearchResult items = 1;
+  PageInfo page_info = 2;
+  string algorithm_used = 3;                                // echoes the algorithm that produced these results
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message SearchResult {
+  ObjectDescriptor object_descriptor = 1;  // renamed from `descriptor` to avoid Message.getDescriptor() collision
+  float relevance_score = 2;                                // 0.0 — 1.0
+  string matched_field = 3;                                 // "name" | "description" | "tags" | "alias" | "keyword" | "pattern" | "alt_description" | "example"
+  string snippet = 4;                                       // surrounding text with the match marked
+
+  // Search feature — which algorithm produced THIS result. Useful when
+  // algorithm="all" merges hits from substring + keyword + regex.
+  string algorithm = 5;
+
+  // Search feature — the actual indexed content that matched (e.g. an alias
+  // string, a keyword, the original pattern source).
+  string matched_value = 6;
+
+  // Search feature — populated by the regex algorithm when capture groups
+  // bind to declared parameters on a Query owner AND the request set
+  // include_extracted_parameters=true. Empty otherwise (including for non-
+  // Query owners — patterns match on entities/attributes/roles too, but
+  // their captures are not surfaced).
+  map<string, string> extracted_parameters = 7;
+
+  // Search feature — index of the matching pattern within the owner's
+  // search.patterns list. Only meaningful when matched_field="pattern".
+  int32 pattern_index = 8;
+  reserved 9;
+}
+
+// =============================================================================
+// GetSnapshot — full model export, ETag-supported
+// =============================================================================
+
+message GetSnapshotRequest {
+  string if_none_match = 1;                                 // ETag = ModelVersion.value; empty = always return
+  reserved 2 to 6;
+}
+
+message GetSnapshotResponse {
+  bool not_modified = 1;                                    // true → snapshot field is empty
+  string etag = 2;                                          // current ModelVersion.value
+  ModelSnapshot snapshot = 3;                               // populated only if not_modified = false
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message ModelSnapshot {
+  ModelDescriptor model = 1;
+  repeated ObjectEntry objects = 2;                         // every object in the model
+  reserved 3 to 7;
+}
+
+message ObjectEntry {
+  ObjectDescriptor object_descriptor = 1;  // renamed from `descriptor` to avoid Message.getDescriptor() collision
+
+  oneof content {
+    DbTableDetail              table = 10;
+    DbViewDetail               view = 11;
+    DbColumnDetail             column = 12;
+    DbProcedureDetail          procedure = 13;
+    DbForeignKeyDetail         foreign_key = 14;
+
+    EntityDetail               entity = 20;
+    AttributeDetail            attribute = 21;
+    RelationDetail             relation = 22;
+
+    Er2DbEntityMappingDetail   er2db_entity_mapping = 30;
+    Er2DbAttributeMappingDetail er2db_attribute_mapping = 31;
+    Er2DbRelationMappingDetail er2db_relation_mapping = 32;
+
+    QueryDetail                query = 40;
+
+    RoleDetail                 role = 50;                  // Phase 2.2 — cnc.role.*
+    Er2CncRoleMappingDetail    er2cnc_role_mapping = 51;   // Phase 2.2
+  }
+  reserved 41 to 45;
+  reserved 52 to 60;
+}
+
+message QueryDetail {
+  Language source_language = 1;
+  string source_text = 2;
+  repeated QueryParameterDef parameters = 3;
+  ParseStatus parse_status = 4;
+  string parse_error_message = 5;
+  org.tatrman.plan.v1.PlanNode canonical_form = 6;
+  repeated org.tatrman.plan.v1.ObjectRef uses = 7;
+  SearchHints search = 8;                                   // search feature
+  reserved 9 to 12;
+}
+
+// =============================================================================
+// GetStatus — rich diagnostic
+// =============================================================================
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+  bool model_loaded = 1;
+  string model_version = 2;
+  string model_loaded_at = 3;                               // ISO-8601
+
+  // Query parse progress
+  int32 queries_total = 4;
+  int32 queries_parsed = 5;
+  int32 queries_failed = 6;
+  int32 queries_pending = 7;
+
+  // Per-source health
+  repeated SourceStatus sources = 8;
+
+  // Per-dependency health (translator, sql-security, ...)
+  repeated DependencyStatus dependencies = 9;
+
+  OverallStatus overall_status = 10;
+
+  // Capability advertisement — what this server can do today.
+  repeated string supported_search_algorithms = 11;         // ["substring", "keyword", "regex", "all"]
+  string default_search_algorithm = 12;                     // "all"
+
+  // Search feature — index health surfaced for operators.
+  int32 search_index_objects = 13;                          // count of model objects with at least one indexed search hint
+  int32 search_index_compile_errors = 14;                   // count of patterns that failed to compile during the latest rebuild
+  repeated CompileError search_compile_errors = 15;         // first 50 — for diagnosis without grepping logs
+
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+enum OverallStatus {
+  OVERALL_STATUS_UNSPECIFIED = 0;
+  OK = 1;
+  DEGRADED = 2;
+  DOWN = 3;
+}
+
+message SourceStatus {
+  string id = 1;
+  OverallStatus status = 2;
+  string version = 3;                                       // last source version successfully loaded
+  string last_success = 4;                                  // ISO-8601
+  string last_error = 5;                                    // empty if OK
+  string last_error_at = 6;                                 // ISO-8601
+  reserved 7 to 11;
+}
+
+message DependencyStatus {
+  string name = 1;                                          // "translator" | "sql-security" | ...
+  OverallStatus status = 2;
+  string last_reached = 3;                                  // ISO-8601
+  int32 pending_retries = 4;
+  string next_retry_at = 5;                                 // ISO-8601
+  string last_error = 6;                                    // human-readable detail of the last failure; empty when OK
+  reserved 7 to 10;
+}
+
+// =============================================================================
+// Admin: Refresh
+// =============================================================================
+
+message RefreshRequest {
+  string source_id = 1;                                     // empty = all sources
+  bool force = 2;                                           // bypass dedup if a refresh is in flight
+  reserved 3 to 7;
+}
+
+message RefreshResponse {
+  repeated SourceRefreshResult results = 1;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message SourceRefreshResult {
+  string source_id = 1;
+  bool success = 2;
+  string error_message = 3;                                 // empty if success
+  string old_version = 4;
+  string new_version = 5;                                   // empty if success && nothing changed
+  bool snapshot_swapped = 6;                                // true if reconciliation produced a new model
+  string new_model_version = 7;                             // populated if snapshot_swapped
+  reserved 8 to 12;
+}
+
+// =============================================================================
+// Admin: ValidateModel — re-run validation on the current snapshot
+// =============================================================================
+
+message ValidateModelRequest {}
+
+// =============================================================================
+// Phase 2.2 — conceptual roles RPCs
+// =============================================================================
+
+message ListRolesRequest {
+  PageRequest page = 1;
+  reserved 2 to 6;
+}
+
+message ListRolesResponse {
+  // Each entry pairs the role's [ObjectDescriptor] with its [RoleDetail] so
+  // callers don't need a follow-up GetObject per role.
+  repeated RoleEntry items = 1;
+  PageInfo page_info = 2;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message RoleEntry {
+  ObjectDescriptor object_descriptor = 1;
+  RoleDetail role = 2;
+  reserved 3 to 7;
+}
+
+message GetRolesForEntityRequest {
+  org.tatrman.plan.v1.QualifiedName entity = 1;            // er.entity.*
+  reserved 2 to 6;
+}
+
+message GetRolesForEntityResponse {
+  // Qnames of roles attached to the entity (transitive via Er2CncRoleMapping).
+  repeated org.tatrman.plan.v1.QualifiedName roles = 1;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// Validation re-uses the platform-wide ResponseMessage type. The "issues"
+// surfaced by validation are exactly the kind of structured-message payload
+// every other response also carries; no need for a separate ValidationIssue.
+message ValidateModelResponse {
+  repeated org.tatrman.common.v1.ResponseMessage issues = 1;                      // each issue's `code` is one of: "missing_target" | "type_mismatch" | "duplicate_qname" | "cycle" | ...
+  int32 errors_count = 2;
+  int32 warnings_count = 3;
+  int32 info_count = 4;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;                   // call-level messages distinct from validation findings
+  reserved 100 to 104;
+}
+

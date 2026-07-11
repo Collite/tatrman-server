@@ -1,0 +1,67 @@
+# Default values for whois. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# environments (Olymp cluster values, or test-context values) override image, telemetry,
+# repository mode and the Postgres/Keycloak/ERP wiring in extraEnv.
+
+replicaCount: 1
+
+image:
+  repository: whois
+  # Defaults to .Chart.appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# whois exposes a single HTTP port (REST + OPA bundle server). No gRPC, no MCP wrapper.
+# This is the container port AND the service port AND the probe target. Kept at 7110.
+ports:
+  http: 7110
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: "1"
+
+# OpenTelemetry. Reads a single OTLP endpoint URL (OTEL_EXPORTER_OTLP_ENDPOINT) plus the
+# per-service OTEL_ENABLED_WHOIS flag. Point `endpoint` at a collector (e.g. the cluster's
+# Alloy) and set enabled; leave disabled where no collector exists (e.g. test runs).
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: whois
+
+# Repository mode: "json" (in-memory from a fixture; no DB) or "db" (Postgres + Flyway + the
+# Keycloak/ERP sync loop). The live deployment runs "db"; default here is "json" so a bare
+# `helm install` comes up without a database. A deploying env sets db mode + the DB wiring below.
+repositoryType: json
+
+# Downstream wiring + any other env. A deploying env REPLACES this list to point whois at its
+# own Postgres and Keycloak/ERP upstreams (and to flip repositoryType to "db"). Defaults are
+# inert (json mode ignores them).
+extraEnv:
+  - { name: WHOIS_DB_HOST, value: "kantheon-postgres" }
+  - { name: WHOIS_DB_PORT, value: "5432" }
+  - { name: WHOIS_DB_NAME, value: "whois" }
+  - { name: WHOIS_DB_USER, value: "whois" }
+
+# Probes (HTTP on the http port).
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 30
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

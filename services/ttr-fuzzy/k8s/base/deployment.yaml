@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fuzzy
+  namespace: kantheon
+  labels:
+    app: fuzzy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fuzzy
+  template:
+    metadata:
+      labels:
+        app: fuzzy
+    spec:
+      containers:
+        - name: fuzzy
+          image: fuzzy:dev
+          ports:
+            - name: http
+              containerPort: 7265
+            - name: grpc
+              containerPort: 7266
+          env:
+            - name: FUZZY_HTTP_PORT
+              value: "7265"
+            - name: FUZZY_GRPC_PORT
+              value: "7266"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://alloy.observability.svc.cluster.local:4317
+            - name: OTEL_SERVICE_NAME
+              value: fuzzy
+            - name: OTEL_ENABLED_FUZZY
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7265
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7265
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 250m
+            limits:
+              memory: 1Gi
+              cpu: 1000m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fuzzy
+  namespace: kantheon
+  labels:
+    app: fuzzy
+spec:
+  selector:
+    app: fuzzy
+  ports:
+    - name: http
+      port: 7265
+      targetPort: 7265
+    - name: grpc
+      port: 7266
+      targetPort: 7266

@@ -1,0 +1,154 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
+plugins {
+    base
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.ktor)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.jib)
+}
+
+application {
+    mainClass.set("org.tatrman.worker.mssql.ApplicationKt")
+}
+
+kotlin {
+    jvmToolchain(21)
+}
+
+tasks.test {
+    useJUnitPlatform()
+    // Apache Arrow needs explicit module access on JDK 16+ to use sun.misc.Unsafe.
+    jvmArgs(
+        "--add-opens=java.base/java.nio=ALL-UNNAMED",
+        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+    )
+}
+
+// Fork Stage 4.1 T4 — on-demand throughput bench (NOT in the CI gate).
+// `src/bench/kotlin` is compiled against main; run with `:workers:ttr-worker-mssql:benchThroughput`.
+val bench: SourceSet by sourceSets.creating
+configurations["benchImplementation"].extendsFrom(configurations["implementation"])
+dependencies { "benchImplementation"(sourceSets["main"].output) }
+
+tasks.register<JavaExec>("benchThroughput") {
+    group = "verification"
+    description = "Arrow IPC read-out throughput baseline (Fork Stage 4.1 T4)."
+    mainClass.set("org.tatrman.worker.mssql.bench.ThroughputBenchKt")
+    classpath = bench.runtimeClasspath
+    jvmArgs(
+        "--add-opens=java.base/java.nio=ALL-UNNAMED",
+        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+    )
+}
+
+val osArch = System.getProperty("os.arch").lowercase()
+val isArm64 = osArch.contains("aarch64") || osArch.contains("arm64")
+val isCi = System.getenv("CI") != null
+
+jib {
+    from {
+        image = "eclipse-temurin:21-jre"
+        platforms {
+            if (isCi) {
+                platform {
+                    architecture = "arm64"
+                    os = "linux"
+                }
+                platform {
+                    architecture = "amd64"
+                    os = "linux"
+                }
+            } else {
+                platform {
+                    architecture = if (isArm64) "arm64" else "amd64"
+                    os = "linux"
+                }
+            }
+        }
+    }
+    to {
+        image = "mssql:dev"
+    }
+    container {
+        mainClass = "org.tatrman.worker.mssql.ApplicationKt"
+        ports = listOf("7295", "7296")
+        // Arrow needs these on JDK 21.
+        jvmFlags =
+            listOf(
+                "--add-opens=java.base/java.nio=ALL-UNNAMED",
+                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+            )
+    }
+    dockerClient {
+        executable = "docker"
+        val targetSocket =
+            System.getenv("DOCKER_HOST") ?: if (Os.isFamily(Os.FAMILY_MAC)) {
+                "unix://${System.getProperty("user.home")}/.rd/docker.sock"
+            } else {
+                "npipe:////./pipe/docker_engine"
+            }
+        environment = mapOf("DOCKER_HOST" to targetSocket)
+    }
+}
+
+dependencies {
+    implementation(project(":shared:libs:kotlin:ktor-configurator"))
+    implementation(project(":shared:libs:kotlin:otel-config"))
+    implementation(project(":shared:libs:kotlin:logging-config"))
+    implementation(project(":shared:proto"))
+
+    implementation(libs.grpc.kotlin.stub)
+    implementation(libs.grpc.netty.shaded)
+    implementation(libs.grpc.services)
+
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.typesafe.config)
+    implementation(libs.slf4j.api)
+    implementation(libs.logback.classic)
+    implementation(libs.logstash.logback.encoder)
+    implementation(libs.ktor.opentelemetry)
+    api(libs.otel.logback.appender)
+
+    implementation(libs.mssql.jdbc)
+    implementation(libs.hikaricp)
+    implementation(libs.arrow.vector)
+    implementation(libs.arrow.memory.netty)
+
+    testImplementation(libs.bundles.kotest)
+    testImplementation(libs.mockk)
+    // Stage 3.3 T5 — pins the worker → data-formatter Arrow IPC contract:
+    // the formatter must round-trip whatever Mssql emits.
+    testImplementation(project(":shared:libs:kotlin:data-formatter"))
+
+    // Component tier (testing arc Stage 1.2) — real MSSQL via Testcontainers.
+    // The convention's `componentTest` suite already brings kotest + the base
+    // testcontainers + `project()` (mssql main, exposing mssql-jdbc on the
+    // runtime classpath). These add what the spec compiles against directly:
+    // the testkit (mssql() factory + CI gate + seed runner), the protos, the
+    // Arrow reader for result deserialization, and coroutines for the flow.
+    "componentTestImplementation"(project(":shared:libs:kotlin:component-testkit"))
+    "componentTestImplementation"(project(":shared:proto"))
+    "componentTestImplementation"(libs.kotlinx.coroutines.core)
+    "componentTestImplementation"(libs.arrow.vector)
+    "componentTestImplementation"(libs.arrow.memory.netty)
+}
+
+// Arrow's Netty allocator needs these JDK-module opens on the componentTest JVM,
+// exactly as the `test` task above (the spec deserializes Arrow IPC results).
+tasks.named<Test>("componentTest") {
+    jvmArgs(
+        "--add-opens=java.base/java.nio=ALL-UNNAMED",
+        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+    )
+    // Forward the `-DmssqlLocal` opt-in to the forked test JVM so the CI-gated
+    // MSSQL spec (CiOnly) can be run locally under amd64 emulation when needed.
+    // `CI` is an env var and is inherited automatically.
+    System.getProperty("mssqlLocal")?.let { systemProperty("mssqlLocal", it) }
+}

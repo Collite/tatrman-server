@@ -1,0 +1,22 @@
+capability_id: "query.run:v1"
+category: "query"
+version: "1.0.0"
+description: |
+  Run a query against the kantheon platform. Source language may be SQL,
+  TransDSL, or DataFrame DSL. Returns formatted result data (json | csv | tsv |
+  markdown) plus a structured envelope with row counts, columns, warnings, and
+  pipeline messages. Orchestrated by Query: Translate (translate) → Validate
+  (validate, RLS) → Dispatch (dispatch) → a worker (Mssql / Polars).
+service_endpoint: "http://query-mcp.kantheon.svc.cluster.local:7307"
+search_tags:
+  - query
+  - query
+  - sql
+  - transdsl
+  - dfdsl
+  - run
+cost_hints:
+  typical_latency_ms: 4000
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 8

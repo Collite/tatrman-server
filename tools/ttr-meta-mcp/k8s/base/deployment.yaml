@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veles-mcp
+  namespace: kantheon
+  labels:
+    app: veles-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: veles-mcp
+  template:
+    metadata:
+      labels:
+        app: veles-mcp
+    spec:
+      containers:
+        - name: veles-mcp
+          image: veles-mcp:dev
+          ports:
+            - containerPort: 7262
+          env:
+            - name: VELES_MCP_SERVER_PORT
+              value: "7262"
+            # In-cluster DNS points at the veles service's gRPC port. The
+            # host's gRPC channel target is the veles Deployment's Service.
+            - name: VELES_PROTOCOL
+              value: grpc
+            - name: VELES_GRPC_HOST
+              value: veles
+            - name: VELES_GRPC_PORT
+              value: "7261"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://alloy.observability.svc.cluster.local:4317
+            - name: OTEL_SERVICE_NAME
+              value: veles-mcp
+            - name: OTEL_ENABLED_VELES_MCP
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7262
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7262
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: veles-mcp
+  namespace: kantheon
+  labels:
+    app: veles-mcp
+spec:
+  selector:
+    app: veles-mcp
+  ports:
+    - name: http
+      port: 7262
+      targetPort: 7262

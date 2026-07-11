@@ -84,3 +84,53 @@ subprojects {
         // ktlint config picked up from .editorconfig at repo root.
     }
 }
+
+// ── SV-P0 interim publishing (S5 wrinkle) ────────────────────────────────────
+// The shared libs + proto stubs moved from kantheon, but kantheon's staying
+// agents/tools/services still consume them (otel-config, logging-config,
+// ktor-configurator, the client libs, the spine proto stubs, …). They publish
+// `0.0.1-LOCAL` to Maven Local so kantheon resolves them as `org.tatrman:*`
+// artifacts — the SAME mechanism kantheon already uses for `ttr-metadata`
+// (standing facts). Flips to the 0.9.x public line at SV-P1 gate 3. Test-support
+// libs (component-testkit, integration-harness) are server-internal → not published.
+val publishableLibs =
+    setOf(
+        ":shared:proto",
+        ":shared:libs:kotlin:otel-config",
+        ":shared:libs:kotlin:logging-config",
+        ":shared:libs:kotlin:ktor-configurator",
+        ":shared:libs:kotlin:db-common",
+        ":shared:libs:kotlin:data-formatter",
+        ":shared:libs:kotlin:fuzzy-common",
+        ":shared:libs:kotlin:whois-common",
+        ":shared:libs:kotlin:keycloak-auth",
+        ":shared:libs:kotlin:ttr-meta-client",
+        ":shared:libs:kotlin:ttr-llm-client",
+        ":shared:libs:kotlin:capabilities-client",
+    )
+subprojects {
+    if (path !in publishableLibs) return@subprojects
+    apply(plugin = "maven-publish")
+    afterEvaluate {
+        extensions.configure<org.gradle.api.publish.PublishingExtension> {
+            publications {
+                create<org.gradle.api.publish.maven.MavenPublication>("maven") {
+                    from(components["java"])
+                    // group inherited (org.tatrman); version inherited; artifactId = project.name,
+                    // except shared/proto whose bare name "proto" is too generic a coordinate.
+                    if (project.path == ":shared:proto") artifactId = "ttr-server-proto"
+                }
+            }
+            repositories {
+                maven {
+                    name = "GitHubPackages"
+                    url = uri("https://maven.pkg.github.com/Collite/tatrman-server")
+                    credentials {
+                        username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                        password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
+                    }
+                }
+            }
+        }
+    }
+}

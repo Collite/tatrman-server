@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: nlp
+  description: Nlp — Python FastAPI NLP foundation service (tokenize / lemmatize / POS / dep-parse / NER / langid)
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - python
+    - fastapi
+    - service
+    - v1
+spec:
+  type: service
+  lifecycle: production
+  owner: df-platform
+  system: kantheon

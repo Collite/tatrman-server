@@ -1,0 +1,19 @@
+capability_id: "meta.get_model:v1"
+category: "meta"
+version: "1.0.0"
+description: |
+  Fetch the full ModelBundle (entities, relations, tables, views, pattern
+  queries, named queries, roles, drill maps, package versions) for one or
+  more packages in a single round-trip. This is the heavy tool — the
+  MCP-side timeout is 30s to accommodate fixture load.
+service_endpoint: "http://veles-mcp.kantheon.svc.cluster.local:7262"
+search_tags:
+  - veles
+  - model
+  - bundle
+  - full
+cost_hints:
+  typical_latency_ms: 10000
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 4

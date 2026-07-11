@@ -1,0 +1,11 @@
+model db schema dbo
+def table products {
+    description: "Product catalog (fuzzy-loader fixture)"
+    primaryKey: ["id"]
+    tags: ["core"]
+    columns: [
+        def column id { type: int, isKey: true },
+        def column name { type: text, search { searchable: true, fuzzy: true } },
+        def column sku { type: text }
+    ]
+}
