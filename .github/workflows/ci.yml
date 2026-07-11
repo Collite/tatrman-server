@@ -66,7 +66,7 @@ jobs:
           # system) — those legitimate hits are excluded below; genuine persona
           # instances (the Echo/fuzzy service, the "Prometheus LLM gateway") are renamed.
           # `formerly` excludes historical "formerly Kadmos" provenance notes.
-          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|\barges\b|brontes|steropes|echo\b|kadmos|prometheus' \
+          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos|kyklop|\barges|brontes|steropes|echo\b|kadmos|prometheus' \
             --include='*.proto' --include='*.kt' --include='*.kts' --include='*.py' --include='*.conf' \
             --include='*.yaml' --include='*.toml' --include='Dockerfile*' --include='*.tpl' --include='logback.xml' . \
             | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|formerly|_to_delete' \
