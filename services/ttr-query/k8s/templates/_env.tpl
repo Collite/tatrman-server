@@ -1,12 +1,12 @@
-{{/* theseus container env — SERVER_PORT/GRPC_PORT + OTel + downstream extraEnv. */}}
-{{- define "theseus.env" -}}
-- name: THESEUS_SERVER_PORT
+{{/* query container env — SERVER_PORT/GRPC_PORT + OTel + downstream extraEnv. */}}
+{{- define "query.env" -}}
+- name: QUERY_SERVER_PORT
   value: {{ .Values.ports.http | quote }}
-- name: THESEUS_SERVER_GRPC_PORT
+- name: QUERY_SERVER_GRPC_PORT
   value: {{ .Values.ports.grpc | quote }}
 - name: OTEL_SERVICE_NAME
   value: {{ .Values.telemetry.serviceName | quote }}
-- name: OTEL_ENABLED_THESEUS
+- name: OTEL_ENABLED_QUERY
   value: {{ .Values.telemetry.enabled | quote }}
 {{- if and .Values.telemetry.enabled .Values.telemetry.endpoint }}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT

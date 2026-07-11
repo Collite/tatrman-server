@@ -1,16 +1,16 @@
-{{/* ariadne container env — lifted verbatim from the pre-library chart (D1). */}}
-{{- define "ariadne.env" -}}
-- name: ARIADNE_HTTP_PORT
+{{/* veles container env — lifted verbatim from the pre-library chart (D1). */}}
+{{- define "veles.env" -}}
+- name: VELES_HTTP_PORT
   value: {{ .Values.ports.http | quote }}
 {{- if .Values.ports.grpc }}
-- name: ARIADNE_GRPC_PORT
+- name: VELES_GRPC_PORT
   value: {{ .Values.ports.grpc | quote }}
 {{- end }}
 - name: METADATA_GIT_REMOTE_URI
   value: {{ .Values.metadata.gitRemoteUri | quote }}
 - name: OTEL_SERVICE_NAME
   value: {{ .Values.telemetry.serviceName | quote }}
-- name: OTEL_ENABLED_ARIADNE
+- name: OTEL_ENABLED_METADATA
   value: {{ .Values.telemetry.enabled | quote }}
 {{- if and .Values.telemetry.enabled .Values.telemetry.endpoint }}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT

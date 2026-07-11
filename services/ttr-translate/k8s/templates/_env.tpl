@@ -1,12 +1,12 @@
-{{/* proteus container env — lifted verbatim from the pre-library chart (D1). */}}
-{{- define "proteus.env" -}}
-- name: PROTEUS_SERVER_PORT
+{{/* translate container env — lifted verbatim from the pre-library chart (D1). */}}
+{{- define "translate.env" -}}
+- name: TRANSLATE_SERVER_PORT
   value: {{ .Values.ports.http | quote }}
-- name: PROTEUS_SERVER_GRPC_PORT
+- name: TRANSLATE_SERVER_GRPC_PORT
   value: {{ .Values.ports.grpc | quote }}
 - name: OTEL_SERVICE_NAME
   value: {{ .Values.telemetry.serviceName | quote }}
-- name: OTEL_ENABLED_PROTEUS
+- name: OTEL_ENABLED_TRANSLATE
   value: {{ .Values.telemetry.enabled | quote }}
 {{- if and .Values.telemetry.enabled .Values.telemetry.endpoint }}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT

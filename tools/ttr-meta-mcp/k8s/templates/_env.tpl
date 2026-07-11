@@ -1,10 +1,10 @@
-{{/* ariadne-mcp container env — lifted from the kustomize base (D2). */}}
-{{- define "ariadne-mcp.env" -}}
-- name: ARIADNE_MCP_SERVER_PORT
+{{/* veles-mcp container env — lifted from the kustomize base (D2). */}}
+{{- define "veles-mcp.env" -}}
+- name: VELES_MCP_SERVER_PORT
   value: {{ .Values.ports.http | quote }}
 - name: OTEL_SERVICE_NAME
   value: {{ .Values.telemetry.serviceName | quote }}
-- name: OTEL_ENABLED_ARIADNE_MCP
+- name: OTEL_ENABLED_VELES_MCP
   value: {{ .Values.telemetry.enabled | quote }}
 {{- if and .Values.telemetry.enabled .Values.telemetry.endpoint }}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT

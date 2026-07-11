@@ -68,7 +68,7 @@ jobs:
           # `formerly` excludes historical "formerly Kadmos" provenance notes.
           matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|\barges\b|brontes|steropes|echo\b|kadmos|prometheus' \
             --include='*.proto' --include='*.kt' --include='*.kts' --include='*.py' --include='*.conf' \
-            --include='*.yaml' --include='*.toml' --include='Dockerfile*' . \
+            --include='*.yaml' --include='*.toml' --include='Dockerfile*' --include='*.tpl' --include='logback.xml' . \
             | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|formerly|_to_delete' \
             | grep -viE 'PrometheusMeterRegistry|PrometheusConfig|PrometheusHealthCheck|prometheus\.io|:9090|/metrics|actuator|micrometer|registry.prometheus|MeterRegistry|prometheus (meter|call|scrape|registry|endpoint)|monitoring|include:.*prometheus' \
             | grep -viE 'prometheusUrl|hasPath\("prometheus|getConfig\("prometheus|config\.prometheus|"prometheus" ->|prometheus \{|PromQL|prometheus-client|prometheus_client|prometheus-jvm|prometheus - Prom' \

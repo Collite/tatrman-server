@@ -17,7 +17,7 @@
         <appender-ref ref="OTEL"/>
     </root>
 
-    <logger name="org.tatrman.kantheon.theseus" level="${LOG_LEVEL:-DEBUG}"/>
+    <logger name="org.tatrman.query" level="${LOG_LEVEL:-DEBUG}"/>
     <!-- gRPC interceptor loggers: request/response CONTENT (in-band errors live here). -->
     <logger name="grpc.in" level="${LOG_LEVEL:-DEBUG}"/>
     <logger name="grpc.out" level="${LOG_LEVEL:-DEBUG}"/>

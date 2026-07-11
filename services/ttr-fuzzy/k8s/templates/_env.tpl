@@ -1,14 +1,14 @@
-{{/* echo container env — lifted verbatim from the pre-library chart (D1). */}}
-{{- define "echo.env" -}}
-- name: ECHO_HTTP_PORT
+{{/* fuzzy container env — lifted verbatim from the pre-library chart (D1). */}}
+{{- define "fuzzy.env" -}}
+- name: FUZZY_HTTP_PORT
   value: {{ .Values.ports.http | quote }}
 {{- if .Values.ports.grpc }}
-- name: ECHO_GRPC_PORT
+- name: FUZZY_GRPC_PORT
   value: {{ .Values.ports.grpc | quote }}
 {{- end }}
 - name: OTEL_SERVICE_NAME
   value: {{ .Values.telemetry.serviceName | quote }}
-- name: OTEL_ENABLED_ECHO
+- name: OTEL_ENABLED_FUZZY
   value: {{ .Values.telemetry.enabled | quote }}
 {{- if and .Values.telemetry.enabled .Values.telemetry.endpoint }}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT

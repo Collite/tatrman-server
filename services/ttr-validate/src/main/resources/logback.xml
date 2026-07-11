@@ -22,7 +22,7 @@
         <appender-ref ref="OTEL"/>
     </root>
 
-    <logger name="org.tatrman.kantheon.argos" level="${LOG_LEVEL:-DEBUG}"/>
+    <logger name="org.tatrman.validate" level="${LOG_LEVEL:-DEBUG}"/>
     <logger name="grpc.in" level="${LOG_LEVEL:-DEBUG}"/>
     <logger name="grpc.out" level="${LOG_LEVEL:-DEBUG}"/>
     <logger name="io.netty" level="INFO"/>
