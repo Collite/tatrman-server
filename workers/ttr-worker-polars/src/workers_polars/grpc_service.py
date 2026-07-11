@@ -17,7 +17,7 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.ipc as ipc
 from opentelemetry import trace
-from org.tatrman.meta.v1 import veles_pb2
+from org.tatrman.meta.v1 import meta_pb2
 from org.tatrman.common.v1 import response_message_pb2
 from org.tatrman.worker.v1 import worker_pb2
 
@@ -285,7 +285,7 @@ def make_status(active_sessions: int = 0, ready: bool = True) -> worker_pb2.GetS
         ready=ready,
         active_queries=0,
         active_sessions=active_sessions,
-        overall_status=veles_pb2.OK,
+        overall_status=meta_pb2.OK,
     )
 
 
