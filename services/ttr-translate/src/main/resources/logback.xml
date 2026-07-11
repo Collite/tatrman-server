@@ -1,0 +1,40 @@
+<configuration>
+    <!--
+      LOG_LEVEL env var controls verbosity of OUR code + the gRPC call interceptors.
+      Default INFO: every incoming RPC is logged with its full payload.
+      Set LOG_LEVEL=DEBUG to additionally see outgoing gRPC calls pre/post-flight.
+      Library loggers (calcite, …) stay pinned below to keep noise out of the default view.
+    -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <captureExperimentalAttributes>true</captureExperimentalAttributes>
+        <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
+        <captureLoggerContext>true</captureLoggerContext>
+        <captureMdcAttributes>*</captureMdcAttributes>
+    </appender>
+
+    <root level="DEBUG">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="OTEL"/>
+    </root>
+
+    <logger name="org.tatrman.kantheon.proteus" level="${LOG_LEVEL:-DEBUG}"/>
+    <logger name="shared.translator" level="${LOG_LEVEL:-DEBUG}"/>
+    <logger name="grpc.in" level="${LOG_LEVEL:-DEBUG}"/>
+    <logger name="grpc.out" level="${LOG_LEVEL:-DEBUG}"/>
+
+    <!-- Libraries: pinned, immune to LOG_LEVEL / root DEBUG. -->
+    <logger name="org.apache.calcite" level="WARN"/>
+    <logger name="io.netty" level="INFO"/>
+    <!-- grpc bundles a *shaded* netty (io.grpc.netty.shaded.io.grpc.netty.*); the
+         io.netty pin above does NOT match it, which is why HTTP/2 frame DEBUG
+         (PING/HEADERS/DATA) floods the logs. Pin the shaded package too. -->
+    <logger name="io.grpc.netty.shaded" level="INFO"/>
+    <logger name="io.grpc.netty" level="INFO"/>
+    <logger name="io.ktor" level="INFO"/>
+</configuration>

@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kantheon
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Deployment
+      name: fuzzy-mcp
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: MCP_FUZZY_SERVER_PORT
+            value: "7267"
+          # Local cluster: point at the fuzzy service's port-forward
+            # (`kubectl port-forward svc/fuzzy 7266:7266`).
+          - name: FUZZY_GRPC_HOST
+            value: localhost
+          - name: FUZZY_GRPC_PORT
+            value: "7266"
+          - name: OTEL_SERVICE_NAME
+            value: fuzzy-mcp
+          - name: OTEL_ENABLED_FUZZY_MCP
+            value: "false"

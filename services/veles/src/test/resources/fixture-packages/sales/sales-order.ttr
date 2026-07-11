@@ -1,0 +1,12 @@
+package sales
+
+model er schema sales
+def entity SalesOrder {
+    description: "References sibling Product in the same package (no import needed — step 2)"
+    nameAttribute: so_id
+    roles: [Product]
+    attributes: [
+        def attribute so_id { type: int, isKey: true },
+        def attribute so_total { type: int }
+    ]
+}

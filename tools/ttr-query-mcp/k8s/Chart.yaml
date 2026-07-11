@@ -1,0 +1,19 @@
+apiVersion: v2
+name: query-mcp
+description: |
+  The Kantheon query-mcp wrapper — the MCP edge of the query path (the `query` tool over
+  StreamableHTTP). Env-agnostic Helm chart: image, replicas, resources, telemetry endpoint,
+  identity enforcement and downstream wiring are all values. Per-environment values live in
+  the deploying repo (Olymp clusters via ArgoCD multi-source D3'; test contexts via the Olymp
+  scripted harness D23). Converted from the kustomize base/overlays, mirroring the five
+  service charts (D20). Added to the `query-runquery` test context so the integration suite
+  can reach the MCP edge (testing arc Stage 2.3).
+type: application
+# Chart version: the packaging. appVersion tracks the default image tag.
+version: 0.1.0
+appVersion: "dev"
+# Common Deployment/Service shape from the kantheon-service library chart (D1).
+dependencies:
+  - name: kantheon-service
+    version: 0.1.0
+    repository: "file://../../../shared/charts/kantheon-service"

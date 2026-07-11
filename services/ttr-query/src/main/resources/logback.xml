@@ -1,0 +1,32 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <captureExperimentalAttributes>true</captureExperimentalAttributes>
+        <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
+        <captureLoggerContext>true</captureLoggerContext>
+        <captureMdcAttributes>*</captureMdcAttributes>
+    </appender>
+
+    <root level="DEBUG">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="OTEL"/>
+    </root>
+
+    <logger name="org.tatrman.kantheon.theseus" level="${LOG_LEVEL:-DEBUG}"/>
+    <!-- gRPC interceptor loggers: request/response CONTENT (in-band errors live here). -->
+    <logger name="grpc.in" level="${LOG_LEVEL:-DEBUG}"/>
+    <logger name="grpc.out" level="${LOG_LEVEL:-DEBUG}"/>
+
+    <!-- Libraries: pinned so HTTP/2 frame DEBUG (PING/HEADERS/DATA) doesn't flood.
+         grpc bundles a *shaded* netty whose logger is io.grpc.netty.shaded.io.grpc.netty.*
+         — NOT covered by an io.netty pin. -->
+    <logger name="io.netty" level="INFO"/>
+    <logger name="io.grpc.netty.shaded" level="INFO"/>
+    <logger name="io.grpc.netty" level="INFO"/>
+    <logger name="io.ktor" level="INFO"/>
+</configuration>

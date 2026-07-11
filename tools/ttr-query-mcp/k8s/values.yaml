@@ -1,0 +1,68 @@
+# Default values for query-mcp. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# environments (Olymp cluster values, or test-context values) override image, telemetry,
+# identity, and the downstream wiring in extraEnv.
+
+replicaCount: 1
+
+image:
+  repository: query-mcp
+  # Defaults to .Chart.appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# query-mcp serves the MCP `query` tool over StreamableHTTP on a single HTTP port — the
+# container port AND the service port AND the probe target.
+ports:
+  http: 7307
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: "1"
+
+# OBO/bearer identity at the MCP edge (kantheon-security.md). Default ON — agents call with the
+# user's bearer; a missing token fails closed (`missing_user_identity`). A test context keeps
+# this on to exercise the fail-closed discipline end-to-end.
+requireIdentity: true
+
+# OpenTelemetry. Reads OTEL_EXPORTER_OTLP_ENDPOINT + the per-service OTEL_ENABLED_QUERY_MCP
+# flag. Point `endpoint` at a collector and set enabled; leave disabled where none exists
+# (e.g. test runs).
+telemetry:
+  enabled: false
+  # e.g. http://alloy.observability.svc.cluster.local:4317
+  endpoint: ""
+  serviceName: query-mcp
+
+# Downstream constellation wiring + any other env. Defaults match the constellation's stable
+# in-cluster service names (env-agnostic — every cluster names them the same). A deploying env
+# REPLACES this list to retarget. Set CAPABILITIES_MCP_URL here to opt into registration.
+extraEnv:
+  - { name: QUERY_SERVER, value: "query" }
+  - { name: TRANSLATE_SERVER, value: "translate" }
+  - { name: VALIDATE_SERVER, value: "validate" }
+  - { name: VELES_SERVER, value: "meta" }
+
+# Probes (HTTP on the http port).
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 30
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nlp-mcp
+  namespace: kantheon
+  labels:
+    app: nlp-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nlp-mcp
+  template:
+    metadata:
+      labels:
+        app: nlp-mcp
+    spec:
+      containers:
+        - name: nlp-mcp
+          image: nlp-mcp:dev
+          ports:
+            - containerPort: 7272
+          env:
+            - name: MCP_NLP_SERVER_PORT
+              value: "7272"
+            # HTTP target → nlp service (contracts §7 port 7270).
+            - name: NLP_HTTP_HOST
+              value: nlp
+            - name: NLP_HTTP_PORT
+              value: "7270"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://alloy.observability.svc.cluster.local:4317
+            - name: OTEL_SERVICE_NAME
+              value: nlp-mcp
+            - name: OTEL_ENABLED_NLP_MCP
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7272
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7272
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nlp-mcp
+  namespace: kantheon
+  labels:
+    app: nlp-mcp
+spec:
+  selector:
+    app: nlp-mcp
+  ports:
+    - name: http
+      port: 7272
+      targetPort: 7272

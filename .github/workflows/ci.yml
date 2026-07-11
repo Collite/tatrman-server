@@ -40,29 +40,44 @@ jobs:
       - name: check dependency rules
         run: bash scripts/check-dependency-rules.sh
 
-  # Persona grep gate (naming ledger §5). Wired now but REPORT-ONLY through the
-  # SV-P0 window (S1 T5 "allow-empty until S3"): the verbatim libs.versions.toml
-  # and, from S3, the freshly-grafted spine still carry retired persona strings
-  # until the S4 sweep cleans them. It flips to ENFORCING (drop continue-on-error)
-  # at S6's phase-DONE gate. Surviving personas (Veles/Perun/Charon, Golem/Pythia/
-  # Iris) are not in the regex, so a post-sweep hit is real.
+  # Persona grep gate (naming ledger §5). ENFORCING as of S6's phase-DONE gate
+  # (was report-only through the S1→S5 window while the grafted spine still
+  # carried retired persona strings). Now scans wire/build surfaces AND
+  # Dockerfiles (S6 fix: the S4 sweep's include list missed Dockerfiles, which
+  # had let stale `services/kadmos`/`workers/steropes` COPY paths through).
+  # Surviving personas (Veles/Perun/Charon, Golem/Pythia/Iris) are not in the
+  # regex, so any hit is real → the job fails.
+  #
+  # NOT yet scanned (SV-P1 chart-rename scope): Helm `*.tpl` templates + `logback.xml`
+  # still carry chart-internal persona env/logger names; they rename WITH the
+  # image publish + olymp repoint at SV-P1 gate 3, at which point add
+  # `--include='*.tpl' --include='logback.xml'` here.
   grep-gate:
     runs-on: ubuntu-latest
-    continue-on-error: true   # report-only until S6; flip to enforcing then
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v5
-      - name: report retired personas on wire/build surfaces
+      - name: enforce no retired personas on wire/build surfaces
         run: |
-          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|arges|brontes|steropes|echo\b|kadmos|prometheus' \
+          # Detect RETIRED persona strings (naming ledger §3). Refined per the
+          # 2026-07-10 decision: the regex over-matched `echo` (English verb) and
+          # `prometheus` (Micrometer's PrometheusMeterRegistry / the real monitoring
+          # system) — those legitimate hits are excluded below; genuine persona
+          # instances (the Echo/fuzzy service, the "Prometheus LLM gateway") are renamed.
+          # `formerly` excludes historical "formerly Kadmos" provenance notes.
+          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|\barges\b|brontes|steropes|echo\b|kadmos|prometheus' \
             --include='*.proto' --include='*.kt' --include='*.kts' --include='*.py' --include='*.conf' \
-            --include='*.yaml' --include='*.toml' . \
-            | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|_to_delete' || true)
+            --include='*.yaml' --include='*.toml' --include='Dockerfile*' . \
+            | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|formerly|_to_delete' \
+            | grep -viE 'PrometheusMeterRegistry|PrometheusConfig|PrometheusHealthCheck|prometheus\.io|:9090|/metrics|actuator|micrometer|registry.prometheus|MeterRegistry|prometheus (meter|call|scrape|registry|endpoint)|monitoring|include:.*prometheus' \
+            | grep -viE 'prometheusUrl|hasPath\("prometheus|getConfig\("prometheus|config\.prometheus|"prometheus" ->|prometheus \{|PromQL|prometheus-client|prometheus_client|prometheus-jvm|prometheus - Prom' \
+            | grep -viE '"prometheus",|Prometheus (metrics|exposition)|the fabric-infra estate' \
+            || true)
           if [ -n "$matches" ]; then
-            echo "::warning::retired persona strings still present (expected pre-S4-sweep):"
+            echo "::error::retired persona strings on a wire/build surface (naming ledger §5):"
             echo "$matches" | head -50
-            echo "(report-only until S6 flips this gate to enforcing)"
+            exit 1
           else
             echo "grep-gate: clean"
           fi

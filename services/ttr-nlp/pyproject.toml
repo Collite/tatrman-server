@@ -1,0 +1,66 @@
+[project]
+name = "nlp-service"
+version = "0.1.0"
+description = "NLP — NLP foundation service - multi-engine analysis (Stanza, spaCy, NameTag, langid)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.128.0",
+    "uvicorn[standard]>=0.40.0",
+    "stanza>=1.10.0",
+    "spacy>=3.8.0",
+    "httpx>=0.27.0",
+    "lingua-language-detector>=2.0.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0.3",
+    "shared-proto",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "opentelemetry-instrumentation-fastapi>=0.40b0",
+    "opentelemetry-instrumentation-httpx>=0.40b0",
+    "otel-config",
+    "torch>=2.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "ruff>=0.9.4",
+    "pytest-asyncio>=0.25.0",
+]
+
+[tool.uv]
+# Not an installable package (no build-system); deps-only project, like the
+# other Python services. Tests import `nlp_service` via the pytest `pythonpath`
+# below rather than from an installed wheel.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `src/` layout: put it on sys.path so `from nlp_service...` resolves under
+# `uv run pytest` (the package is intentionally not installed — see above).
+pythonpath = ["src"]
+# Component tier (testing arc Phase 1 Stage 1.1) — mirrors the Kotlin
+# `componentTest` source set. Real-dep specs (testcontainers-python) carry
+# `@pytest.mark.component`; select with `just test-py services/ttr-nlp -m component`.
+markers = [
+    "component: real-dependency component tier (testcontainers-python; no cluster)",
+]
+
+[tool.ruff]
+target-version = "py313"
+
+# CPU-only PyTorch: this service runs NLP pipelines (Stanza / spaCy) that
+# work fine on CPU. Pulling the default torch wheel drags in ~5 GB of
+# CUDA / nvidia-* wheels which we don't need and which blow up the image
+# size and CI disk usage. Pin torch to the PyTorch CPU index instead.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+shared-proto = { path = "../../shared/proto/build/python-package", editable = true }
+otel-config = { path = "../../shared/libs/python/otel-config", editable = true }
+torch = { index = "pytorch-cpu" }

@@ -1,0 +1,61 @@
+# Default values for health. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# environments (Olymp cluster values, or test-context values) override image, telemetry, and
+# retune the per-target check wiring through the HEALTH_* env overrides (extraEnv).
+
+replicaCount: 1
+
+image:
+  repository: health
+  # Defaults to .Chart.appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# health exposes a single HTTP port (the roll-up REST API). No gRPC, no MCP wrapper.
+ports:
+  http: 7000
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 192Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: "1"
+
+# OpenTelemetry. Reads a single OTLP endpoint URL (OTEL_EXPORTER_OTLP_ENDPOINT) plus the
+# per-service OTEL_ENABLED_HEALTH flag. Point `endpoint` at a collector (e.g. the cluster's
+# Alloy) and set enabled; leave disabled where no collector exists (e.g. test runs).
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: health-check-service
+
+# Per-target check wiring. The bundled application.conf carries kantheon + fabric-infra defaults;
+# a deploying env appends HEALTH_*_URL / HEALTH_*_HOST / HEALTH_*_PORT overrides here to retune
+# DNS/ports/paths for its cluster (and the monitoring Prometheus URL for prometheus-type checks).
+extraEnv: []
+
+# Probes hit /healthz — the cheap SELF-liveness route (200 immediately, independent of any target;
+# HealthRoutes.kt). NOT /health/all: that fans out to every configured target (each up to a 30s
+# timeout), so with any unreachable target it exceeds the kubelet probe timeout → the request is
+# cancelled → the pod is killed even though the aggregator itself is fine. /health/all is the
+# DASHBOARD roll-up; target-state belongs there, not on the pod probe.
+readinessProbe:
+  path: /healthz
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 30
+livenessProbe:
+  path: /healthz
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

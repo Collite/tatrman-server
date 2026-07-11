@@ -1,0 +1,335 @@
+from __future__ import annotations
+
+import logging
+import os
+from typing import Any, Dict, List, Set
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+
+from nlp_service.config import load_config
+from nlp_service.engines.base import NlpOp
+from nlp_service.pipeline.orchestrator import Orchestrator
+from otel_config import setup_opentelemetry, instrument_fastapi
+
+logger = logging.getLogger("nlp-service")
+
+
+# ---------------------------------------------------------------------------
+# Request/Response models (Pydantic with camelCase for JSON)
+# ---------------------------------------------------------------------------
+
+class AnalyzeRequest(BaseModel):
+    """Request model for POST /v1/analyze."""
+
+    text: str = Field(..., description="Input text to analyze", min_length=1, max_length=50000)
+    language: str = Field("", description="Language code (empty triggers auto-detection)")
+    ops: Set[str] = Field(..., description="Set of requested NLP operations")
+    mode: str = Field("NORMAL", description="NORMAL or COMPARE mode")
+    engineHints: Dict[str, str] = Field(default_factory=dict, description="Engine override per operation")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class TokenResponse(BaseModel):
+    """Token representation in API response."""
+    text: str
+    charStart: int
+    charEnd: int
+    lemma: str
+    upos: str
+    xpos: str
+    feats: Dict[str, str]
+    depHead: int
+    depRelation: str
+
+
+class NerEntityResponse(BaseModel):
+    """NER entity representation in API response."""
+    text: str
+    label: str
+    charStart: int
+    charEnd: int
+    normalizedValue: str
+    sourceEngine: str
+
+
+class AnalyzeResponse(BaseModel):
+    """Response model for POST /v1/analyze."""
+    language: str
+    languageConfidence: float
+    engineUsed: str
+    tokens: List[TokenResponse]
+    sentences: List[Dict[str, int]]
+    paragraphs: List[Dict[str, int]]
+    entities: List[NerEntityResponse]
+    byEngine: Dict[str, Any]
+    traceId: str
+    elapsedMs: int
+    messages: List[Dict[str, Any]]
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    config = load_config()
+    service_name = "nlp"
+
+    # Build OTEL endpoint from environment
+    otel_host = os.getenv("OTEL_EXPORTER_OTLP_HOST", "localhost")
+    otel_port = int(os.getenv(
+        "OTEL_EXPORTER_OTLP_GRPC_PORT",
+        "4317" if os.getenv("NLP_SERVICE_OTEL_PROTOCOL", "grpc").lower() == "grpc"
+        else os.getenv("OTEL_EXPORTER_OTLP_HTTP_PORT", "4318")
+    ))
+    otel_protocol = os.getenv("NLP_SERVICE_OTEL_PROTOCOL", "grpc").lower()
+    otel_endpoint = f"{otel_host}:{otel_port}"
+
+    # Initialize OTEL via shared library
+    otel = setup_opentelemetry(
+        service_name=service_name,
+        otel_endpoint=otel_endpoint,
+        protocol=otel_protocol,
+        insecure=True,
+    )
+    tracer = otel["tracer"]
+    meter = otel["meter"]
+
+    # Create metrics
+    request_counter = meter.create_counter(
+        name="nlp_request_total",
+        description="Total Nlp NLP requests",
+        unit="1",
+    )
+    request_duration = meter.create_histogram(
+        name="nlp_request_duration_seconds",
+        description="Nlp NLP request duration in seconds",
+        unit="s",
+    )
+
+    app = FastAPI(
+        title="Nlp NLP Service",
+        description="Multi-engine NLP analysis (Stanza, spaCy, NameTag, langid)",
+        version="0.1.0",
+    )
+
+    # Instrument FastAPI via shared library
+    instrument_fastapi(app)
+
+    # Initialize orchestrator
+    orchestrator = Orchestrator(config)
+
+    # Health endpoints
+    @app.get("/healthz")
+    def healthz():
+        return {"status": "ok"}
+
+    @app.get("/readyz")
+    def readyz():
+        if orchestrator._registry.is_ready():
+            return {"status": "ready"}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "reason": "No engines available"}
+        )
+
+    @app.get("/version")
+    def version():
+        engine_info = orchestrator._registry.get_engine_info()
+        return {
+            "service": "nlp-service",
+            "version": "0.1.0",
+            "engines": engine_info,
+        }
+
+    # Main analysis endpoint
+    @app.post("/v1/analyze", response_model=AnalyzeResponse)
+    async def analyze(request: AnalyzeRequest, http_request: Request):
+        """Run NLP analysis on the input text."""
+        with tracer.start_as_current_span("nlp.analyze") as span:
+            span.set_attribute("nlp.text_length", len(request.text))
+            span.set_attribute("nlp.language", request.language or "auto")
+            span.set_attribute("nlp.ops", ",".join(sorted(request.ops)))
+
+            logger.debug(
+                "/v1/analyze request | language=%r ops=%s mode=%r text=%r",
+                request.language,
+                sorted(request.ops),
+                request.mode,
+                request.text,
+            )
+
+            try:
+                requested_ops: Set[NlpOp] = set()
+                for op_str in request.ops:
+                    try:
+                        op = NlpOp(op_str)
+                        requested_ops.add(op)
+                    except ValueError:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Invalid operation: {op_str}. Valid values: {[o.value for o in NlpOp]}"
+                        )
+
+                if not requested_ops:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="At least one operation must be specified"
+                    )
+
+                # Run analysis
+                result = orchestrator.analyze(
+                    text=request.text,
+                    language=request.language,
+                    ops=requested_ops,
+                    mode=request.mode,
+                    engine_hints=request.engineHints,
+                )
+
+                # Convert to response format
+                tokens_response = [
+                    TokenResponse(
+                        text=t.text,
+                        charStart=t.char_start,
+                        charEnd=t.char_end,
+                        lemma=t.lemma,
+                        upos=t.upos,
+                        xpos=t.xpos,
+                        feats=t.feats,
+                        depHead=t.dep_head,
+                        depRelation=t.dep_relation,
+                    )
+                    for t in result.tokens
+                ]
+
+                entities_response = [
+                    NerEntityResponse(
+                        text=e.text,
+                        label=e.label,
+                        charStart=e.char_start,
+                        charEnd=e.char_end,
+                        normalizedValue=e.normalized_value,
+                        sourceEngine=e.source_engine,
+                    )
+                    for e in result.entities
+                ]
+
+                sentences_response = [
+                    {"charStart": s[0], "charEnd": s[1]}
+                    for s in result.sentences
+                ]
+
+                paragraphs_response = [
+                    {"charStart": p[0], "charEnd": p[1]}
+                    for p in result.paragraphs
+                ]
+
+                # Convert EngineResult to dict for byEngine response
+                def engine_result_to_dict(er):
+                    return {
+                        "tokens": [
+                            {
+                                "text": t.text,
+                                "charStart": t.char_start,
+                                "charEnd": t.char_end,
+                                "lemma": t.lemma,
+                                "upos": t.upos,
+                                "xpos": t.xpos,
+                                "feats": t.feats,
+                                "depHead": t.dep_head,
+                                "depRelation": t.dep_relation,
+                            }
+                            for t in er.tokens
+                        ],
+                        "entities": [
+                            {
+                                "text": e.text,
+                                "label": e.label,
+                                "charStart": e.char_start,
+                                "charEnd": e.char_end,
+                                "normalizedValue": e.normalized_value,
+                                "sourceEngine": e.source_engine,
+                            }
+                            for e in er.entities
+                        ],
+                        "sentences": [{"charStart": s[0], "charEnd": s[1]} for s in er.sentences],
+                        "paragraphs": [{"charStart": p[0], "charEnd": p[1]} for p in er.paragraphs],
+                        "error": er.error,
+                    }
+
+                by_engine_response = {
+                    name: engine_result_to_dict(er)
+                    for name, er in result.by_engine.items()
+                }
+
+                # Record metrics
+                request_counter.add(1, {"status": "success", "engine": result.engine_used})
+                request_duration.record(result.elapsed_ms / 1000.0, {"engine": result.engine_used})
+
+                span.set_attribute("nlp.engine_used", result.engine_used)
+                span.set_attribute("nlp.token_count", len(result.tokens))
+                span.set_attribute("nlp.entity_count", len(result.entities))
+                span.set_attribute("nlp.by_engine_count", len(result.by_engine))
+
+                logger.debug(
+                    "/v1/analyze response | engine=%s language=%s tokens=%d entities=%d sentences=%d "
+                    "elapsedMs=%d messages=%r firstTokens=%s firstEntities=%s",
+                    result.engine_used,
+                    result.language,
+                    len(result.tokens),
+                    len(result.entities),
+                    len(result.sentences),
+                    result.elapsed_ms,
+                    result.messages,
+                    [f"{t.text}/{t.upos}" for t in result.tokens[:10]],
+                    [f"{e.text}/{e.label}" for e in result.entities[:10]],
+                )
+
+                return AnalyzeResponse(
+                    language=result.language,
+                    languageConfidence=result.language_confidence,
+                    engineUsed=result.engine_used,
+                    tokens=tokens_response,
+                    sentences=sentences_response,
+                    paragraphs=paragraphs_response,
+                    entities=entities_response,
+                    byEngine=by_engine_response,
+                    traceId=result.trace_id,
+                    elapsedMs=result.elapsed_ms,
+                    messages=result.messages,
+                )
+
+            except HTTPException:
+                request_counter.add(1, {"status": "error"})
+                raise
+            except Exception as e:
+                logger.exception(f"Unexpected error in /v1/analyze: {e}")
+                request_counter.add(1, {"status": "error"})
+                span.record_exception(e)
+                raise HTTPException(status_code=500, detail=str(e))
+
+    return app
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+app = create_app()
+
+if __name__ == "__main__":
+    import uvicorn
+
+    config = load_config()
+    uvicorn.run(
+        "nlp_service.api.routes:app",
+        host=config.service.host,
+        port=config.service.port,
+        reload=False,
+    )

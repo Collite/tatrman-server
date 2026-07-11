@@ -1,0 +1,17 @@
+capability_id: "meta.list_queries:v1"
+category: "meta"
+version: "1.0.0"
+description: |
+  List query templates authored against the veles model. Filter by
+  package and parse status. The MCP wrapper returns the query descriptors
+  with their SQL template + parameter list.
+service_endpoint: "http://veles-mcp.kantheon.svc.cluster.local:7262"
+search_tags:
+  - veles
+  - queries
+  - list
+cost_hints:
+  typical_latency_ms: 500
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 16

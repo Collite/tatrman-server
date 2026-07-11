@@ -1,0 +1,228 @@
+syntax = "proto3";
+
+// Forked from ai-platform@kantheon-fork-point
+//   (shared/proto/src/main/proto/org/tatrman/llmgateway/v1/llm_gateway_chat.proto).
+// Fork Stage 2.5 (LLM gateway). Package org.tatrman.llmgateway.grpc →
+// org.tatrman.llm.v1; service ChatService → LlmGatewayService (persona
+// consistency, contracts §1). Wire shapes otherwise unchanged.
+
+package org.tatrman.llm.v1;
+
+import "google/protobuf/struct.proto";
+
+option java_multiple_files = true;
+option java_package = "org.tatrman.llm.v1";
+
+service LlmGatewayService {
+  // Responses API
+  rpc CreateResponse (CreateResponseRequest) returns (Response);
+  rpc GetResponse (GetResponseRequest) returns (Response);
+
+  // Conversations API
+  rpc CreateConversation (CreateConversationRequest) returns (Conversation);
+  rpc GetConversation (GetConversationRequest) returns (Conversation);
+  rpc DeleteConversation (DeleteConversationRequest) returns (DeleteConversationResponse);
+
+  // Legacy/Simple Chat
+  rpc Chat (ChatRequest) returns (ChatResponse);
+
+  // Embeddings (additive — Kleio/DocWH P2 pre-flight; kleio/contracts.md §10).
+  // One multilingual model for the whole corpus (a conformed dimension); the
+  // An embeddings consumer calls this. The LLM-gateway service impl wires the
+  // model egress; an unimplemented stub is harmless until then (the Kleio client
+  // is Wiremock-tested against the REST mirror).
+  rpc EmbedText (EmbedRequest) returns (EmbedResponse);
+}
+
+// --- Embeddings (kleio/contracts.md §10) ---
+
+message EmbedRequest {
+  string model = 1;
+  repeated string inputs = 2;   // batched
+}
+message EmbedResponse {
+  repeated Embedding embeddings = 1;
+  string model = 2;
+  int32 dimensions = 3;
+}
+message Embedding {
+  repeated float vector = 1;
+}
+
+// --- Responses API ---
+
+message CreateResponseRequest {
+  // The identifier of the conversation this response is being created for.
+  string conversation = 1;
+
+  // The model to use for this response.
+  string model = 2;
+
+  // Input for the response. Can be a string or a list of content parts.
+  ResponseInput input = 3;
+
+  // Instructions for the model.
+  string instructions = 4;
+
+  // Background context for the model.
+  string background = 5;
+
+  // Temperature for the response.
+  optional float temperature = 6;
+
+  // The maximum number of tokens to generate.
+  optional int32 max_output_tokens = 7;
+
+  // The maximum number of tool calls allowed.
+  optional int32 max_tools_calls = 8;
+
+  // Reasoning configuration.
+  ReasoningConfig reasoning = 9;
+
+  // A list of tools available to the model.
+  repeated Tool tools = 10;
+
+  // Tags to select a model.
+  repeated string model_tags = 11;
+
+  // Expected response format
+  ResponseFormat response_format = 12;
+}
+
+message ResponseFormat {
+  string type = 1;
+  JsonSchema json_schema = 2;
+}
+
+message JsonSchema {
+  string name = 1;
+  optional string description = 2;
+  google.protobuf.Struct schema = 3;
+  optional bool strict = 4;
+}
+
+message ResponseInput {
+  oneof input_type {
+    string text = 1;
+    // can be extended with repeated ContentPart
+  }
+}
+
+message ReasoningConfig {
+  ReasoningEffort effort = 1;
+}
+
+enum ReasoningEffort {
+  REASONING_EFFORT_UNSPECIFIED = 0;
+  LOW = 1;
+  MEDIUM = 2;
+  HIGH = 3;
+}
+
+message Tool {
+  ToolType type = 1;
+  Function function = 2;
+}
+
+message Function {
+  string name = 1;
+  optional string description = 2;
+  google.protobuf.Struct parameters = 3;
+  optional bool strict = 4;
+}
+
+enum ToolType {
+  TOOL_TYPE_UNSPECIFIED = 0;
+  FUNCTION = 1;
+  FILE_SEARCH = 2;
+  CODE_INTERPRETER = 3;
+}
+
+message Response {
+  string id = 1;
+  string object = 2; // "response"
+  int64 created_at = 3;
+  string conversation_id = 4;
+  string model = 5;
+  string status = 6;
+  repeated ResponseOutput output = 7;
+  Usage usage = 8;
+  ResponseReasoning reasoning = 9;
+}
+
+message ResponseOutput {
+  string type = 1; // "text", "tool_call", etc.
+  string text = 2;
+  repeated ToolCall tool_calls = 3;
+}
+
+message ToolCall {
+  string id = 1;
+  string type = 2; // e.g., "function"
+  FunctionCall function = 3;
+}
+
+message FunctionCall {
+  string name = 1;
+  string arguments = 2; // JSON string
+}
+
+message ResponseReasoning {
+  string summary = 1;
+  // other reasoning fields if any
+}
+
+message Usage {
+  int32 total_tokens = 1;
+  int32 input_tokens = 2;
+  int32 output_tokens = 3;
+}
+
+message GetResponseRequest {
+  string response_id = 1;
+}
+
+// --- Conversations API ---
+
+message CreateConversationRequest {
+  // Initial messages or other metadata
+  google.protobuf.Struct metadata = 1;
+}
+
+message Conversation {
+  string id = 1;
+  string object = 2; // "conversation"
+  int64 created_at = 3;
+  google.protobuf.Struct metadata = 4;
+}
+
+message GetConversationRequest {
+  string conversation_id = 1;
+}
+
+message DeleteConversationRequest {
+  string conversation_id = 1;
+}
+
+message DeleteConversationResponse {
+  string id = 1;
+  string object = 2; // "conversation.deleted"
+  bool deleted = 3;
+}
+
+// --- Legacy/Simple Chat ---
+
+message ChatRequest {
+  string model = 1;
+  repeated ChatMessage messages = 2;
+}
+
+message ChatMessage {
+  string role = 1;
+  string content = 2;
+}
+
+message ChatResponse {
+  string content = 1;
+  string model = 2;
+}

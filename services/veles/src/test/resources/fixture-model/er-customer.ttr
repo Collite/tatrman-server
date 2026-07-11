@@ -1,0 +1,13 @@
+model er
+def entity Customer {
+    description: "A customer in the system"
+    labelPlural: "Customers"
+    nameAttribute: name
+    aliases: ["client"]
+    tags: ["core"]
+    attributes: [
+        def attribute id { type: int, isKey: true },
+        def attribute name { type: text },
+        def attribute tenant_id { type: int }
+    ]
+}

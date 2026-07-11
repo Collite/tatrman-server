@@ -1,0 +1,5 @@
+# Snapshot fixtures: line endings are part of the format contract,
+# git must not normalise them. CSV emits CRLF per RFC 4180, TSV / MD
+# emit LF; both are tested for byte-identity.
+fixtures/* binary
+snapshots/** binary

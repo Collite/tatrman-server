@@ -1,0 +1,291 @@
+// =============================================================================
+// AI Platform v1 — Worker service
+//
+// Promoted in Phase 1.0 from docs/v1/protos/ — this is the canonical location.
+//
+// Generic per-engine query executor. v1 has workers/mssql/ as the only
+// implementation; future workers/polars/, workers/duckdb/, etc. will
+// implement the same contract.
+//
+// Per Round 6 decisions:
+//   - Worker statefulness is per-engine, declared via capability advertisement.
+//     MS SQL Worker advertises supports_stateful_sessions = false; future
+//     Polars / DuckDB Workers will advertise true with concrete limits.
+//   - Workers stream Arrow IPC batches via gRPC server-streaming.
+//   - First batch carries the schema_fingerprint (SHA-256 of canonical
+//     Arrow IPC schema bytes); subsequent batches don't repeat it.
+//   - Per-engine optimisation rules live in the Translator library indexed
+//     by dialect; Workers don't customise rules. Worker calls
+//     Translator.UnparseFromRelNode with its dialect.
+//   - Connection identity comes from the Worker's HOCON config; the Worker
+//     advertises the connection_ids it can serve.
+//   - Type mapping: opinionated, exhaustive, documented in v1-architecture.md
+//     and the Calcite TechDocs. NULLs via Arrow validity bitmap, decimals
+//     preserved exactly, unsupported types as BINARY+metadata, BLOB/CLOB
+//     rejected over 8 MB per cell (configurable).
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.worker.v1;
+
+import "org/tatrman/plan/v1/plan.proto";
+import "org/tatrman/plan/v1/context.proto";
+import "org/tatrman/meta/v1/meta.proto";
+import "org/tatrman/common/v1/response_message.proto";
+
+option java_package = "org.tatrman.worker.v1";
+option java_multiple_files = true;
+
+// =============================================================================
+// Service
+// =============================================================================
+
+service WorkerService {
+  // Execute a validated PlanNode and stream Arrow IPC results.
+  rpc Execute(ExecuteRequest) returns (stream ResultBatch);
+
+  // Capability discovery — what engine, what dialects, what connections,
+  // statefulness limits, execution caps.
+  rpc GetCapabilities(GetCapabilitiesRequest) returns (GetCapabilitiesResponse);
+
+  // Service-level status, mirrors metadata-service / dispatcher shape.
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+
+  // Stage an externally-produced Arrow DataFrame INTO a session workspace
+  // (charon/contracts.md §6 "Worker paths"; Charon Stage 3.1 closeout
+  // 2026-06-26). Client-streams Arrow IPC chunks; the first chunk carries the
+  // ImportHeader (session_id, df_name). Mirrors the metis.v1 ImportDataFrame
+  // shape so Charon's WorkerEndpoint stages into POLARS sessions the same way
+  // it stages into METIS. Stateful Workers only — a Worker advertising
+  // supports_stateful_sessions = false aborts with UNIMPLEMENTED.
+  rpc ImportDataFrame(stream ImportChunk) returns (ImportDataFrameResult);
+
+  // Drop a named DataFrame from a session workspace (Charon Evict(worker_df)).
+  // Idempotent. Stateful Workers only.
+  rpc DropWorkspaceEntry(DropWorkspaceRequest) returns (DropWorkspaceResult);
+}
+
+// =============================================================================
+// ImportDataFrame / DropWorkspaceEntry (session-workspace ingest + drop)
+// =============================================================================
+
+// One streamed chunk of an Arrow DataFrame being imported. The first chunk in
+// the stream sets `header`; every chunk carries an `ipc_payload` that is a
+// self-contained Arrow IPC stream (schema + one record batch + EOS), matching
+// the Execute/ResultBatch streaming-isolation convention.
+message ImportChunk {
+  optional ImportHeader header = 1;   // first chunk only
+  bytes ipc_payload = 2;
+}
+
+message ImportHeader {
+  string session_id = 1;
+  string df_name = 2;
+  // When set, the Worker verifies the imported schema's fingerprint matches
+  // before storing; mismatch aborts with FAILED_PRECONDITION.
+  optional string expected_schema_fingerprint = 3;
+  reserved 4 to 9;
+}
+
+message ImportDataFrameResult {
+  string df_name = 1;
+  string schema_fingerprint = 2;      // canonical logical-schema digest of the stored DF
+  int64 rows = 3;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message DropWorkspaceRequest {
+  string session_id = 1;
+  string name = 2;
+  reserved 3 to 9;
+}
+
+message DropWorkspaceResult {
+  bool existed = 1;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// =============================================================================
+// Execute
+// =============================================================================
+
+message ExecuteRequest {
+  org.tatrman.plan.v1.PlanNode plan = 1;
+  org.tatrman.plan.v1.PipelineContext context = 2;
+
+  // Which connection to execute against. Validated against this Worker's
+  // supported_connections; mismatch → empty stream + ResponseMessage with
+  // code "connection_not_supported".
+  string connection_id = 3;
+
+  ExecutionOptions options = 4;
+
+  // Phase 2.4 — when non-empty, the materialised result is stashed under
+  // `(context.session_id, this name)` in the Worker's session-scoped
+  // workspace store. Subsequent ExecuteRequests in the same session can
+  // reference it via a `WorkspaceRef` PlanNode. Stateless Workers (MS SQL)
+  // ignore this field; setting it on a Worker that advertises
+  // `supports_stateful_sessions = false` is a no-op.
+  string assign_to_workspace = 5;
+  reserved 6 to 9;
+}
+
+message ExecutionOptions {
+  // Rows per Arrow batch; 0 = server default. The Worker must not exceed
+  // ExecutionLimits.max_batch_size_rows from GetCapabilities.
+  int32 batch_size_rows = 1;
+
+  // Hard cap on rows returned across the whole stream; 0 = no cap.
+  // Validator's TopN enforcement is already applied — this is an additional
+  // belt-and-braces cap callers may set.
+  int64 row_limit = 2;
+
+  // Hard execution timeout in seconds (covers connection acquire +
+  // statement execute + fetch). 0 = server default.
+  int64 timeout_seconds = 3;
+  reserved 4 to 8;
+}
+
+message ResultBatch {
+  // Arrow IPC bytes. The schema is bundled with the first batch (per Arrow
+  // IPC streaming format); subsequent batches contain data rows only.
+  bytes arrow_ipc = 1;
+
+  int32 batch_index = 2;           // monotonic from 0
+  int64 batch_row_count = 3;
+  bool is_first = 4;               // first batch — schema is included
+  bool is_last = 5;                // end-of-stream marker — may carry 0 rows
+
+  // PipelineContext travels with every batch (per Round 6 decision).
+  // Most warnings accumulate on the first batch (when the Worker has just
+  // unparsed and prepared the statement); subsequent batches typically
+  // carry the same context with no new warnings.
+  org.tatrman.plan.v1.PipelineContext context = 6;
+
+  // SHA-256 (lowercase hex) of the canonical Arrow IPC schema bytes.
+  // Populated only on is_first = true batches; empty otherwise.
+  // Used for:
+  //   - sanity check across batches (Worker must emit consistent schema)
+  //   - downstream caching keys (query-runner / clients cache by fingerprint)
+  //   - audit / forensics ("what columns did this query return?")
+  string schema_fingerprint = 7;
+
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// =============================================================================
+// GetCapabilities
+// =============================================================================
+
+message GetCapabilitiesRequest {}
+
+message GetCapabilitiesResponse {
+  string engine_name = 1;          // "mssql" | "duckdb" | "polars" | ...
+  string engine_version = 2;       // descriptive, e.g. "SQL Server 2022"
+
+  repeated string supported_languages = 3;   // ["SQL"] for MS SQL Worker
+  repeated string supported_dialects = 4;    // ["MSSQL"] for MS SQL Worker
+  repeated string supported_connections = 5; // connection IDs this instance can serve
+
+  ExecutionLimits limits = 6;
+
+  // Stateful-session capability — see Round 6 statefulness discussion and
+  // ai_platform_session_workspace.md. MS SQL Worker advertises
+  // supports_stateful_sessions = false; future Polars / DuckDB Workers
+  // will advertise true with concrete per-session resource limits.
+  bool supports_stateful_sessions = 7;
+  int32 max_concurrent_sessions = 8;        // 0 when supports_stateful_sessions = false
+  int64 session_idle_timeout_seconds = 9;   // when an idle session is evicted
+  int64 max_session_memory_mb = 10;         // soft per-session memory cap; 0 = no per-session limit
+
+  // Issue #57 Phase B — per-connection identity. The dispatcher uses this to map a logical
+  // `<namespace>.<table>` reference to the concrete database/schema the chosen worker
+  // serves. `supported_connections` (field 5) carries the same IDs as flat strings; this
+  // list adds the engine-side database + default schema each ID is bound to. Sourced from
+  // the worker's connection config (e.g. `connections.<id>.{database,default-schema}`).
+  repeated ConnectionInfo connections = 11;
+
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+// Issue #57 Phase B — per-connection database identity advertised by the worker so the
+// dispatcher can concretize logical TableScan qnames to the engine's database namespace.
+// One entry per connection_id; `connection_id` matches an entry in
+// `GetCapabilitiesResponse.supported_connections`.
+message ConnectionInfo {
+  string connection_id = 1;          // matches supported_connections entries
+  string database = 2;               // engine-side database name, e.g. "tatrman"
+  string default_schema = 3;         // e.g. "dbo"; empty = engine default
+  reserved 4 to 9;
+}
+
+message ExecutionLimits {
+  int64 default_timeout_seconds = 1;
+  int64 max_timeout_seconds = 2;
+  int32 default_batch_size_rows = 3;
+  int32 max_batch_size_rows = 4;
+  int64 max_row_limit = 5;          // 0 = unbounded
+  // Per-cell BLOB/CLOB cap — values exceeding this size cause the row to
+  // be rejected with code "blob_too_large" in messages. MS SQL Worker
+  // default: 8 MB. Configurable per Worker instance.
+  int64 max_blob_bytes_per_cell = 6;
+  reserved 7 to 11;
+}
+
+// =============================================================================
+// GetStatus
+// =============================================================================
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+  bool ready = 1;                   // true once at least one connection pool is initialised
+  int32 active_queries = 2;
+  ConnectionPoolStatus pool = 3;    // aggregate across all configured connections
+  int32 active_sessions = 4;        // 0 for stateless Workers (MS SQL)
+  org.tatrman.meta.v1.OverallStatus overall_status = 5;
+
+  // Per-`connection_id` health. Populated at boot by a `SELECT 1` probe and
+  // refreshed lazily. `connected = false` + `last_error` surfaces DB outages
+  // without forcing the operator to read worker logs.
+  repeated ConnectionStatus connections = 6;
+
+  // Outbound dependencies (translator, etc.). The worker degrades overall_status
+  // to DEGRADED when any dependency is not OK, so operators can see DB-up-but-
+  // translator-down without grepping logs for `UnknownHostException`.
+  repeated org.tatrman.meta.v1.DependencyStatus dependencies = 7;
+
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+  reserved 100 to 104;
+}
+
+message ConnectionPoolStatus {
+  int32 active_connections = 1;
+  int32 idle_connections = 2;
+  int32 max_connections = 3;
+  int32 pending_acquires = 4;
+  reserved 5 to 9;
+}
+
+// Per-`connection_id` view: who we are configured to talk to and whether the
+// last probe could open a real session. `jdbc_url` carries no password — the
+// MSSQL JDBC URL puts `databaseName=…` only; user/pass live separately.
+message ConnectionStatus {
+  string connection_id = 1;
+  string jdbc_url = 2;
+  string database = 3;
+  string default_schema = 4;
+  bool connected = 5;               // last probe succeeded
+  string last_error = 6;            // empty when connected
+  string last_probed = 7;           // ISO-8601, empty if never probed
+  int32 active_connections = 8;
+  int32 idle_connections = 9;
+  int32 max_connections = 10;
+  int32 pending_acquires = 11;
+  reserved 12 to 19;
+}

@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kantheon
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Deployment
+      name: llm-gateway
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: LLM_GATEWAY_SERVER_PORT
+            value: "7280"
+          # Local cluster: the `test` profile uses in-memory H2 (no Postgres
+          # needed) so the pod boots standalone. Upstream LLM calls hit the
+          # placeholder keys; WireMock-backed upstreams are wired in the
+          # separate integration track (Stage 2.5 T4).
+          - name: SPRING_PROFILES_ACTIVE
+            value: test
+          - name: AZURE_OPENAI_API_KEY
+            value: azure-placeholder
+          - name: ANTHROPIC_API_KEY
+            value: anthropic-placeholder
+          - name: OTEL_SERVICE_NAME
+            value: llm-gateway

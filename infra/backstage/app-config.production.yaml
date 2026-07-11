@@ -1,0 +1,48 @@
+app:
+  # Should be the same as backend.baseUrl when using the `app-backend` plugin.
+  baseUrl: ${BACKSTAGE_APP_BASE_URL}
+
+backend:
+  # Note that the baseUrl should be the URL that the browser and other clients
+  # should use when communicating with the backend, i.e. it needs to be
+  # reachable not just from within the backend host, but from all of your
+  # callers. When its value is "http://localhost:7007", it's strictly private
+  # and can't be reached by others.
+  baseUrl: ${BACKSTAGE_BACKEND_BASE_URL}
+  # The listener can also be expressed as a single <host>:<port> string. In this case we bind to
+  # all interfaces, the most permissive setting. The right value depends on your specific deployment.
+  listen:
+    port: 7007
+    host: 0.0.0.0
+  cors:
+      origin: ${BACKSTAGE_APP_BASE_URL}
+  csp:
+    upgrade-insecure-requests: false
+
+auth:
+#  providers:
+#    guest:
+#      dangerouslyAllowOutsideDevelopment: true
+    environment: production
+    session:
+        secret: ${BACKSTAGE_SESSION_SECRET}
+    providers:
+        oidc:
+            production:
+                clientId: ${VITE_KEYCLOAK_BACKSTAGE_CLIENT_ID}
+                clientSecret: ${KEYCLOAK_CLIENT_SECRET}
+                metadataUrl: ${VITE_KEYCLOAK_URL_METADATA}
+                prompt: login
+
+proxy:
+    endpoints:
+        '/agent-starter':
+            target: ${BACKSTAGE_AGENT_STARTER_BASE_URL}
+            changeOrigin: true
+            allowedMethods: ['GET']
+            credentials: dangerously-allow-unauthenticated
+
+agentStarter:
+    baseUrl: ${BACKSTAGE_AGENT_STARTER_BASE_URL}
+
+

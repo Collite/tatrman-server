@@ -1,0 +1,63 @@
+# Default values for nlp-mcp. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# environments (Olymp cluster values, or test-context values) override image, telemetry, and the
+# downstream wiring in extraEnv.
+
+replicaCount: 1
+
+image:
+  repository: nlp-mcp
+  # Defaults to .Chart.appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# nlp-mcp serves its MCP tools over a single HTTP port — the container port AND the service
+# port AND the probe target.
+ports:
+  http: 7272
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+# OpenTelemetry. Reads OTEL_EXPORTER_OTLP_ENDPOINT + the per-service OTEL_ENABLED_NLP_MCP flag.
+# Point `endpoint` at a collector and set enabled; leave disabled where none exists (e.g. test runs).
+telemetry:
+  enabled: false
+  # e.g. http://alloy.observability.svc.cluster.local:4317
+  endpoint: ""
+  serviceName: nlp-mcp
+
+# Downstream wiring. Defaults match Nlp's stable in-cluster service name + HTTP port
+# (env-agnostic — every cluster names them the same). A deploying env REPLACES this list to retarget.
+extraEnv:
+  - { name: NLP_HTTP_HOST, value: "nlp" }
+  - { name: NLP_HTTP_PORT, value: "7270" }
+  # capabilities-mcp registration endpoint (the query-path registry). For the three wrappers whose
+  # application.conf lacks a capabilities-mcp{} default block, this env is REQUIRED — without it
+  # registerWithCapabilities() throws ConfigException at boot.
+  - { name: CAPABILITIES_MCP_URL, value: "http://capabilities-mcp:7501" }
+
+# Probes (HTTP on the http port).
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 2
+  periodSeconds: 3
+  failureThreshold: 20
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

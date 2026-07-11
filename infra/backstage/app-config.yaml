@@ -1,0 +1,175 @@
+app:
+    title: Kantheon Developer Portal
+    baseUrl: ${BACKSTAGE_APP_BASE_URL}
+
+organization:
+    name: Kantheon
+
+backend:
+    # Used for enabling authentication, secret is shared by all backend plugins
+    # See https://backstage.io/docs/auth/service-to-service-auth for
+    # information on the format
+    # auth:
+    #   keys:
+    #     - secret: ${BACKEND_SECRET}
+    baseUrl: ${BACKSTAGE_BACKEND_BASE_URL}
+    listen:
+        port: 7007
+        host: 0.0.0.0
+        # Uncomment the following host directive to bind to specific interfaces
+        # host: 127.0.0.1
+    csp:
+        connect-src: [ "'self'", 'http:', 'https:' ]
+        upgrade-insecure-requests: false
+        # Content-Security-Policy directives follow the Helmet format: https://helmetjs.github.io/#reference
+        # Default Helmet Content-Security-Policy values can be removed by setting the key to false
+    cors:
+        origin: ${BACKSTAGE_APP_BASE_URL}
+        methods: [ GET, HEAD, PATCH, POST, PUT, DELETE ]
+        credentials: true
+    # This is for local development only, it is not recommended to use this in production
+    # The production database configuration is stored in app-config.production.yaml
+    database:
+        client: pg
+        connection:
+            host: ${BACKSTAGE_DB_HOST}
+            port: ${BACKSTAGE_DB_PORT}
+            user: ${BACKSTAGE_DB_USER}
+            password: ${BACKSTAGE_DB_PASSWORD}
+            database: ${BACKSTAGE_DB}
+                # ssl: { rejectUnauthorized: false } # Uncomment if using Azure Database for PostgreSQL
+    # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
+auth:
+    #  providers:
+    #    guest:
+    #      dangerouslyAllowOutsideDevelopment: true
+    environment: production
+    session:
+        secret: ${BACKSTAGE_SESSION_SECRET}
+    providers:
+        oidc:
+            production:
+                clientId: ${VITE_KEYCLOAK_BACKSTAGE_CLIENT_ID}
+                clientSecret: ${KEYCLOAK_CLIENT_SECRET}
+                metadataUrl: ${VITE_KEYCLOAK_URL_METADATA}
+                prompt: login
+
+
+integrations:
+    github:
+        -   host: github.com
+            # This is a Personal Access Token or PAT from GitHub. You can find out how to generate this token, and more information
+            # about setting up the GitHub integration here: https://backstage.io/docs/integrations/github/locations#configuration
+            token: ${GITHUB_TOKEN}
+        ### Example for how to add your GitHub Enterprise instance using the API:
+        # - host: ghe.example.net
+        #   apiBaseUrl: https://ghe.example.net/api/v3
+        #   token: ${GHE_TOKEN}
+
+proxy:
+### Example for how to add a proxy endpoint for the frontend.
+### A typical reason to do this is to handle HTTPS and CORS for internal services.
+# endpoints:
+#   '/test':
+#     target: 'https://example.com'
+#     changeOrigin: true
+    endpoints:
+        '/agent-starter':
+            target: ${BACKSTAGE_AGENT_STARTER_BASE_URL}
+            changeOrigin: true
+            allowedMethods: ['GET']
+            credentials: dangerously-allow-unauthenticated
+
+# Reference documentation http://backstage.io/docs/features/techdocs/configuration
+# Note: After experimenting with basic setup, use CI/CD to generate docs
+# and an external cloud storage when deploying TechDocs for production use-case.
+# https://backstage.io/docs/features/techdocs/how-to-guides#how-to-migrate-from-techdocs-basic-to-recommended-deployment-approach
+techdocs:
+    builder: 'local' # Alternatives - 'external'
+    generator:
+        runIn: 'local' # Alternatives - 'local'
+    publisher:
+        type: 'local' # Alternatives - 'googleGcs' or 'awsS3'. Read documentation for using alternatives.
+
+#auth:
+#    # see https://backstage.io/docs/auth/ to learn about auth providers
+#    providers:
+#        # See https://backstage.io/docs/auth/guest/provider
+#        guest: { }
+
+scaffolder:
+# see https://backstage.io/docs/features/software-templates/configuration for software template options
+
+catalog:
+    import:
+        entityFilename: catalog-info.yaml
+        pullRequestBranchName: backstage-integration
+    rules:
+        -   allow: [ Component, System, API, Resource, Location, Template, Group, User ]
+    locations:
+        # The Kantheon constellation catalog (fork Phase 5 Stage 5.5) — the pantheon entities
+        # (agents, platform services, the Dispatchs workers, MCP wrappers, technical-wave infra).
+        # Replaces the upstream example catalog. Path is relative to the backend CWD.
+        -   type: file
+            target: ../../examples/kantheon-catalog.yaml
+            rules:
+                -   allow: [ Component, System, Group ]
+
+        # Local example data, file locations are relative to the backend process, typically `packages/backend`
+#        -   type: file
+#            target: ../../examples/entities.yaml
+
+        # Link to the monorepo services
+        # We use a glob pattern to import all catalog-info.yaml files from docs/services
+        # Note: Backstage unfortunately doesn't support globs in `locations` directly for file type in all versions well,
+        # or it might be relative to the running dir.
+        # The best practice for monorepos is often to have a central `all.yaml` or discovery.
+        # However, let's try to add specific locations for now or use a discovery processor if available.
+        # For simplicity, I will explicitly list the locations I am about to create, or use a relative path that works.
+        # Relative paths in `app-config.yaml` are relative to the CWD when running the backend.
+        # PRO TIP: create a location that points to a file that includes others.
+
+        # Central location for all documentation
+        -   type: file
+            target: ${BACKSTAGE_CATALOG_DIR}/all-locations.yaml
+            rules:
+                -   allow: [ Component, System, API, Resource, Location, Group, User, Template ]
+
+        # Agent Starter template
+        -   type: file
+            target: templates/agent-starter/template.yaml
+            rules:
+                -   allow: [ Template ]
+
+#        # Local example template
+#        -   type: file
+#            target: ../../examples/template/template.yaml
+#            rules:
+#                -   allow: [ Template ]
+#
+#        # Local example organizational data
+#        -   type: file
+#            target: ../../examples/org.yaml
+#            rules:
+#                -   allow: [ User, Group ]
+
+        ## Uncomment these lines to add more example data
+        # - type: url
+        #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
+
+        ## Uncomment these lines to add an example org
+        # - type: url
+        #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/acme-corp.yaml
+        #   rules:
+        #     - allow: [User, Group]
+
+agentStarter:
+    baseUrl: ${BACKSTAGE_AGENT_STARTER_BASE_URL}
+
+kubernetes:
+# see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
+
+# see https://backstage.io/docs/permissions/getting-started for more on the permission framework
+permission:
+    # setting this to `false` will disable permissions
+    enabled: false

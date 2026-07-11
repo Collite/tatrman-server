@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kantheon
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Deployment
+      name: nlp-mcp
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: MCP_NLP_SERVER_PORT
+            value: "7272"
+          # Local cluster: point at the nlp service's port-forward
+          # (`kubectl port-forward svc/nlp 7270:7270`).
+          - name: NLP_HTTP_HOST
+            value: localhost
+          - name: NLP_HTTP_PORT
+            value: "7270"
+          - name: OTEL_SERVICE_NAME
+            value: nlp-mcp
+          - name: OTEL_ENABLED_NLP_MCP
+            value: "false"
