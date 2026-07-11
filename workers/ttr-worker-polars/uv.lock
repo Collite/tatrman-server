@@ -1481,7 +1481,7 @@ wheels = [
 ]
 
 [[package]]
-name = "workers-steropes"
+name = "workers-polars"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

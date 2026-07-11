@@ -7,16 +7,16 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir uv==0.5.*
 
-COPY workers/steropes/pyproject.toml workers/steropes/uv.lock workers/steropes/README.md /app/workers/steropes/
+COPY workers/ttr-worker-polars/pyproject.toml workers/ttr-worker-polars/uv.lock workers/ttr-worker-polars/README.md /app/workers/ttr-worker-polars/
 COPY shared /app/shared
 
-WORKDIR /app/workers/steropes
+WORKDIR /app/workers/ttr-worker-polars
 
 RUN uv sync --frozen --no-dev
 
-COPY workers/steropes/src /app/workers/steropes/src
-COPY workers/steropes/conf /app/workers/steropes/conf
+COPY workers/ttr-worker-polars/src /app/workers/ttr-worker-polars/src
+COPY workers/ttr-worker-polars/conf /app/workers/ttr-worker-polars/conf
 
 EXPOSE 7300 7301
 
-CMD ["uv", "run", "python", "-m", "workers_steropes.main"]
+CMD ["uv", "run", "python", "-m", "workers_polars.main"]

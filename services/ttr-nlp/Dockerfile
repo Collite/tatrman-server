@@ -1,4 +1,4 @@
-# Kadmos (NLP foundation) — multi-stage Dockerfile.
+# ttr-nlp (NLP foundation service; formerly Kadmos) — multi-stage Dockerfile.
 #
 # Image-size / build-time strategy (the Metis/prophet "cached base layer"
 # pattern — metis/architecture.md §2 container row): the NLP engine models
@@ -10,7 +10,7 @@
 # model is bundled for them.
 #
 # Build from the repo root so the uv path-deps (../../shared/...) resolve:
-#   docker build -t kadmos:dev -f services/kadmos/Dockerfile .   (== `just deploy-py services/kadmos`)
+#   docker build -t ttr-nlp:dev -f services/ttr-nlp/Dockerfile .
 
 FROM python:3.13-slim-bookworm AS base
 
@@ -33,20 +33,20 @@ FROM base AS deps
 # *within* the workspace root. uv refuses to normalize paths that escape
 # the project root, so the project must live at the same depth as in the
 # source repo.
-WORKDIR /build/services/kadmos
+WORKDIR /build/services/ttr-nlp
 
 # Copy local path dependencies (shared libs) so uv can resolve them
 COPY shared/libs/python/otel-config /build/shared/libs/python/otel-config
 COPY shared/proto/build/python-package /build/shared/proto/build/python-package
 
-COPY services/kadmos/pyproject.toml services/kadmos/uv.lock ./
+COPY services/ttr-nlp/pyproject.toml services/ttr-nlp/uv.lock ./
 RUN pip install --upgrade pip && pip install uv && uv sync --frozen
 
 # ===== model download layer (the cached base — see header) =====
 FROM deps AS models
 
 # Use the uv-managed venv so `stanza`, `spacy`, etc. are importable.
-ENV PATH="/build/services/kadmos/.venv/bin:${PATH}"
+ENV PATH="/build/services/ttr-nlp/.venv/bin:${PATH}"
 
 # Create model directory
 RUN mkdir -p /opt/nlp-models/stanza
@@ -85,7 +85,7 @@ WORKDIR /app
 # under /build/shared/..., so we must preserve that tree at runtime too.
 USER root
 COPY --from=deps /usr/local /usr/local
-COPY --from=deps /build/services/kadmos/.venv /build/services/kadmos/.venv
+COPY --from=deps /build/services/ttr-nlp/.venv /build/services/ttr-nlp/.venv
 COPY --from=deps /build/shared /build/shared
 
 # Copy pre-downloaded models and hand them to appuser. Stanza's Pipeline()
@@ -101,17 +101,17 @@ ENV STANZA_RESOURCES_DIR=/opt/nlp-models/stanza
 USER appuser
 
 # Copy app source
-COPY --chown=appuser:appuser services/kadmos/pyproject.toml services/kadmos/README.md ./
-COPY --chown=appuser:appuser services/kadmos/src ./src
-COPY --chown=appuser:appuser services/kadmos/config.yaml ./
+COPY --chown=appuser:appuser services/ttr-nlp/pyproject.toml services/ttr-nlp/README.md ./
+COPY --chown=appuser:appuser services/ttr-nlp/src ./src
+COPY --chown=appuser:appuser services/ttr-nlp/config.yaml ./
 
 # Environment variables
 # Prepend the uv-managed venv so its site-packages (which contain the
 # editable installs of the shared libs) are picked up at runtime.
-ENV PATH="/build/services/kadmos/.venv/bin:${PATH}"
+ENV PATH="/build/services/ttr-nlp/.venv/bin:${PATH}"
 ENV PYTHONPATH=/app/src
 ENV CONFIG_FILE=/app/config.yaml
-ENV KADMOS_SERVICE_OTEL_PROTOCOL=grpc
+ENV NLP_SERVICE_OTEL_PROTOCOL=grpc
 
 # Networking and health
 EXPOSE ${UVICORN_PORT:-7270}
@@ -123,4 +123,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
 # Uvicorn startup
 ENV UVICORN_HOST=0.0.0.0
 ENV UVICORN_PORT=7270
-CMD ["sh", "-c", "exec uvicorn kadmos_service.api.routes:app --host ${UVICORN_HOST:-0.0.0.0} --port ${UVICORN_PORT:-7270}"]
+CMD ["sh", "-c", "exec uvicorn nlp_service.api.routes:app --host ${UVICORN_HOST:-0.0.0.0} --port ${UVICORN_PORT:-7270}"]
