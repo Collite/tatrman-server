@@ -1,0 +1,203 @@
+name: Release Image (GHCR)
+
+# Build a moved-spine module's container image and push it to GitHub Container
+# Registry (ghcr.io/collite/<module>:<version>). Cloned shape from kantheon's
+# release-image.yml (SV-P0 S6 T1), retargeted to tatrman-server's module layout
+# with the N1 rename folded in: image repository names are publish-adjacent, so
+# they use FUNCTIONAL names (ttr-query, ttr-validate, …) per the J-v2 guardrail —
+# personas are legal only in Helm *release* names + k8s labels, NOT image repos.
+# `veles` is a SURVIVING persona and keeps its name.
+#
+# DORMANT THROUGH SV-P0: rename-before-publish is the phase invariant (plan
+# §SV-P0) — nothing is published to any registry in SV-P0. This workflow only
+# fires on a pushed `<module>/v*` tag or a manual dispatch; no such tag is pushed
+# in SV-P0. Spine images publish for real at SV-P1 gate 3, at which point the
+# Python lane's known Dockerfile breakage (see ⚑ below) must be fixed first.
+#
+# ⚑ KNOWN PRE-EXISTING GAP (S4 sweep blind spot, recorded in S6 findings): the
+# Python Dockerfiles still COPY the old persona dir paths — services/ttr-nlp
+# COPYs `services/kadmos/...`, workers/ttr-worker-polars COPYs `workers/steropes/...`
+# — and ttr-nlp's uv.lock still carries `kadmos-service`. The Python lane below is
+# structurally correct but will fail until those paths are renamed + uv.lock
+# regenerated (SV-P1 image-publish work).
+#
+# Two triggers:
+#   1. push of a per-module tag `<module>/v<X.Y.Z>` (e.g. `ttr-query/v0.9.0`)
+#      -> builds just that module at that version.
+#   2. workflow_dispatch -> pick a version and `all` or a space-separated subset.
+#
+# Lane is auto-detected from the module directory:
+#   Kotlin (has build.gradle.kts, no pyproject) -> Jib (./gradlew :path:jib, multi-arch via CI=true)
+#   Python (has pyproject.toml)                  -> Docker build with repo-root context (COPY shared/)
+#
+# Secrets:
+#   GITHUB_TOKEN           - provided automatically; GHCR push + reading Collite/tatrman TTR packages.
+#   TATRMAN_PKG_USER/TOKEN - optional; set if GITHUB_TOKEN cannot read the Collite/tatrman
+#                            GitHub Packages (org.tatrman:ttr-*, needed by Veles + Translate).
+
+on:
+  push:
+    tags:
+      - '*/v*'            # per-module image tags
+      - '!shared/v*'      # shared libs are Maven artifacts, not images
+      - '!shared-proto/v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (no leading v), e.g. 0.9.0'
+        required: true
+        default: '0.9.0'
+      modules:
+        description: '"all" for every deployable module, or a space-separated list (e.g. "ttr-query veles")'
+        required: true
+        default: 'all'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_ORG: collite
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Exact name -> buildable path map for the deployable (k8s-overlay) set.
+          # Names are the FUNCTIONAL image-repo names (== directory basenames);
+          # veles is a surviving persona and stays veles.
+          declare -A PATHS=(
+            [veles]=services/veles
+            [ttr-query]=services/ttr-query
+            [ttr-translate]=services/ttr-translate
+            [ttr-validate]=services/ttr-validate
+            [ttr-dispatch]=services/ttr-dispatch
+            [ttr-fuzzy]=services/ttr-fuzzy
+            [ttr-llm-gateway]=services/ttr-llm-gateway
+            [ttr-nlp]=services/ttr-nlp
+            [ttr-meta-mcp]=tools/ttr-meta-mcp
+            [ttr-query-mcp]=tools/ttr-query-mcp
+            [ttr-fuzzy-mcp]=tools/ttr-fuzzy-mcp
+            [ttr-nlp-mcp]=tools/ttr-nlp-mcp
+            [ttr-worker-postgres]=workers/ttr-worker-postgres
+            [ttr-worker-mssql]=workers/ttr-worker-mssql
+            [ttr-worker-polars]=workers/ttr-worker-polars
+            [ttr-identity]=infra/ttr-identity
+            [health]=infra/health
+          )
+          ALL="veles ttr-query ttr-translate ttr-validate ttr-dispatch ttr-fuzzy ttr-llm-gateway ttr-nlp ttr-meta-mcp ttr-query-mcp ttr-fuzzy-mcp ttr-nlp-mcp ttr-worker-postgres ttr-worker-mssql ttr-worker-polars ttr-identity health"
+
+          declare -a NAMES
+          if [ "${{ github.event_name }}" = "push" ]; then
+            REF="${{ github.ref_name }}"
+            NAME=$(echo "$REF" | rev | cut -d'/' -f2- | rev)
+            VERSION=$(echo "$REF" | rev | cut -d'/' -f1 | rev | sed 's/^v//')
+            NAMES=("$NAME")
+          else
+            VERSION="${{ github.event.inputs.version }}"
+            if [ "${{ github.event.inputs.modules }}" = "all" ]; then
+              read -r -a NAMES <<< "$ALL"
+            else
+              read -r -a NAMES <<< "${{ github.event.inputs.modules }}"
+            fi
+          fi
+
+          ENTRIES=()
+          for n in "${NAMES[@]}"; do
+            [ -z "$n" ] && continue
+            P="${PATHS[$n]:-}"
+            if [ -z "$P" ]; then
+              P=$(find services workers tools infra -maxdepth 3 -type d -name "$n" -print -quit 2>/dev/null || true)
+            fi
+            if [ -z "$P" ] || [ ! -d "$P" ]; then
+              echo "::error::could not resolve a buildable path for module '$n'"
+              exit 1
+            fi
+            ENTRIES+=("{\"name\":\"$n\",\"path\":\"$P\",\"version\":\"$VERSION\"}")
+          done
+
+          MATRIX="{\"include\":[$(IFS=,; echo "${ENTRIES[*]}")]}"
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Planned build matrix:"; echo "$MATRIX"
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Detect lane
+        id: lane
+        shell: bash
+        run: |
+          set -euo pipefail
+          P="${{ matrix.path }}"
+          if [ -f "$P/pyproject.toml" ]; then LANE=python
+          else LANE=kotlin; fi
+          echo "lane=$LANE" >> "$GITHUB_OUTPUT"
+          echo "Module ${{ matrix.name }} ($P) -> $LANE @ ${{ matrix.version }}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Both lanes need auth to the Collite/tatrman GitHub Packages repo (the TTR
+      # toolchain org.tatrman:ttr-*; the Kotlin jib compile and the Python proto
+      # prep both resolve it). GITHUB_TOKEN is not auto-exported to env.
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '21' }
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Gradle auth for Collite/tatrman (TTR toolchain)
+        env:
+          GPR_USER: ${{ secrets.TATRMAN_PKG_USER != '' && secrets.TATRMAN_PKG_USER || github.actor }}
+          GPR_TOKEN: ${{ secrets.TATRMAN_PKG_TOKEN != '' && secrets.TATRMAN_PKG_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ~/.gradle
+          printf 'gpr.user=%s\ngpr.token=%s\n' "$GPR_USER" "$GPR_TOKEN" >> ~/.gradle/gradle.properties
+
+      # ---------- Kotlin (Jib) ----------
+      - name: Build & push (Jib)
+        if: steps.lane.outputs.lane == 'kotlin'
+        env:
+          CI: 'true'   # build files use this to emit a multi-arch (amd64+arm64) manifest
+        run: |
+          set -euo pipefail
+          GRADLE_MODULE=":$(echo "${{ matrix.path }}" | sed 's#/#:#g')"
+          ./gradlew "${GRADLE_MODULE}:jib" --no-configuration-cache \
+            -Djib.to.image="${REGISTRY}/${IMAGE_ORG}/${{ matrix.name }}:${{ matrix.version }}" \
+            -Djib.to.auth.username="${{ github.actor }}" \
+            -Djib.to.auth.password="${{ secrets.GITHUB_TOKEN }}"
+
+      # ---------- Python (Docker, repo-root context) ----------
+      - uses: actions/setup-python@v6
+        if: steps.lane.outputs.lane == 'python'
+        with: { python-version: '3.13' }
+      - name: Install uv
+        if: steps.lane.outputs.lane == 'python'
+        run: pip install uv
+      - name: Build & push (Python Docker)
+        if: steps.lane.outputs.lane == 'python'
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMG="${REGISTRY}/${IMAGE_ORG}/${{ matrix.name }}:${{ matrix.version }}"
+          # The shared-proto Python package is COPYed by the Dockerfile from
+          # shared/proto/build/python-package — generate it first.
+          ./gradlew :shared:proto:preparePythonPackage --no-configuration-cache
+          # Repo-root context: the Dockerfile COPYs shared/ and services/<x> from root.
+          docker build -f "${{ matrix.path }}/Dockerfile" -t "$IMG" .
+          docker push "$IMG"
