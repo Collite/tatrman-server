@@ -106,7 +106,9 @@ val publishableLibs =
         ":shared:libs:kotlin:keycloak-auth",
         ":shared:libs:kotlin:ttr-meta-client",
         ":shared:libs:kotlin:ttr-llm-client",
-        ":shared:libs:kotlin:capabilities-client",
+        // capabilities-client TRIMMED at SV-P1 S2 (2026-07-11): no external consumer
+        // (kantheon keeps its own copy; nothing published depends on it). Publishing it
+        // would be a maintenance promise with no taker — re-add here if a consumer appears.
     )
 subprojects {
     if (path !in publishableLibs) return@subprojects
@@ -119,6 +121,15 @@ subprojects {
                     // group inherited (org.tatrman); version inherited; artifactId = project.name,
                     // except shared/proto whose bare name "proto" is too generic a coordinate.
                     if (project.path == ":shared:proto") artifactId = "ttr-server-proto"
+                    pom {
+                        url.set("https://github.com/Collite/tatrman-server")
+                        licenses {
+                            license {
+                                name.set("Apache-2.0")
+                                url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                            }
+                        }
+                    }
                 }
             }
             repositories {

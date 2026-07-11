@@ -1,0 +1,78 @@
+name: Publish server libraries (GH Packages)
+
+# Publishes the moved shared libs + proto stubs (org.tatrman:*) that kantheon
+# consumes, to GitHub Packages `Collite/tatrman-server` (RO-17: GH Packages =
+# staging registry). Tag-driven, mirroring tatrman's publish.yml.
+#
+# Tag → set:
+#   server-libs/v<x.y.z>   the 11-module library set (SV-P1 S2 T1 audit):
+#     ttr-server-proto · otel-config · logging-config · ktor-configurator ·
+#     db-common · data-formatter · fuzzy-common · whois-common · keycloak-auth ·
+#     ttr-meta-client · ttr-llm-client
+#   (capabilities-client trimmed — no external consumer; see build.gradle.kts.)
+#
+# Version comes from the tag via -Ptatrman-server.version (the build reads that
+# gradle property, NOT -Pversion). RO-24: never re-cut an existing version.
+
+on:
+  push:
+    tags:
+      - 'server-libs/v*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # The publish path MUST NOT be reachable with a red gate (T3). Re-runs the two
+  # enforcing checks from ci.yml (persona grep gate + P2/RO-6 dependency rules).
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: enforce no retired personas on wire/build surfaces
+        run: |
+          matches=$(grep -rn -iE 'ariadne|theseus|proteus|argos\b|kyklop|\barges\b|brontes|steropes|echo\b|kadmos|prometheus' \
+            --include='*.proto' --include='*.kt' --include='*.kts' --include='*.py' --include='*.conf' \
+            --include='*.yaml' --include='*.toml' --include='Dockerfile*' . \
+            | grep -viE 'CHANGELOG|docs/|history|lore|Forked 2026|formerly|_to_delete' \
+            | grep -viE 'PrometheusMeterRegistry|PrometheusConfig|PrometheusHealthCheck|prometheus\.io|:9090|/metrics|actuator|micrometer|registry.prometheus|MeterRegistry|prometheus (meter|call|scrape|registry|endpoint)|monitoring|include:.*prometheus' \
+            | grep -viE 'prometheusUrl|hasPath\("prometheus|getConfig\("prometheus|config\.prometheus|"prometheus" ->|prometheus \{|PromQL|prometheus-client|prometheus_client|prometheus-jvm|prometheus - Prom' \
+            | grep -viE '"prometheus",|Prometheus (metrics|exposition)|the fabric-infra estate' \
+            || true)
+          if [ -n "$matches" ]; then
+            echo "::error::retired persona strings on a wire/build surface — publish blocked (naming ledger §5):"
+            echo "$matches" | head -50
+            exit 1
+          else
+            echo "grep-gate: clean"
+          fi
+      - name: check dependency rules (P2/RO-6)
+        run: bash scripts/check-dependency-rules.sh
+
+  publish:
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Resolve version from tag
+        id: ver
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "version=${TAG##*/v}" >> "$GITHUB_OUTPUT"
+          echo "Publishing server libraries version ${TAG##*/v}"
+
+      - name: Publish to GH Packages
+        run: ./gradlew --no-configuration-cache -Ptatrman-server.version=${{ steps.ver.outputs.version }} publish
+        env:
+          # Read the org.tatrman:ttr-* toolchain (Collite/tatrman) to compile the
+          # libs, AND write the org.tatrman:* libs to Collite/tatrman-server.
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
