@@ -2,7 +2,7 @@ apiVersion: v2
 name: backstage
 description: |
   The Kantheon developer portal (Backstage — a Node app, NOT an nginx/Vue SPA) — an
-  env-agnostic Helm chart. Uses the kantheon-service library's BACKEND Deployment/Service
+  env-agnostic Helm chart. Uses the ttr-service library's BACKEND Deployment/Service
   shape (single HTTP port) plus a Gateway API HTTPRoute for external exposure. Holds no
   cluster knowledge: image, replicas, resources, the app/backend base URLs, the Postgres
   wiring and the Keycloak OIDC client are all values (secrets via secretKeyRef). The
@@ -11,9 +11,9 @@ description: |
 type: application
 version: 0.1.0
 appVersion: "dev"
-# Backend Deployment/Service shape from the kantheon-service library chart (D1);
+# Backend Deployment/Service shape from the ttr-service library chart (D1);
 # the FE-family configmap is not used (Backstage reads env directly).
 dependencies:
-  - name: kantheon-service
+  - name: ttr-service
     version: 0.1.0
-    repository: "file://../../../shared/charts/kantheon-service"
+    repository: "file://../../../shared/charts/ttr-service"

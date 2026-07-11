@@ -10,8 +10,8 @@ type: application
 # Chart version: the packaging. appVersion tracks the default image tag.
 version: 0.1.0
 appVersion: "dev"
-# Common Deployment/Service shape from the kantheon-service library chart (D1).
+# Common Deployment/Service shape from the ttr-service library chart (D1).
 dependencies:
-  - name: kantheon-service
+  - name: ttr-service
     version: 0.1.0
-    repository: "file://../../../shared/charts/kantheon-service"
+    repository: "file://../../../shared/charts/ttr-service"
