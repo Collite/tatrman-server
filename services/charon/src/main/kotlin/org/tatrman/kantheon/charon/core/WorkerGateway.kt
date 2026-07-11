@@ -4,9 +4,9 @@ import org.apache.arrow.memory.BufferAllocator
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.ipc.ArrowReader
 import org.apache.arrow.vector.types.pojo.Schema
-import org.tatrman.charon.v1.DescribeResult
-import org.tatrman.charon.v1.EvictResult
-import org.tatrman.charon.v1.WorkerKind
+import org.tatrman.transfer.v1.DescribeResult
+import org.tatrman.transfer.v1.EvictResult
+import org.tatrman.transfer.v1.WorkerKind
 
 /**
  * The worker-edge SPI (charon/plan.md §5 Stage 3.1). A [WorkerGateway] talks to
@@ -15,13 +15,13 @@ import org.tatrman.charon.v1.WorkerKind
  * (PD-5 liveness), and [evict] it.
  *
  * Both engines now expose the **full** workspace surface (the worker-arc
- * `ImportDataFrame`/`DropWorkspaceEntry` RPCs landed on `worker.v1`/Steropes at
+ * `ImportDataFrame`/`DropWorkspaceEntry` RPCs landed on `worker.v1`/Polars at
  * the Charon Stage 3.1 closeout, 2026-06-26):
  *
  *   - **METIS** (`org.tatrman.metis.v1.MetisService`) — `ImportDataFrame`
  *     (client-stream), `ExportDataFrame` (server-stream), `DropWorkspaceEntry`.
  *     [MetisWorkerGateway]. Pythia 4.2's "Charon stages a handle → Metis session DF".
- *   - **POLARS / Steropes** (`org.tatrman.worker.v1.WorkerService`) —
+ *   - **POLARS / Polars** (`org.tatrman.worker.v1.WorkerService`) —
  *     `ImportDataFrame` (stage-in), `Execute` over a `WorkspaceRef` (scan-out),
  *     `DropWorkspaceEntry` (evict). [PolarsWorkerGateway]. Pythia 4.1's
  *     "Charon stages data into a Polars-Worker session DataFrame via Stage".
@@ -61,7 +61,7 @@ interface WorkerGateway {
     ): DescribeResult
 
     /** Drop the session DataFrame. @throws WorkerOpUnsupportedException for
-     *  engines without a drop RPC (POLARS/Steropes at v1). */
+     *  engines without a drop RPC (POLARS/Polars at v1). */
     fun evict(
         sessionId: String,
         dfName: String,
@@ -75,7 +75,7 @@ interface WorkerGatewayFactory {
     fun forKind(kind: WorkerKind): WorkerGateway?
 }
 
-/** The engine has no RPC for this operation (e.g. POLARS/Steropes stage-in or
+/** The engine has no RPC for this operation (e.g. POLARS/Polars stage-in or
  *  evict at v1). The executor maps it to `UNIMPLEMENTED` with a message naming
  *  the gap, so a caller gets a clear "this engine can't do that yet" rather
  *  than a silent failure. */

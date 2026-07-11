@@ -5,7 +5,7 @@ import io.grpc.ManagedChannelBuilder
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import org.slf4j.LoggerFactory
-import org.tatrman.charon.v1.WorkerKind
+import org.tatrman.transfer.v1.WorkerKind
 import org.tatrman.kantheon.charon.core.WorkerGateway
 import org.tatrman.kantheon.charon.core.WorkerGatewayFactory
 import org.tatrman.metis.v1.MetisServiceGrpcKt
@@ -17,11 +17,11 @@ private val log = LoggerFactory.getLogger(GrpcWorkerGatewayFactory::class.java)
  * Production [WorkerGatewayFactory] — builds one gRPC channel + gateway per
  * engine from `target` addresses (`host:port`), lazily on first use.
  *
- * `polarsTarget` → [PolarsWorkerGateway] over `worker.v1` (Steropes);
+ * `polarsTarget` → [PolarsWorkerGateway] over `worker.v1` (Polars);
  * `metisTarget` → [MetisWorkerGateway] over `metis.v1`. A `null` target means
  * that engine isn't wired on this pod (the factory returns `null`, and the
  * executor surfaces `WorkerEngineUnavailable`). Channels use the same
- * plaintext + keep-alive idiom as kyklop's `WorkerClient`.
+ * plaintext + keep-alive idiom as dispatch's `WorkerClient`.
  */
 class GrpcWorkerGatewayFactory(
     private val polarsTarget: String? = null,

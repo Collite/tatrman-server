@@ -13,9 +13,9 @@ import org.apache.arrow.memory.BufferAllocator
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.ipc.ArrowReader
 import org.apache.arrow.vector.types.pojo.Schema
-import org.tatrman.charon.v1.DescribeResult
-import org.tatrman.charon.v1.EvictResult
-import org.tatrman.charon.v1.WorkerKind
+import org.tatrman.transfer.v1.DescribeResult
+import org.tatrman.transfer.v1.EvictResult
+import org.tatrman.transfer.v1.WorkerKind
 import org.tatrman.kantheon.charon.core.Integrity
 import org.tatrman.kantheon.charon.core.WorkerDfNotFoundException
 import org.tatrman.kantheon.charon.core.WorkerGateway
@@ -29,7 +29,7 @@ import org.tatrman.worker.v1.ImportHeader
 import org.tatrman.worker.v1.WorkerServiceGrpcKt
 
 /**
- * The POLARS / Steropes worker gateway (charon/plan.md §5 Stage 3.1) over
+ * The POLARS / Polars worker gateway (charon/plan.md §5 Stage 3.1) over
  * `org.tatrman.worker.v1.WorkerService`. Full parity with the METIS path since
  * the worker-arc `ImportDataFrame`/`DropWorkspaceEntry` RPCs landed (Charon
  * Stage 3.1 closeout, 2026-06-26):

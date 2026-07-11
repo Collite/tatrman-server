@@ -64,9 +64,9 @@ tasks.register<JavaExec>("bench") {
 dependencies {
     // Shared libs (in-repo; AGENTS.md §5 — every shared dep is a project ref).
     implementation(project(":shared:proto"))
-    implementation(project(":shared:libs:kotlin:ktor-configurator"))
-    implementation(project(":shared:libs:kotlin:otel-config"))
-    implementation(project(":shared:libs:kotlin:logging-config"))
+    implementation(libs.tatrman.ktor.configurator)
+    implementation(libs.tatrman.otel.config)
+    implementation(libs.tatrman.logging.config)
 
     // Kotlin / coroutines / serialization
     implementation(libs.kotlin.stdlib)
@@ -90,7 +90,7 @@ dependencies {
     implementation(libs.logback.classic)
 
     // gRPC — kantheon idiom: NettyServerBuilder direct (charon/architecture.md §2 +
-    // ariadne Application.kt precedent). gRPC-Java + gRPC-Kotlin are both
+    // veles Application.kt precedent). gRPC-Java + gRPC-Kotlin are both
     // available via the proto module's `grpc-stub` / `grpc-kotlin-stub` transitives.
     implementation(libs.grpc.stub)
     implementation(libs.grpc.protobuf)

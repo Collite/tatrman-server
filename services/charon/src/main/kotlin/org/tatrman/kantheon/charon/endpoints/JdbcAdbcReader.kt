@@ -4,7 +4,7 @@ import java.sql.SQLException
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.ipc.ArrowReader
 import org.slf4j.LoggerFactory
-import org.tatrman.charon.v1.DescribeResult
+import org.tatrman.transfer.v1.DescribeResult
 import org.tatrman.kantheon.charon.core.AdbcReader
 import org.tatrman.kantheon.charon.core.ConnectionHandle
 import org.tatrman.kantheon.charon.core.DbConnectionProvider

@@ -15,7 +15,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType
 import org.apache.arrow.vector.types.pojo.Field
 import org.apache.arrow.vector.types.pojo.FieldType
 import org.apache.arrow.vector.types.pojo.Schema
-import org.tatrman.charon.v1.Location
+import org.tatrman.transfer.v1.Location
 import org.tatrman.kantheon.charon.core.ArrowPipe
 import org.tatrman.kantheon.charon.core.Either
 import org.tatrman.kantheon.charon.core.LocationKind

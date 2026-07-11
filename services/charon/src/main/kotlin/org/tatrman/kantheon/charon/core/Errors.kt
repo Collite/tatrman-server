@@ -208,7 +208,7 @@ sealed class CharonError(
             grpcStatusCode = Code.DEADLINE_EXCEEDED,
         )
 
-    /** A worker engine has no RPC for the requested op (POLARS/Steropes
+    /** A worker engine has no RPC for the requested op (POLARS/Polars
      *  stage-in or evict at v1 — `worker.v1` has no Arrow-ingest / drop RPC).
      *  `UNIMPLEMENTED` per contracts §1 — names the engine + op + the gap. */
     data class WorkerOpUnsupported(

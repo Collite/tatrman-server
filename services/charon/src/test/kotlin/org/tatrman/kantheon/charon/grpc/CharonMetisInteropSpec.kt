@@ -3,11 +3,11 @@ package org.tatrman.kantheon.charon.grpc
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.SeaweedBlob
-import org.tatrman.charon.v1.StageRequest
-import org.tatrman.charon.v1.WorkerKind
-import org.tatrman.charon.v1.WorkerSessionDf
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.SeaweedBlob
+import org.tatrman.transfer.v1.StageRequest
+import org.tatrman.transfer.v1.WorkerKind
+import org.tatrman.transfer.v1.WorkerSessionDf
 import org.tatrman.kantheon.charon.core.MovePlanner
 import org.tatrman.kantheon.charon.core.Planned
 

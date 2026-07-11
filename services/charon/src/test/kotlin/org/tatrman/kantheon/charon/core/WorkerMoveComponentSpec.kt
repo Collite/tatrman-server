@@ -18,12 +18,12 @@ import org.apache.arrow.vector.types.pojo.ArrowType
 import org.apache.arrow.vector.types.pojo.Field
 import org.apache.arrow.vector.types.pojo.FieldType
 import org.apache.arrow.vector.types.pojo.Schema
-import org.tatrman.charon.v1.Location
-import org.tatrman.charon.v1.MoveOptions
-import org.tatrman.charon.v1.MoveResult
-import org.tatrman.charon.v1.SeaweedBlob
-import org.tatrman.charon.v1.WorkerKind
-import org.tatrman.charon.v1.WorkerSessionDf
+import org.tatrman.transfer.v1.Location
+import org.tatrman.transfer.v1.MoveOptions
+import org.tatrman.transfer.v1.MoveResult
+import org.tatrman.transfer.v1.SeaweedBlob
+import org.tatrman.transfer.v1.WorkerKind
+import org.tatrman.transfer.v1.WorkerSessionDf
 import org.tatrman.kantheon.charon.endpoints.FixtureMetisWorker
 import org.tatrman.kantheon.charon.endpoints.FixturePolarsWorker
 import org.tatrman.kantheon.charon.endpoints.MetisWorkerGateway
@@ -136,7 +136,7 @@ class WorkerMoveComponentSpec :
                             MoveOptions.getDefaultInstance(),
                         ),
                     )
-                described.shouldBeInstanceOf<Either.Right<org.tatrman.charon.v1.DescribeResult>>()
+                described.shouldBeInstanceOf<Either.Right<org.tatrman.transfer.v1.DescribeResult>>()
                 (described as Either.Right).value.exists shouldBe true
 
                 // worker → seaweed read-out.

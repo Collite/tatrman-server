@@ -53,7 +53,7 @@ private val log = LoggerFactory.getLogger("org.tatrman.kantheon.charon.Applicati
  *    (Stage 1.3) into the move-pipe seam.
  *  - The Lettuce [RedisClient] / [StatefulRedisConnection] are built at
  *    startup and shut down on `ApplicationStopping`.
- *  - `/metrics` route serves the Prometheus scrape.
+ *  - `/metrics` route serves the LLM gateway scrape.
  *  - `/ready` returns a static 200 once the process is up. It does NOT
  *    probe S3/Redis reachability — that is checked lazily at the first
  *    move (per the architecture §7 readiness contract: endpoints
@@ -87,7 +87,7 @@ fun main() {
     Runtime.getRuntime().addShutdownHook(Thread { dbProvider.close() })
     log.info("Charon connection registry: {} connection(s) {}", connectionRegistry.ids().size, connectionRegistry.ids())
 
-    // Phase 3 — worker gateways (POLARS = Steropes worker.v1; METIS = metis.v1).
+    // Phase 3 — worker gateways (POLARS = Polars worker.v1; METIS = metis.v1).
     // Targets are optional; an unset engine isn't wired on this pod.
     val workerFactory =
         GrpcWorkerGatewayFactory(
@@ -133,7 +133,7 @@ fun main() {
             .forPort(grpcPort)
             .permitKeepAliveTime(20, TimeUnit.SECONDS)
             .permitKeepAliveWithoutCalls(true)
-            .maxInboundMessageSize(33554432) // 32 MiB; matches ai-platform/ariadne
+            .maxInboundMessageSize(33554432) // 32 MiB; matches ai-platform/veles
             .addService(service)
             .build()
     Runtime.getRuntime().addShutdownHook(Thread { grpcServer.shutdownNow() })
