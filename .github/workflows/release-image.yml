@@ -41,6 +41,7 @@ on:
       - '*/v*'            # per-module image tags
       - '!shared/v*'      # shared libs are Maven artifacts, not images
       - '!shared-proto/v*'
+      - '!server-libs/v*' # the Maven library publish tag (publish.yml) — not an image
   workflow_dispatch:
     inputs:
       version:
