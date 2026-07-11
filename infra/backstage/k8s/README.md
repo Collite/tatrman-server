@@ -2,7 +2,7 @@
 
 Env-agnostic chart for the Kantheon developer portal. **Not** an nginx/Vue FE — Backstage is a
 Node backend serving both the app bundle and the backend API on one HTTP port. The chart uses
-the kantheon-service library's **backend** Deployment/Service shape + a Gateway API HTTPRoute
+the ttr-service library's **backend** Deployment/Service shape + a Gateway API HTTPRoute
 for external exposure. Authored in deploy-test WS-D Stage 2 (no pre-existing kustomize base).
 **BEST-EFFORT** — renders cleanly; config is env-driven and expected to be overridden per env.
 
@@ -22,8 +22,8 @@ externally-exposed: { hostname: <backstage.…> }   # Olymp sets httpRoute.hostn
 
 ## Template choice: BACKEND, not FE
 
-Chosen the **backend** templates (`kantheon-service.deployment` / `.service`) plus
-`templates/httproute.yaml` (`kantheon-service.httproute`) — Backstage reads its config from env
+Chosen the **backend** templates (`ttr-service.deployment` / `.service`) plus
+`templates/httproute.yaml` (`ttr-service.httproute`) — Backstage reads its config from env
 (app-config.yaml `${VAR}` substitution), not from a generated `env.js`, so the FE `fe-configmap`
 model does not fit. A per-module env hook `templates/_env.tpl` (`backstage.env`) supplies:
 

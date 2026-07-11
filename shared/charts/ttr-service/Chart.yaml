@@ -1,0 +1,16 @@
+apiVersion: v2
+name: ttr-service
+description: |
+  Kantheon shared Helm LIBRARY chart. Captures the common Deployment/Service shape
+  every constellation module ships (Kotlin/Ktor services, agents, workers, Python
+  services) plus the FE-nginx + Gateway-API HTTPRoute shapes. Emits no resources on
+  its own (type: library) — each deployable's thin `<module>/k8s` chart depends on it
+  and renders the named templates from `templates/main.yaml`.
+
+  The per-module container `env:` block (its var names, OTel wiring, DB/secret env)
+  is the one genuinely per-service surface: each module supplies it as a named
+  template `<module>.env` that the library's deployment includes. Ports, probes,
+  labels, resources, scheduling and the Service are owned here — a probe/label fix
+  lands once. See docs/architecture/deploy-test/contracts.md §1 + master-plan §7-D5.
+type: library
+version: 0.1.0
