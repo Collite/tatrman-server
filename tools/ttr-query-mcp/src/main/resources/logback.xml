@@ -25,7 +25,7 @@
         <appender-ref ref="OTEL" />
     </root>
 
-    <logger name="org.tatrman.kantheon.theseus.mcp" level="DEBUG" />
+    <logger name="org.tatrman.query.mcp" level="DEBUG" />
     <logger name="io.modelcontextprotocol" level="INFO" />
     <logger name="io.ktor.server" level="WARN" />
 </configuration>

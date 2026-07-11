@@ -23,7 +23,7 @@
         <appender-ref ref="OTEL"/>
     </root>
 
-    <logger name="org.tatrman.kantheon.arges" level="${LOG_LEVEL:-DEBUG}"/>
+    <logger name="org.tatrman.worker.postgres" level="${LOG_LEVEL:-DEBUG}"/>
     <logger name="grpc.in" level="${LOG_LEVEL:-DEBUG}"/>
     <logger name="grpc.out" level="${LOG_LEVEL:-DEBUG}"/>
 

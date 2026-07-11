@@ -1,10 +1,10 @@
-{{/* echo-mcp container env — lifted from the kustomize base (D2). */}}
-{{- define "echo-mcp.env" -}}
-- name: MCP_ECHO_SERVER_PORT
+{{/* fuzzy-mcp container env — lifted from the kustomize base (D2). */}}
+{{- define "fuzzy-mcp.env" -}}
+- name: MCP_FUZZY_SERVER_PORT
   value: {{ .Values.ports.http | quote }}
 - name: OTEL_SERVICE_NAME
   value: {{ .Values.telemetry.serviceName | quote }}
-- name: OTEL_ENABLED_ECHO_MCP
+- name: OTEL_ENABLED_FUZZY_MCP
   value: {{ .Values.telemetry.enabled | quote }}
 {{- if and .Values.telemetry.enabled .Values.telemetry.endpoint }}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT

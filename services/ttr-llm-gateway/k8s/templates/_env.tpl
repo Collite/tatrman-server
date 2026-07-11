@@ -1,6 +1,6 @@
 {{/* llm-gateway container env — lifted verbatim from the pre-library chart (D1). */}}
 {{- define "llm-gateway.env" -}}
-- name: PROMETHEUS_SERVER_PORT
+- name: SERVER_PORT
   value: {{ .Values.ports.http | quote }}
 - name: POSTGRESQL_HOST
   value: {{ .Values.db.host | quote }}
