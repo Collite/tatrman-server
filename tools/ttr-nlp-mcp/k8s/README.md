@@ -1,6 +1,6 @@
-module: kadmos-mcp
-image: ghcr.io/boraperusic/kadmos-mcp   # jib
+module: nlp-mcp
+image: ghcr.io/boraperusic/nlp-mcp   # jib
 ports: { http: 7272 }
 needs:
-  downstream: [ kadmos ]
+  downstream: [ nlp ]
 wave: 2    # query-path — MCP edge over the NLP foundation

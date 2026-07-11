@@ -1,13 +1,13 @@
-# kadmos
+# ttr-nlp
 
-> **forked-from:** `ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4` (`infra/nlp/`), tag `kantheon-fork-point`, forked 2026-06-14.
+> **forked-from:** `ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4` (`infra/nlp/`), tag `kantheon-fork-point`, forked 2026-06-14 (service formerly named Kadmos).
 > Maintained independently since the fork; do not assume parity with the ai-platform original.
 
 The **NLP foundation service** for kantheon — multi-engine analysis (Stanza, spaCy, NameTag/MorphoDiTa via UFAL, langid) over Python/FastAPI.
 
 ## Overview
 
-`services/kadmos` is a stateless Python/FastAPI service that provides NLP operations (tokenize, lemmatize, POS, dependency parse, NER, language detection) via a plugin-based engine architecture, with per-op-per-language routing (Czech routed through the UFAL stack). It is the NLP foundation consumed by Themis (via `tools/kadmos-mcp`) and Echo. HTTP at v1; proto types fork as `org.tatrman.kadmos.v1` (no gRPC binding). Default HTTP port **7270**.
+`services/ttr-nlp` is a stateless Python/FastAPI service that provides NLP operations (tokenize, lemmatize, POS, dependency parse, NER, language detection) via a plugin-based engine architecture, with per-op-per-language routing (Czech routed through the UFAL stack). It is the NLP foundation consumed by Themis (via `tools/ttr-nlp-mcp`) and Echo. HTTP at v1; proto types fork as `org.tatrman.nlp.v1` (no gRPC binding). Default HTTP port **7270**.
 
 ## Supported Operations
 
@@ -171,24 +171,24 @@ Service version and engine information.
 
 ```bash
 # Install dependencies
-cd services/kadmos
+cd services/ttr-nlp
 uv sync
 
 # Run service (default port 7270)
 uv run python src/main.py
 
 # Or with uvicorn directly
-uvicorn kadmos_service.api.routes:app --reload --port 7270
+uvicorn nlp_service.api.routes:app --reload --port 7270
 ```
 
 ## Testing
 
 ```bash
 # Run tests (from repo root; regenerates proto-py first)
-just test-py services/kadmos
+just test-py services/ttr-nlp
 
 # Lint (ruff)
-just lint-py services/kadmos
+just lint-py services/ttr-nlp
 ```
 
 ## Evaluation
@@ -199,29 +199,29 @@ carried over **verbatim** from the ai-platform original — same code, same corp
 Run it against a deployed service:
 
 ```bash
-just eval-kadmos                 # port-forwards the kadmos pod (7270) + runs the harness
+just eval-nlp                    # port-forwards the nlp pod (7270) + runs the harness
 # or against a local instance:
 uv run python eval/run_eval.py --url http://localhost:7270
 ```
 
 **Baseline:** because the engine code and corpus are byte-identical to the
-ai-platform original at the fork point, Kadmos answers identically by
+ai-platform original at the fork point, ttr-nlp answers identically by
 construction — the Stage 2.6 Themis gate builds on this. A numeric baseline is
 recorded at the first live deployment (the ai-platform original shipped no
 recorded `eval/reports` metrics, and the harness needs a running service +
 remote UFAL endpoints to score; live infra was unavailable in the fork session,
-deferred to the deployment pipeline — Ariadne/Echo precedent). Reports land in
+deferred to the deployment pipeline — Veles/Echo precedent). Reports land in
 `eval/reports/` (`metrics.json` + `report.md`).
 
 ## Container & deployment
 
 ```bash
-# Build the Docker image (tagged kadmos:dev) — repo-root build context so the
+# Build the Docker image (tagged ttr-nlp:dev) — repo-root build context so the
 # uv path-deps (../../shared/...) resolve.
-just build-py services/kadmos
+just build-py services/ttr-nlp
 
 # Build + deploy to local K3s (applies k8s/overlays/local)
-just deploy-py services/kadmos
+just deploy-py services/ttr-nlp
 ```
 
 ### Image-size strategy (cached model layer)
@@ -244,7 +244,7 @@ Stanza + spaCy.
 
 **Image sizes:** the actual built-image size is recorded at first pipeline
 build — the Docker daemon was not available in the fork session, so the build /
-live-K3s deploy is left to the deployment pipeline (same precedent as Ariadne /
+live-K3s deploy is left to the deployment pipeline (same precedent as Veles /
 Echo: manifests + recipes validated, live infra deferred). The dominant
 contributors are torch-cpu (~200 MB), the Stanza models (~1 GB across cs+en),
 and spaCy `en_core_web_md` (~40 MB).
@@ -253,7 +253,7 @@ and spaCy `en_core_web_md` (~40 MB).
 
 ```
                     ┌─────────────────────────────────────────────┐
-                    │              services/kadmos                 │
+                    │             services/ttr-nlp                 │
                     │                                              │
 Request ──────────► │ ┌─────────┐    ┌────────────────────────┐  │
                     │ │ FastAPI │───►│     Orchestrator        │  │
@@ -278,7 +278,7 @@ Request ──────────► │ ┌─────────┐ 
 To add a new engine, implement `NlpEngine` protocol:
 
 ```python
-from kadmos_service.engines.base import NlpEngine, NlpOp, EngineResult
+from nlp_service.engines.base import NlpEngine, NlpOp, EngineResult
 
 class MyEngine(NlpEngine):
     @property

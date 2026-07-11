@@ -34,7 +34,7 @@ component tier proved against a container.
    the gate (Kotest 6 removed `@AutoScan`, so apply it explicitly):
 
    ```kotlin
-   @RequiresContext("theseus-runquery")
+   @RequiresContext("query-runquery")
    @ApplyExtension(RequiresContextExtension::class)
    @Tags("integration")
    class RunQueryIntegrationSpec : StringSpec({
@@ -43,9 +43,9 @@ component tier proved against a container.
            // load fixtures into the context's WireMock
            val wm = WireMockAdmin(handle.wireMockAdmin)
            wm.reset()
-           wm.importMappingsFromResource("wiremock/theseus-runquery/<scenario>/mappings.json")
+           wm.importMappingsFromResource("wiremock/query-runquery/<scenario>/mappings.json")
            // drive the service via its resolved in-cluster URL
-           val theseus = handle.url("theseus-mcp")
+           val queryMcp = handle.url("ttr-query-mcp")
            // … assertions …
        }
    })
