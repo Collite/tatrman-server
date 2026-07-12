@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: postgres
+  repository: ghcr.io/collite/ttr-worker-postgres
   # Defaults to .Chart.appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent

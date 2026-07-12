@@ -4,7 +4,7 @@
 replicaCount: 1
 
 image:
-  repository: polars
+  repository: ghcr.io/collite/ttr-worker-polars
   # Defaults to .Chart.appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent

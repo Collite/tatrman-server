@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: llm-gateway
+  repository: ghcr.io/collite/ttr-llm-gateway
   tag: ""
   pullPolicy: IfNotPresent
 
