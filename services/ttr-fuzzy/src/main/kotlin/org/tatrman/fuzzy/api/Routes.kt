@@ -99,6 +99,14 @@ fun Application.configureRoutes(
                                 candidate = it.candidate,
                                 score = it.score,
                                 category = it.category,
+                                source = it.source.name,
+                                targetRef = it.targetRef,
+                                provenance =
+                                    org.fuzzy.common.Provenance(
+                                        producer = it.provenance.producer,
+                                        method = it.provenance.method,
+                                        rawScore = it.provenance.rawScore,
+                                    ),
                             )
                         }
 

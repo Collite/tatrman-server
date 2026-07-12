@@ -1,0 +1,41 @@
+{"_comment": "RG-P2.S1.T1 — Q-17 match-quality referee corpus. Provenance: seeded from the RO-25 'fuzzy match with diacritics' floor + the ai-platform resolver eval corpora (seed.jsonl entity forms), recomputed by hand against the deterministic matcher over the fixture vocabulary defined in MatchQualityCorpusTest. Four classes: diacritics (fold handles), inflection (REQUIRES the lemma axis — fail with it off, T5), multi-word-order (order bonus — both orders hit), typos (1- and 2-edit at the LEVENSHTEIN/TATRMAN boundary). This is the gate for any future B2-beta engine evolution."}
+{"query": "zakaznik", "category": "customer", "expected_top_id": "c-zakaznik", "class": "diacritics"}
+{"query": "Zákazník", "category": "customer", "expected_top_id": "c-zakaznik", "class": "diacritics"}
+{"query": "dodavatel", "category": "customer", "expected_top_id": "c-dodavatel", "class": "diacritics"}
+{"query": "prazska pobocka", "category": "branch", "expected_top_id": "b-praha", "class": "diacritics"}
+{"query": "brnenska pobocka", "category": "branch", "expected_top_id": "b-brno", "class": "diacritics"}
+{"query": "ostravska pobocka", "category": "branch", "expected_top_id": "b-ostrava", "class": "diacritics"}
+{"query": "skoda octavia", "category": "product", "expected_top_id": "p-octavia", "class": "diacritics"}
+{"query": "skoda fabia", "category": "product", "expected_top_id": "p-fabia", "class": "diacritics"}
+{"query": "tesla inc", "category": "customer", "expected_top_id": "c-tesla", "class": "diacritics"}
+{"query": "shell uk", "category": "customer", "expected_top_id": "c-shell", "class": "diacritics"}
+{"query": "octavii", "category": "product", "expected_top_id": "p-octavia", "class": "inflection"}
+{"query": "octavie", "category": "product", "expected_top_id": "p-octavia", "class": "inflection"}
+{"query": "fabii", "category": "product", "expected_top_id": "p-fabia", "class": "inflection"}
+{"query": "superbu", "category": "product", "expected_top_id": "p-superb", "class": "inflection"}
+{"query": "golfu", "category": "product", "expected_top_id": "p-golf", "class": "inflection"}
+{"query": "passatu", "category": "product", "expected_top_id": "p-passat", "class": "inflection"}
+{"query": "pobočkách", "category": "branch-term", "expected_top_id": "term-pobocka", "class": "inflection"}
+{"query": "poboček", "category": "branch-term", "expected_top_id": "term-pobocka", "class": "inflection"}
+{"query": "tržby", "category": "measure-term", "expected_top_id": "term-trzba", "class": "inflection"}
+{"query": "tržbu", "category": "measure-term", "expected_top_id": "term-trzba", "class": "inflection"}
+{"query": "obratu", "category": "measure-term", "expected_top_id": "term-obrat", "class": "inflection"}
+{"query": "zákazníků", "category": "customer", "expected_top_id": "c-zakaznik", "class": "inflection"}
+{"query": "škoda octavia", "category": "product", "expected_top_id": "p-octavia", "class": "multi-word-order"}
+{"query": "octavia škoda", "category": "product", "expected_top_id": "p-octavia", "class": "multi-word-order"}
+{"query": "golf volkswagen", "category": "product", "expected_top_id": "p-golf", "class": "multi-word-order"}
+{"query": "volkswagen golf", "category": "product", "expected_top_id": "p-golf", "class": "multi-word-order"}
+{"query": "pobočka pražská", "category": "branch", "expected_top_id": "b-praha", "class": "multi-word-order"}
+{"query": "inc tesla", "category": "customer", "expected_top_id": "c-tesla", "class": "multi-word-order"}
+{"query": "uk shell", "category": "customer", "expected_top_id": "c-shell", "class": "multi-word-order"}
+{"query": "passat volkswagen", "category": "product", "expected_top_id": "p-passat", "class": "multi-word-order"}
+{"query": "oktavia", "category": "product", "expected_top_id": "p-octavia", "class": "typos"}
+{"query": "superrb", "category": "product", "expected_top_id": "p-superb", "class": "typos"}
+{"query": "shel uk", "category": "customer", "expected_top_id": "c-shell", "class": "typos"}
+{"query": "teslla", "category": "customer", "expected_top_id": "c-tesla", "class": "typos"}
+{"query": "dodavtel", "category": "customer", "expected_top_id": "c-dodavatel", "class": "typos"}
+{"query": "volkswagn golf", "category": "product", "expected_top_id": "p-golf", "class": "typos"}
+{"query": "faba", "category": "product", "expected_top_id": "p-fabia", "class": "typos"}
+{"query": "passsat", "category": "product", "expected_top_id": "p-passat", "class": "typos"}
+{"query": "brnenska poboka", "category": "branch", "expected_top_id": "b-brno", "class": "typos"}
+{"query": "ostravsk pobocka", "category": "branch", "expected_top_id": "b-ostrava", "class": "typos"}

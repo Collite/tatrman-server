@@ -76,16 +76,18 @@ data class TokenBasedConfig(
     val idfEnabled: Boolean = true,
 )
 
-/** Nlp (Phase 2.3) integration for Czech lemmatisation. Disabled → folded-surface matching only. */
+/**
+ * `ttr-nlp` integration for Czech lemmatisation via gRPC `BatchLemmatize`
+ * (RG-P2.S1.T4). Disabled → folded-surface matching only. `port` is the nlp
+ * **gRPC** port (7271; gRPC is ttr-nlp's contract, REST is its dev mirror).
+ */
 data class NlpConfig(
     val enabled: Boolean = false,
     val host: String = "nlp",
-    val port: Int = 7270,
+    val port: Int = 7271,
     val timeoutMs: Long = 5_000,
     val lang: String = "cs",
-) {
-    val baseUrl: String get() = "http://$host:$port"
-}
+)
 
 object ConfigLoader {
     fun load(): AppConfig {

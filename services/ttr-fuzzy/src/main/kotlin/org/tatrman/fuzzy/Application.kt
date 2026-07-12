@@ -79,26 +79,27 @@ fun Application.module(serverConfig: KtorServerConfig) {
             .load()
     configureSecurity(typesafeConfig)
 
-    // Czech lemmatisation via Nlp (Phase 2.3). Disabled at v1 → folded-
-    // surface matching only. The HTTP client is built only when `nlp.enabled`
-    // is true (off in the default config).
-    val nlpHttpClient: io.ktor.client.HttpClient? =
+    // Czech lemmatisation via ttr-nlp's gRPC BatchLemmatize (RG-P2.S1.T4 — the
+    // lemma axis ON; batched, never per-string HTTP). The channel is built only
+    // when `nlp.enabled` (true in the open chart). Degradable: NLP failure ⇒
+    // folded-surface matching, never a match outage.
+    val nlpBatchClient: org.tatrman.fuzzy.core.NlpBatchClient? =
         if (config.nlp.enabled) {
-            io.ktor.client.HttpClient(io.ktor.client.engine.cio.CIO) {
-                install(io.ktor.client.plugins.HttpTimeout) {
-                    requestTimeoutMillis = config.nlp.timeoutMs
-                    connectTimeoutMillis = 5_000
-                    socketTimeoutMillis = config.nlp.timeoutMs
-                }
-            }
+            org.tatrman.fuzzy.core.GrpcNlpBatchClient(
+                host = config.nlp.host,
+                port = config.nlp.port,
+                deadlineSeconds = (config.nlp.timeoutMs / 1000).coerceAtLeast(1),
+            )
         } else {
             null
         }
     val lemmatizer: Lemmatizer =
-        if (nlpHttpClient != null) {
-            log.info("Czech lemmatisation enabled via Nlp at ${config.nlp.baseUrl} (lang=${config.nlp.lang})")
+        if (nlpBatchClient != null) {
+            log.info(
+                "Czech lemmatisation enabled via ttr-nlp gRPC at ${config.nlp.host}:${config.nlp.port} (lang=${config.nlp.lang})",
+            )
             org.tatrman.fuzzy.core
-                .NlpLemmatizer(nlpHttpClient, config.nlp.baseUrl, config.nlp.lang)
+                .NlpLemmatizer(nlpBatchClient, config.nlp.lang)
         } else {
             NoopLemmatizer
         }
@@ -192,7 +193,7 @@ fun Application.module(serverConfig: KtorServerConfig) {
 
     environment.monitor.subscribe(ApplicationStopping) {
         repository.close()
-        nlpHttpClient?.close()
+        nlpBatchClient?.close()
         grpcServer.shutdown()
         metadataChannel?.shutdown()?.awaitTermination(5, TimeUnit.SECONDS)
     }

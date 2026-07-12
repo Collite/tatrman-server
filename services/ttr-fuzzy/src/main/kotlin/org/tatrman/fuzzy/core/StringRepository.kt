@@ -24,6 +24,10 @@ data class Candidate(
     val tokenSet: Set<String> = emptySet(),
     val lemmaTokens: List<String> = tokens,
     val lemmaTokenSet: Set<String> = tokenSet,
+    // RG-P2 (contracts §2, RS-15): how the owning category was sourced. MEMBER
+    // (default) → `id` is a data PK; VOCABULARY → `targetRef` is the lexicon target.
+    val source: SourceTag = SourceTag.MEMBER,
+    val targetRef: String? = null,
 ) {
     /** Surface tokens ∪ lemma tokens — used to seed the candidate set for a query. */
     val allTokenSet: Set<String> get() = tokenSet + lemmaTokenSet
@@ -47,12 +51,35 @@ data class Candidate(
             )
         }
 
-        /** Builds a candidate with explicit (folded) lemma tokens — used by [StringRepository.lemmatiseCandidates]. */
+        /** A declared-vocabulary candidate (contracts §2): carries the lexicon [targetRef]. */
+        fun vocabulary(
+            id: String,
+            value: String,
+            targetRef: String,
+        ): Candidate {
+            val tokens = tokenize(value)
+            val set = tokens.toSet()
+            return Candidate(
+                id = id,
+                value = value,
+                tokens = tokens,
+                tokenSet = set,
+                lemmaTokens = tokens,
+                lemmaTokenSet = set,
+                source = SourceTag.VOCABULARY,
+                targetRef = targetRef,
+            )
+        }
+
+        /** Builds a candidate with explicit (folded) lemma tokens — used by [StringRepository.lemmatiseCandidates].
+         *  Preserves the source dimension (MEMBER/VOCABULARY + targetRef) of the original. */
         fun withLemmas(
             id: String,
             value: String,
             surfaceTokens: List<String>,
             lemmaTokens: List<String>,
+            source: SourceTag = SourceTag.MEMBER,
+            targetRef: String? = null,
         ): Candidate =
             Candidate(
                 id = id,
@@ -61,6 +88,8 @@ data class Candidate(
                 tokenSet = surfaceTokens.toSet(),
                 lemmaTokens = lemmaTokens,
                 lemmaTokenSet = lemmaTokens.toSet(),
+                source = source,
+                targetRef = targetRef,
             )
 
         /** Tokens used for matching: lower-cased, NFD-folded, whitespace-split. */
@@ -171,7 +200,14 @@ class StringRepository(
         val lemmaMap = lemmatizer.lemmatize(uniqueRaw)
         return candidates.map { c ->
             val lemmaTokens = (rawByCandidate[c] ?: emptyList()).map { lemmaMap[it] ?: TextNormalizer.fold(it) }
-            Candidate.withLemmas(c.id, c.value, surfaceTokens = c.tokens, lemmaTokens = lemmaTokens)
+            Candidate.withLemmas(
+                c.id,
+                c.value,
+                surfaceTokens = c.tokens,
+                lemmaTokens = lemmaTokens,
+                source = c.source,
+                targetRef = c.targetRef,
+            )
         }
     }
 

@@ -4,12 +4,15 @@ package org.tatrman.fuzzy.api
 import org.tatrman.fuzzy.core.AlgorithmType
 import org.tatrman.fuzzy.core.CascadeStep
 import org.tatrman.fuzzy.core.FuzzyMatcher
+import org.tatrman.fuzzy.core.SourceTag as CoreSourceTag
 import org.tatrman.fuzzy.core.cascadeFrom
 import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import org.tatrman.fuzzy.v1.FuzzyMatch
 import org.tatrman.fuzzy.v1.FuzzyMatchResponse
 import org.tatrman.fuzzy.v1.FuzzyServiceGrpcKt
 import org.tatrman.fuzzy.v1.MatchRequest
+import org.tatrman.fuzzy.v1.Provenance as ProtoProvenance
+import org.tatrman.fuzzy.v1.SourceTag as ProtoSourceTag
 import org.slf4j.LoggerFactory
 
 class GrpcService(
@@ -52,13 +55,28 @@ class GrpcService(
 
             val matches =
                 outcome.matches.map {
-                    FuzzyMatch
-                        .newBuilder()
-                        .setCandidateId(it.candidateId)
-                        .setCandidate(it.candidate)
-                        .setScore(it.score)
-                        .setCategory(it.category)
-                        .build()
+                    val b =
+                        FuzzyMatch
+                            .newBuilder()
+                            .setCandidateId(it.candidateId)
+                            .setCandidate(it.candidate)
+                            .setScore(it.score)
+                            .setCategory(it.category)
+                            .setSource(
+                                when (it.source) {
+                                    CoreSourceTag.MEMBER -> ProtoSourceTag.MEMBER
+                                    CoreSourceTag.VOCABULARY -> ProtoSourceTag.VOCABULARY
+                                },
+                            ).setProvenance(
+                                ProtoProvenance
+                                    .newBuilder()
+                                    .setProducer(it.provenance.producer)
+                                    .setMethod(it.provenance.method)
+                                    .setRawScore(it.provenance.rawScore)
+                                    .build(),
+                            )
+                    it.targetRef?.let { ref -> b.setTargetRef(ref) }
+                    b.build()
                 }
 
             return FuzzyMatchResponse
