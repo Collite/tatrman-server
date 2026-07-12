@@ -106,8 +106,11 @@ val publishableLibs =
         ":shared:libs:kotlin:ktor-configurator",
         ":shared:libs:kotlin:db-common",
         ":shared:libs:kotlin:data-formatter",
-        ":shared:libs:kotlin:ttr-text",
-        ":shared:libs:kotlin:ttr-diagnostics",
+        // ttr-text / ttr-diagnostics (RG-P0.S3) are NOT published yet: they have no
+        // external consumer today (in-repo project deps only), and per the
+        // capabilities-client precedent below we don't make a Central maintenance
+        // promise without a taker. Add them here when a cross-repo consumer lands
+        // (e.g. ai-platform vendoring the S-2 fold for byte-identical parity).
         ":shared:libs:kotlin:fuzzy-common",
         ":shared:libs:kotlin:whois-common",
         ":shared:libs:kotlin:keycloak-auth",
@@ -129,8 +132,6 @@ val pomMeta: Map<String, Triple<String, String, String>> =
         ":shared:libs:kotlin:ktor-configurator" to Triple("ktor-configurator", "TTR Server Ktor Configurator", "Shared Ktor server bootstrap (routing, health, OTel, error handling) for the TTR read-spine services."),
         ":shared:libs:kotlin:db-common" to Triple("db-common", "TTR Server DB Common", "Shared JDBC/connection-pool helpers for the TTR worker services."),
         ":shared:libs:kotlin:data-formatter" to Triple("data-formatter", "TTR Server Data Formatter", "Shared result/value formatting for the TTR read-spine services."),
-        ":shared:libs:kotlin:ttr-text" to Triple("ttr-text", "TTR Server Text Normalization", "The S-2 fold() normalization spec (lowercase → NFD → strip combining marks) shared by every matcher in the understanding layer."),
-        ":shared:libs:kotlin:ttr-diagnostics" to Triple("ttr-diagnostics", "TTR Server Diagnostics", "The RG-* diagnostics registry (named, severity-typed, fixture-backed) for the resolution & grounding services."),
         ":shared:libs:kotlin:fuzzy-common" to Triple("fuzzy-common", "TTR Server Fuzzy Common", "Shared fuzzy-matching types for the TTR services."),
         ":shared:libs:kotlin:whois-common" to Triple("whois-common", "TTR Server Whois Common", "Shared identity/role-source (roleSource: bearer|whois) types for the TTR services."),
         ":shared:libs:kotlin:keycloak-auth" to Triple("keycloak-auth", "TTR Server Keycloak Auth", "Shared Keycloak/OBO bearer-auth helpers for the TTR services."),

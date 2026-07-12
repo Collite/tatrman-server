@@ -4,7 +4,9 @@ package org.tatrman.diagnostics
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotBeBlank
+import io.kotest.matchers.string.shouldNotContain
 
 /**
  * RG-P0.S3.T6 — the fixture IS contracts §8. Every `RG-*` id must be registered
@@ -55,11 +57,22 @@ class RgDiagnosticsSpec :
             }
         }
 
-        test("render substitutes placeholders; an RgDiagnosticException carries the diagnostic") {
-            val rendered = RgDiagnostics.render("RG-NLP-010", "cs" to "cs", "op" to "DEP_PARSE")
-            rendered.shouldNotBeBlank()
+        test("render substitutes every placeholder in the template") {
+            // RG-NLP-010 template = "Unsupported ({language}, {op}) — degrade floor …"
+            val rendered = RgDiagnostics.render("RG-NLP-010", "language" to "cs", "op" to "DEP_PARSE")
+            rendered shouldContain "cs"
+            rendered shouldContain "DEP_PARSE"
+            // no placeholder left behind (every {name} in the template was supplied)
+            rendered shouldNotContain "{"
+        }
+
+        test("an RgDiagnosticException carries the diagnostic and names its id in the message") {
             val ex = RgDiagnosticException(RgDiagnostics["RG-FUZ-002"], "category=widgets")
             ex.diagnostic.id shouldBe "RG-FUZ-002"
             ex.diagnostic.severity shouldBe Severity.ERROR
+            val message = ex.message!!
+            message.shouldNotBeBlank()
+            message shouldContain "RG-FUZ-002"
+            message shouldContain "category=widgets"
         }
     })
