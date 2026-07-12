@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Canonical, implementation-independent Arrow schema fingerprint.
 
 The cross-engine schema-identity check shared by Charon (`Integrity.kt`),

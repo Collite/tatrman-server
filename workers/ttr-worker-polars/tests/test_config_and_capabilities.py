@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Phase 2.4 §C+§D — config loads + capabilities surface is correct."""
 
 from __future__ import annotations

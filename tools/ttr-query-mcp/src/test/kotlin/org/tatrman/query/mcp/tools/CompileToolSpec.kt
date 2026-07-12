@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.query.mcp.tools
 
 import org.tatrman.common.v1.ResponseMessage

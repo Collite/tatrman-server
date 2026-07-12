@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.veles.mcp
 
 import org.tatrman.plan.v1.QualifiedName

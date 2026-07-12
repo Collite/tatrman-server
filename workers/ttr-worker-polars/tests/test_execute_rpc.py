@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Phase 2.4 §H — Execute RPC server-streaming Arrow IPC + assign_to_workspace."""
 
 from __future__ import annotations

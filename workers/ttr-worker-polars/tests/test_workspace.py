@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Phase 2.4 §E — workspace store: put/get, TTL, caps."""
 
 from __future__ import annotations

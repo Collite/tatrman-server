@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.capabilities.client
 
 import io.github.oshai.kotlinlogging.KotlinLogging

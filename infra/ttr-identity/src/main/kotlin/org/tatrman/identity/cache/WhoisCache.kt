@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.identity.cache
 
 import com.github.benmanes.caffeine.cache.Cache

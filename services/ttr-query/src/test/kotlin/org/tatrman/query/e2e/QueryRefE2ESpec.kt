@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.query.e2e
 
 import com.google.protobuf.kotlin.toByteString

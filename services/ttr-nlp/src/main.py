@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Main entry point for the Nlp NLP service.
 
 Logging root config lives in `nlp_service/__init__.py` so it also fires

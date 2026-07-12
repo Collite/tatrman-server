@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Charon Stage 3.1 closeout — ImportDataFrame + DropWorkspaceEntry RPCs.
 
 The session-workspace ingest path that closes the POLARS stage-in gap: Charon's

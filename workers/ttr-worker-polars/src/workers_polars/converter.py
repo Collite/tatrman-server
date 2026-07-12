@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """PlanNode → Polars LazyFrame converter.
 
 The Polars Worker's heart. Walks a `org.tatrman.plan.v1.PlanNode` and

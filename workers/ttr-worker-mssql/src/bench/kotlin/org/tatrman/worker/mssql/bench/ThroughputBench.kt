@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.worker.mssql.bench
 
 import org.apache.arrow.memory.RootAllocator

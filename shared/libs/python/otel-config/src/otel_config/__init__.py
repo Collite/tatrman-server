@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from .client_interceptor import HttpClientLoggingInterceptor
 from .logging_handler import OTELLoggingHandler
 from .middleware import LoggingMiddleware

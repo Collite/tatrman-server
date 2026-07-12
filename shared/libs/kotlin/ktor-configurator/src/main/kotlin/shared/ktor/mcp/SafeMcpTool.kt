@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package shared.ktor.mcp
 
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest

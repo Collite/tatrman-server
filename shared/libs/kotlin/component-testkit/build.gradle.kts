@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 plugins {
     base
     alias(libs.plugins.kotlin.jvm)

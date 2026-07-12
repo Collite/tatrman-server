@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Phase 2.4 §J — HTTP probes + metrics surface."""
 
 from __future__ import annotations

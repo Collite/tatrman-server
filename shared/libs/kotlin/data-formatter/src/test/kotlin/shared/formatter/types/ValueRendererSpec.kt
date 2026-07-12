@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package shared.formatter.types
 
 import io.kotest.core.spec.style.StringSpec

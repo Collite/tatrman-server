@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.validate.client
 
 import org.tatrman.validate.policy.PolicyEngine

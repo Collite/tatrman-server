@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.query.client
 
 import org.tatrman.dispatch.v1.DispatchRequest

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 syntax = "proto3";
 
 // Forked from ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4 (tag kantheon-fork-point)

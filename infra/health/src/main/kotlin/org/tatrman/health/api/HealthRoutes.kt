@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.health.api
 
 import org.tatrman.health.service.HealthCheckResult

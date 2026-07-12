@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Polars Worker — second engine implementing the v1 platform's WorkerService.
 
 Phase 2.4. Stateful (session-scoped workspace store) — see plan in

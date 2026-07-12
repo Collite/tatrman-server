@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.query.mcp.integration
 
 import io.ktor.client.HttpClient

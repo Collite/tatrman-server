@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.testkit.integration
 
 /** A single workload the gate re-asserts is Ready before a suite runs. */

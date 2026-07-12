@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package shared.libs.db.common
 
 import com.typesafe.config.Config

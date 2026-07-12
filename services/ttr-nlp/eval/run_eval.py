@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """NLP evaluation harness - runs corpus against NLP service and computes per-engine metrics."""
 
 from __future__ import annotations

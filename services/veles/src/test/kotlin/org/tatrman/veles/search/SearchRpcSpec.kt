@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.veles.search
 
 import org.tatrman.meta.v1.PageRequest

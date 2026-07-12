@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.llmgateway.model.rules
 
 import com.typesafe.config.Config

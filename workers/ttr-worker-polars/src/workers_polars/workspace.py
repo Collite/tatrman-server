@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Session-scoped workspace store.
 
 Holds Polars DataFrames keyed by ``(session_id, workspace_name)``. The
