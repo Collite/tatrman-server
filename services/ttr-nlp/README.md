@@ -247,7 +247,8 @@ The front and each engine backend are **separate images** (RG-P1.S2/S3):
 | `ttr-nlp` (front) | `Dockerfile` | engine-free front (gRPC + REST mirror); no models needed at run time |
 | `ttr-nlp-morphodita` | `backends/morphodita/Dockerfile` | `morphodita_server` + baked `czech-morfflex2.0-pdtc1.0-220710` (S2) |
 | `ttr-nlp-nametag3` | `backends/nametag3/Dockerfile` | `nametag3_server.py` + baked `nametag3-czech-cnec2.0-240830` + RobeCzech PLM (S2) |
-| Stanza / spaCy backends | *(RG-P1.S3)* | baked Stanza cs+en / spaCy `en_core_web_md` |
+| `ttr-nlp-stanza` | `backends/stanza/Dockerfile` | uniform-JSON `server.py` + baked Stanza cs+en (cs DEP_PARSE hot path) (S3) |
+| `ttr-nlp-spacy` | `backends/spacy/Dockerfile` | uniform-JSON `server.py` + baked spaCy `en_core_web_md` (en NER fallback) (S3) |
 
 Backend images target the **x86 cluster** (`docker buildx build --platform
 linux/amd64 …`); UFAL models are **CC BY-NC-SA** (FI-4 — building/running is
@@ -266,23 +267,21 @@ Each backend isolates its baked model in a dedicated stage so app/config edits
 never invalidate the heavy model layer (the Metis/prophet "cached base layer"
 pattern). Sizing (Q-10 §3/§5): MorphoDiTa ~250 MB / sub-10 ms / scales with
 concurrency; NameTag 3 ~1.1 GB / ~72 ms p50 / ~12 rps per replica → **scale by
-replicas**, ~5 s cold start. The front carries no models (Stanza/spaCy move to
-their own images in S3; their bake in the front Dockerfile is dead weight the S3
-engine-free-front task strips, with torch).
+replicas**, ~5 s cold start. The front is **engine-free** — no torch, no models,
+no per-engine native deps (a test asserts the import- and install-level
+guarantee); only langid runs in it.
+
+The **front** image (engine-free) has no model stage:
 
 | Stage | Holds | Cache-busts on |
 |-------|-------|----------------|
 | `base` | python:3.13-slim + build-essential/curl | base image bump |
-| `deps` | uv venv (incl. torch-cpu) from `pyproject.toml`+`uv.lock` | dependency change |
-| `models` | Stanza cs+en + spaCy en_core_web_md under `/opt/nlp-models` | dependency change (not app code) |
-| `runtime` | venv + models + **app `src/`** (thin) | app-source change |
+| `deps` | uv venv (contract + routing + langid; NO torch) from `pyproject.toml`+`uv.lock` | dependency change |
+| `protogen` | generated `org.tatrman.{nlp,common}.v1` stubs (grpcio-tools) | `.proto` change |
+| `runtime` | venv + generated stubs + **app `src/`** (thin) | app-source change |
 
-**Image sizes:** the actual built-image size is recorded at first pipeline
-build — the Docker daemon was not available in the fork session, so the build /
-live-K3s deploy is left to the deployment pipeline (same precedent as Veles /
-Echo: manifests + recipes validated, live infra deferred). The dominant
-contributors are torch-cpu (~200 MB), the Stanza models (~1 GB across cs+en),
-and spaCy `en_core_web_md` (~40 MB).
+The front image is small (no torch/models); the model weight now lives in the
+per-engine backend images (each with its own cached model stage).
 
 ## Architecture
 

@@ -1,14 +1,13 @@
-# ttr-nlp engine-free FRONT — multi-stage Dockerfile.
+# ttr-nlp ENGINE-FREE FRONT — multi-stage Dockerfile.
 #
 # RG-P1: the front is the gRPC contract server (NlpService on :7271) + a REST
 # dev/health mirror (:7270). It owns its generated org.tatrman.{nlp,common}.v1
 # Python stubs (produced from the shared .proto by scripts/gen_proto.py at build
 # — NOT the shared-proto package, which emits messages only and would collide).
 #
-# NOTE (S2): the model-bearing engines are now separate backend images (S2/S3);
-# the front reaches them over HTTP. The Stanza/spaCy model bake below is dead
-# weight the S3 engine-free-front task strips (with torch); kept here only so the
-# image keeps building until then.
+# ENGINE-FREE (S3.T6): NO torch, NO models, NO per-engine native deps — the
+# model-bearing engines are separate backend images (backends/*); the front
+# reaches them over HTTP. Only langid (lingua) runs in-process.
 #
 # Build from the repo root (uv path-deps + the proto tree resolve there):
 #   docker build -t ttr-nlp:dev -f services/ttr-nlp/Dockerfile .
@@ -42,18 +41,7 @@ COPY shared/proto/src/main/proto /build/shared/proto/src/main/proto
 COPY services/ttr-nlp/scripts ./scripts
 RUN python scripts/gen_proto.py   # → /build/services/ttr-nlp/generated/org/...
 
-# ===== model download layer (dead weight until S3 strips it; see header) =====
-FROM deps AS models
-ENV PATH="/build/services/ttr-nlp/.venv/bin:${PATH}"
-RUN mkdir -p /opt/nlp-models/stanza
-RUN python - <<'PY'
-import stanza
-for lang in ["cs", "en"]:
-    stanza.download(lang, model_dir="/opt/nlp-models/stanza")
-PY
-RUN python -m spacy download en_core_web_md
-
-# ===== runtime layer (thin app layer) =====
+# ===== runtime layer (thin app layer; engine-free — no models) =====
 FROM base AS runtime
 
 RUN useradd -ms /bin/bash appuser
@@ -63,8 +51,6 @@ COPY --from=deps /usr/local /usr/local
 COPY --from=deps /build/services/ttr-nlp/.venv /build/services/ttr-nlp/.venv
 COPY --from=deps /build/shared /build/shared
 COPY --from=protogen /build/services/ttr-nlp/generated ./generated
-COPY --from=models /opt/nlp-models /opt/nlp-models
-RUN chown -R appuser:appuser /opt/nlp-models
 
 USER appuser
 COPY --chown=appuser:appuser services/ttr-nlp/pyproject.toml services/ttr-nlp/README.md ./

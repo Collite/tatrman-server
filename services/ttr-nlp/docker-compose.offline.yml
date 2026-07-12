@@ -3,9 +3,12 @@
 # determinism/offline claim (RG-P1 DoD). This is the harness for the S2.T7 hero
 # parse and for running the component parity suite (`-m component`) locally.
 #
-#   # build (x86 target; QEMU on arm64 dev boxes):
+#   # build (x86 target; QEMU on arm64 dev boxes). UFAL backends need
+#   # --build-arg MODEL_URL=<DSpace bitstream URL> (see their Dockerfiles):
 #   docker buildx build --platform linux/amd64 -t ttr-nlp-morphodita:dev services/ttr-nlp/backends/morphodita
 #   docker buildx build --platform linux/amd64 -t ttr-nlp-nametag3:dev   services/ttr-nlp/backends/nametag3
+#   docker build -t ttr-nlp-stanza:dev services/ttr-nlp/backends/stanza
+#   docker build -t ttr-nlp-spacy:dev  services/ttr-nlp/backends/spacy
 #   docker build -t ttr-nlp:dev -f services/ttr-nlp/Dockerfile .
 #   # run (from repo root):
 #   docker compose -f services/ttr-nlp/docker-compose.offline.yml up
@@ -33,6 +36,21 @@ services:
     ports:
       - "8001:8001"
 
+  # Stanza serves the hero's cs DEP_PARSE (+ en). spaCy is the en NER fallback.
+  ttr-nlp-stanza:
+    image: ttr-nlp-stanza:dev
+    build:
+      context: ./backends/stanza
+    ports:
+      - "8090:8090"
+
+  ttr-nlp-spacy:
+    image: ttr-nlp-spacy:dev
+    build:
+      context: ./backends/spacy
+    ports:
+      - "8091:8091"
+
   front:
     image: ttr-nlp:dev
     build:
@@ -42,6 +60,10 @@ services:
       ttr-nlp-morphodita:
         condition: service_healthy
       ttr-nlp-nametag3:
+        condition: service_healthy
+      ttr-nlp-stanza:
+        condition: service_healthy
+      ttr-nlp-spacy:
         condition: service_healthy
     environment:
       NLP_SERVICE_GRPC_PORT: "7271"
