@@ -240,25 +240,35 @@ deferred to the deployment pipeline — Veles/Echo precedent). Reports land in
 
 ## Container & deployment
 
-```bash
-# Build the Docker image (tagged ttr-nlp:dev) — repo-root build context so the
-# uv path-deps (../../shared/...) resolve.
-just build-py services/ttr-nlp
+The front and each engine backend are **separate images** (RG-P1.S2/S3):
 
-# Build + deploy to local K3s (applies k8s/overlays/local)
-just deploy-py services/ttr-nlp
+| Image | Dockerfile | Contents |
+|---|---|---|
+| `ttr-nlp` (front) | `Dockerfile` | engine-free front (gRPC + REST mirror); no models needed at run time |
+| `ttr-nlp-morphodita` | `backends/morphodita/Dockerfile` | `morphodita_server` + baked `czech-morfflex2.0-pdtc1.0-220710` (S2) |
+| `ttr-nlp-nametag3` | `backends/nametag3/Dockerfile` | `nametag3_server.py` + baked `nametag3-czech-cnec2.0-240830` + RobeCzech PLM (S2) |
+| Stanza / spaCy backends | *(RG-P1.S3)* | baked Stanza cs+en / spaCy `en_core_web_md` |
+
+Backend images target the **x86 cluster** (`docker buildx build --platform
+linux/amd64 …`); UFAL models are **CC BY-NC-SA** (FI-4 — building/running is
+fine, **publishing** the images is the gated legal item). The pinned model
+download URLs (LINDAT) resolve; set the `MODEL_SHA256` build-arg to the verified
+digest on the first build (digest-pin). Local **offline** bring-up (front + both
+backends, no Lindat egress):
+
+```bash
+docker compose -f services/ttr-nlp/docker-compose.offline.yml up   # see the file header for build + hero-parse recipes
 ```
 
 ### Image-size strategy (cached model layer)
 
-The NLP engine models (Stanza `cs`+`en`, spaCy `en_core_web_md`) dominate image
-size and build time, so the Dockerfile isolates them in a dedicated `models`
-stage that depends **only** on the dependency layer (`pyproject.toml` +
-`uv.lock`). App-source edits invalidate only the final thin `runtime` COPY
-layers — never the heavy model download (the Metis/prophet "cached base layer"
-pattern, `metis/architecture.md` §2). NameTag / MorphoDiTa use the remote UFAL
-endpoints, so no local model is bundled for them; the only bundled engines are
-Stanza + spaCy.
+Each backend isolates its baked model in a dedicated stage so app/config edits
+never invalidate the heavy model layer (the Metis/prophet "cached base layer"
+pattern). Sizing (Q-10 §3/§5): MorphoDiTa ~250 MB / sub-10 ms / scales with
+concurrency; NameTag 3 ~1.1 GB / ~72 ms p50 / ~12 rps per replica → **scale by
+replicas**, ~5 s cold start. The front carries no models (Stanza/spaCy move to
+their own images in S3; their bake in the front Dockerfile is dead weight the S3
+engine-free-front task strips, with torch).
 
 | Stage | Holds | Cache-busts on |
 |-------|-------|----------------|

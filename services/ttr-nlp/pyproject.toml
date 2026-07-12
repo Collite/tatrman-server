@@ -49,6 +49,10 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# Component tier (real backends: MorphoDiTa/NameTag 3 self-hosted + Lindat) is
+# opt-in — excluded by default so the unit suite needs no network. Run it with
+# `just test-py services/ttr-nlp -m component` once the backend images are up.
+addopts = ["-m", "not component"]
 # `src/` layout: put it on sys.path so `from nlp_service...` resolves under
 # `uv run pytest` (the package is intentionally not installed — see above).
 # `generated/` carries the grpcio-tools-produced `org.tatrman.*` proto stubs

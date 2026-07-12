@@ -23,6 +23,27 @@ from nlp_service.engines.base import EngineResult, NerEntity, NlpOp
 
 logger = logging.getLogger(__name__)
 
+# CNEC 2.0 leading-class-letter → universal entity type. The tagset is
+# fine-grained (gu=city, gc=country, pf=firstname, ps=surname, if=firm/inst,
+# oa=artifact/product, th=time-interval, …); the resolver's universal path wants
+# coarse classes. Map by the FIRST letter (case-insensitive); anything unmapped
+# collapses to MISC so an entity is NEVER silently dropped (the leading-letter
+# brittleness this guards). Boundary note: products (`o*`) surface as MISC — the
+# resolver's DOMAIN path (fuzzy over declared vocabulary), not this NER label,
+# is what actually resolves product names like "Octavie".
+_CNEC_CLASS_TO_UNIVERSAL = {
+    "p": "PERSON",       # personal names
+    "g": "LOCATION",     # geographical
+    "i": "ORGANIZATION", # institutions
+    "t": "DATE",         # time expressions
+}
+
+
+def _cnec_to_universal(cnec_tag: str) -> str:
+    if not cnec_tag:
+        return "MISC"
+    return _CNEC_CLASS_TO_UNIVERSAL.get(cnec_tag[0].lower(), "MISC")
+
 
 class Nametag3Engine:
     def __init__(self, backend: BackendConfig):
@@ -58,7 +79,10 @@ class Nametag3Engine:
                 "data": text,
                 "model": model,
                 "input": "untokenized",
-                "output": "vertical",
+                # output=conll gives the BIO `word\tB-/I-/O` form this adapter
+                # parses. (output=vertical is a different `idx\ttype\ttext` shape —
+                # NOT what _parse_vertical expects.)
+                "output": "conll",
             }
 
             result_text = None
@@ -108,14 +132,39 @@ class Nametag3Engine:
         self._rate_queue.append(time.time())
 
     def _parse_vertical(self, vertical_text: str, original_text: str) -> list[NerEntity]:
-        """Parse NameTag vertical (`word\\tB-/I-/O` tags) into NER entities."""
+        """Parse NameTag vertical (`word\\tB-/I-/O` tags) into NER entities.
+
+        `NerEntity` is frozen, so accumulate each entity's words/tag in locals
+        and build it once at close (a B-/O boundary or EOF). The CNEC class maps
+        to a universal label; the raw CNEC tag is preserved in normalized_value.
+        """
         entities: list[NerEntity] = []
         if not vertical_text:
             return entities
 
-        lines = vertical_text.strip().split("\n")
-        current_entity: NerEntity | None = None
-        for line in lines:
+        words: list[str] = []
+        cnec = ""
+        start = -1
+        cursor = 0
+
+        def _flush() -> None:
+            nonlocal words, cnec, start
+            if not words:
+                return
+            text = " ".join(words)
+            entities.append(
+                NerEntity(
+                    text=text,
+                    label=_cnec_to_universal(cnec),
+                    char_start=start,
+                    char_end=(start + len(text)) if start >= 0 else 0,
+                    normalized_value=f"cnec:{cnec}",
+                    source_engine=self.name,
+                )
+            )
+            words, cnec, start = [], "", -1
+
+        for line in vertical_text.strip().split("\n"):
             parts = line.split("\t")
             if len(parts) < 2:
                 continue
@@ -123,27 +172,20 @@ class Nametag3Engine:
             tag = parts[1].strip()
 
             if tag == "O":
-                if current_entity:
-                    entities.append(current_entity)
-                    current_entity = None
+                _flush()
             elif tag.startswith("B-"):
-                if current_entity:
-                    entities.append(current_entity)
-                current_entity = NerEntity(
-                    text=word,
-                    label=tag[2:],
-                    char_start=original_text.find(word) if word in original_text else -1,
-                    char_end=0,
-                    normalized_value="",
-                    source_engine=self.name,
-                )
-            elif tag.startswith("I-") and current_entity:
-                current_entity.text += " " + word
+                _flush()
+                cnec = tag[2:]
+                found = original_text.find(word, cursor)
+                start = found
+                if found >= 0:
+                    cursor = found + len(word)
+                words = [word]
+            elif tag.startswith("I-") and words:
+                words.append(word)
+                found = original_text.find(word, cursor)
+                if found >= 0:
+                    cursor = found + len(word)
 
-        if current_entity:
-            entities.append(current_entity)
-
-        for ent in entities:
-            if ent.char_start >= 0:
-                ent.char_end = ent.char_start + len(ent.text)
+        _flush()
         return entities

@@ -10,9 +10,11 @@ image:
 
 imagePullSecrets: []
 
-# HTTP port only — uvicorn. (No gRPC.)
+# Front ports: gRPC is the service contract (RG-P1.S1); HTTP is the dev/health
+# mirror (uvicorn).
 ports:
   http: 7270
+  grpc: 7271
 
 service:
   type: ClusterIP
@@ -54,3 +56,38 @@ podAnnotations: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# ── RG-P1.S2/S3 self-hosted engine backends ────────────────────────────────
+# Separate workloads (own images, models baked, independent scaling). The front
+# is engine-free and reaches these over the uniform / native HTTP protocols;
+# the front's httpx client is OTel-instrumented, so front→backend calls are
+# traced without the backends self-instrumenting. Resource requests are the
+# Q-10 §5 sizing (arm64 dev numbers — re-baseline on the x86 cluster).
+backends:
+  # MorphoDiTa (S2) — cs tokenize/lemma/POS. C++, featherweight, scales with
+  # concurrency. --max_request_size raised for BatchLemmatize.
+  morphodita:
+    enabled: true
+    image:
+      repository: ghcr.io/collite/ttr-nlp-morphodita
+      tag: ""
+      pullPolicy: IfNotPresent
+    port: 8080
+    replicaCount: 1
+    resources:
+      requests: { cpu: 250m, memory: 384Mi }
+      limits: { memory: 512Mi }
+  # NameTag 3 (S2) — cs/en NER. torch CPU, thread-bound (~12 rps/replica) →
+  # scale by replicas; generous readiness for the ~5 s cold start.
+  nametag3:
+    enabled: true
+    image:
+      repository: ghcr.io/collite/ttr-nlp-nametag3
+      tag: ""
+      pullPolicy: IfNotPresent
+    port: 8001
+    replicaCount: 2
+    resources:
+      requests: { cpu: "1", memory: 1536Mi }
+      limits: { memory: 2Gi }
+  # Stanza + spaCy backends land in RG-P1.S3.

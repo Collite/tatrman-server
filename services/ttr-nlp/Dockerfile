@@ -1,15 +1,16 @@
-# ttr-nlp (NLP foundation service; formerly Kadmos) — multi-stage Dockerfile.
+# ttr-nlp engine-free FRONT — multi-stage Dockerfile.
 #
-# Image-size / build-time strategy (the Metis/prophet "cached base layer"
-# pattern — metis/architecture.md §2 container row): the NLP engine models
-# (Stanza cs+en, spaCy en_core_web_md) dominate image size and build time, so
-# they live in a dedicated `models` stage that depends ONLY on the dependency
-# layer (pyproject + uv.lock). App-source changes invalidate only the final
-# thin `runtime` COPY layers — never the heavy model download. NameTag /
-# MorphoDiTa run against the remote UFAL endpoints (config.yaml), so no local
-# model is bundled for them.
+# RG-P1: the front is the gRPC contract server (NlpService on :7271) + a REST
+# dev/health mirror (:7270). It owns its generated org.tatrman.{nlp,common}.v1
+# Python stubs (produced from the shared .proto by scripts/gen_proto.py at build
+# — NOT the shared-proto package, which emits messages only and would collide).
 #
-# Build from the repo root so the uv path-deps (../../shared/...) resolve:
+# NOTE (S2): the model-bearing engines are now separate backend images (S2/S3);
+# the front reaches them over HTTP. The Stanza/spaCy model bake below is dead
+# weight the S3 engine-free-front task strips (with torch); kept here only so the
+# image keeps building until then.
+#
+# Build from the repo root (uv path-deps + the proto tree resolve there):
 #   docker build -t ttr-nlp:dev -f services/ttr-nlp/Dockerfile .
 
 FROM python:3.13-slim-bookworm AS base
@@ -28,99 +29,63 @@ WORKDIR /app
 # ===== dependencies layer =====
 FROM base AS deps
 
-# Mirror the repo layout inside the image so that the lockfile's relative
-# path dependencies (e.g. ../../shared/libs/python/otel-config) resolve
-# *within* the workspace root. uv refuses to normalize paths that escape
-# the project root, so the project must live at the same depth as in the
-# source repo.
 WORKDIR /build/services/ttr-nlp
-
-# Copy local path dependencies (shared libs) so uv can resolve them
 COPY shared/libs/python/otel-config /build/shared/libs/python/otel-config
-COPY shared/proto/build/python-package /build/shared/proto/build/python-package
-
 COPY services/ttr-nlp/pyproject.toml services/ttr-nlp/uv.lock ./
 RUN pip install --upgrade pip && pip install uv && uv sync --frozen
 
-# ===== model download layer (the cached base — see header) =====
-FROM deps AS models
-
-# Use the uv-managed venv so `stanza`, `spacy`, etc. are importable.
+# ===== proto generation layer (org.tatrman.{nlp,common}.v1 stubs) =====
+FROM deps AS protogen
 ENV PATH="/build/services/ttr-nlp/.venv/bin:${PATH}"
+# The canonical .proto source + the gen script.
+COPY shared/proto/src/main/proto /build/shared/proto/src/main/proto
+COPY services/ttr-nlp/scripts ./scripts
+RUN python scripts/gen_proto.py   # → /build/services/ttr-nlp/generated/org/...
 
-# Create model directory
+# ===== model download layer (dead weight until S3 strips it; see header) =====
+FROM deps AS models
+ENV PATH="/build/services/ttr-nlp/.venv/bin:${PATH}"
 RUN mkdir -p /opt/nlp-models/stanza
-
-# Download Stanza models (cs and en) at build time
-# This avoids slow first-call downloads in production
 RUN python - <<'PY'
-import os
 import stanza
-
-model_dir = "/opt/nlp-models/stanza"
 for lang in ["cs", "en"]:
-    print(f"Downloading Stanza {lang} model...")
-    stanza.download(lang, model_dir=model_dir)
-    print(f"Stanza {lang} model downloaded")
+    stanza.download(lang, model_dir="/opt/nlp-models/stanza")
 PY
-
-# Download spaCy en_core_web_md model
-RUN python - <<'PY'
-import subprocess
-print("Downloading spaCy en_core_web_md model...")
-subprocess.run(["python", "-m", "spacy", "download", "en_core_web_md"], check=True, capture_output=True)
-print("spaCy model downloaded")
-PY
+RUN python -m spacy download en_core_web_md
 
 # ===== runtime layer (thin app layer) =====
 FROM base AS runtime
 
-# Create non-root user
 RUN useradd -ms /bin/bash appuser
-USER appuser
 WORKDIR /app
 
-# Copy installed site-packages and the project virtualenv from deps layer.
-# The venv contains editable installs whose `.pth` files reference paths
-# under /build/shared/..., so we must preserve that tree at runtime too.
-USER root
 COPY --from=deps /usr/local /usr/local
 COPY --from=deps /build/services/ttr-nlp/.venv /build/services/ttr-nlp/.venv
 COPY --from=deps /build/shared /build/shared
-
-# Copy pre-downloaded models and hand them to appuser. Stanza's Pipeline()
-# init writes lock + temp files inside the model_dir even when the models
-# are already present (see stanza/utils/atomic_save.py), so root-owned
-# /opt/nlp-models would 13-EACCES at runtime under appuser.
+COPY --from=protogen /build/services/ttr-nlp/generated ./generated
 COPY --from=models /opt/nlp-models /opt/nlp-models
 RUN chown -R appuser:appuser /opt/nlp-models
 
-# Set stanza model directory
-ENV STANZA_RESOURCES_DIR=/opt/nlp-models/stanza
-
 USER appuser
-
-# Copy app source
 COPY --chown=appuser:appuser services/ttr-nlp/pyproject.toml services/ttr-nlp/README.md ./
 COPY --chown=appuser:appuser services/ttr-nlp/src ./src
 COPY --chown=appuser:appuser services/ttr-nlp/config.yaml ./
 
-# Environment variables
-# Prepend the uv-managed venv so its site-packages (which contain the
-# editable installs of the shared libs) are picked up at runtime.
 ENV PATH="/build/services/ttr-nlp/.venv/bin:${PATH}"
-ENV PYTHONPATH=/app/src
+# `generated/` carries the proto stubs; `src/` the app.
+ENV PYTHONPATH=/app/src:/app/generated
 ENV CONFIG_FILE=/app/config.yaml
 ENV NLP_SERVICE_OTEL_PROTOCOL=grpc
+ENV NLP_SERVICE_HOST=0.0.0.0 \
+    NLP_SERVICE_PORT=7270 \
+    NLP_SERVICE_GRPC_PORT=7271
 
-# Networking and health
-EXPOSE ${UVICORN_PORT:-7270}
+EXPOSE 7270 7271
 
-# Container-level HEALTHCHECK using /healthz
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:${UVICORN_PORT:-7270}/healthz || exit 1
+# Health via the REST mirror.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:${NLP_SERVICE_PORT:-7270}/healthz || exit 1
 
-# Uvicorn startup
-ENV UVICORN_HOST=0.0.0.0
-ENV UVICORN_PORT=7270
-CMD ["sh", "-c", "exec uvicorn nlp_service.api.routes:app --host ${UVICORN_HOST:-0.0.0.0} --port ${UVICORN_PORT:-7270}"]
+# main.py runs BOTH servers on one loop: gRPC (:7271, the contract) + uvicorn
+# REST mirror (:7270).
+CMD ["python", "src/main.py"]
