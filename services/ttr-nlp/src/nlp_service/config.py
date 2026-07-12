@@ -108,7 +108,12 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
     elif env_cfg:
         cfg_path = Path(env_cfg)
     else:
-        cfg_path = Path(__file__).parent.parent / "config.yaml"
+        # config.yaml lives at the SERVICE ROOT (services/ttr-nlp/config.yaml),
+        # three levels up from this file (src/nlp_service/config.py) — NOT src/.
+        # (The container sets CONFIG_FILE explicitly; this default matters for
+        # local/non-container boots, where a wrong path silently dropped the
+        # pinned models to empty AppConfig() defaults.)
+        cfg_path = Path(__file__).resolve().parent.parent.parent / "config.yaml"
 
     data = _read_yaml_config(cfg_path)
     config = AppConfig(**data) if data else AppConfig()
