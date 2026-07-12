@@ -45,6 +45,20 @@ class NerEntity:
     source_engine: str = ""  # Which engine produced this entity
 
 
+@dataclass(frozen=True)
+class EngineVersion:
+    """S-1 model-identity echo: which engine+model served an op.
+
+    Mirrors the proto `org.tatrman.nlp.v1.EngineVersion`. Populated on every
+    model-touched response's `used[]` (never a blank `model`).
+    """
+
+    op: str
+    engine: str
+    model: str
+    model_version: str
+
+
 @dataclass
 class EngineResult:
     """Result from a single NLP engine."""

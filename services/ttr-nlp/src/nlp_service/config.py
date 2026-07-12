@@ -1,4 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
+"""ttr-nlp front configuration.
+
+RG-P1.S1: the front is **engine-free** — every model-bearing engine is an
+HTTP-adapter client to a separate backend image (`url`), launched with an
+**explicit model id** (`model`, S-1). Only `langid` (lingua) runs in-process.
+Each backend declares its pinning `tier`: `SELF_HOSTED_PINNED` (in-cluster,
+conformant) or `REMOTE_UNPINNED` (Lindat dev/eval — `RG-NLP-002`).
+"""
+
 from __future__ import annotations
 
 import os
@@ -12,48 +21,40 @@ from pydantic import BaseModel, Field
 class ServiceConfig(BaseModel):
     host: str = Field(default="0.0.0.0", validation_alias="NLP_SERVICE_HOST")
     port: int = Field(default=7270, validation_alias="NLP_SERVICE_PORT")
+    grpc_port: int = Field(default=7271, validation_alias="NLP_SERVICE_GRPC_PORT")
 
 
-class StanzaEngineConfig(BaseModel):
+class BackendConfig(BaseModel):
+    """A model-bearing engine served by its own backend image (or Lindat).
+
+    `model` is the explicit model id sent to the backend and echoed on every
+    response (S-1) — never empty for an enabled model-bearing engine.
+    """
+
     enabled: bool = True
-    model_dir: str = "/opt/nlp-models/stanza"
-
-
-class SpacyEngineConfig(BaseModel):
-    enabled: bool = True
-    model_name: str = "en_core_web_md"
-
-
-class NametagEngineConfig(BaseModel):
-    enabled: bool = True
-    # `/services/nametag` 301-redirects to a landing page; the REST API is at
-    # `/api/recognize` (kept in sync with config.yaml).
-    endpoint: str = "https://lindat.mff.cuni.cz/services/nametag/api/recognize"
+    url: str = ""              # backend base URL (in-cluster) or Lindat endpoint
+    model: str = ""            # explicit model id (S-1)
+    model_version: str = ""    # backend-reported version / handle
+    tier: str = "SELF_HOSTED_PINNED"  # or REMOTE_UNPINNED (Lindat dev/eval)
     timeout_seconds: int = 30
     max_retries: int = 3
-    rate_limit_per_minute: int = 5
+    # >0 only for the remote (Lindat) dev tier; self-hosted backends are unthrottled.
+    rate_limit_per_minute: int = 0
 
 
 class LangidEngineConfig(BaseModel):
-    enabled: bool = True
+    """The one engine that stays in the front — lingua, tiny, no model files."""
 
-
-class MorphoditaEngineConfig(BaseModel):
-    # On by default: Czech tokenize/lemmatize/POS route through morphodita
-    # (config.yaml), so a config-less boot must not silently lose cs morphology.
     enabled: bool = True
-    # REST API at `/api/tag` (same shape as nametag/api/recognize).
-    endpoint: str = "https://lindat.mff.cuni.cz/services/morphodita/api/tag"
-    timeout_seconds: int = 30
-    max_retries: int = 3
-    rate_limit_per_minute: int = 5
+    model: str = "lingua"
+    model_version: str = "lingua-2.0"
 
 
 class EnginesConfig(BaseModel):
-    stanza: StanzaEngineConfig = Field(default_factory=StanzaEngineConfig)
-    spacy: SpacyEngineConfig = Field(default_factory=SpacyEngineConfig)
-    nametag: NametagEngineConfig = Field(default_factory=NametagEngineConfig)
-    morphodita: MorphoditaEngineConfig = Field(default_factory=MorphoditaEngineConfig)
+    morphodita: BackendConfig = Field(default_factory=BackendConfig)
+    nametag3: BackendConfig = Field(default_factory=BackendConfig)
+    stanza: BackendConfig = Field(default_factory=BackendConfig)
+    spacy: BackendConfig = Field(default_factory=BackendConfig)
     langid: LangidEngineConfig = Field(default_factory=LangidEngineConfig)
 
 
@@ -66,18 +67,13 @@ class AppConfig(BaseModel):
 
 
 def load_config(config_path: Optional[str] = None) -> AppConfig:
-    """Load configuration from YAML file with optional environment variable overrides.
-
-    CONFIG_FILE env var can override the default config path.
-    """
-    # Determine config file path
+    """Load configuration from YAML with optional `CONFIG_FILE` override."""
     env_cfg = os.getenv("CONFIG_FILE")
     if config_path:
         cfg_path = Path(config_path)
     elif env_cfg:
         cfg_path = Path(env_cfg)
     else:
-        # Default to config.yaml in the same directory as this file's parent
         cfg_path = Path(__file__).parent.parent / "config.yaml"
 
     data = _read_yaml_config(cfg_path)

@@ -7,7 +7,32 @@ The **NLP foundation service** for kantheon — multi-engine analysis (Stanza, s
 
 ## Overview
 
-`services/ttr-nlp` is a stateless Python/FastAPI service that provides NLP operations (tokenize, lemmatize, POS, dependency parse, NER, language detection) via a plugin-based engine architecture, with per-op-per-language routing (Czech routed through the UFAL stack). It is the NLP foundation consumed by Themis (via `tools/ttr-nlp-mcp`) and Echo. HTTP at v1; proto types fork as `org.tatrman.nlp.v1` (no gRPC binding). Default HTTP port **7270**.
+`services/ttr-nlp` provides NLP operations (tokenize, lemmatize, POS, dependency
+parse, NER, language detection) with per-op-per-language routing (Czech through
+the UFAL stack). It is the NLP foundation consumed by Themis (via
+`tools/ttr-nlp-mcp`) and Echo.
+
+**RG-P1.S1 (Resolution & Grounding, workstream C):**
+
+- **gRPC is the service contract** — `org.tatrman.nlp.v1.NlpService`
+  (`Analyze` / `BatchLemmatize` / `GetStatus`) on port **7271**. The FastAPI
+  REST endpoint (port **7270**) is a **dev/health mirror only**.
+- **The front is engine-free** — no in-process torch/models. Every model-bearing
+  engine (MorphoDiTa, NameTag 3, Stanza, spaCy) is an **HTTP-adapter client** to
+  its own backend image; only `langid` (lingua) runs in-front. Backends land in
+  S2 (MorphoDiTa + NameTag 3) and S3 (Stanza + spaCy).
+- **S-1 (model identity on the wire)** — every backend is launched with an
+  **explicit model id**; every response echoes `used[]` (engine + model +
+  version), never blank. `GetStatus` returns the capability matrix with each
+  routed (language, op)'s pinning `tier` (`SELF_HOSTED_PINNED` /
+  `REMOTE_UNPINNED`). Diagnostics: `RG-NLP-002` (Lindat/unpinned), `RG-NLP-003`
+  (empty model), `RG-NLP-010` (degrade floor).
+
+> **Proto stubs.** ttr-nlp owns its generated `org.tatrman.{nlp,common}.v1`
+> Python stubs under `generated/` (gitignored), produced from the shared
+> `.proto` source by `scripts/gen_proto.py` (a pytest conftest regenerates them
+> on demand). The `.proto` file remains the single canonical source; the Kotlin
+> consumer's gRPC stubs come from `:shared:proto`.
 
 ## Supported Operations
 

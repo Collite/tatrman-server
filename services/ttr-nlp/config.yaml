@@ -1,76 +1,90 @@
-# Nlp (NLP) Service Configuration
-# Engine plugin architecture with per-op-per-language routing
+# ttr-nlp front configuration (RG-P1.S1)
+#
+# The front is ENGINE-FREE: every model-bearing engine is an HTTP-adapter client
+# to its own backend image (`url`), launched with an EXPLICIT model id (`model`,
+# S-1). Only `langid` (lingua) runs in-process. Each backend declares its
+# pinning `tier`: SELF_HOSTED_PINNED (in-cluster, conformant) or REMOTE_UNPINNED
+# (Lindat dev/eval — RG-NLP-002).
+#
+# NOTE (S1): the self-hosted MorphoDiTa + NameTag 3 backend IMAGES land in
+# RG-P1.S2 and Stanza + spaCy in RG-P1.S3. The in-cluster URLs below are the
+# target state; the Lindat dev endpoints (commented) are the selectable
+# REMOTE_UNPINNED tier the S2.T4 repoint toggles between.
 
 service:
   host: "0.0.0.0"
-  port: 7270
+  port: 7270        # REST mirror (dev/health only)
+  grpc_port: 7271   # gRPC — the service contract
 
-# Engine instances configuration
 engines:
+  # ---- self-hosted backends (models baked, digest-pinned; RG-P1.S2/S3) ----
+  morphodita:
+    enabled: true
+    url: "http://ttr-nlp-morphodita:8080/tag"
+    model: "czech-morfflex2.0-pdtc1.0-220710"   # = czech-morfflex2.0+pdtc (Q-10)
+    model_version: "czech-morfflex2.0-pdtc1.0-220710"
+    tier: "SELF_HOSTED_PINNED"
+    timeout_seconds: 30
+    max_retries: 3
+    # Dev/eval REMOTE_UNPINNED tier (S2.T4 env-toggle):
+    #   url: "https://lindat.mff.cuni.cz/services/morphodita/api/tag"
+    #   tier: "REMOTE_UNPINNED"
+    #   rate_limit_per_minute: 5
+
+  nametag3:
+    enabled: true
+    url: "http://ttr-nlp-nametag3:8001/recognize"
+    model: "nametag3-czech-cnec2.0-240830"       # Q-10
+    model_version: "nametag3-czech-cnec2.0-240830"
+    tier: "SELF_HOSTED_PINNED"
+    timeout_seconds: 60      # torch CPU; generous per Q-10 cold-start
+    max_retries: 3
+    # Dev/eval REMOTE_UNPINNED tier:
+    #   url: "https://lindat.mff.cuni.cz/services/nametag/api/recognize"
+    #   tier: "REMOTE_UNPINNED"
+    #   rate_limit_per_minute: 5
+
   stanza:
     enabled: true
-    # Stanza downloads models on first use; we bundle them in the Docker image
-    # Model directory is pre-populated via startup script
-    model_dir: "/opt/nlp-models/stanza"
+    url: "http://ttr-nlp-stanza:8090"
+    model: "stanza-cs-en"
+    model_version: "stanza-1.10.0"
+    tier: "SELF_HOSTED_PINNED"
+    timeout_seconds: 60
 
   spacy:
     enabled: true
-    # spaCy model bundled in Docker image
-    model_name: "en_core_web_md"
-
-  nametag:
-    enabled: true
-    # UFAL public endpoint. `/services/nametag` 301-redirects to a landing
-    # HTML page; the real REST API is at `/api/recognize`.
-    endpoint: "https://lindat.mff.cuni.cz/services/nametag/api/recognize"
+    url: "http://ttr-nlp-spacy:8091"
+    model: "en_core_web_md"
+    model_version: "en_core_web_md-3.8.0"
+    tier: "SELF_HOSTED_PINNED"
     timeout_seconds: 30
-    max_retries: 3
-    rate_limit_per_minute: 5  # configurable as requested
-
-  morphodita:
-    enabled: true
-    # UFAL public endpoint — same `/api/tag` shape as nametag/api/recognize.
-    endpoint: "https://lindat.mff.cuni.cz/services/morphodita/api/tag"
-    timeout_seconds: 30
-    max_retries: 3
-    rate_limit_per_minute: 5
 
   langid:
     enabled: true
-    # lingua-language-detector is a local library, no external endpoint
+    model: "lingua"
+    model_version: "lingua-2.0"
 
-# Per-operation routing: which engine handles which op per language
-# Format: {op}.{language} -> engine_name
-# Fallback chain: if primary engine unavailable, try fallback
+# Per-op-per-language routing: {op}.{lang} -> engine name (+ optional .fallback).
 op_routing:
-  # Czech (cs) — UFAL stack is best-in-class for Czech, and Stanza's bundled
-  # cs model has no NER head (default.pt missing), so we route around it.
-  #   tokenize / sentence_split / lemmatize / POS  → morphodita (/api/tag
-  #     returns vertical word\tlemma\ttag with blank-line sentence breaks)
-  #   NER                                          → nametag (/api/recognize)
-  #   dep_parse                                    → stanza (the one cs op
-  #     Stanza handles cleanly once the broken `ner` processor is excluded)
+  # Czech (cs) — UFAL stack; Stanza's cs bundle has no NER head, so NER routes
+  # to NameTag 3 and DEP_PARSE (the resolver's span-proposal feed) to Stanza.
   TOKENIZE.cs: "morphodita"
   SENTENCE_SPLIT.cs: "morphodita"
   LEMMATIZE.cs: "morphodita"
   POS_TAG.cs: "morphodita"
   DEP_PARSE.cs: "stanza"
-  NER.cs: "nametag"
-  NER.cs.fallback: ""    # No fallback — stanza-cs has no NER model.
+  NER.cs: "nametag3"
 
   # English (en)
   TOKENIZE.en: "stanza"
   LEMMATIZE.en: "stanza"
   POS_TAG.en: "stanza"
   DEP_PARSE.en: "stanza"
-  NER.en: "stanza"      # Stanza for English NER
-  NER.en.fallback: "spacy"  # spaCy as fallback for English NER
+  NER.en: "stanza"
+  NER.en.fallback: "spacy"
 
-  # Language detection - special handling
   DETECT_LANGUAGE: "langid"
 
-# Default language when not specified and DETECT_LANGUAGE not requested
 default_language: "cs"
-
-# Logging
 log_level: "INFO"

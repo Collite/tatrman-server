@@ -61,9 +61,6 @@ dependencies {
     api(libs.otel.logback.appender)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.cio)
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.cio)
-    implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.server.cors)
     implementation(libs.ktor.server.call.logging)
@@ -87,8 +84,14 @@ dependencies {
     implementation(project(":shared:libs:kotlin:logging-config"))
     implementation(project(":shared:libs:kotlin:capabilities-client"))
 
-    // Nlp is HTTP-only at v1: no gRPC, no `:services:ttr-nlp` project dep
-    // (that's a Python module). The wrapper speaks JSON to nlp:7270.
+    // Nlp speaks gRPC at v1 (RG-P1.S1 — gRPC is the service contract; REST is a
+    // dev/health mirror). The generated `org.tatrman.nlp.v1` Kotlin stubs come
+    // from `:shared:proto` (the `.proto` is the single source; the Python front
+    // owns its own generated stubs). No `:services:ttr-nlp` dep — that's Python.
+    implementation(project(":shared:proto"))
+    implementation(libs.grpc.kotlin.stub)
+    implementation(libs.grpc.netty.shaded)
+
     implementation(libs.ktor.opentelemetry)
     implementation(libs.micrometer.registry.prometheus)
 

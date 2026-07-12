@@ -7,8 +7,14 @@ syntax = "proto3";
 // org.tatrman.nlp.v1; the Rule-6 messages=99 field re-targeted from
 // com.tatrman.metadata.v1.ResponseMessage to the kantheon stand-in
 // org.tatrman.common.v1.ResponseMessage. NLP wire shapes are otherwise
-// unchanged (fork principle: wire shapes fork unchanged). HTTP at v1 — types
-// only, no gRPC service binding. themis/v1's nlp.v1 import is swapped in Stage 2.6.
+// unchanged (fork principle: wire shapes fork unchanged). themis/v1's nlp.v1
+// import is swapped in Stage 2.6.
+//
+// RG-P1.S1 (Resolution & Grounding, workstream C): the `NlpService` gRPC
+// binding is added — gRPC is now the service contract, REST mirrors it for
+// dev/health only (contracts §1). Additive-only over the forked wire shapes:
+// `BatchLemmatize` (RS-6), `GetStatus`/capability matrix (RS-7), `EngineVersion`
+// `used[]` echo (S-1: model identity on the wire), and the `Tier` label.
 
 package org.tatrman.nlp.v1;
 
@@ -37,6 +43,16 @@ enum Mode {
   MODE_UNSPECIFIED = 0;
   NORMAL = 1;
   COMPARE = 2;
+}
+
+// RG-P1 (S-1): the pinning tier a routed (language, op) resolves to.
+// SELF_HOSTED_PINNED = in-cluster backend launched with an explicit model id
+// (conformant). REMOTE_UNPINNED = Lindat (dev/eval only; non-conformant for
+// parity/determinism claims — surfaced as RG-NLP-002).
+enum Tier {
+  TIER_UNSPECIFIED = 0;
+  SELF_HOSTED_PINNED = 1;
+  REMOTE_UNPINNED = 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,5 +120,72 @@ message AnalyzeResponse {
   map<string, EngineResult> by_engine = 8;  // populated only in COMPARE mode
   string trace_id = 9;
   int64 elapsed_ms = 10;
+  // RG-P1 additions (contracts §1). `detected_language` is the contract-named
+  // echo of `language`; `used` is the S-1 model-identity channel — one entry
+  // per op that ran, ALWAYS populated (never a blank model), so consumers get
+  // cache keys + provenance and the RG-NLP-002/003 tiers are observable.
+  string detected_language = 11;
+  repeated EngineVersion used = 12;
   repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+}
+
+// ---------------------------------------------------------------------------
+// S-1 — model identity on the wire (contracts §6). Echoed on every
+// model-touched response; no empty/default model anywhere.
+// ---------------------------------------------------------------------------
+
+message EngineVersion {
+  string op = 1;             // the NlpOp this engine served (name form)
+  string engine = 2;         // e.g. "morphodita", "nametag3", "stanza", "spacy"
+  string model = 3;          // explicit model id — NEVER empty (S-1)
+  string model_version = 4;  // backend-reported version / handle
+}
+
+// ---------------------------------------------------------------------------
+// BatchLemmatize (RS-6 / C4-T2) — the throughput path for fuzzy's RG-P2 lemma
+// axis. Shape sized by Q-11 (≤100k short strings; batches to the backend hop).
+// ---------------------------------------------------------------------------
+
+message BatchLemmatizeRequest {
+  repeated string texts = 1;
+  string language = 2;       // empty ⇒ langid detect, fallback = deployment default
+}
+
+message LemmaList {
+  repeated string lemmas = 1;  // lemmas for one input text, in token order
+}
+
+message BatchLemmatizeResponse {
+  repeated LemmaList results = 1;   // positional to BatchLemmatizeRequest.texts
+  repeated EngineVersion used = 2;  // S-1
+}
+
+// ---------------------------------------------------------------------------
+// GetStatus / capability matrix (RS-7). One row per routed (language, op),
+// built from config + backend readiness — not hardcoded.
+// ---------------------------------------------------------------------------
+
+message StatusRequest {}
+
+message Capability {
+  string language = 1;
+  NlpOp op = 2;
+  string engine = 3;
+  string model_version = 4;
+  Tier tier = 5;
+}
+
+message StatusResponse {
+  bool ready = 1;
+  repeated Capability capabilities = 2;  // the capability matrix
+}
+
+// ---------------------------------------------------------------------------
+// Service (RG-P1.S1). gRPC is the contract; the REST mirror is dev/health only.
+// ---------------------------------------------------------------------------
+
+service NlpService {
+  rpc Analyze        (AnalyzeRequest)        returns (AnalyzeResponse);
+  rpc BatchLemmatize (BatchLemmatizeRequest) returns (BatchLemmatizeResponse);
+  rpc GetStatus      (StatusRequest)         returns (StatusResponse);
 }

@@ -56,9 +56,18 @@ class NerEntityResponse(BaseModel):
     sourceEngine: str
 
 
+class EngineVersionResponse(BaseModel):
+    """S-1 model-identity echo (contracts §1 `used[]`)."""
+    op: str
+    engine: str
+    model: str
+    modelVersion: str
+
+
 class AnalyzeResponse(BaseModel):
     """Response model for POST /v1/analyze."""
     language: str
+    detectedLanguage: str
     languageConfidence: float
     engineUsed: str
     tokens: List[TokenResponse]
@@ -66,6 +75,7 @@ class AnalyzeResponse(BaseModel):
     paragraphs: List[Dict[str, int]]
     entities: List[NerEntityResponse]
     byEngine: Dict[str, Any]
+    used: List[EngineVersionResponse]
     traceId: str
     elapsedMs: int
     messages: List[Dict[str, Any]]
@@ -142,11 +152,20 @@ def create_app() -> FastAPI:
 
     @app.get("/version")
     def version():
-        engine_info = orchestrator._registry.get_engine_info()
+        matrix = [
+            {
+                "language": row["language"],
+                "op": row["op"].value,
+                "engine": row["engine"],
+                "modelVersion": row["model_version"],
+                "tier": row["tier"],
+            }
+            for row in orchestrator._registry.capability_matrix()
+        ]
         return {
             "service": "nlp-service",
             "version": "0.1.0",
-            "engines": engine_info,
+            "capabilities": matrix,
         }
 
     # Main analysis endpoint
@@ -292,8 +311,19 @@ def create_app() -> FastAPI:
                     [f"{e.text}/{e.label}" for e in result.entities[:10]],
                 )
 
+                used_response = [
+                    EngineVersionResponse(
+                        op=ev.op,
+                        engine=ev.engine,
+                        model=ev.model,
+                        modelVersion=ev.model_version,
+                    )
+                    for ev in result.used
+                ]
+
                 return AnalyzeResponse(
                     language=result.language,
+                    detectedLanguage=result.language,
                     languageConfidence=result.language_confidence,
                     engineUsed=result.engine_used,
                     tokens=tokens_response,
@@ -301,6 +331,7 @@ def create_app() -> FastAPI:
                     paragraphs=paragraphs_response,
                     entities=entities_response,
                     byEngine=by_engine_response,
+                    used=used_response,
                     traceId=result.trace_id,
                     elapsedMs=result.elapsed_ms,
                     messages=result.messages,
