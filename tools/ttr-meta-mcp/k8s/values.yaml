@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: veles-mcp
+  repository: ghcr.io/collite/ttr-meta-mcp
   # Defaults to .Chart.appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent

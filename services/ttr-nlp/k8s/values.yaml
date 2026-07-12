@@ -4,7 +4,7 @@
 replicaCount: 1
 
 image:
-  repository: nlp
+  repository: ghcr.io/collite/ttr-nlp
   tag: ""
   pullPolicy: IfNotPresent
 

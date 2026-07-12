@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: nlp-mcp
+  repository: ghcr.io/collite/ttr-nlp-mcp
   # Defaults to .Chart.appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent

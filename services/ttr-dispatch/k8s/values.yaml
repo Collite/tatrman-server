@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: dispatch
+  repository: ghcr.io/collite/ttr-dispatch
   # Defaults to .Chart.appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent

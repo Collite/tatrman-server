@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: validate
+  repository: ghcr.io/collite/ttr-validate
   # Defaults to .Chart.appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent
