@@ -126,12 +126,7 @@ class FuzzyMatcher(
             }
 
         return results.map { (candidate, score) ->
-            FuzzyMatchResult(
-                candidateId = candidate.id,
-                candidate = candidate.value,
-                score = score,
-                category = category ?: "unknown",
-            )
+            candidate.toResult(score, category, method = "TATRMAN")
         }
     }
 
@@ -150,13 +145,28 @@ class FuzzyMatcher(
                 // Match on folded text so diacritic-only differences don't penalise the score,
                 // but return the candidate's original value to the caller.
                 val score = algorithm.similarity(foldedQuery, TextNormalizer.fold(candidate.value))
-                FuzzyMatchResult(
-                    candidateId = candidate.id,
-                    candidate = candidate.value,
-                    score = score,
-                    category = category ?: "unknown",
-                )
+                candidate.toResult(score, category, method = (algorithmType ?: AlgorithmType.LEVENSHTEIN).name)
             }.sortedByDescending { it.score }
             .take(limit)
     }
 }
+
+/**
+ * Maps a scored [Candidate] to a [FuzzyMatchResult], carrying its source tag +
+ * lexicon target_ref (RS-15) and stamping S-4 provenance (producer=fuzzy,
+ * method=the algorithm that scored it).
+ */
+private fun Candidate.toResult(
+    score: Double,
+    category: String?,
+    method: String,
+): FuzzyMatchResult =
+    FuzzyMatchResult(
+        candidateId = id,
+        candidate = value,
+        score = score,
+        category = category ?: "unknown",
+        source = source,
+        targetRef = targetRef,
+        provenance = Provenance(producer = "fuzzy", method = method, rawScore = score),
+    )

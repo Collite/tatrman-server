@@ -35,6 +35,22 @@ message FuzzyMatchResponse {
   bool is_error = 2;
   string error = 3;
   string matched_algorithm = 4; // Which algorithm produced these results (cascade winner / last tried)
+  // RG-P2 additive (S-1): snapshot hash + per-category load timestamp of the
+  // vocabulary that produced these results. Populated from RG-P2.S2 (refresh).
+  string vocabulary_version = 5;
+}
+
+// RG-P2 (contracts §2, RS-15): how a candidate's category was sourced.
+enum SourceTag {
+  MEMBER = 0;      // data value — candidate_id is a data PK (→ resolved_id)
+  VOCABULARY = 1;  // declared lexicon/valueLabels — carries target_ref
+}
+
+// RG-P2 (S-4): confidence provenance — producer + scoring method + raw score.
+message Provenance {
+  string producer = 1;  // e.g. "fuzzy"
+  string method = 2;    // the algorithm that scored it, e.g. "TATRMAN"
+  double raw_score = 3;
 }
 
 message FuzzyMatch {
@@ -42,4 +58,8 @@ message FuzzyMatch {
   string candidate = 2;
   double score = 3; // Similarity score/distance
   string category = 4;
+  // RG-P2 additive (response-side; the pinned MatchRequest is untouched):
+  SourceTag source = 5;
+  optional string target_ref = 6;  // set iff source = VOCABULARY (→ lexicon target)
+  Provenance provenance = 7;       // S-4
 }
