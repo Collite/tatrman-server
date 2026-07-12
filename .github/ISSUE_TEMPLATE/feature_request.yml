@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest an idea or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Core changes (service contracts / MCP surface / plan
+        wire format) go through the public RFC process — see
+        [GOVERNANCE.md](../blob/master/GOVERNANCE.md). This form is a fine place to
+        start the conversation.
+  - type: dropdown
+    id: track
+    attributes:
+      label: Which part of Tatrman Server?
+      options:
+        - A service / worker / connector (SPI edge)
+        - MCP surface / service contract (core)
+        - Plan wire format / governed query path (core)
+        - Deployment (chart, images, compose)
+        - Docs / DX
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and where does the server get in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like to see? Alternatives you considered?
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope-honesty
+    attributes:
+      label: Scope check
+      options:
+        - label: This might be a large / separable capability (a "parked satellite"), not a small change.

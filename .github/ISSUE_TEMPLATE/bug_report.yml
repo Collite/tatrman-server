@@ -1,0 +1,63 @@
+name: Bug report
+description: Something isn't working the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. For **security** problems, do **not** use this
+        form — see [SECURITY.md](../blob/master/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Which image tag / chart version / commit are you on?
+      placeholder: "e.g. ghcr.io/collite/ttr-query:0.9.4, chart 0.9.4, or a commit SHA"
+    validations:
+      required: true
+  - type: dropdown
+    id: deploy-mode
+    attributes:
+      label: Deployment mode
+      description: How are you running Tatrman Server?
+      options:
+        - Chart (Kubernetes)
+        - Compose / local containers
+        - Individual images
+        - From source
+        - Other / not applicable
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence that triggers the problem.
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Expected vs. actual
+      description: What did you expect to happen, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Provenance / pipeline warnings (if query-related)
+      description: >
+        If the bug is about a governed answer, paste the provenance / pipeline
+        warnings the query surface returned. Redact any real data.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Logs / environment / anything else
+    validations:
+      required: false
