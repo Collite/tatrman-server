@@ -1,0 +1,49 @@
+name: Validate Maven Central token
+
+# Manual credential check — publishes NOTHING. Run it from the Actions tab
+# (Run workflow) after (re)setting the Central Portal secrets. It hits the
+# Publisher API's status endpoint with a throwaway deployment id using the exact
+# Bearer the vanniktech plugin sends — base64(username:password) — and reports
+# whether the token authenticates:
+#   HTTP 401        -> the token is INVALID (wrong user token, or the portal login
+#                      was used instead of a generated token).
+#   HTTP 400 / 404  -> the token is VALID (it authenticated; the fake id just
+#                      does not exist).
+# Uses the SAME secrets the publish workflow uses, so this validates the actual
+# repo secrets, not a local copy.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check-central-token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe the Central Portal token
+        env:
+          MC_USER: ${{ secrets.ORG_GRADLE_PROJECT_mavenCentralUsername }}
+          MC_PASS: ${{ secrets.ORG_GRADLE_PROJECT_mavenCentralPassword }}
+        run: |
+          if [ -z "${MC_USER}" ] || [ -z "${MC_PASS}" ]; then
+            echo "::error::ORG_GRADLE_PROJECT_mavenCentralUsername / ...Password are not both set on this repo."
+            exit 1
+          fi
+          # Exactly what the plugin sends: Bearer base64(user:pass). Never printed.
+          TOKEN=$(printf '%s:%s' "${MC_USER}" "${MC_PASS}" | base64 -w0)
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${TOKEN}" \
+            'https://central.sonatype.com/api/v1/publisher/status?id=00000000-0000-0000-0000-000000000000' \
+            || echo "000")
+          echo "Central Portal responded: HTTP ${CODE}"
+          case "${CODE}" in
+            401)
+              echo "::error::HTTP 401 — the Central Portal token is INVALID. Regenerate a User Token at central.sonatype.com (Account -> Generate User Token) and re-set both ORG_GRADLE_PROJECT_mavenCentral{Username,Password} secrets from the token pair (NOT your login)."
+              exit 1 ;;
+            000|"")
+              echo "::error::Could not reach the Central Portal (network/curl error). Inconclusive."
+              exit 1 ;;
+            *)
+              echo "✅ Token AUTHENTICATED (HTTP ${CODE} is not 401 — the credentials are accepted). Safe to publish."
+              ;;
+          esac
