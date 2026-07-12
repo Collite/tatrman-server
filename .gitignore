@@ -59,3 +59,7 @@ agents/themis/eval/results/
 # Helm: vendored library-chart deps are rebuilt by `just validate-charts`
 **/k8s/charts/
 **/k8s/Chart.lock
+
+# RG-P1.S1 — ttr-nlp Python proto stubs (regenerated from shared/proto via
+# services/ttr-nlp/scripts/gen_proto.py; canonical source is the .proto file).
+services/ttr-nlp/generated/

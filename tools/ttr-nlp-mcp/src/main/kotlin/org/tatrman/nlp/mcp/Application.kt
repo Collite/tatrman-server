@@ -3,12 +3,7 @@ package org.tatrman.nlp.mcp
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO as ClientCIO
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
-import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.serverConfig
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EngineConnectorBuilder
@@ -21,7 +16,6 @@ import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import org.tatrman.capabilities.client.CapabilitiesClient
@@ -41,11 +35,12 @@ fun main(): Unit =
         val telemetry = NlpMcpTelemetry()
         val serverPort = config.getString("server.port").toInt()
 
-        // The analyze call goes over HTTP (POST /v1/analyze) to the nlp
-        // service. The target is read from `nlp.{host,port}` (HOCON resolves
-        // the NLP_HTTP_* env overrides the k8s manifest sets). A blank host →
-        // `null` and the tool surfaces a "not wired" error rather than crashing
-        // boot — local-without-cluster mode (veles-mcp / fuzzy-mcp pattern).
+        // The analyze call goes over gRPC (NlpService.Analyze) to the nlp
+        // service — gRPC is the service contract (RG-P1.S1). The target is read
+        // from `nlp.{host,port}` (HOCON resolves the NLP_GRPC_* env overrides
+        // the k8s manifest sets). A blank host → `null` and the tool surfaces a
+        // "not wired" error rather than crashing boot — local-without-cluster
+        // mode (veles-mcp / fuzzy-mcp pattern).
         val nlpClient: NlpClient? = buildNlpClient(config)
         val tools = Tools(nlpClient, telemetry)
 
@@ -123,32 +118,22 @@ fun main(): Unit =
     }
 
 /**
- * Builds the HTTP client to the nlp service from the `nlp.*` HOCON block.
+ * Builds the gRPC client to the nlp service from the `nlp.*` HOCON block.
  * Returns `null` when the host is blank (local no-backend mode) — the [Tools]
  * then surfaces a "not wired" error on every invocation rather than crashing
- * boot. Mirrors the veles-mcp / fuzzy-mcp pattern.
+ * boot. Mirrors the fuzzy-mcp pattern. The channel connects lazily, so a live
+ * client is returned without requiring the backend to be up at boot.
  */
 internal fun buildNlpClient(config: Config): NlpClient? {
     val host = config.getString("nlp.host")
     if (host.isBlank()) {
-        logger.warn("nlp.host is blank — HTTP client disabled; tools will surface 'not wired'")
+        logger.warn("nlp.host is blank — gRPC client disabled; tools will surface 'not wired'")
         return null
     }
     val port = config.getString("nlp.port").toInt()
     val timeout = config.getInt("nlp.timeout")
-    val httpClient =
-        HttpClient(ClientCIO) {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = timeout.toLong()
-                connectTimeoutMillis = 5_000
-                socketTimeoutMillis = timeout.toLong()
-            }
-        }
-    logger.info("nlp service: $host:$port (timeout: ${timeout}ms)")
-    return NlpClient(httpClient, "http://$host:$port")
+    logger.info("nlp service (gRPC): $host:$port (deadline: ${timeout}ms)")
+    return NlpClient(host, port, deadlineSeconds = (timeout / 1000).toLong().coerceAtLeast(1))
 }
 
 /**

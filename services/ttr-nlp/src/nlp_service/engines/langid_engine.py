@@ -6,6 +6,7 @@ from typing import Set
 
 from lingua import LanguageDetectorBuilder
 
+from nlp_service.config import LangidEngineConfig
 from nlp_service.engines.base import EngineResult, NlpOp
 
 logger = logging.getLogger(__name__)
@@ -14,12 +15,14 @@ logger = logging.getLogger(__name__)
 class LangidEngine:
     """Language detection engine using lingua-language-detector.
 
-    This engine only supports DETECT_LANGUAGE operation.
-    Results are returned as a minimal EngineResult with detected language info
-    stored in the error field (for internal routing purposes).
+    The one engine that stays in the front (tiny, no model files, no torch).
+    Only supports DETECT_LANGUAGE. `model`/`model_version` back the S-1 echo.
     """
 
-    def __init__(self):
+    def __init__(self, config: LangidEngineConfig | None = None):
+        cfg = config or LangidEngineConfig()
+        self.model = cfg.model
+        self.model_version = cfg.model_version
         self._detector = LanguageDetectorBuilder.from_all_languages().build()
 
     @property

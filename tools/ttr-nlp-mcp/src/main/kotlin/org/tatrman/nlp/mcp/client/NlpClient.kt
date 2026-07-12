@@ -1,25 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.nlp.mcp.client
 
-import io.ktor.client.HttpClient
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
-import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
-import io.opentelemetry.context.Context
-import io.opentelemetry.context.propagation.TextMapSetter
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import io.grpc.ManagedChannel
+import io.grpc.ManagedChannelBuilder
+import org.slf4j.LoggerFactory
+import org.tatrman.nlp.v1.AnalyzeRequest
+import org.tatrman.nlp.v1.Mode
+import org.tatrman.nlp.v1.NlpOp
+import org.tatrman.nlp.v1.NlpServiceGrpcKt
+import java.io.Closeable
+import java.util.concurrent.TimeUnit
 
-@Serializable
 data class NlpToken(
     val text: String,
     val charStart: Int,
@@ -32,13 +23,11 @@ data class NlpToken(
     val depRelation: String,
 )
 
-@Serializable
 data class NlpSpan(
     val charStart: Int,
     val charEnd: Int,
 )
 
-@Serializable
 data class NlpEntity(
     val text: String,
     val label: String,
@@ -48,14 +37,20 @@ data class NlpEntity(
     val sourceEngine: String,
 )
 
-@Serializable
 data class NlpMessage(
     val severity: String,
     val code: String,
     val message: String,
 )
 
-@Serializable
+/** S-1 model-identity echo (contracts §1 `used[]`). */
+data class NlpEngineVersion(
+    val op: String,
+    val engine: String,
+    val model: String,
+    val modelVersion: String,
+)
+
 data class NlpAnalyzeResult(
     val language: String,
     val languageConfidence: Double,
@@ -67,20 +62,33 @@ data class NlpAnalyzeResult(
     val traceId: String,
     val elapsedMs: Long,
     val messages: List<NlpMessage>,
+    val used: List<NlpEngineVersion> = emptyList(),
 )
 
 /**
- * HTTP client for the Nlp NLP service. Caller owns [httpClient] and its
- * lifecycle. Timeouts and connection config belong on the injected client.
- * W3C trace context is injected into every request so traces stitch across the
- * boundary. Forked from ai-platform `tools/nlp-mcp` `NlpClient` (Stage 2.3) —
- * the wire is unchanged (`POST /v1/analyze`); only the persona name moves.
+ * gRPC client for `org.tatrman.nlp.v1.NlpService` (RG-P1.S1 — gRPC is the
+ * service contract; the nlp REST endpoint is a dev/health mirror). Migrated
+ * from the forked ai-platform `POST /v1/analyze` HTTP client. Owns its
+ * [ManagedChannel]; call [close] on shutdown. Mirrors fuzzy-mcp's
+ * `FuzzyGrpcClient`.
  */
 class NlpClient(
-    private val httpClient: HttpClient,
-    private val baseUrl: String,
-) {
-    private val json = Json { ignoreUnknownKeys = true }
+    host: String,
+    port: Int,
+    private val deadlineSeconds: Long = 30,
+) : Closeable {
+    private val logger = LoggerFactory.getLogger(NlpClient::class.java)
+
+    private val channel: ManagedChannel =
+        ManagedChannelBuilder
+            .forAddress(host, port)
+            .usePlaintext()
+            .keepAliveTime(30, TimeUnit.SECONDS)
+            .keepAliveTimeout(10, TimeUnit.SECONDS)
+            .keepAliveWithoutCalls(true)
+            .build()
+
+    private val stub = NlpServiceGrpcKt.NlpServiceCoroutineStub(channel)
 
     suspend fun analyze(
         text: String,
@@ -88,51 +96,76 @@ class NlpClient(
         ops: Set<String>,
         mode: String = "NORMAL",
         engineHints: Map<String, String> = emptyMap(),
-        authHeaders: Map<String, String> = emptyMap(),
     ): NlpAnalyzeResult {
-        val requestBody =
-            buildJsonObject {
-                put("text", JsonPrimitive(text))
-                put("language", JsonPrimitive(language))
-                put("ops", JsonArray(ops.map { JsonPrimitive(it) }))
-                put("mode", JsonPrimitive(mode))
-                if (engineHints.isNotEmpty()) {
-                    putJsonObject("engineHints") {
-                        engineHints.forEach { (k, v) -> put(k, JsonPrimitive(v)) }
+        val request =
+            AnalyzeRequest
+                .newBuilder()
+                .setText(text)
+                .setLanguage(language)
+                .setMode(runCatching { Mode.valueOf(mode) }.getOrDefault(Mode.NORMAL))
+                .apply {
+                    ops.forEach { op ->
+                        runCatching { NlpOp.valueOf(op) }.getOrNull()?.let { addOps(it) }
                     }
-                }
-            }
+                    engineHints.forEach { (k, v) -> putEngineHints(k, v) }
+                }.build()
 
-        val traceCarrier = mutableMapOf<String, String>()
-        W3CTraceContextPropagator.getInstance().inject(
-            Context.current(),
-            traceCarrier,
-            TextMapSetter { c, k, v -> c?.set(k, v) },
-        )
-
-        val analyzeUrl = "$baseUrl/v1/analyze"
         val response =
             try {
-                httpClient.post(analyzeUrl) {
-                    contentType(ContentType.Application.Json)
-                    setBody(requestBody.toString())
-                    traceCarrier.forEach { (k, v) -> header(k, v) }
-                    authHeaders.forEach { (k, v) -> header(k, v) }
-                }
+                stub.withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS).analyze(request)
             } catch (e: Exception) {
                 throw NlpClientException(
-                    "Nlp service call failed at $analyzeUrl: ${e.javaClass.simpleName}: ${e.message}",
+                    "Nlp service gRPC call failed: ${e.javaClass.simpleName}: ${e.message}",
                     e,
                 )
             }
 
-        val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
-            throw NlpClientException(
-                "Nlp service error at $analyzeUrl: ${response.status.value} - $responseText",
-            )
-        }
-        return json.decodeFromString<NlpAnalyzeResult>(responseText)
+        return NlpAnalyzeResult(
+            language = response.language.ifBlank { response.detectedLanguage },
+            languageConfidence = response.languageConfidence,
+            engineUsed = response.engineUsed,
+            tokens =
+                response.tokensList.map {
+                    NlpToken(
+                        text = it.text,
+                        charStart = it.charStart,
+                        charEnd = it.charEnd,
+                        lemma = it.lemma,
+                        upos = it.upos,
+                        xpos = it.xpos,
+                        feats = it.featsMap,
+                        depHead = it.depHead,
+                        depRelation = it.depRelation,
+                    )
+                },
+            sentences = response.sentencesList.map { NlpSpan(it.charStart, it.charEnd) },
+            paragraphs = response.paragraphsList.map { NlpSpan(it.charStart, it.charEnd) },
+            entities =
+                response.entitiesList.map {
+                    NlpEntity(
+                        text = it.text,
+                        label = it.label,
+                        charStart = it.charStart,
+                        charEnd = it.charEnd,
+                        normalizedValue = it.normalizedValue,
+                        sourceEngine = it.sourceEngine,
+                    )
+                },
+            traceId = response.traceId,
+            elapsedMs = response.elapsedMs,
+            messages =
+                response.messagesList.map {
+                    NlpMessage(severity = it.severity.name, code = it.code, message = it.humanMessage)
+                },
+            used =
+                response.usedList.map {
+                    NlpEngineVersion(op = it.op, engine = it.engine, model = it.model, modelVersion = it.modelVersion)
+                },
+        )
+    }
+
+    override fun close() {
+        channel.shutdown()
     }
 }
 
