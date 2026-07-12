@@ -7,7 +7,7 @@
     "identities": {
       "KEYCLOAK": {
         "userId": "adam-kc-id",
-        "userName": "bora",
+        "userName": "adam",
         "active": true,
         "userRoles": ["admin", "user"]
       },
