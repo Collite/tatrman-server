@@ -9,6 +9,48 @@ option java_outer_classname = "FuzzyProto";
 
 service FuzzyService {
   rpc Match (MatchRequest) returns (FuzzyMatchResponse) {}
+  // RG-P2.S2 (additive): N spans × M categories in ONE rpc (the resolver's
+  // gate-spans call). Results are positional to `spans`.
+  rpc BatchMatch (BatchMatchRequest) returns (BatchMatchResponse) {}
+  // Category discovery + staleness (contracts §2).
+  rpc GetStatus (FuzzyStatusRequest) returns (FuzzyStatusResponse) {}
+}
+
+message BatchMatchRequest {
+  repeated SpanQuery spans = 1;
+  optional string locale = 2; // RS-11
+}
+
+message SpanQuery {
+  string query = 1;
+  repeated string categories = 2; // match across these; explicit-unknown ⇒ EMPTY (leak guard, per-slot)
+  int32 limit = 3;
+}
+
+message BatchMatchResponse {
+  repeated FuzzyMatchResponse results = 1; // positional to BatchMatchRequest.spans
+}
+
+message FuzzyStatusRequest {}
+
+message FuzzyStatusResponse {
+  bool ready = 1;
+  string vocabulary_version = 2;      // snapshot hash + load stamp (S-1)
+  repeated CategoryStatus categories = 3;
+  repeated LoaderWarning warnings = 4; // B-T4: PK-skipped declared columns (RG-FUZ-001)
+}
+
+message CategoryStatus {
+  string category = 1;
+  SourceTag source = 2;
+  int32 size = 3;           // candidate count
+  int64 loaded_at_epoch_ms = 4;
+}
+
+message LoaderWarning {
+  string code = 1;          // e.g. "RG-FUZ-001"
+  string category = 2;
+  string message = 3;
 }
 
 message MatchRequest {

@@ -41,6 +41,52 @@ fun Application.configureSecurity(config: Config) {
 
 fun ApplicationCall.getUserId(): String? = attributes.getOrNull(USER_ID_ATTRIBUTE)
 
+/**
+ * S-3 admin authorization (RG-P2.S2.T6): operator endpoints (`/refresh`) require
+ * an `admin` role — never unauthenticated in the open offering. Authority is
+ * either an `admin` role on the `X-Roles` header (set by the gateway after H-2
+ * OBO) OR an admin API key. Pure so the decision is unit-testable.
+ */
+fun isAdminAuthorized(
+    roles: List<String>,
+    apiKey: String?,
+    adminApiKeys: List<String>,
+): Boolean =
+    roles.any { it.trim().equals("admin", ignoreCase = true) } ||
+        (apiKey != null && adminApiKeys.contains(apiKey))
+
+fun adminApiKeys(config: Config): List<String> =
+    try {
+        config
+            .getString("security.admin-api-keys")
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    } catch (e: com.typesafe.config.ConfigException) {
+        emptyList()
+    }
+
+/**
+ * Gates [build] behind the admin role (S-3). Refuses (403) any caller lacking
+ * admin authority — enforced regardless of `security.enabled`, so an operator
+ * endpoint is never open.
+ */
+fun Route.adminOnly(
+    config: Config,
+    build: Route.() -> Unit,
+) {
+    val adminKeys = adminApiKeys(config)
+    intercept(ApplicationCallPipeline.Call) {
+        val roles = call.request.headers["X-Roles"]?.split(",") ?: emptyList()
+        val apiKey = call.request.headers["X-API-Key"]
+        if (!isAdminAuthorized(roles, apiKey, adminKeys)) {
+            call.respond(HttpStatusCode.Forbidden, "admin role required")
+            finish()
+        }
+    }
+    build()
+}
+
 fun Route.secured(
     config: Config,
     build: Route.() -> Unit,

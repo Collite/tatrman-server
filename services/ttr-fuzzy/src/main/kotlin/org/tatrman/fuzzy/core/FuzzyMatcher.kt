@@ -3,12 +3,36 @@ package org.tatrman.fuzzy.core
 
 import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /** One step of an algorithm cascade: run [algorithm], treat it as the winner if its top-1 score ≥ [minScore]. */
 data class CascadeStep(
     val algorithm: AlgorithmType,
     val minScore: Double,
+)
+
+/** A BatchMatch span (contracts §2): match [query] across [categories]; explicit-unknown ⇒ EMPTY slot. */
+data class SpanQuery(
+    val query: String,
+    val categories: List<String>,
+    val limit: Int = 10,
+)
+
+/** One span's result within a BatchMatch. */
+data class BatchSpanResult(
+    val matches: List<FuzzyMatchResult>,
+    val matchedAlgorithm: AlgorithmType?,
+)
+
+/** BatchMatch outcome: positional [results] + the one [vocabularyVersion] read for the whole call. */
+data class BatchMatchResult(
+    val results: List<BatchSpanResult>,
+    val vocabularyVersion: String,
 )
 
 /** Outcome of a cascade run: the matches returned and which algorithm produced them (null if no steps). */
@@ -80,6 +104,50 @@ class FuzzyMatcher(
         }
         // Option (a): no step qualified — fall back to the last step's results.
         return CascadeOutcome(lastResults, lastAlgorithm)
+    }
+
+    /**
+     * RG-P2.S2 — N spans × M categories in ONE call (the resolver's gate-spans
+     * step). Each span matches its [SpanQuery.query] across its categories
+     * (explicit-unknown ⇒ EMPTY slot, the per-slot leak guard) and the merged
+     * top-[SpanQuery.limit] are returned, positional to [spans]. Spans fan out
+     * with bounded parallelism; the `vocabularyVersion` is read ONCE up front so
+     * the whole batch reflects a consistent snapshot.
+     */
+    suspend fun batchMatch(
+        spans: List<SpanQuery>,
+        maxParallelism: Int = 8,
+    ): BatchMatchResult {
+        val version = repository.vocabularyVersion()
+        if (spans.isEmpty()) return BatchMatchResult(emptyList(), version)
+
+        val gate = Semaphore(maxParallelism.coerceAtLeast(1))
+        val results =
+            coroutineScope {
+                spans
+                    .map { span -> async { gate.withPermit { matchSpan(span) } } }
+                    .awaitAll()
+            }
+        return BatchMatchResult(results, version)
+    }
+
+    private suspend fun matchSpan(span: SpanQuery): BatchSpanResult {
+        val limit = if (span.limit > 0) span.limit else 10
+        val steps = cascadeFrom(emptyList(), AlgorithmType.TATRMAN.name)
+
+        // Empty categories ⇒ deliberate global (cross-category) lookup; otherwise
+        // match per explicit category (unknown ones contribute nothing — leak guard).
+        val targets: List<String?> = span.categories.ifEmpty { listOf(null) }
+        val perCategory = targets.map { cat -> matchCascade(span.query, cat, steps, limit) }
+
+        val matchedAlgorithm = perCategory.firstOrNull { it.matches.isNotEmpty() }?.matchedAlgorithm
+        val merged =
+            perCategory
+                .flatMap { it.matches }
+                .sortedByDescending { it.score }
+                .distinctBy { it.candidateId to it.category }
+                .take(limit)
+        return BatchSpanResult(merged, matchedAlgorithm)
     }
 
     private suspend fun runSingle(

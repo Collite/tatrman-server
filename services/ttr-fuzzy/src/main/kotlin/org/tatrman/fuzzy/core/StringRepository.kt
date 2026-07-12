@@ -2,7 +2,9 @@
 package org.tatrman.fuzzy.core
 
 import org.tatrman.fuzzy.config.AppConfig
+import org.tatrman.fuzzy.loader.DeclaredVocabularyLoader
 import org.tatrman.fuzzy.loader.LoaderSource
+import org.tatrman.fuzzy.loader.SnapshotVocabularySource
 import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
@@ -107,11 +109,29 @@ data class Candidate(
     }
 }
 
+/** Per-category discovery + staleness for `GetStatus` (contracts §2). */
+data class CategoryStatusInfo(
+    val category: String,
+    val source: SourceTag,
+    val size: Int,
+    val loadedAtEpochMs: Long,
+)
+
+/** B-T4 loader-report entry (e.g. `RG-FUZ-001` PK-skipped declared column). */
+data class LoaderWarningInfo(
+    val code: String,
+    val category: String,
+    val message: String,
+)
+
 class StringRepository(
     private val config: AppConfig,
     private val loaderSource: LoaderSource,
     private val telemetry: FuzzyTelemetry? = null,
     private val lemmatizer: Lemmatizer = NoopLemmatizer,
+    // RG-P2.S2: declared vocabulary (lexicon terms + valueLabels) — VOCABULARY
+    // categories merged alongside the member data. Null = member data only.
+    private val snapshotSource: SnapshotVocabularySource? = null,
 ) {
     private val logger = LoggerFactory.getLogger(StringRepository::class.java)
 
@@ -133,11 +153,33 @@ class StringRepository(
     @Volatile
     private var globalDistanceCache: DistanceCache = DistanceCache()
 
+    // RG-P2.S2: the vocabulary version echoed on every response + in GetStatus
+    // (S-1). Content hash of {category → size} + the member load stamp; the
+    // declared-vocabulary snapshot hash folds into this in T5.
+    @Volatile
+    private var version: String = ""
+
+    @Volatile
+    private var loadedAtMs: Long = 0L
+
+    // Declared vocabulary is the SECOND clock: reloaded (+ lemmatised) only when
+    // its snapshot hash changes, then merged into the cache on every member
+    // refresh. Stored pre-lemmatised so member refreshes don't re-lemmatise it.
+    @Volatile
+    private var declaredCache: Map<String, List<Candidate>> = emptyMap()
+
+    @Volatile
+    private var declaredHash: String = ""
+
     init {
         startRefreshLoop()
     }
 
     private fun startRefreshLoop() {
+        // refreshIntervalSeconds <= 0 ⇒ manual mode: no background loop, refresh
+        // only via forceRefresh (deterministic for tests; also a valid "reload
+        // on /refresh only" deployment posture — Q-8 open-vs-harvest line).
+        if (config.refreshIntervalSeconds <= 0) return
         if (isRunning.getAndSet(true)) return
 
         scope.launch {
@@ -166,14 +208,69 @@ class StringRepository(
         // "db.dbo.QSTRED_DF.KOD_STR"); without this the per-column index was
         // never hit and lookups silently fell back to the global index,
         // returning *other columns'* values (a KOD_STR query served NAZEV_STR).
-        val nextCache =
+        val memberCache =
             loaded.entries.associate { (category, raw) ->
                 category.lowercase() to lemmatiseCandidates(raw)
             }
+
+        // Second clock: reload + lemmatise declared vocabulary ONLY when its
+        // snapshot hash changes (T5), then merge it into the member cache.
+        refreshDeclaredIfChanged()
+        val nextCache = LinkedHashMap<String, List<Candidate>>(memberCache)
+        declaredCache.forEach { (key, vocab) ->
+            nextCache.merge(key, vocab) { member, declared -> member + declared }
+        }
+
         cache.clear()
         cache.putAll(nextCache)
+        loadedAtMs = System.currentTimeMillis()
+        version = computeVersion(nextCache, declaredHash, loadedAtMs)
         isCatalogReady.set(true)
         rebuildIndices()
+    }
+
+    private suspend fun refreshDeclaredIfChanged() {
+        val source = snapshotSource ?: return
+        val hash = source.hash()
+        if (hash == declaredHash && declaredCache.isNotEmpty()) return
+        val raw = DeclaredVocabularyLoader.toCategories(source.fetch())
+        declaredCache = raw.mapValues { lemmatiseCandidates(it.value) }
+        declaredHash = hash
+        logger.info("Declared vocabulary loaded (hash={}, categories={})", hash, declaredCache.size)
+    }
+
+    /** The vocabulary version (S-1): content signature + load stamp. */
+    fun vocabularyVersion(): String = version
+
+    /** Per-category discovery + staleness for `GetStatus` (contracts §2). */
+    fun categoryStatuses(): List<CategoryStatusInfo> =
+        cache
+            .map { (category, candidates) ->
+                CategoryStatusInfo(
+                    category = category,
+                    source = candidates.firstOrNull()?.source ?: SourceTag.MEMBER,
+                    size = candidates.size,
+                    loadedAtEpochMs = loadedAtMs,
+                )
+            }.sortedBy { it.category }
+
+    /** B-T4 loader report: PK-skipped declared columns etc. (`RG-FUZ-001`). Populated in S2.T7. */
+    fun loaderWarnings(): List<LoaderWarningInfo> = loaderSource.warnings()
+
+    private fun computeVersion(
+        content: Map<String, List<Candidate>>,
+        vocabHash: String,
+        stamp: Long,
+    ): String {
+        // Order-independent content signature: sorted (category → size) pairs +
+        // the declared-vocabulary snapshot hash + the member load stamp (S-1).
+        val sig =
+            content.entries
+                .sortedBy { it.key }
+                .joinToString("|") { "${it.key}:${it.value.size}" }
+                .hashCode()
+        val vocab = if (vocabHash.isBlank()) "-" else vocabHash
+        return "member:%08x/vocab:%s@%d".format(sig, vocab, stamp)
     }
 
     /**

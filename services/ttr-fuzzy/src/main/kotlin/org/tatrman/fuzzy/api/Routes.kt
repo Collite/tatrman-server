@@ -5,6 +5,7 @@ import com.typesafe.config.Config
 import org.tatrman.fuzzy.core.AlgorithmType
 import org.tatrman.fuzzy.core.CascadeStep
 import org.tatrman.fuzzy.core.FuzzyMatcher
+import org.tatrman.fuzzy.adminOnly
 import org.tatrman.fuzzy.core.cascadeFrom
 import org.tatrman.fuzzy.secured
 import org.tatrman.fuzzy.core.StringRepository
@@ -125,27 +126,29 @@ fun Application.configureRoutes(
                 }
             }
         }
-        // Unauthenticated, cluster-internal (see DF decision: /refresh has no auth) — deliberately
-        // OUTSIDE the `secured` block. Forces an immediate reload of the candidate cache from its
-        // loader (metadata-backed in production) instead of waiting for the background interval.
-        // Golem's /v2/refresh calls this in parallel with the translator→query-runner chain, since
-        // fuzzy depends on metadata directly.
-        post("/refresh") {
-            runCatching { stringRepository.forceRefresh() }.fold(
-                onSuccess = {
-                    call.respond(buildJsonObject { put("status", JsonPrimitive("ok")) })
-                },
-                onFailure = { e ->
-                    LoggingUtils.logError(logger, "Error processing refresh request", e)
-                    call.respond(
-                        HttpStatusCode.InternalServerError,
-                        buildJsonObject {
-                            put("status", JsonPrimitive("failed"))
-                            put("error", JsonPrimitive(e.message ?: "Unknown error"))
-                        },
-                    )
-                },
-            )
+        // ADMIN-GATED (RG-P2.S2.T6 / S-3): operator endpoints are never open in
+        // the offering. Callers must present admin authority (an `admin` role
+        // via X-Roles after H-2 OBO, or an admin API key). Forces an immediate
+        // reload of the candidate cache instead of waiting for the interval.
+        // Consumers that call /refresh (e.g. Golem) must now present admin identity.
+        adminOnly(config) {
+            post("/refresh") {
+                runCatching { stringRepository.forceRefresh() }.fold(
+                    onSuccess = {
+                        call.respond(buildJsonObject { put("status", JsonPrimitive("ok")) })
+                    },
+                    onFailure = { e ->
+                        LoggingUtils.logError(logger, "Error processing refresh request", e)
+                        call.respond(
+                            HttpStatusCode.InternalServerError,
+                            buildJsonObject {
+                                put("status", JsonPrimitive("failed"))
+                                put("error", JsonPrimitive(e.message ?: "Unknown error"))
+                            },
+                        )
+                    },
+                )
+            }
         }
     }
 }
