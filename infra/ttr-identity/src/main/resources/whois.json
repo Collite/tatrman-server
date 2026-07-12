@@ -1,13 +1,13 @@
 [
   {
     "internalId": 1,
-    "email": "boris.perusic@dolphinconsulting.cz",
-    "firstName": "Boris",
-    "lastName": "Perusic",
+    "email": "adam.novak@kantheon.example",
+    "firstName": "Adam",
+    "lastName": "Novak",
     "identities": {
       "KEYCLOAK": {
-        "userId": "bora-kc-id",
-        "userName": "bora",
+        "userId": "adam-kc-id",
+        "userName": "adam",
         "active": true,
         "userRoles": ["admin", "user"]
       },
@@ -19,7 +19,7 @@
       },
       "ENTRAID": {
         "userId": "ENTRAID001",
-        "userName": "Boris Perusic",
+        "userName": "Adam Novak",
         "active": true,
         "userRoles": []
       }
@@ -27,7 +27,7 @@
   },
   {
     "internalId": 2,
-    "email": "jirikrov@seznam.cz",
+    "email": "jiri.krov@kantheon.example",
     "firstName": "Jiri",
     "lastName": "Krov",
     "identities": {
@@ -53,7 +53,7 @@
   },
   {
     "internalId": 3,
-    "email": "jan.petr@dolphinconsulting.cz",
+    "email": "jan.petr@kantheon.example",
     "firstName": "Jan",
     "lastName": "Petr",
     "identities": {

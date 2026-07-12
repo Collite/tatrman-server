@@ -57,15 +57,15 @@ class WhoisRoutesComponentSpec :
 
         "GET /whois by user_id + type resolves the user" {
             testApp { client ->
-                val resp = client.get("/whois?user_id=bora-kc-id&user_id_type=KEYCLOAK")
+                val resp = client.get("/whois?user_id=adam-kc-id&user_id_type=KEYCLOAK")
                 resp.status shouldBe HttpStatusCode.OK
-                resp.bodyAsText() shouldContain "boris.perusic@dolphinconsulting.cz"
+                resp.bodyAsText() shouldContain "adam.novak@kantheon.example"
             }
         }
 
         "GET /whois by email resolves the user" {
             testApp { client ->
-                val resp = client.get("/whois?email=jirikrov@seznam.cz")
+                val resp = client.get("/whois?email=jiri.krov@kantheon.example")
                 resp.status shouldBe HttpStatusCode.OK
                 resp.bodyAsText() shouldContain "Jiri"
             }
