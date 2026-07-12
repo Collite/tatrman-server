@@ -37,7 +37,7 @@ dependencies {
     // recompiling them here), so `import "org/tatrman/plan/v1/plan.proto"` in the
     // downstream service protos keeps resolving. FQCNs are identical (org.tatrman.*).
     api(libs.tatrman.ttr.plan.proto)
-    // All other protos are in-repo. The ai-platform Maven dep (cz.dfpartner:shared-proto,
+    // All other protos are in-repo. The ai-platform Maven dep (com.tatrman:shared-proto,
     // Themis's residual nlp.v1) was removed in fork Stage 2.6 — Themis now imports
     // org.tatrman.nlp.v1 + common.v1, both generated here.
 
@@ -99,7 +99,7 @@ ktlint {
 // `just proto-py` (which invokes `:shared:proto:preparePythonPackage`).
 //
 // The wheel ships only `src/org` — the in-repo `org.tatrman.*` generated types.
-// Since fork Stage 2.6 every proto is in-repo (no `cz.dfpartner.*` Maven jar),
+// Since fork Stage 2.6 every proto is in-repo (no `com.tatrman.*` Maven jar),
 // so there is no `src/cz` tree and nothing external to package.
 val pythonPackageDir = project.layout.buildDirectory.dir("python-package")
 

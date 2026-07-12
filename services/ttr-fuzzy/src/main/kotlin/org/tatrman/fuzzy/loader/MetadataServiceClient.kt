@@ -29,7 +29,7 @@ data class FuzzyTarget(
  * cancels the coroutine, not the underlying blocking I/O).
  *
  * Forked from ai-platform `fuzzy-matcher.MetadataServiceClient` (2026-06-14):
- * `cz.dfpartner.metadata.v1` → `org.tatrman.meta.v1`, `MetadataServiceGrpc`
+ * `com.tatrman.metadata.v1` → `org.tatrman.meta.v1`, `MetadataServiceGrpc`
  * → `VelesServiceGrpc`. The wire calls (`ListObjects` fuzzy-only + `GetObject`)
  * are unchanged.
  */

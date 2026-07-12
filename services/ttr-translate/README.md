@@ -15,7 +15,7 @@ the two-halves way the pipeline uses it:
 - **`DetectSourceSchema`** — infer the effective source schema.
 
 The gRPC service proto is forked as `org.tatrman.translate.v1` / `TranslateService`
-(RPC names kept; `cz.dfpartner.translator.v1` is gone). The `Language` /
+(RPC names kept; `com.tatrman.translator.v1` is gone). The `Language` /
 `SqlDialect` enums live in the library-only `translator.proto` (same package,
 Stage 1.3) and are imported by the service proto. Model data comes from
 **Veles** (formerly the metadata service): ttr-translate polls `GetSnapshot` and

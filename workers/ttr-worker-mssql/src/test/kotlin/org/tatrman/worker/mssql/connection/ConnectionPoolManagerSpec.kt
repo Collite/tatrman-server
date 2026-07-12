@@ -75,14 +75,14 @@ class ConnectionPoolManagerSpec :
                     """
                     host = "h.example"
                     port = 1433
-                    database = "dfpartner"
+                    database = "tatrman"
                     default-schema = "dbo"
                     username = "u"
                     password = "p"
                     """.trimIndent(),
                 )
             val parsed = ConnectionConfig.fromConfig("df-test", cfg)
-            parsed.database shouldBe "dfpartner"
+            parsed.database shouldBe "tatrman"
             parsed.defaultSchema shouldBe "dbo"
         }
 

@@ -224,10 +224,10 @@ class WorkerServiceImplSpec :
                             "df-test" to
                                 ConnectionConfig(
                                     id = "df-test",
-                                    jdbcUrl = "jdbc:sqlserver://h:1433;databaseName=dfpartner",
+                                    jdbcUrl = "jdbc:sqlserver://h:1433;databaseName=tatrman",
                                     username = "u",
                                     password = "p",
-                                    database = "dfpartner",
+                                    database = "tatrman",
                                     defaultSchema = "dbo",
                                 ),
                             "df-test-fin" to
@@ -244,7 +244,7 @@ class WorkerServiceImplSpec :
                 val resp = svc.getCapabilities(GetCapabilitiesRequest.getDefaultInstance())
                 val byId = resp.connectionsList.associateBy { it.connectionId }
                 byId.keys shouldContainExactlyInAnyOrder setOf("df-test", "df-test-fin")
-                byId["df-test"]!!.database shouldBe "dfpartner"
+                byId["df-test"]!!.database shouldBe "tatrman"
                 byId["df-test"]!!.defaultSchema shouldBe "dbo"
                 byId["df-test-fin"]!!.database shouldBe "df_fin"
                 byId["df-test-fin"]!!.defaultSchema shouldBe "fin"

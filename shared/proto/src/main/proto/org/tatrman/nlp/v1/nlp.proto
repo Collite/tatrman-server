@@ -2,10 +2,10 @@
 syntax = "proto3";
 
 // Forked from ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4 (tag kantheon-fork-point)
-//   (shared/proto/src/main/proto/cz/dfpartner/nlp/v1/nlp.proto).
-// Fork Stage 2.3 (Nlp). Package + outer-class renamed cz.dfpartner.nlp.v1 →
+//   (shared/proto/src/main/proto/com/tatrman/nlp/v1/nlp.proto).
+// Fork Stage 2.3 (Nlp). Package + outer-class renamed com.tatrman.nlp.v1 →
 // org.tatrman.nlp.v1; the Rule-6 messages=99 field re-targeted from
-// cz.dfpartner.metadata.v1.ResponseMessage to the kantheon stand-in
+// com.tatrman.metadata.v1.ResponseMessage to the kantheon stand-in
 // org.tatrman.common.v1.ResponseMessage. NLP wire shapes are otherwise
 // unchanged (fork principle: wire shapes fork unchanged). HTTP at v1 — types
 // only, no gRPC service binding. themis/v1's nlp.v1 import is swapped in Stage 2.6.

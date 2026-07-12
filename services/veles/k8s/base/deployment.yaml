@@ -29,7 +29,7 @@ spec:
             - name: VELES_GRPC_PORT
               value: "7261"
             - name: METADATA_GIT_REMOTE_URI
-              value: "https://github.com/DFPartner/ai-models.git"
+              value: "https://github.com/Tatrman/ai-models.git"
               # Override per cluster with the canonical fabric-infra secret.
             - name: METADATA_GIT_TOKEN
               valueFrom:

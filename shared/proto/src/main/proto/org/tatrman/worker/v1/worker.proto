@@ -220,7 +220,7 @@ message GetCapabilitiesResponse {
 // `GetCapabilitiesResponse.supported_connections`.
 message ConnectionInfo {
   string connection_id = 1;          // matches supported_connections entries
-  string database = 2;               // engine-side database name, e.g. "dfpartner"
+  string database = 2;               // engine-side database name, e.g. "tatrman"
   string default_schema = 3;         // e.g. "dbo"; empty = engine default
   reserved 4 to 9;
 }

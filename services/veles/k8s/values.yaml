@@ -39,7 +39,7 @@ telemetry:
 # ai-models repo; a deploying env (or a test context needing a seed-aligned model) overrides
 # `gitRemoteUri` and supplies the PAT via `secretEnv`.
 metadata:
-  gitRemoteUri: "https://github.com/DFPartner/ai-models.git"
+  gitRemoteUri: "https://github.com/Tatrman/ai-models.git"
 
 # Secret-backed env (valueFrom.secretKeyRef). `optional: true` mirrors the kustomize base — the
 # pod boots without the PAT (public/fixture remotes need none).

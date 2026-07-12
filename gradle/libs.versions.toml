@@ -104,9 +104,9 @@ jgit                                 = "6.8.0.202311291450-r"
 apache-commons-compress              = "1.24.0"
 micrometer                           = "1.16.2"
 
-# (fork Stage 2.6) The last ai-platform Maven coordinate — cz.dfpartner:shared-proto
+# (fork Stage 2.6) The last ai-platform Maven coordinate — com.tatrman:shared-proto
 # (Themis's residual nlp.v1) — was removed here. Themis now consumes only in-repo
-# protos via :shared:proto. No cz.dfpartner Maven artifact remains.
+# protos via :shared:proto. No com.tatrman Maven artifact remains.
 
 # LLM gateway (Spring Boot) — fork Stage 2.5. The repo's only
 # Spring module; resolved from mavenCentral (incl. Spring AI 2.0.0-M2, as
@@ -270,7 +270,7 @@ testcontainers-postgresql           = { module = "org.testcontainers:testcontain
 # Read-only k8s status reads for the integration readiness gate (Stage 2.1).
 fabric8-kubernetes-client           = { module = "io.fabric8:kubernetes-client",                          version.ref = "fabric8" }
 
-# (fork Stage 2.6) cz.dfpartner:shared-proto removed — Themis retargeted to
+# (fork Stage 2.6) com.tatrman:shared-proto removed — Themis retargeted to
 # in-repo protos (:shared:proto). No ai-platform Maven coordinate remains.
 
 # Engine

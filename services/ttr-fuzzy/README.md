@@ -11,7 +11,7 @@ entity references before query construction.
 
 ## Surface
 
-Proto `org.tatrman.fuzzy.v1` / `FuzzyService` (`cz.dfpartner.fuzzy.v1` /
+Proto `org.tatrman.fuzzy.v1` / `FuzzyService` (`com.tatrman.fuzzy.v1` /
 `FuzzyMatcherService` are gone — renamed at fork, wire shapes unchanged):
 
 - **Match** — fuzzy-match a term against the entity catalog; the algorithm is a

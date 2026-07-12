@@ -32,8 +32,8 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER tsvectorupdate BEFORE INSERT OR UPDATE
 ON prompt_logs FOR EACH ROW EXECUTE FUNCTION prompt_logs_tsvector_trigger();
 
-GRANT ALL PRIVILEGES ON TABLE prompt_logs TO dfpartner;
-GRANT USAGE, SELECT ON SEQUENCE prompt_logs_id_seq TO dfpartner;
+GRANT ALL PRIVILEGES ON TABLE prompt_logs TO tatrman;
+GRANT USAGE, SELECT ON SEQUENCE prompt_logs_id_seq TO tatrman;
 
 CREATE TABLE if not exists jobs (
     id VARCHAR(255) PRIMARY KEY,
@@ -46,4 +46,4 @@ CREATE TABLE if not exists jobs (
 
 CREATE INDEX if not exists idx_jobs_status ON jobs(status);
 
-GRANT ALL PRIVILEGES ON TABLE jobs TO dfpartner;
+GRANT ALL PRIVILEGES ON TABLE jobs TO tatrman;

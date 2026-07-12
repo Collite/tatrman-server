@@ -50,7 +50,7 @@ the default policy set — comfortably below the in-cluster network hop the fold
 ## Proto
 
 The service proto is `org.tatrman.validate.v1` / `ValidateService` (RPC `Validate` kept;
-`cz.dfpartner.validator.v1` is gone). `org.tatrman.security.v1` is now a **data contract**
+`com.tatrman.validator.v1` is gone). `org.tatrman.security.v1` is now a **data contract**
 only (`EvaluatePoliciesRequest`/`Response`, `TablePredicate`, `ColumnRule`) — the in-process
 DTOs the `PolicyEngine` consumes/produces. Its gRPC `SecurityService`, legacy SQL-fragment
 messages, and `GetStatus` were removed in the 3.2 fold (the surface is not re-exposed).

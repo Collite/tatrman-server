@@ -3,8 +3,8 @@
 // Kantheon — Security (policy evaluation) data contract
 //
 // Forked from ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4 (tag kantheon-fork-point)
-//   (shared/proto/src/main/proto/cz/dfpartner/security/v1/security.proto).
-// Fork Stage 3.1 (Validate): package cz.dfpartner.security.v1 → org.tatrman.security.v1;
+//   (shared/proto/src/main/proto/com/tatrman/security/v1/security.proto).
+// Fork Stage 3.1 (Validate): package com.tatrman.security.v1 → org.tatrman.security.v1;
 // plan/context refs → org.tatrman.plan.v1; Rule-6 messages=99 → kantheon common.ResponseMessage.
 //
 // Fork Stage 3.2 (the policy fold): policy evaluation moved IN-PROCESS into Validate

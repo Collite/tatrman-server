@@ -73,7 +73,7 @@ class WorkerRegistrySpec :
                         ConnectionInfo
                             .newBuilder()
                             .setConnectionId("df-test")
-                            .setDatabase("dfpartner")
+                            .setDatabase("tatrman")
                             .setDefaultSchema("dbo")
                             .build(),
                     ).build()
@@ -88,7 +88,7 @@ class WorkerRegistrySpec :
                     consecutiveFailures = 0,
                 )
             val info = entry.connectionInfo("df-test")
-            info?.database shouldBe "dfpartner"
+            info?.database shouldBe "tatrman"
             info?.defaultSchema shouldBe "dbo"
             entry.connectionInfo("unknown") shouldBe null
         }

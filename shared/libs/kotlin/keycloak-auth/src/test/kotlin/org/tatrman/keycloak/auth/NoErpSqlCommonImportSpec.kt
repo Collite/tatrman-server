@@ -16,7 +16,7 @@ import java.io.File
 class NoErpSqlCommonImportSpec :
     StringSpec({
 
-        val forbidden = listOf("erp.sql.common", "erp_sql_common", "infra.erp", "cz.dfpartner")
+        val forbidden = listOf("erp.sql.common", "erp_sql_common", "infra.erp", "com.tatrman")
 
         "keycloak-auth main sources carry no erp-sql-common / legacy coupling" {
             val mainSrc = File("src/main/kotlin")

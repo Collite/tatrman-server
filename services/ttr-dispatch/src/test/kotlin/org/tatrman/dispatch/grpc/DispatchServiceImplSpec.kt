@@ -454,7 +454,7 @@ class DispatchServiceImplSpec :
                             ConnectionInfo
                                 .newBuilder()
                                 .setConnectionId("df-fin")
-                                .setDatabase("dfpartner")
+                                .setDatabase("tatrman")
                                 .setDefaultSchema("dbo")
                                 .build(),
                         ),
@@ -488,7 +488,7 @@ class DispatchServiceImplSpec :
                 out[0]
                     .context.warningsList
                     .first { it.code == "routing_decision" }
-            warning.message shouldContainStr "database=dfpartner"
+            warning.message shouldContainStr "database=tatrman"
             warning.message shouldContainStr "schema=dbo"
         }
 
@@ -532,7 +532,7 @@ class DispatchServiceImplSpec :
                             ConnectionInfo
                                 .newBuilder()
                                 .setConnectionId("df-default")
-                                .setDatabase("dfpartner")
+                                .setDatabase("tatrman")
                                 .setDefaultSchema("dbo")
                                 .build(),
                         ),
@@ -586,7 +586,7 @@ class DispatchServiceImplSpec :
                             ConnectionInfo
                                 .newBuilder()
                                 .setConnectionId("df-fin")
-                                .setDatabase("dfpartner")
+                                .setDatabase("tatrman")
                                 .setDefaultSchema("fin")
                                 .build(),
                         ),

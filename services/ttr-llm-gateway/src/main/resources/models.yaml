@@ -17,10 +17,10 @@ models:
     tags: ["embedding"]
     cost: 1
   - name: gpt-4.1
-    fullName: dfpartner-gpt-4.1
+    fullName: tatrman-gpt-4.1
     provider: azure
     type: chat
-    tags: ["dfpartner"]
+    tags: ["tatrman"]
     cost: 10
   # Gap 10 Stage A — Anthropic Claude models. fullName is the Anthropic API id (used as the
   # AnthropicChatOptions.model() value). provider="anthropic" routes through the Anthropic

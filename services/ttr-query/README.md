@@ -12,7 +12,7 @@ repeated identical queries skip parse/translate.
 
 ## Surface
 
-Proto `org.tatrman.query.v1` / `QueryService` (`cz.dfpartner.runner.v1` is gone):
+Proto `org.tatrman.query.v1` / `QueryService` (`com.tatrman.runner.v1` is gone):
 
 - **Run** — submit a query in any source language; stream Arrow IPC results.
 - **Compile** — front of the pipeline only (ttr-translate + ttr-validate); returns the

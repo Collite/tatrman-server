@@ -27,7 +27,7 @@ adding only routing-decision warnings on the first batch.
 
 The service proto is `org.tatrman.dispatch.v1` / `DispatchService` (RPCs `Dispatch`
 streaming `org.tatrman.worker.v1.ResultBatch`, `ListWorkers`, `GetStatus`;
-`cz.dfpartner.dispatcher.v1` is gone). `OverallStatus` comes from
+`com.tatrman.dispatcher.v1` is gone). `OverallStatus` comes from
 `org.tatrman.meta.v1`; Rule-6 `messages = 99` is the
 `org.tatrman.common.v1.ResponseMessage` stand-in.
 

@@ -3,8 +3,8 @@
 // Kantheon — Validate (validator) service
 //
 // Forked from ai-platform@2575b923dca521fea0e3156257e4b779f02a6ed4 (tag kantheon-fork-point)
-//   (shared/proto/src/main/proto/cz/dfpartner/validator/v1/validator.proto).
-// Fork Stage 3.1 (Validate). Package cz.dfpartner.validator.v1 →
+//   (shared/proto/src/main/proto/com/tatrman/validator/v1/validator.proto).
+// Fork Stage 3.1 (Validate). Package com.tatrman.validator.v1 →
 // org.tatrman.validate.v1; service ValidatorService → ValidateService (RPC name kept);
 // plan/context refs → org.tatrman.plan.v1; the Rule-6 messages=99 field
 // re-targeted to org.tatrman.common.v1.ResponseMessage. Wire shapes
