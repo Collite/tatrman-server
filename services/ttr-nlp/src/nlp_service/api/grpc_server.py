@@ -114,31 +114,12 @@ class NlpServicer(nlp_pb2_grpc.NlpServiceServicer):
     # ---- BatchLemmatize ---------------------------------------------------
 
     async def BatchLemmatize(self, request, context):  # noqa: N802
-        language = request.language or self._config.default_language
-        route = self._registry.route(language, NlpOp.LEMMATIZE)
+        outcome = self._orchestrator.batch_lemmatize(list(request.texts), request.language)
         resp = nlp_pb2.BatchLemmatizeResponse()
-
-        engine = self._registry.get_engine(route.engine)
-        batched = getattr(engine, "batch_lemmatize", None) if engine else None
-        if batched is not None and not route.is_floor:
-            groups = batched(list(request.texts), language)
-        else:
-            # No batch path (e.g. floor / non-morphodita): per-text lemmatize.
-            groups = []
-            for text in request.texts:
-                r = self._orchestrator.analyze(text, language, {NlpOp.LEMMATIZE})
-                groups.append([t.lemma or t.text for t in r.tokens])
-
-        for lemmas in groups:
+        for lemmas in outcome.results:
             resp.results.append(nlp_pb2.LemmaList(lemmas=lemmas))
-        resp.used.append(
-            _engine_version_proto(
-                EngineVersion(
-                    op=NlpOp.LEMMATIZE.value, engine=route.engine,
-                    model=route.model, model_version=route.model_version,
-                )
-            )
-        )
+        for ev in outcome.used:
+            resp.used.append(_engine_version_proto(ev))
         return resp
 
     # ---- GetStatus --------------------------------------------------------

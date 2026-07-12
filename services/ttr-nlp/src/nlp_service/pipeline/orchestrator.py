@@ -23,6 +23,7 @@ from nlp_service.contract import iter_s1_violations
 from nlp_service.diagnostics import RG_NLP_003, RG_NLP_010, message
 from nlp_service.engines import EngineRegistry
 from nlp_service.engines.base import EngineResult, EngineVersion, NerEntity, NlpOp, Token
+from nlp_service.floor import FloorEngine
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,14 @@ class NlpPipelineError(Exception):
 
 class EngineNotFoundError(NlpPipelineError):
     pass
+
+
+@dataclass
+class BatchLemmatizeResult:
+    """Positional lemma lists + the S-1 model-identity echo."""
+
+    results: List[List[str]] = field(default_factory=list)
+    used: List[EngineVersion] = field(default_factory=list)
 
 
 @dataclass
@@ -57,6 +66,7 @@ class Orchestrator:
     def __init__(self, config: AppConfig | None = None, registry: EngineRegistry | None = None):
         self._config = config or load_config()
         self._registry = registry or EngineRegistry(self._config)
+        self._floor = FloorEngine()  # RG-P1.S3: deterministic degrade floor
 
     def analyze(
         self,
@@ -141,10 +151,12 @@ class Orchestrator:
                 messages.append(message(code, f"{language}/{op.value}"))
                 if code == RG_NLP_010:
                     seen_floor = True
-            if route.is_floor:
-                # The floor's deterministic producers land in RG-P1.S3; for now
-                # the op is labelled (RG-NLP-010) and produces no output.
+            if route.is_floor and not self._floor.supports(language, op):
+                # A floor op the floor can't serve (LEMMATIZE/POS/DEP/NER on an
+                # unsupported language): labelled RG-NLP-010, produces no output.
                 continue
+            # is_floor TOKENIZE/SENTENCE_SPLIT falls through: served by the floor
+            # engine (route.engine == "floor"), stamped like any other producer.
             ops_by_engine.setdefault(route.engine, set()).add(op)
             served_ops_engine[op] = route.engine
             route_by_engine[route.engine] = route
@@ -158,6 +170,8 @@ class Orchestrator:
 
         for engine_name, engine_ops in ops_by_engine.items():
             engine = self._registry.get_engine(engine_name)
+            if engine is None and engine_name == self._floor.name:
+                engine = self._floor
             if not engine:
                 continue
             result = engine.analyze(text, language, engine_ops)
@@ -293,6 +307,40 @@ class Orchestrator:
             elapsed_ms=elapsed_ms,
             messages=messages,
         )
+
+    def batch_lemmatize(self, texts: List[str], language: str = "") -> BatchLemmatizeResult:
+        """Batched lemmatization for fuzzy's RG-P2 lemma axis (RS-6 / C4-T2).
+
+        Fans a single batched request to the routed backend (MorphoDiTa) — the
+        front batches to the backend, it does NOT loop per-string HTTP (the
+        both-hops requirement, Q-10 §4). Falls back to per-text analyze only when
+        the routed engine has no batch path (floor / non-batching).
+        """
+        language = language or self._config.default_language
+        if not texts:
+            return BatchLemmatizeResult(results=[], used=[])
+
+        route = self._registry.route(language, NlpOp.LEMMATIZE)
+        engine = self._registry.get_engine(route.engine)
+        batched = getattr(engine, "batch_lemmatize", None) if engine else None
+
+        if batched is not None and not route.is_floor:
+            groups = batched(list(texts), language)
+        else:
+            groups = [
+                [t.lemma or t.text for t in self.analyze(text, language, {NlpOp.LEMMATIZE}).tokens]
+                for text in texts
+            ]
+
+        used = [
+            EngineVersion(
+                op=NlpOp.LEMMATIZE.value,
+                engine=route.engine,
+                model=route.model,
+                model_version=route.model_version,
+            )
+        ]
+        return BatchLemmatizeResult(results=groups, used=used)
 
     def _detect_language(self, text: str) -> EngineResult:
         langid_engine = self._registry.get_engine("langid")

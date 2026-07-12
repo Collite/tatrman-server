@@ -1,0 +1,118 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Stanza backend server (RG-P1.S3.T2) — the uniform-JSON NLP contract.
+
+A standalone FastAPI app the engine-free front's `JsonBackendEngine` adapter
+talks to. Runs Stanza in-process (models baked in the image) and serves:
+
+    POST /analyze  {"text", "language", "ops": [..], "model"}
+      -> {"tokens":[{text,charStart,charEnd,lemma,upos,xpos,feats,depHead,depRelation}],
+          "entities":[{text,label,charStart,charEnd,normalizedValue,sourceEngine}],
+          "sentences":[{charStart,charEnd}], "modelVersion"}
+
+Stanza serves cs (tokenize/mwt/lemma/pos/depparse — no cs NER head) and en
+(+ ner). DEP_PARSE is the cs hot path (feeds the resolver's span proposal).
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Any
+
+import stanza
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+MODEL_DIR = os.getenv("STANZA_RESOURCES_DIR", "/opt/nlp-models/stanza")
+MODEL_VERSION = f"stanza-{stanza.__version__}"
+
+app = FastAPI(title="ttr-nlp Stanza backend")
+_pipelines: dict[str, Any] = {}
+
+
+def _pipeline(lang: str):
+    if lang not in _pipelines:
+        processors = (
+            "tokenize,mwt,lemma,pos,depparse" if lang == "cs"
+            else "tokenize,lemma,pos,depparse,ner"
+        )
+        _pipelines[lang] = stanza.Pipeline(
+            lang=lang, model_dir=MODEL_DIR, processors=processors, quiet=True
+        )
+    return _pipelines[lang]
+
+
+class AnalyzeRequest(BaseModel):
+    text: str
+    language: str = "cs"
+    ops: list[str] = []
+    model: str = ""
+
+
+def _feats(feats_str: str | None) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for part in (feats_str or "").split("|"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            out[k] = v
+    return out
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+def readyz():
+    return {"status": "ready", "modelVersion": MODEL_VERSION}
+
+
+@app.post("/analyze")
+def analyze(req: AnalyzeRequest):
+    lang = req.language or "cs"
+    try:
+        doc = _pipeline(lang)(req.text)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+    tokens: list[dict] = []
+    entities: list[dict] = []
+    sentences: list[dict] = []
+    for sentence in doc.sentences:
+        if sentence.tokens:
+            sentences.append(
+                {"charStart": sentence.tokens[0].start_char, "charEnd": sentence.tokens[-1].end_char}
+            )
+        for word in sentence.words:
+            tokens.append(
+                {
+                    "text": word.text,
+                    "charStart": word.start_char,
+                    "charEnd": word.end_char,
+                    "lemma": word.lemma or "",
+                    "upos": word.upos or "",
+                    "xpos": word.xpos or "",
+                    "feats": _feats(word.feats),
+                    "depHead": word.head if word.head else 0,
+                    "depRelation": word.deprel or "",
+                }
+            )
+        for ent in sentence.entities:
+            entities.append(
+                {
+                    "text": ent.text,
+                    "label": ent.type,
+                    "charStart": ent.start_char,
+                    "charEnd": ent.end_char,
+                    "normalizedValue": "",
+                    "sourceEngine": "stanza",
+                }
+            )
+    return {"tokens": tokens, "entities": entities, "sentences": sentences, "modelVersion": MODEL_VERSION}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8090")))
