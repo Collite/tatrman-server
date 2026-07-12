@@ -133,6 +133,18 @@ def create_app() -> FastAPI:
     # Instrument FastAPI via shared library
     instrument_fastapi(app)
 
+    # RG-P1.S2.T6 — trace every front→backend HTTP call. The engine adapters
+    # use httpx.Client to reach the MorphoDiTa/NameTag 3 (and Stanza/spaCy)
+    # backends; auto-instrumentation emits a client span per call and propagates
+    # W3C trace context, so the trace stitches across the front↔backend boundary
+    # even though the UFAL servers don't self-instrument.
+    try:
+        from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
+        HTTPXClientInstrumentor().instrument()
+    except Exception:  # noqa: BLE001 — tracing must never block boot
+        logger.warning("httpx OTel instrumentation unavailable; backend calls untraced")
+
     # Initialize orchestrator
     orchestrator = Orchestrator(config)
 

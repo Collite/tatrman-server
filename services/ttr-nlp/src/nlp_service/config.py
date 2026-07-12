@@ -66,8 +66,42 @@ class AppConfig(BaseModel):
     log_level: str = "INFO"
 
 
+# Lindat dev/eval endpoints (the REMOTE_UNPINNED tier — RG-NLP-002). Selected by
+# NLP_UFAL_ENDPOINT_MODE=lindat; the pinned model ids stay explicit (S-1).
+_LINDAT_MORPHODITA = "https://lindat.mff.cuni.cz/services/morphodita/api/tag"
+_LINDAT_NAMETAG = "https://lindat.mff.cuni.cz/services/nametag/api/recognize"
+_LINDAT_RATE_LIMIT = 5
+
+
+def apply_env_overrides(config: AppConfig) -> AppConfig:
+    """Apply the S2.T4 endpoint repoint from the environment (config-only swap).
+
+    - `NLP_UFAL_ENDPOINT_MODE=lindat` flips MorphoDiTa + NameTag 3 to Lindat as a
+      `REMOTE_UNPINNED` dev/eval tier (endpoint + tier + rate-limit change; the
+      model id stays pinned — S-1).
+    - `NLP_MORPHODITA_URL` / `NLP_NAMETAG3_URL` override just the endpoint.
+    """
+    if os.getenv("NLP_UFAL_ENDPOINT_MODE", "self_hosted").lower() == "lindat":
+        m = config.engines.morphodita
+        m.url = _LINDAT_MORPHODITA
+        m.tier = "REMOTE_UNPINNED"
+        m.rate_limit_per_minute = _LINDAT_RATE_LIMIT
+        n = config.engines.nametag3
+        n.url = _LINDAT_NAMETAG
+        n.tier = "REMOTE_UNPINNED"
+        n.rate_limit_per_minute = _LINDAT_RATE_LIMIT
+
+    if url := os.getenv("NLP_MORPHODITA_URL"):
+        config.engines.morphodita.url = url
+    if url := os.getenv("NLP_NAMETAG3_URL"):
+        config.engines.nametag3.url = url
+
+    return config
+
+
 def load_config(config_path: Optional[str] = None) -> AppConfig:
-    """Load configuration from YAML with optional `CONFIG_FILE` override."""
+    """Load configuration from YAML with optional `CONFIG_FILE` override, then
+    apply the environment endpoint overrides (S2.T4)."""
     env_cfg = os.getenv("CONFIG_FILE")
     if config_path:
         cfg_path = Path(config_path)
@@ -77,7 +111,8 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
         cfg_path = Path(__file__).parent.parent / "config.yaml"
 
     data = _read_yaml_config(cfg_path)
-    return AppConfig(**data) if data else AppConfig()
+    config = AppConfig(**data) if data else AppConfig()
+    return apply_env_overrides(config)
 
 
 def _read_yaml_config(path: Path) -> dict:

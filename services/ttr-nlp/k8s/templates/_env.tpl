@@ -4,6 +4,10 @@
   value: {{ .Values.ports.http | quote }}
 - name: NLP_SERVICE_PORT
   value: {{ .Values.ports.http | quote }}
+{{- if .Values.ports.grpc }}
+- name: NLP_SERVICE_GRPC_PORT
+  value: {{ .Values.ports.grpc | quote }}
+{{- end }}
 {{- if and .Values.telemetry.enabled .Values.telemetry.otlpHost }}
 - name: OTEL_EXPORTER_OTLP_HOST
   value: {{ .Values.telemetry.otlpHost | quote }}

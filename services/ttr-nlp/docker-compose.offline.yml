@@ -1,0 +1,53 @@
+# RG-P1.S2 — local OFFLINE bring-up: engine-free front + the two self-hosted
+# UFAL backends (MorphoDiTa + NameTag 3). No Lindat/HF egress at run time — the
+# determinism/offline claim (RG-P1 DoD). This is the harness for the S2.T7 hero
+# parse and for running the component parity suite (`-m component`) locally.
+#
+#   # build (x86 target; QEMU on arm64 dev boxes):
+#   docker buildx build --platform linux/amd64 -t ttr-nlp-morphodita:dev services/ttr-nlp/backends/morphodita
+#   docker buildx build --platform linux/amd64 -t ttr-nlp-nametag3:dev   services/ttr-nlp/backends/nametag3
+#   docker build -t ttr-nlp:dev -f services/ttr-nlp/Dockerfile .
+#   # run (from repo root):
+#   docker compose -f services/ttr-nlp/docker-compose.offline.yml up
+#   # hero parse over gRPC (host):
+#   grpcurl -plaintext -d '{"text":"Kolik jsme utržili za Octavie v pražských pobočkách za poslední fiskální čtvrtletí?","language":"cs","ops":["TOKENIZE","LEMMATIZE","POS_TAG","DEP_PARSE","NER"]}' \
+#     localhost:7271 org.tatrman.nlp.v1.NlpService/Analyze
+#   # component parity suite against the running backends:
+#   NLP_MORPHODITA_URL=http://localhost:8080/tag NLP_NAMETAG3_URL=http://localhost:8001/recognize \
+#     just test-py services/ttr-nlp -m component
+
+services:
+  # Service names match the config.yaml default in-cluster hostnames, so the
+  # front reaches the backends with no URL override.
+  ttr-nlp-morphodita:
+    image: ttr-nlp-morphodita:dev
+    build:
+      context: ./backends/morphodita
+    ports:
+      - "8080:8080"
+
+  ttr-nlp-nametag3:
+    image: ttr-nlp-nametag3:dev
+    build:
+      context: ./backends/nametag3
+    ports:
+      - "8001:8001"
+
+  front:
+    image: ttr-nlp:dev
+    build:
+      context: ../..
+      dockerfile: services/ttr-nlp/Dockerfile
+    depends_on:
+      ttr-nlp-morphodita:
+        condition: service_healthy
+      ttr-nlp-nametag3:
+        condition: service_healthy
+    environment:
+      NLP_SERVICE_GRPC_PORT: "7271"
+      NLP_SERVICE_PORT: "7270"
+      # Self-hosted tier (default). Do NOT set NLP_UFAL_ENDPOINT_MODE=lindat here
+      # — the whole point is offline, no Lindat egress.
+    ports:
+      - "7270:7270"  # REST mirror (dev/health)
+      - "7271:7271"  # gRPC contract
