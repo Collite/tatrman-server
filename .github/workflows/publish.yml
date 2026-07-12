@@ -82,12 +82,12 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # SV-P1 S4 — public lane (RO-17). The root aggregate `publishToMavenCentral`
-      # uploads ONE signed bundle of all 11 libs to the Central Portal (awaits a
-      # manual "Publish" in the portal UI; switch to `publishAndReleaseToMavenCentral`
-      # once trusted). Skipped until the four credential secrets are set, so the GH
-      # Packages lane above stays green in the interim. Secret names ARE the Gradle
-      # property names so they flow straight through as `ORG_GRADLE_PROJECT_*` env.
+      # SV-P1 S4 — public lane (RO-17). The root aggregate
+      # `publishAndReleaseToMavenCentral` uploads ONE signed bundle of all 11 libs
+      # to the Central Portal and AUTO-RELEASES it (enabled 2026-07-12 after the
+      # first manual release). Skipped until the four credential secrets are set, so
+      # the GH Packages lane above stays green in the interim. Secret names ARE the
+      # Gradle property names so they flow straight through as `ORG_GRADLE_PROJECT_*` env.
       - name: Publish to Maven Central (Central Portal)
         env:
           GITHUB_ACTOR: ${{ github.actor }}
@@ -97,4 +97,4 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.ORG_GRADLE_PROJECT_signingInMemoryKey }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.ORG_GRADLE_PROJECT_signingInMemoryKeyPassword }}
         if: ${{ env.ORG_GRADLE_PROJECT_mavenCentralUsername != '' }}
-        run: ./gradlew --no-configuration-cache -Ptatrman-server.version=${{ steps.ver.outputs.version }} publishToMavenCentral
+        run: ./gradlew --no-configuration-cache -Ptatrman-server.version=${{ steps.ver.outputs.version }} publishAndReleaseToMavenCentral
