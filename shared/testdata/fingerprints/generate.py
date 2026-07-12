@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Generator + reference for the cross-engine schema-fingerprint fixture set.
 
 Fork Stage 3.4 T2. The schema fingerprint is the cross-engine schema-identity

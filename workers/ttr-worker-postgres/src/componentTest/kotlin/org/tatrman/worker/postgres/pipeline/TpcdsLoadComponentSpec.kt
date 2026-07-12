@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.worker.postgres.pipeline
 
 import io.kotest.assertions.throwables.shouldThrow

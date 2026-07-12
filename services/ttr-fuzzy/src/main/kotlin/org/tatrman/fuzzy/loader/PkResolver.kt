@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.fuzzy.loader
 
 import org.tatrman.meta.v1.DbTableDetail

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.veles.mcp
 
 import com.typesafe.config.ConfigFactory

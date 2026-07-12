@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.veles.parse
 
 import org.tatrman.translate.v1.Language as TranslatorLanguage

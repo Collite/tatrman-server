@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.dispatch.sticky
 
 import org.slf4j.LoggerFactory

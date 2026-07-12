@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package shared.formatter.input
 
 import org.apache.arrow.memory.BufferAllocator

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.query.fingerprint
 
 import org.tatrman.plan.v1.AggregateNode

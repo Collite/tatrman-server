@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // veles-client — the shared gRPC client for the Veles model graph service
 // (GetModel / GetPrompts / list*). Extracted from tools/veles-mcp (2026-06-18,
 // Golem Stage 2.2) so Golem's PackageContext + PromptStore and Pythia consume one

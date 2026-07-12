@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.query.mcp.mcp
 
 import io.kotest.assertions.throwables.shouldThrow

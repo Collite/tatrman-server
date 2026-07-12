@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """HTTP probes / status / metrics for the Polars Worker.
 
 Runs alongside the gRPC server on a dedicated HTTP port (default 7502).

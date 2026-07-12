@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.llmgateway.async
 
 import org.springframework.data.annotation.Id

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """NLP service package.
 
 Root-level logging is configured *here* (not in main.py) because the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.validate.roles
 
 import com.github.benmanes.caffeine.cache.Caffeine

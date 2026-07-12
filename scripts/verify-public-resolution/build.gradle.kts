@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // SV-P1 S4 T6 — the phase-DONE proof: every published spine artifact resolves
 // ANONYMOUSLY from Maven Central. Run on a machine/container with NO ~/.gradle
 // credentials:

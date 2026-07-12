@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """WorkerService gRPC handlers for the Polars Worker.
 
 Phase 2.4 §C+§D scaffolding + §H Execute RPC. Registers via

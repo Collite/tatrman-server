@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Read-out throughput micro-benchmark for Polars cost_hints (Fork Stage 4.1 T4).
 
 Pushes a 1e5-row table through the worker's real read-out path — a representative

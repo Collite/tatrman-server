@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.fuzzy.mcp
 
 import io.kotest.core.spec.style.StringSpec

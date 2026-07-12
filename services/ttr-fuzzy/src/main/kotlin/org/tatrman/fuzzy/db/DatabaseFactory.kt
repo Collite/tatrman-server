@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.fuzzy.db
 
 import com.zaxxer.hikari.HikariConfig

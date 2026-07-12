@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Typed config holder loaded from HOCON.
 
 Matches the platform-service convention (Kotlin services use Typesafe Config).

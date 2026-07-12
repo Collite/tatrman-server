@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """DF-P01 / Phase 06 C4 — Polars Worker `Execute` emits an OTEL span hierarchy.
 
 Uses opentelemetry's `InMemorySpanExporter` (the canonical SDK test harness): set a tracer

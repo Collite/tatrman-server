@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // llm-gateway-client — the shared client for the LLM gateway LLM gateway
 // (OpenAI-shaped /v1/chat/completions) + the Koog PromptExecutor bridge.
 // Extracted from agents/themis (2026-06-19, Golem Stage 2.3 T1) so Golem's

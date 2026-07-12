@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package shared.logging
 
 import org.slf4j.Logger

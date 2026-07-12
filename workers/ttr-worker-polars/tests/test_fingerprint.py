@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Fork Stage 3.4 T2 — cross-engine schema-fingerprint pin.
 
 Polars recomputes the canonical fingerprint of every shared reference Arrow

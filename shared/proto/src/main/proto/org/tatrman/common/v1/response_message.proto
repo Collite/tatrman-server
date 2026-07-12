@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Kantheon-local stand-in for the cross-platform `ResponseMessage` referenced by
 // AGENTS.md §6.1 / Rule 6. ai-platform defines a `ResponseMessage` inside
 // `cz.dfpartner.metadata.v1` that carries a metadata-domain `ObjectRef`, so it

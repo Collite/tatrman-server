@@ -40,6 +40,20 @@ jobs:
       - name: check dependency rules
         run: bash scripts/check-dependency-rules.sh
 
+  # License-header gate (SV-P2·S1, RO-18): every tracked *.kt/*.kts/*.py/*.proto/*.ts
+  # source file must carry `SPDX-License-Identifier: Apache-2.0` in its first 3 lines.
+  # Generated (build/, **/generated/**, *_pb2*) and third-party scaffolds
+  # (infra/backstage/** — "The Backstage Authors", Apache-2.0 upstream) are excluded.
+  # `scripts/add-spdx.sh` applies the header idempotently.
+  spdx:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: enforce SPDX license headers
+        run: bash scripts/check-spdx.sh
+
   # Persona grep gate (naming ledger §5). ENFORCING as of S6's phase-DONE gate
   # (was report-only through the S1→S5 window while the grafted spine still
   # carried retired persona strings). Now scans wire/build surfaces AND

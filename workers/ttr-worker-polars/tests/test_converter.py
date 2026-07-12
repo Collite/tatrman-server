@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Phase 2.4 §F+§G — PlanNode → Polars LazyFrame + Expression converter."""
 
 from __future__ import annotations

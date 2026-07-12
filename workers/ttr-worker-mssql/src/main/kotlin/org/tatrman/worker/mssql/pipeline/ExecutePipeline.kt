@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.worker.mssql.pipeline
 
 import com.google.protobuf.kotlin.toByteString
