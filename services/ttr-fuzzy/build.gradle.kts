@@ -74,6 +74,8 @@ dependencies {
 
     implementation(libs.java.string.similarity)
     implementation(project(":shared:libs:kotlin:fuzzy-common"))
+    // RG-P0.S3 — fold() now comes from the shared S-2 lib (was inline here).
+    implementation(project(":shared:libs:kotlin:ttr-text"))
 
     // Nlp (Phase 2.3) Czech lemmatisation client — kept but disabled at v1
     // (see application.conf `fuzzy.nlp.enabled = false`). When the lib is
