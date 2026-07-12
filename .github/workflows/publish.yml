@@ -70,7 +70,12 @@ jobs:
           echo "Publishing server libraries version ${TAG##*/v}"
 
       - name: Publish to GH Packages (staging lane)
-        run: ./gradlew --no-configuration-cache -Ptatrman-server.version=${{ steps.ver.outputs.version }} publish
+        # GH-Packages-SPECIFIC task, not the generic `publish` aggregate: vanniktech
+        # registers a `mavenCentral` repository, so `publish` now also pulls in
+        # `prepareMavenCentralPublishing` (needs `mavenCentralUsername`, absent in
+        # this step) and the whole step fails. The Central lane below runs the
+        # separate `publishToMavenCentral` aggregate with the credentials.
+        run: ./gradlew --no-configuration-cache -Ptatrman-server.version=${{ steps.ver.outputs.version }} publishAllPublicationsToGitHubPackagesRepository
         env:
           # Read the org.tatrman:ttr-* toolchain (Collite/tatrman) to compile the
           # libs, AND write the org.tatrman:* libs to Collite/tatrman-server.
