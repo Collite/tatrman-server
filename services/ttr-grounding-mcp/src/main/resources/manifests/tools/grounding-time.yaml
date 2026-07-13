@@ -1,0 +1,22 @@
+capability_id: "grounding.time:v1"
+category: "grounding"
+version: "1.0.0"
+description: |
+  Ground a DATE_TIME expression (e.g. "May period", "last quarter", "poslední
+  fiskální čtvrtletí", "do konce roku") to a normalized interval + a filter/join
+  recipe, via the chrono grounding service. context.referenceDatetime (ISO-8601
+  with offset) is REQUIRED and load-bearing — the service never reads a clock.
+  Delegates to Ground(kind=DATE_TIME) on the generic GroundingService proto.
+service_endpoint: "http://ttr-grounding-mcp.kantheon.svc.cluster.local:7153"
+search_tags:
+  - grounding
+  - time
+  - date
+  - period
+  - quarter
+  - fiscal
+cost_hints:
+  typical_latency_ms: 150
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 16

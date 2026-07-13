@@ -48,6 +48,10 @@ fun main(): Unit =
         val geo = grpcClient(config, "geo", deadline)
         val money = grpcClient(config, "money", deadline)
 
+        // RG-P3.S2.T6 — register the kind-named capability ids (grounding.time|geo|money:v1) with
+        // capabilities-mcp (warn-and-continue; a no-op unless CAPABILITIES_MCP_URL is set).
+        registerWithCapabilities(config)
+
         try {
             val tools = Tools(chrono, geo, money)
             println("grounding-mcp running on port $serverPort (chrono/geo/money)")

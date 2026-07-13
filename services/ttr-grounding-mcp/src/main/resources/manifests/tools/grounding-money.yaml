@@ -1,0 +1,21 @@
+capability_id: "grounding.money:v1"
+category: "grounding"
+version: "1.0.0"
+description: |
+  Ground a MONEY expression (e.g. "over 100k CZK", "kolem 2 mil", "over 5000 EUR")
+  to a normalized amount + a filter/join recipe, via the money grounding service.
+  A time-versioned fx_rate table with no as-of date fails loud, never a silent
+  current-rate guess. Delegates to Ground(kind=MONEY) on the generic
+  GroundingService proto.
+service_endpoint: "http://ttr-grounding-mcp.kantheon.svc.cluster.local:7153"
+search_tags:
+  - grounding
+  - money
+  - amount
+  - currency
+  - fx
+cost_hints:
+  typical_latency_ms: 120
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 16

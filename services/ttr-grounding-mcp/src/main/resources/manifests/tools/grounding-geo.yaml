@@ -1,0 +1,22 @@
+capability_id: "grounding.geo:v1"
+category: "grounding"
+version: "1.0.0"
+description: |
+  Ground a LOCATION expression (e.g. "within 20 km of Brno", "in Prague", "do 20
+  km od Brna") to a geo point/shape + a filter/join recipe, via the geo grounding
+  service. Honours the geo capability posture: when the geocoder is dark or
+  erroring the tool fails loud (UNAVAILABLE), never a false "place not found".
+  Delegates to Ground(kind=LOCATION) on the generic GroundingService proto.
+service_endpoint: "http://ttr-grounding-mcp.kantheon.svc.cluster.local:7153"
+search_tags:
+  - grounding
+  - geo
+  - location
+  - place
+  - distance
+  - boundary
+cost_hints:
+  typical_latency_ms: 300
+  typical_cost_usd: 0.0
+  is_idempotent: true
+  max_concurrent: 16
