@@ -107,15 +107,34 @@ class MoneyRecipeBuilderSpec :
         }
 
         "foreign EUR + fx, current rate but NO reference date → Ungroundable (no silent rate fan-out)" {
-            builder(FakeMetadataClient.withFxTable("cnc"))
-                .build(
-                    money(5_000, currency = "EUR", atCurrentRate = true),
-                    "cnc",
-                    "CZK",
-                    10.0,
-                    fxCurrent = true,
-                    referenceDatetime = "",
-                ).shouldBeInstanceOf<MoneyRecipe.Ungroundable>()
+            // RG-GND-002 (current-rate branch): time-versioned rate table + no as-of ref ⇒ fail loud.
+            val r =
+                builder(FakeMetadataClient.withFxTable("cnc"))
+                    .build(
+                        money(5_000, currency = "EUR", atCurrentRate = true),
+                        "cnc",
+                        "CZK",
+                        10.0,
+                        fxCurrent = true,
+                        referenceDatetime = "",
+                    ).shouldBeInstanceOf<MoneyRecipe.Ungroundable>()
+            r.reason shouldContain "reference_datetime"
+        }
+
+        "RG-GND-002: transaction-date fx, time-versioned rate, no event_date column → Ungroundable" {
+            // The transaction-date policy needs the fact's event_date to pick the one applicable rate
+            // row; a time-versioned table with no event_date must fail loud, never fan out the join.
+            val r =
+                builder(FakeMetadataClient.withFxTableNoEventDate("cnc"))
+                    .build(
+                        money(5_000, currency = "EUR"),
+                        "cnc",
+                        "CZK",
+                        10.0,
+                        fxCurrent = false,
+                        referenceDatetime = "2026-05-15T00:00:00+02:00",
+                    ).shouldBeInstanceOf<MoneyRecipe.Ungroundable>()
+            r.reason shouldContain "event_date"
         }
 
         "fractional threshold keeps exact decimal precision (no double rounding)" {

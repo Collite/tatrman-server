@@ -103,6 +103,25 @@ class FakeMetadataClient(
                 ),
             )
 
+        /**
+         * Sale (amount, NO event_date) + a time-versioned FxRate (rate/from/to + valid_from/valid_to).
+         * RG-GND-002: the transaction-date FX policy needs the fact's event_date to pick the applicable
+         * rate row; without it the join would match every historical rate version — so grounding must
+         * fail loudly rather than silently guess.
+         */
+        fun withFxTableNoEventDate(pkg: String = "cnc"): FakeMetadataClient =
+            FakeMetadataClient(
+                listOf(
+                    Obj(pkg, "Sale", "amount", "attribute", role = "amount"),
+                    Obj(pkg, "FxRate", "FxRate", "entity", semanticKind = "fx_rate"),
+                    Obj(pkg, "FxRate", "rate", "attribute", role = "fx_rate"),
+                    Obj(pkg, "FxRate", "from_ccy", "attribute", role = "fx_from_currency"),
+                    Obj(pkg, "FxRate", "to_ccy", "attribute", role = "fx_to_currency"),
+                    Obj(pkg, "FxRate", "valid_from", "attribute", role = "valid_from"),
+                    Obj(pkg, "FxRate", "valid_to", "attribute", role = "valid_to"),
+                ),
+            )
+
         /** Sale with a native amount + currency_code, no fx table — the native-foreign-filter fixture. */
         fun withCurrencyCode(pkg: String = "cnc"): FakeMetadataClient =
             FakeMetadataClient(

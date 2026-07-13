@@ -61,6 +61,13 @@ enum EntityKind {
   MONEY = 3;
 }
 
+// The server-owned grounding context (D-T1). This is the SINGLE shape all three
+// grounding services (chrono/geo/money) consume — none defines its own. Assembly
+// (turn state -> context) is AGENT-SIDE: the agent fills reference_datetime,
+// timezone, locale, default_currency, here_place_ref, fx_policy and tolerance from
+// the conversation turn. A service never reads a clock, a locale, or "here" from
+// its own environment — every ambient value arrives here (NoClockReadsTest asserts
+// the reference_datetime half of this invariant).
 message GroundingContext {
   string reference_datetime = 1;      // ISO-8601 with offset; ALWAYS from the agent turn context, never "now" in-service
   string timezone = 2;                // IANA, e.g. "Europe/Prague"
