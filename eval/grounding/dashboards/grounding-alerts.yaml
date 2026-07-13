@@ -1,0 +1,55 @@
+# Grounding alerting rules — fabric-infra draft (A14.3).
+# Prometheus rule group. Move to the deployed PrometheusRule / rules ConfigMap in
+# fabric-infra; do not apply from this repo.
+#
+# Gate (A14.5): the LLM-fallback share of OK groundings must stay < 10% over 1d.
+groups:
+  - name: grounding.rules
+    rules:
+      # Per-service LLM-fallback share of OK groundings, over 1 day.
+      - record: grounding:llm_fallback_share:ratio1d
+        expr: |
+          sum by (service) (
+            rate(grounding_ground_total{source="LLM", outcome="OK"}[1d])
+          )
+          /
+          sum by (service) (
+            rate(grounding_ground_total{outcome="OK"}[1d])
+          )
+        labels: {}
+      # NOTE: `grounding_ground_total` above is a placeholder for a relabeled
+      # union of chrono_/geo_/money_ground_total. If the collector does not
+      # expose a unified metric, replace the recording rule with three explicit
+      # sums (one per `*_ground_total`) or add a `service` label via metric_relabel.
+
+      - alert: GroundingLlmFallbackHigh
+        expr: grounding:llm_fallback_share:ratio1d > 0.10
+        for: 2h
+        labels:
+          severity: warning
+          feature: grounding
+        annotations:
+          summary: "Grounding LLM-fallback rate above 10% ({{ $labels.service }})"
+          description: >-
+            {{ $labels.service }} resolved {{ $value | humanizePercentage }} of OK
+            groundings via the LLM fallback over the last day (target < 10%). The
+            deterministic rules path is regressing — check recent recognizer/model
+            changes and the eval report (`just eval-grounding`).
+
+      # Safety net: a spike in UNGROUNDABLE spans (recognizer/model breakage).
+      - alert: GroundingUngroundableHigh
+        expr: |
+          sum by (service) (rate(grounding_ground_total{outcome="UNGROUNDABLE"}[1h]))
+          /
+          sum by (service) (rate(grounding_ground_total[1h]))
+          > 0.30
+        for: 1h
+        labels:
+          severity: warning
+          feature: grounding
+        annotations:
+          summary: "Grounding UNGROUNDABLE rate above 30% ({{ $labels.service }})"
+          description: >-
+            Over 30% of {{ $labels.service }} grounding attempts returned
+            UNGROUNDABLE in the last hour — likely a metadata-model or recognizer
+            outage rather than genuine user input.

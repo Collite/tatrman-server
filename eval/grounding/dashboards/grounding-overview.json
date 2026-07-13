@@ -1,0 +1,125 @@
+{
+  "__comment": "fabric-infra DRAFT (A14.3) — Grounding overview. Import into the df-test Grafana; do not provision from ai-platform. Datasource via the $datasource variable.",
+  "title": "Grounding — time / geo / money",
+  "uid": "grounding-overview",
+  "tags": ["grounding", "df-test"],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    { "type": "row", "title": "Outcomes & source", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+    {
+      "type": "timeseries",
+      "title": "Grounding rate by outcome (all services)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate({__name__=~\"(chrono|geo|money)_ground_total\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "Source share of OK groundings (RULES vs LLM)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source) (rate({__name__=~\"(chrono|geo|money)_ground_total\", outcome=\"OK\"}[1h]))",
+          "legendFormat": "{{source}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "LLM-fallback rate (1d) — gate < 10%",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.1 } ] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate({__name__=~\"(chrono|geo|money)_ground_total\", source=\"LLM\", outcome=\"OK\"}[1d])) / clamp_min(sum(rate({__name__=~\"(chrono|geo|money)_ground_total\", outcome=\"OK\"}[1d])), 1)"
+        }
+      ]
+    },
+
+    { "type": "row", "title": "Latency", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 } },
+    {
+      "type": "timeseries",
+      "title": "Ground latency percentiles (all services)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate({__name__=~\"(chrono|geo|money)_ground_latency_ms_bucket\"}[5m])))", "legendFormat": "p50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate({__name__=~\"(chrono|geo|money)_ground_latency_ms_bucket\"}[5m])))", "legendFormat": "p95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate({__name__=~\"(chrono|geo|money)_ground_latency_ms_bucket\"}[5m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Ground latency p95 by service",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(chrono_ground_latency_ms_bucket[5m])))", "legendFormat": "chrono" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(geo_ground_latency_ms_bucket[5m])))", "legendFormat": "geo" },
+        { "refId": "C", "expr": "histogram_quantile(0.95, sum by (le) (rate(money_ground_latency_ms_bucket[5m])))", "legendFormat": "money" }
+      ]
+    },
+
+    { "type": "row", "title": "Golem GroundEntities node", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 } },
+    {
+      "type": "timeseries",
+      "title": "GroundEntities attempts by tool & status",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum by (tool, status) (rate(golem_grounding_total[5m]))", "legendFormat": "{{tool}} / {{status}}" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "GroundEntities FAILED (degraded) rate",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 19 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 0.02 }, { "color": "red", "value": 0.1 } ] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(golem_grounding_total{status=\"FAILED\"}[30m])) / clamp_min(sum(rate(golem_grounding_total[30m])), 1)" }
+      ]
+    }
+  ]
+}
