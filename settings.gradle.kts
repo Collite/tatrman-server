@@ -57,6 +57,8 @@ include(":shared:libs:kotlin:data-formatter")
 // RG-P0.S3 — S-2 shared normalization (fold) + RG-* diagnostics registry.
 include(":shared:libs:kotlin:ttr-text")
 include(":shared:libs:kotlin:ttr-diagnostics")
+// RG-P3 grounding kernel (workstream D) — consolidated PlanExpr/SqlRenderer/RecipeBuilder scaffolding.
+include(":shared:libs:kotlin:ttr-grounding-core")
 include(":shared:libs:kotlin:fuzzy-common")
 include(":shared:libs:kotlin:whois-common")
 include(":shared:libs:kotlin:keycloak-auth")
