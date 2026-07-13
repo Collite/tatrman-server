@@ -8,6 +8,8 @@ import org.tatrman.grounding.v1.Normalized
 import org.tatrman.plan.v1.Expression
 import org.tatrman.plan.v1.JoinType
 import org.tatrman.plan.v1.ParameterBinding
+import org.tatrman.grounding.core.PlanExpr
+import org.tatrman.grounding.core.SqlRenderer
 import org.tatrman.money.discover.ColumnRef
 import org.tatrman.money.discover.FxTable
 import org.tatrman.money.discover.MoneyDiscovery
@@ -258,9 +260,7 @@ class MoneyRecipeBuilder(
                 .addAllParameters(params)
                 .setSuggestedAlias(FX_ALIAS)
                 .build()
-        val sql =
-            "JOIN ${SqlRenderer.quote(fx.entityName)} AS $FX_ALIAS ON " +
-                "${SqlRenderer.render(onCondition)} WHERE ${SqlRenderer.render(filterCond)}"
+        val sql = SqlRenderer.renderJoin(fx.entityName, FX_ALIAS, onCondition, filterCond)
         val policy = if (fxCurrent) "current rate" else "transaction-date rate"
         return MoneyRecipe.Ok(
             result(normalized, amount, sql, "${describe(amount)} converted from $currency at the $policy") {

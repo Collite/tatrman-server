@@ -7,6 +7,8 @@ import org.tatrman.grounding.v1.GroundingResult
 import org.tatrman.grounding.v1.JoinRecipe
 import org.tatrman.grounding.v1.Normalized
 import org.tatrman.plan.v1.JoinType
+import org.tatrman.grounding.core.PlanExpr
+import org.tatrman.grounding.core.SqlRenderer
 import org.tatrman.geo.discover.GeoDiscovery
 import org.tatrman.geo.parse.GeoQuery
 import org.tatrman.geo.resolve.ModelPoiRef
@@ -114,9 +116,7 @@ class GeoRecipeBuilder(
                 .newBuilder()
                 .setPoint(GeoPoint.newBuilder().setRadiusM(query.radiusMeters))
                 .build()
-        val sql =
-            "JOIN ${SqlRenderer.quote(poi.entityName)} AS $poiAlias ON " +
-                "${SqlRenderer.render(onCondition)} WHERE ${SqlRenderer.render(filterCond)}"
+        val sql = SqlRenderer.renderJoin(poi.entityName, poiAlias, onCondition, filterCond)
         return GroundingResult
             .newBuilder()
             .setNormalized(normalized)

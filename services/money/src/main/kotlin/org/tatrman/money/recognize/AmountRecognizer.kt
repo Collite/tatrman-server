@@ -1,5 +1,6 @@
 package org.tatrman.money.recognize
 
+import org.tatrman.text.Normalization
 import java.math.BigDecimal
 
 /**
@@ -20,7 +21,7 @@ class AmountRecognizer {
         span: String,
         locale: String,
     ): MoneyAmount? {
-        val norm = Diacritics.strip(span).lowercase()
+        val norm = Normalization.fold(span)
         val amount = parseMagnitude(span, norm, locale) ?: return null
         val comparator = detectComparator(norm)
         val tolerance = TOLERANCE.containsMatchIn(norm)

@@ -6,6 +6,8 @@ import org.tatrman.grounding.v1.GroundingResult
 import org.tatrman.grounding.v1.JoinRecipe
 import org.tatrman.grounding.v1.Normalized
 import org.tatrman.plan.v1.JoinType
+import org.tatrman.grounding.core.PlanExpr
+import org.tatrman.grounding.core.SqlRenderer
 import org.tatrman.chrono.discover.ColumnRef
 import org.tatrman.chrono.discover.PeriodTable
 import org.tatrman.chrono.discover.SemanticDiscovery
@@ -137,9 +139,7 @@ class RecipeBuilder(
                 .addParameters(PlanExpr.textParam("p", code, "Accounting period"))
                 .setSuggestedAlias(alias)
                 .build()
-        val sql =
-            "JOIN ${SqlRenderer.quote(pt.entityName)} AS $alias ON " +
-                "${SqlRenderer.render(onCondition)} WHERE ${SqlRenderer.render(filter)}"
+        val sql = SqlRenderer.renderJoin(pt.entityName, alias, onCondition, filter)
         return result(normalized, recognition, sql, "accounting period $code") { setJoin(join) }
     }
 

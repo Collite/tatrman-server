@@ -18,8 +18,26 @@ import org.tatrman.plan.v1.Expression
  * where the caller renders one too.
  */
 object SqlRenderer {
-    /** Double-quote an identifier so reserved words (`date`, `period`, `amount`, `order`, …) parse. */
-    fun quote(identifier: String): String = "\"$identifier\""
+    /**
+     * Double-quote an identifier so reserved words (`date`, `period`, `amount`, `order`, …) parse.
+     * Private: the only public entry points are [render] and [renderJoin], both derived from the
+     * plan.v1 Expression tree — there is no public string-assembly primitive for a recipe to build a
+     * `sql_preview` by hand (the "derived, not duplicated" invariant, contracts §1.1).
+     */
+    private fun quote(identifier: String): String = "\"$identifier\""
+
+    /**
+     * Render a JoinRecipe's `sql_preview` — `JOIN "<entity>" AS <alias> ON <onCondition> WHERE <filter>`
+     * — from its structured parts. The on-condition and filter are [render]ed from their plan.v1
+     * Expression trees; centralising the clause assembly here keeps the preview derived-not-duplicated
+     * (no service hand-builds the JOIN string). Mirrors the format the three recipe builders emitted.
+     */
+    fun renderJoin(
+        entityName: String,
+        alias: String,
+        onCondition: Expression,
+        filter: Expression,
+    ): String = "JOIN ${quote(entityName)} AS $alias ON ${render(onCondition)} WHERE ${render(filter)}"
 
     /** Render a boolean/scalar Expression to a SQL fragment. */
     fun render(e: Expression): String =
