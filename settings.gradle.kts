@@ -78,6 +78,8 @@ include(":services:ttr-validate")
 include(":services:ttr-dispatch")
 include(":services:ttr-fuzzy")
 include(":services:ttr-llm-gateway")
+// RG-P5 — the deterministic resolver core (workstream E). ZERO LLM by arch test.
+include(":services:ttr-resolver")
 // RG-P3 grounding services (workstream D) — moved from ai-platform, J-v2 renamed.
 include(":services:chrono")
 include(":services:money")

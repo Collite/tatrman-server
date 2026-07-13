@@ -1,0 +1,173 @@
+// SPDX-License-Identifier: Apache-2.0
+// org.tatrman.resolver.v1 — the deterministic resolver core (RG-P5, workstream E).
+//
+// Reshaped from the ai-platform reference resolver per RS-23: the `function_specs`
+// / joint-inference / ResolveMode (NORMAL) machinery is REMOVED — that LLM
+// escalation ladder is the kantheon Resolving Agent's job (Q-21). This service is
+// the deterministic core only: parse → extractUniversal → proposeDomainSpans
+// (anchored, Q-20 GO-WITH-FALLBACK) → gateSpans (one BatchMatch) → bindings |
+// AwaitingClarification. ZERO LLM below the door line. Contracts §4/§5.
+syntax = "proto3";
+
+package org.tatrman.resolver.v1;
+
+option java_multiple_files = true;
+option java_package = "org.tatrman.resolver.v1";
+option java_outer_classname = "ResolverProto";
+
+import "org/tatrman/nlp/v1/nlp.proto";
+
+service ResolverService {
+  rpc Resolve (ResolveRequest) returns (ResolveResponse) {}
+}
+
+message ResolveRequest {
+  string conversation_id = 1;
+  oneof input {
+    FreshQuestion fresh = 2;
+    ResumeAnswer resume = 3;
+  }
+  // Per-request registry override; default = snapshot-fed (RS-24, one channel).
+  optional Registry registry = 4;
+  // Reference info only. NO ResolveMode — the NORMAL machinery is gone (RS-23).
+  ResolveContext context = 5;
+}
+
+message FreshQuestion {
+  string text = 1;
+  string locale = 2; // RS-11
+}
+
+message ResumeAnswer {
+  string token = 1;               // the HMAC resume token (§5)
+  string selected_option_id = 2;  // must match a signed option
+  string free_text_answer = 3;    // optional free text (unsigned path stays refuse-over-guess)
+}
+
+// Reference context carried statelessly (no server session).
+message ResolveContext {
+  string reference_datetime = 1;  // ISO-8601; grounding anchor
+  string tenant = 2;
+}
+
+// Caller-supplied registry override (RS-24). When absent the snapshot-fed
+// registry is used; when present it WINS for this request.
+message Registry {
+  repeated EntityType entity_types = 1;
+  repeated string locales = 2;
+  Thresholds thresholds = 3;
+  string snapshot_hash = 4;
+}
+
+message EntityType {
+  string ref = 1;                 // e.g. "md.measure.net", "er.entity.branch"
+  repeated string categories = 2; // fuzzy categories to gate this type's spans
+  repeated string anchors = 3;    // declared entity-type anchor words (Q-20 anchored gating)
+}
+
+// Gating thresholds — ported from the live ENTITIES_ONLY config (ResolverGraph).
+message Thresholds {
+  double bind = 1;        // candidate bind floor (live: 0.5)
+  double ambiguity_gap = 2; // contenders within this gap ⇒ ambiguous (live: 0.05)
+  double exact = 3;       // exact-match dominance (live: 0.9999)
+  int32 max_options = 4;  // clarification option cap (live: 20)
+}
+
+message ResolveResponse {
+  // Parse passthrough (E-T1): agents skip a second parse.
+  org.tatrman.nlp.v1.AnalyzeResponse parse = 1;
+  oneof outcome {
+    Resolution resolution = 2;
+    AwaitingClarification awaiting = 3;
+  }
+  string trace_id = 4;
+  int64 elapsed_ms = 5;
+  // RS-7 capability matrix echoed — what actually backed this resolve (F-T3 honesty).
+  Capabilities capabilities = 6;
+}
+
+message Resolution {
+  repeated EntityBinding bindings = 1;
+  double confidence = 2;
+  string rationale = 3;
+}
+
+message EntityBinding {
+  Span span = 1;
+  oneof kind {
+    Universal universal = 2;
+    Domain domain = 3;
+  }
+  BindingProvenance provenance = 4; // S-1 + S-4 + RS-15
+  bool degraded = 5;                // RS-25: set when the capability matrix forced a floor
+}
+
+// A character span of the resolved surface text.
+message Span {
+  int32 start = 1;   // 0-indexed char offset
+  int32 end = 2;     // exclusive
+  string text = 3;
+}
+
+message Universal {
+  UniversalEntityType entity_type = 1;
+  string raw_text = 2;
+  string normalized_value = 3;
+  string source_engine = 4;
+}
+
+message Domain {
+  string entity_type_ref = 1;
+  string raw_text = 2;
+  string resolved_id = 3;    // set when instance-determinate (MEMBER hit)
+  string resolved_label = 4;
+  repeated Candidate candidates = 5;
+}
+
+message Candidate {
+  string resolved_id = 1;
+  string resolved_label = 2;
+  double score = 3;
+  string target_ref = 4;     // set for VOCABULARY hits
+}
+
+message BindingProvenance {
+  string vocabulary_source = 1;  // RS-15 source tag (MEMBER | VOCABULARY | universal engine)
+  string algorithm = 2;          // S-4 scoring method (e.g. "TATRMAN")
+  double score = 3;              // S-4 raw score
+  string tier = 4;              // reserved embedding-tier label (RS-14)
+  string snapshot_hash = 5;      // registry/vocab snapshot (one channel)
+  repeated org.tatrman.nlp.v1.EngineVersion model_versions = 6; // S-1
+}
+
+enum UniversalEntityType {
+  PERSON = 0;
+  LOCATION = 1;
+  ORGANIZATION = 2;
+  DATE = 3;
+  MONEY = 4;
+  MISC = 5;
+}
+
+message AwaitingClarification {
+  repeated Option options = 1;
+  string resume_token = 2; // HMAC — see §5
+}
+
+message Option {
+  string id = 1;
+  string label = 2;
+  string target_ref = 3;   // set for VOCABULARY options
+  string resolved_id = 4;  // set for MEMBER options
+}
+
+// RS-7 matrix echo — what backed this resolve. `degraded_reasons` carries the
+// RG-RES-001 floor reasons so the door can promise honesty (F-T3).
+message Capabilities {
+  string language = 1;
+  bool cs_ner = 2;              // Czech NER available (universal extraction)
+  bool dep_parse = 3;           // dependency parse available (anchored span proposal)
+  bool fuzzy_ready = 4;         // the vocabulary matcher is loaded
+  bool degraded = 5;
+  repeated string degraded_reasons = 6;
+}
