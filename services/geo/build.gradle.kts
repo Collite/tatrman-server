@@ -112,13 +112,25 @@ dependencies {
     testImplementation(libs.wiremock)
     // InMemoryMetricReader for the GeoMetrics assertions.
     testImplementation(libs.opentelemetry.sdk.testing)
-    // Postgres boundary-cache round-trip (durable persistence) over a real Postgres.
-    testImplementation(libs.testcontainers)
-    testImplementation(libs.testcontainers.postgresql)
     // RG-P3.S0 metadata-seam component test — stands up an in-process Veles
     // (MetadataServiceImpl) over the semantics fixture to prove MetaV1GeoDiscovery
     // maps the real meta.v1 projection to the discovery domain types.
     testImplementation(project(":services:veles"))
     testImplementation(libs.tatrman.ttr.metadata)
     testImplementation(libs.grpc.inprocess)
+
+    // Component tier — the durable Postgres boundary cache round-trips over a REAL
+    // Postgres (Testcontainers). Physically separated into `src/componentTest` (repo
+    // convention, mirror :services:veles) so the mocked-only unit `test` gate stays
+    // Docker-free and green offline. The convention suite (root build) already carries
+    // project()/kotest/testcontainers; these are geo-main `implementation` deps the
+    // spec imports directly (not on the componentTest compile classpath transitively).
+    "componentTestImplementation"(libs.testcontainers.postgresql)
+    "componentTestImplementation"(project(":shared:libs:kotlin:db-common"))
+    "componentTestImplementation"(libs.exposed.core)
+    "componentTestImplementation"(libs.exposed.jdbc)
+    "componentTestImplementation"(libs.postgresql)
+    "componentTestImplementation"(libs.flyway.core)
+    "componentTestImplementation"(libs.flyway.pgsql)
+    "componentTestImplementation"(libs.typesafe.config)
 }
