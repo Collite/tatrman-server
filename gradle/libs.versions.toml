@@ -4,7 +4,7 @@
 
 [versions]
 tatrman-modeler           = "0.8.6"
-tatrman-ttr-metadata      = "0.8.6"
+tatrman-ttr-metadata      = "0.9.4"
 tatrman-translator        = "0.8.5"
 # SV-P1 S4 — Maven Central publishing via the Central Portal.
 vanniktech-publish        = "0.36.0"
