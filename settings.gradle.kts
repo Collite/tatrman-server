@@ -76,6 +76,8 @@ include(":services:ttr-validate")
 include(":services:ttr-dispatch")
 include(":services:ttr-fuzzy")
 include(":services:ttr-llm-gateway")
+// RG-P3 grounding services (workstream D) — moved from ai-platform, J-v2 renamed.
+include(":services:chrono")
 
 // Engine workers (JVM; the Polars worker is Python — out of the Gradle build)
 include(":workers:ttr-worker-postgres")
