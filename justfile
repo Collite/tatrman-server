@@ -59,7 +59,12 @@ lint-py path:
 
 # Cut a release tag. Two families, both read the version from the git tag:
 #   • server-libs   → publish.yml: the 11 org.tatrman:* Maven libs → GH Packages
-#                     (staging) + Maven Central (public, once the S4 secrets are set).
+#                     (staging) always, + Maven Central only for a bare x.y.z
+#                     version (public release). A prerelease suffix
+#                     (e.g. 0.9.5-rc.1) stays on GH Packages only — see
+#                     publish.yml's lane-gating comment and tatrman's
+#                     PUBLISHING.md § Release lanes (Central's free tier can't
+#                     absorb fast-iteration publishing).
 #   • <image module> → release-image.yml: one container image → ghcr.io/collite/<m>.
 #
 # ⚠️  Published versions are PERMANENT — GitHub Packages + GHCR can't be deleted,
@@ -69,6 +74,7 @@ lint-py path:
 # Usage (args in order: <which> <level> [version]; `which` = the tag prefix):
 #   just package server-libs patch            # Maven libs, patch bump (0.9.0 -> 0.9.1)
 #   just package server-libs set 0.9.2        # Maven libs, explicit version
+#   just package server-libs set 0.9.2-rc.1   # Maven libs, WIP — GH Packages only
 #   just package veles set 0.9.2              # the veles image only
 #   just package ttr-query patch              # the ttr-query image, patch bump
 #
@@ -147,6 +153,18 @@ package which="server-libs" level="patch" version="":
         echo "❌ Tag ${NEW_TAG} already exists."; exit 1
     fi
 
+    # Lane gating (SV — Central quota, mirrors tatrman's justfile): only
+    # server-libs ever touches Maven Central, and only a bare x.y.z version
+    # reaches it — a prerelease suffix (e.g. 0.9.5-rc.1) stays on GH Packages
+    # (see publish.yml). Image modules always go to GHCR only, regardless.
+    if [ "$PREFIX" = "server-libs" ]; then
+        if [[ "$NEW_VERSION" == *-* ]]; then
+            TARGET_DESC="the 11 org.tatrman:* Maven libs → GH Packages ONLY (prerelease — Central step skipped)"
+        else
+            TARGET_DESC="the 11 org.tatrman:* Maven libs → GH Packages + Maven Central (PUBLIC — counts against Central quota)"
+        fi
+    fi
+
     echo "────────────────────────────────────────────────────────────"
     echo "  Latest released : ${LATEST}"
     echo "  New version      : ${NEW_VERSION}   →  tag ${NEW_TAG}"
@@ -159,5 +177,5 @@ package which="server-libs" level="patch" version="":
 
     git tag -a "${NEW_TAG}" -m "Release ${NEW_VERSION}"
     git push origin "${NEW_TAG}"
-    echo "✅ Pushed ${NEW_TAG} — the matching workflow will build & publish."
+    echo "✅ Pushed ${NEW_TAG} — the matching workflow will publish: ${TARGET_DESC}"
     echo "   Watch it: gh run watch  (or the repo's Actions tab)"

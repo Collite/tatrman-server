@@ -13,6 +13,15 @@ name: Publish server libraries (GH Packages)
 #
 # Version comes from the tag via -Ptatrman-server.version (the build reads that
 # gradle property, NOT -Pversion). RO-24: never re-cut an existing version.
+#
+# Lane gating (SV — Central quota, 2026-07-13, mirrors tatrman/publish.yml):
+# EVERY tag publishes to the GitHub Packages staging lane; ONLY a bare x.y.z
+# version also publishes to Maven Central. A prerelease suffix (e.g.
+# v0.9.5-rc.1, v0.9.5-dev.3) marks a WIP cut: internal consumers (kantheon)
+# pin it from GH Packages, and the Central step is skipped — Central's free
+# tier (~1,167 files / ~78 MB / ~7 releases per month, 3-month rolling
+# average) cannot absorb fast-iteration publishing. See tatrman's
+# PUBLISHING.md § Release lanes for the full rationale.
 
 on:
   push:
@@ -66,8 +75,18 @@ jobs:
         id: ver
         run: |
           TAG="${{ github.ref_name }}"
-          echo "version=${TAG##*/v}" >> "$GITHUB_OUTPUT"
-          echo "Publishing server libraries version ${TAG##*/v}"
+          VERSION="${TAG##*/v}"
+          # Lane gating: a prerelease suffix (anything after a '-', semver §9)
+          # keeps the release on the GH Packages staging lane only. Bare x.y.z
+          # is a public release and also goes to Maven Central.
+          if [[ "$VERSION" == *-* ]]; then
+            PUBLIC=false
+          else
+            PUBLIC=true
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "public=${PUBLIC}" >> "$GITHUB_OUTPUT"
+          echo "Publishing server libraries version ${VERSION} (public=${PUBLIC})"
 
       - name: Publish to GH Packages (staging lane)
         # GH-Packages-SPECIFIC task, not the generic `publish` aggregate: vanniktech
@@ -88,6 +107,10 @@ jobs:
       # first manual release). Skipped until the four credential secrets are set, so
       # the GH Packages lane above stays green in the interim. Secret names ARE the
       # Gradle property names so they flow straight through as `ORG_GRADLE_PROJECT_*` env.
+      #
+      # ALSO skipped for prerelease versions (public=false above) — WIP cuts stay
+      # on the GH Packages staging lane to protect the Central monthly quota.
+      # Only bare x.y.z reaches Maven Central.
       - name: Publish to Maven Central (Central Portal)
         env:
           GITHUB_ACTOR: ${{ github.actor }}
@@ -96,5 +119,5 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.ORG_GRADLE_PROJECT_mavenCentralPassword }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.ORG_GRADLE_PROJECT_signingInMemoryKey }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.ORG_GRADLE_PROJECT_signingInMemoryKeyPassword }}
-        if: ${{ env.ORG_GRADLE_PROJECT_mavenCentralUsername != '' }}
+        if: ${{ env.ORG_GRADLE_PROJECT_mavenCentralUsername != '' && steps.ver.outputs.public == 'true' }}
         run: ./gradlew --no-configuration-cache -Ptatrman-server.version=${{ steps.ver.outputs.version }} publishAndReleaseToMavenCentral
