@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.withPermit
 import org.slf4j.LoggerFactory
 import org.tatrman.translator.orchestrator.ParseResult
 import org.tatrman.translator.orchestrator.Translator
+import org.tatrman.translator.params.SqlParam
 
 /**
  * Section F (DF-M05) — background query-parse worker. On every model swap it
@@ -59,7 +60,13 @@ class QueryParseWorker(
             if (lang == null) {
                 ParseStatus.ParseFailure("Unsupported source language '${query.sourceLanguage}'")
             } else {
-                when (val r = translator.parseToRelNode(query.sourceText, lang)) {
+                // Pass the query's declared parameters so `parseToRelNode` runs the
+                // ParameterBridge: `{name}` placeholders are rewritten to Calcite positional
+                // `?` (pre-typed from the declared `type`). Without them the bridge is skipped
+                // and Calcite chokes on `{` — the reason parametrized queries reported FAILED.
+                // The runtime value is irrelevant at parse time, so bind `null`.
+                val params = query.parameters.map { SqlParam(name = it.name, type = it.type, value = null) }
+                when (val r = translator.parseToRelNode(query.sourceText, lang, parameters = params)) {
                     is ParseResult.Success -> ParseStatus.ParseSuccess(r.plan.toByteArray())
                     is ParseResult.Failure -> ParseStatus.ParseFailure(message = "${r.code}: ${r.message}")
                 }

@@ -19,6 +19,7 @@ import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.model.ModelVersion
 import org.tatrman.ttr.metadata.model.ParseStatus
 import org.tatrman.ttr.metadata.model.Query
+import org.tatrman.ttr.metadata.model.QueryParameterDef
 import org.tatrman.veles.parse.MetadataModelHandle
 import org.tatrman.veles.parse.QueryParseState
 import org.tatrman.veles.parse.QueryParseWorker
@@ -92,6 +93,19 @@ class QueryParseWorkerSpec :
                 sourceText = "SELEKT * FROM customers",
                 parseStatus = ParseStatus.ParsePending,
             )
+        // Parametrized query: `{name_filter}` must be de-braced to a Calcite `?` via the
+        // ParameterBridge before parsing. Without the declared parameters threaded through,
+        // Calcite fails on `{` — the bug this fixes. (Infix-LIKE `'%' || {p} || '%'` form: a bare
+        // `?` inside `||` is untypeable, so this also exercises the CAST(? AS text) typed retry.)
+        val paramQuery =
+            Query(
+                internalId = "q-param",
+                qname = qn("obj", "q", "paramQuery"),
+                sourceLanguage = "SQL",
+                sourceText = "SELECT id, name FROM customers WHERE name LIKE '%' || {name_filter} || '%'",
+                parameters = listOf(QueryParameterDef(name = "name_filter", type = "text")),
+                parseStatus = ParseStatus.ParsePending,
+            )
         val unknownTableQuery =
             Query(
                 internalId = "q-unknown-table",
@@ -116,7 +130,8 @@ class QueryParseWorkerSpec :
                 schemas = mapOf("db" to dbSchema),
                 mappings = emptyList(),
                 queries =
-                    listOf(okQuery, badSqlQuery, unknownTableQuery, unsupportedLangQuery).associateBy { it.qname },
+                    listOf(okQuery, badSqlQuery, unknownTableQuery, unsupportedLangQuery, paramQuery)
+                        .associateBy { it.qname },
             )
 
         "MetadataModelHandle exposes db tables and columns from the model" {
@@ -138,6 +153,9 @@ class QueryParseWorkerSpec :
             worker.parseAll(m, state).join()
 
             state.get(okQuery.qname).shouldBeInstanceOf<ParseStatus.ParseSuccess>()
+            // The parametrized query parses only because its `{name_filter}` placeholder is
+            // de-braced to `?` via the ParameterBridge (declared params threaded through).
+            state.get(paramQuery.qname).shouldBeInstanceOf<ParseStatus.ParseSuccess>()
             state.get(badSqlQuery.qname).shouldBeInstanceOf<ParseStatus.ParseFailure>()
             state.get(unknownTableQuery.qname).shouldBeInstanceOf<ParseStatus.ParseFailure>()
             val unsupported = state.get(unsupportedLangQuery.qname)
@@ -145,7 +163,7 @@ class QueryParseWorkerSpec :
             unsupported.message shouldContain "PYTHON"
 
             val counts = state.counts()
-            counts.parsed shouldBe 1
+            counts.parsed shouldBe 2
             counts.failed shouldBe 3
             counts.pending shouldBe 0
 
@@ -171,8 +189,8 @@ class QueryParseWorkerSpec :
                     org.tatrman.meta.v1.GetStatusRequest
                         .getDefaultInstance(),
                 ).let {
-                    it.queriesTotal shouldBe 4
-                    it.queriesPending shouldBe 4
+                    it.queriesTotal shouldBe 5
+                    it.queriesPending shouldBe 5
                     it.queriesParsed shouldBe 0
                 }
 
@@ -183,7 +201,7 @@ class QueryParseWorkerSpec :
                     org.tatrman.meta.v1.GetStatusRequest
                         .getDefaultInstance(),
                 ).let {
-                    it.queriesParsed shouldBe 1
+                    it.queriesParsed shouldBe 2
                     it.queriesFailed shouldBe 3
                     it.queriesPending shouldBe 0
                 }
@@ -205,6 +223,6 @@ class QueryParseWorkerSpec :
                             ParseStatusFilter.PARSE_STATUS_FILTER_PARSED,
                         ).build(),
                 ).itemsList
-                .map { it.objectDescriptor.localName } shouldContainExactlyInAnyOrder listOf("okQuery")
+                .map { it.objectDescriptor.localName } shouldContainExactlyInAnyOrder listOf("okQuery", "paramQuery")
         }
     })
