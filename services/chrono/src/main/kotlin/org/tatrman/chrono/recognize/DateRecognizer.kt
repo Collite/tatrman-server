@@ -25,6 +25,7 @@ class DateRecognizer {
         val target = detectTarget(n)
         val base =
             fiscalYear(n)
+                ?: fiscalQuarter(n, reference)
                 ?: periodCode(n)
                 ?: isoDate(n)
                 ?: numericDate(n, reference)
@@ -56,6 +57,46 @@ class DateRecognizer {
                 ?.get(1)
                 ?.toIntOrNull() ?: return null
         return yearInterval(y, ChronoKind.FISCAL_YEAR, 0.95)
+    }
+
+    // ----- fiscal/accounting quarter: "last fiscal quarter" / "poslední fiskální čtvrtletí" (Q-18) -----
+    // Words are diacritic-folded (Normalization.fold) before the recognizer runs, so cs stems match
+    // accent-free: čtvrtletí→ctvrtleti, fiskální→fiskalni, účetní→ucetni, minulé→minule, poslední→posledni.
+
+    private val quarterWordRe = Regex("""(?:ctvrtlet\w*|quarter)""")
+
+    /**
+     * A relative fiscal/accounting quarter → a PERIOD recognition carrying a `yyyyQn` period code plus
+     * the calendar-quarter interval (relative to [reference]). "this/current" = the reference's own
+     * quarter; "last/previous" = one quarter earlier (with year rollover). Requires an explicit scope
+     * word — a bare "quarter" is ambiguous and left for the LLM fallback.
+     */
+    private fun fiscalQuarter(
+        n: String,
+        reference: LocalDate,
+    ): ChronoRecognition? {
+        if (!quarterWordRe.containsMatchIn(n)) return null
+        val thisScope = hasAny(n, "this", "current", "tento", "toto", "soucasn", "aktualn")
+        val lastScope = hasAny(n, "last", "previous", "past", "posledni", "minul", "predchoz")
+        if (thisScope == lastScope) return null // neither, or an ambiguous both → not a quarter match
+        return quarterInterval(reference, if (lastScope) -1 else 0)
+    }
+
+    private fun quarterInterval(
+        reference: LocalDate,
+        deltaQuarters: Int,
+    ): ChronoRecognition {
+        val refQuarter = reference.year * 4 + (reference.monthValue - 1) / 3 + deltaQuarters
+        val year = Math.floorDiv(refQuarter, 4)
+        val q = Math.floorMod(refQuarter, 4) // 0..3
+        val start = LocalDate.of(year, q * 3 + 1, 1)
+        return ChronoRecognition(
+            start,
+            start.plusMonths(3),
+            ChronoKind.PERIOD,
+            0.9,
+            periodCode = "%04dQ%d".format(year, q + 1),
+        )
     }
 
     // ----- period code: "202605", "period 202605", "obdobi 202605" -----
