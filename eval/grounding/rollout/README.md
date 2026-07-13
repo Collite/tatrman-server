@@ -44,7 +44,7 @@ The GroundEntities node's soft dependency + per-instance GroundingContext
 
 ```yaml
 env:
-  MCP_GROUNDING_URL: https://grounding-mcp.aip01.dfpartner.cz/mcp   # in-cluster URL on df-test
+  MCP_GROUNDING_URL: https://grounding-mcp.aip01.tatrman.com/mcp   # in-cluster URL on df-test
   GOLEM_GROUNDING_ENABLED: "true"            # global kill switch for the node
   GOLEM_GROUNDING_TIMEZONE: Europe/Prague
   GOLEM_GROUNDING_LOCALE: cs-CZ

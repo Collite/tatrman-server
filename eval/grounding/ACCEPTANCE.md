@@ -39,7 +39,7 @@ Use the existing apps as templates (they already encode the df-test conventions)
 For **each** of `chrono`, `geo`, `money`, `grounding-mcp`, create
 `apps/{services|tools}/<name>/{base/values.yaml, overlays/df-test/{kustomization.yaml,values.yaml}}`
 and register it in the df-test app-of-apps. Set:
-- `image.repository: dfpartner.azurecr.io/<name>`, `image.tag:` (filled in Phase 3).
+- `image.repository: tatrman.azurecr.io/<name>`, `image.tag:` (filled in Phase 3).
 - the container port each service actually listens on (chrono gRPC is 7220 per A8.2;
   grounding-mcp HTTP is **7153**). Copy the port block from the template and adjust.
 - for grounding-mcp, the three gRPC targets — mind the **`*_SERVER_GRPC_PORT`** name

@@ -9,7 +9,7 @@
 // Recipes reuse org.tatrman.plan.v1 (Expression, ParameterBinding, QualifiedName,
 // JoinType) wholesale — the Translator's MAP_TO_PHYSICAL handles DB mapping.
 //
-// Renamed from cz.dfpartner.grounding.v1 in RG-P3 (J-v2). RS-21 wart fix:
+// Renamed from com.tatrman.grounding.v1 in RG-P3 (J-v2). RS-21 wart fix:
 // ResponseMessage now imports from the common package (org.tatrman.common.v1)
 // instead of the metadata package — the ai-platform coupling ("no common
 // package in this repo") no longer holds; tatrman-server owns

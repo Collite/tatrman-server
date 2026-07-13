@@ -10,8 +10,8 @@ import org.tatrman.nlp.v1.AnalyzeRequest
 /**
  * RG-P0.S3.T4/T5 — proto rename compile-smoke.
  *
- * The `cz.dfpartner.* → org.tatrman.*` proto package rename was completed by the
- * SV-P2 client-name scrub; this repo has zero `cz.dfpartner` occurrences. This
+ * The `com.tatrman.* → org.tatrman.*` proto package rename was completed by the
+ * SV-P2 client-name scrub; this repo has zero `com.tatrman` occurrences. This
  * test pins that end state: the renamed `org.tatrman.{fuzzy,nlp}.v1` generated
  * types are importable and constructible from a consumer module. If a proto
  * regressed to the old package, this file would not compile.
