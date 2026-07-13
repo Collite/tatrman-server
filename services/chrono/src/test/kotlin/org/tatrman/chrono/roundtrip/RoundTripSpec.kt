@@ -99,18 +99,11 @@ class RoundTripSpec :
             roundTrip("May 2026", withPeriodTable = true).shouldBeInstanceOf<ParseResult.Success>()
         }
 
-        // TODO(RG-P3): the published ttr-translator 0.9.0 rejects the calendar-aligned grounding
-        // functions `period_start({p})`/`period_end({p})` with Calcite "Illegal use of dynamic
-        // parameter" — ai-platform's in-repo query-translator registered these grounding operators
-        // (GroundingFunctionUnparse / PostgresqlSqlDialectWithGrounding); the published artifact does
-        // not (yet). Cross-arc translator gap, tangential to the G2 metadata seam. The JoinRecipe
-        // round-trips (withPeriodTable = true) pass. Re-enable once ttr-translator registers them.
-        "calendar-aligned period FilterRecipe round-trips; the plan still carries period_start"
-            .config(enabled = false) {
-                val r = roundTrip("May 2026", withPeriodTable = false)
-                r.shouldBeInstanceOf<ParseResult.Success>()
-                r.plan.toString().shouldContainIgnoringCase("period_start")
-            }
+        "calendar-aligned period FilterRecipe round-trips; the plan still carries period_start" {
+            val r = roundTrip("May 2026", withPeriodTable = false)
+            r.shouldBeInstanceOf<ParseResult.Success>()
+            r.plan.toString().shouldContainIgnoringCase("period_start")
+        }
 
         "plain-interval FilterRecipe sql_preview parses + validates" {
             roundTrip("yesterday", withPeriodTable = true).shouldBeInstanceOf<ParseResult.Success>()

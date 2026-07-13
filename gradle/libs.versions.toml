@@ -286,7 +286,11 @@ tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",
 # ttr-plan-proto/ttr-translator now resolve from GitHub Packages — the SV-P0
 # 0.0.1-LOCAL/mavenLocal interim is retired. 0.9.0 carries org/tatrman/translate/v1/.
 tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                            version = "0.9.0" }
-tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version = "0.9.0" }
+# RG-P3: 0.9.5-rgp3-SNAPSHOT restores the grounding catalog functions (period_start etc.)
+# omitted in the extraction. LOCAL mavenLocal build pending the tag-driven release
+# (kotlin-translator/v0.9.5) — bump to the released 0.9.5 once cut; until then this resolves
+# only from ~/.m2 (publishToMavenLocal). Source fix: tatrman @ 9fe7b2d.
+tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version = "0.9.5-rgp3-SNAPSHOT" }
 exposed-core                        = { module = "org.jetbrains.exposed:exposed-core",                    version.ref = "exposed" }
 exposed-jdbc                        = { module = "org.jetbrains.exposed:exposed-jdbc",                    version.ref = "exposed" }
 exposed-java-time                   = { module = "org.jetbrains.exposed:exposed-java-time",               version.ref = "exposed" }
