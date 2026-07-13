@@ -1,0 +1,15 @@
+model er
+
+// RG-P3.S0.T5 — geo metadata-seam component fixture. A POI entity (semantics kind: poi) with a
+// nameAttribute (the display column used for POI-in-model anchor resolution) and WGS84 geo_lat /
+// geo_lon coordinate columns — the shape MetaV1GeoDiscovery reads back as a PoiEntity + GeoColumns.
+
+def entity Store {
+    semantics { kind: poi },
+    nameAttribute: store_name,
+    attributes: [
+        def attribute store_name { type: text },
+        def attribute lat { type: decimal, semantics { role: geo_lat } },
+        def attribute lon { type: decimal, semantics { role: geo_lon } }
+    ]
+}

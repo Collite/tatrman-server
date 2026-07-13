@@ -73,6 +73,7 @@ ktlint-plugin             = "14.0.1"
 
 # Engine
 calcite                   = "1.41.0"
+jts                       = "1.19.0"
 exposed                   = "1.0.0"
 hikaricp                  = "7.0.2"
 pgsql                    = "42.7.9"
@@ -299,6 +300,8 @@ exposed-java-time                   = { module = "org.jetbrains.exposed:exposed-
 exposed-json                        = { module = "org.jetbrains.exposed:exposed-json",                    version.ref = "exposed" }
 hikaricp                            = { module = "com.zaxxer:HikariCP",                                  version.ref = "hikaricp" }
 postgresql                          = { module = "org.postgresql:postgresql",                            version.ref = "pgsql" }
+# RG-P3 geo — JTS: GeoJSON polygon → WKT + bounding box for the boundary-containment recipe.
+jts-core                            = { module = "org.locationtech.jts:jts-core",                        version.ref = "jts" }
 mssql-jdbc                          = { module = "com.microsoft.sqlserver:mssql-jdbc",                   version.ref = "mssql" }
 
 # Kleio / DocWH ingestion parsers (services/kallimachos, P1 Stage 1.1 — ported
