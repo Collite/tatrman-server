@@ -5,7 +5,8 @@
 [versions]
 tatrman-modeler           = "0.8.6"
 tatrman-ttr-metadata      = "0.9.4"
-tatrman-translator        = "0.8.5"
+tatrman-ttr-translator    = "0.9.5"
+tatrman-ttr-plan-proto    = "0.9.5"
 # SV-P1 S4 — Maven Central publishing via the Central Portal.
 vanniktech-publish        = "0.36.0"
 
@@ -285,12 +286,12 @@ tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",
 # translate.v1 public line (SV-P1 gate 2, kotlin-translator/v0.9.0): the renamed
 # ttr-plan-proto/ttr-translator now resolve from GitHub Packages — the SV-P0
 # 0.0.1-LOCAL/mavenLocal interim is retired. 0.9.0 carries org/tatrman/translate/v1/.
-tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                            version = "0.9.0" }
-# RG-P3: 0.9.5-rgp3-SNAPSHOT restores the grounding catalog functions (period_start etc.)
-# omitted in the extraction. LOCAL mavenLocal build pending the tag-driven release
-# (kotlin-translator/v0.9.5) — bump to the released 0.9.5 once cut; until then this resolves
-# only from ~/.m2 (publishToMavenLocal). Source fix: tatrman @ 9fe7b2d.
-tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version = "0.9.5-rgp3-SNAPSHOT" }
+# RG-P3: 0.9.5 (kotlin-translator/v0.9.5, lockstep both artifacts) restores the grounding
+# catalog functions (period_start/period_end/geo_distance_m + grounding dialects) omitted in
+# the extraction — source fix tatrman @ 9fe7b2d, released at bf739bd. Retires the
+# 0.9.5-rgp3-SNAPSHOT mavenLocal interim.
+tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                            version.ref = "tatrman-ttr-plan-proto" }
+tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version.ref = "tatrman-ttr-translator" }
 exposed-core                        = { module = "org.jetbrains.exposed:exposed-core",                    version.ref = "exposed" }
 exposed-jdbc                        = { module = "org.jetbrains.exposed:exposed-jdbc",                    version.ref = "exposed" }
 exposed-java-time                   = { module = "org.jetbrains.exposed:exposed-java-time",               version.ref = "exposed" }
