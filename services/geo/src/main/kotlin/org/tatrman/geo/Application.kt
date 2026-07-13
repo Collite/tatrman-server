@@ -88,6 +88,9 @@ fun Application.module(config: Config) {
             llmFallback = llmFallback,
             llmModel = config.getString("geo.llm-fallback.model"),
             metrics = metrics,
+            // RS-19 / D-T2 capability posture surfaced through GetStatus.
+            nominatimConfigured = config.getString("geo.nominatim.base-url").isNotBlank(),
+            postgisAvailable = boundaryStore is PostgresBoundaryStore,
         )
 
     val grpcPort = config.getInt("grpc.port")

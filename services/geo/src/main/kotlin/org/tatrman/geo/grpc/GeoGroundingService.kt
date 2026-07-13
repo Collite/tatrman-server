@@ -38,6 +38,11 @@ class GeoGroundingService(
     private val llmFallback: LlmGatewayClient?,
     private val llmModel: String = "claude-haiku-4-5",
     private val metrics: GeoMetrics = GeoMetrics.noop(),
+    // RS-19 capability posture: whether a geocoder endpoint (Nominatim) is configured, and whether
+    // the durable boundary cache is PostGIS-backed (D-T2). Surfaced truthfully through GetStatus; a
+    // dark geocoder makes LOCATION grounding fail loud (UNAVAILABLE), never a false "place not found".
+    private val nominatimConfigured: Boolean = true,
+    private val postgisAvailable: Boolean = false,
 ) : org.tatrman.grounding.v1.GroundingServiceGrpcKt.GroundingServiceCoroutineImplBase() {
     private val logger = LoggerFactory.getLogger(GeoGroundingService::class.java)
     private val parser = GeoSpanParser()
@@ -180,13 +185,32 @@ class GeoGroundingService(
 
     override suspend fun getStatus(request: GetStatusRequest): GetStatusResponse {
         val metadataOk = runCatching { discovery.probeReady() }.getOrDefault(false)
-        return GetStatusResponse
-            .newBuilder()
-            .setReady(metadataOk)
-            .setService("geo")
-            .putCapabilities("metadata", if (metadataOk) "ok" else "down")
-            .putCapabilities("llm_fallback", (llmFallback != null).toString())
-            .build()
+        val builder =
+            GetStatusResponse
+                .newBuilder()
+                .setReady(metadataOk)
+                .setService("geo")
+                .putCapabilities("metadata", if (metadataOk) "ok" else "down")
+                .putCapabilities("llm_fallback", (llmFallback != null).toString())
+                // RS-19 / D-T2 — report the geocoding + PostGIS capabilities truthfully.
+                .putCapabilities("nominatim", if (nominatimConfigured) "ok" else "dark")
+                .putCapabilities("postgis", if (postgisAvailable) "ok" else "absent")
+        if (!nominatimConfigured) {
+            // RG-GND-001: the geo capability is dark. LOCATION grounding for administrative places
+            // returns UNAVAILABLE (fail loud), never a false "place doesn't exist".
+            builder.addMessages(
+                ResponseMessage
+                    .newBuilder()
+                    .setSeverity(Severity.WARNING)
+                    .setCode("RG-GND-001")
+                    .setHumanMessage(
+                        "geo geocoding capability is dark: no Nominatim endpoint configured. " +
+                            "LOCATION grounding for administrative places returns UNAVAILABLE, never a " +
+                            "false 'place not found'. Self-host Nominatim and set geo.nominatim.base-url.",
+                    ),
+            )
+        }
+        return builder.build()
     }
 
     // ----- llm-gateway fallback (A9.6) -----
