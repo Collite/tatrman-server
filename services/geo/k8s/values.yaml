@@ -41,6 +41,10 @@ metadata:
   grpcPort: 7261
 
 # Nominatim geocoder — NO default (see Q-19 above). Self-host and set baseUrl to enable geocoding.
+# The public OSM Nominatim (nominatim.openstreetmap.org) is NOT a valid production endpoint — its
+# usage policy forbids heavy/automated use — so this ships empty on purpose. RÚIAN (the ČÚZK CZ
+# administrative register) is the deferred CZ-deterministic geocoding arc; until it lands, a
+# self-hosted Nominatim is the supported source.
 nominatim:
   baseUrl: ""
   userAgent: "tatrman-geo/1.0"

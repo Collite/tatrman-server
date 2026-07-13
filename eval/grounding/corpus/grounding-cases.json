@@ -1,0 +1,2008 @@
+[
+  {
+    "id": "chrono/ambiguous-future-mo",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "December",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "AWAITING_CLARIFICATION"
+    }
+  },
+  {
+    "id": "chrono/cs-adjective-period",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "květnové období",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "period_code": "202605"
+    }
+  },
+  {
+    "id": "chrono/cs-dnes",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "dnes",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "chrono/cs-genitive-day",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "15. května 2026",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER"
+    }
+  },
+  {
+    "id": "chrono/cs-last-n-months",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "poslední 3 měsíce",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER"
+    }
+  },
+  {
+    "id": "chrono/cs-leden-2026-join",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "leden 2026",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "period_code": "202601"
+    }
+  },
+  {
+    "id": "chrono/cs-loni",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "loni",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "chrono/cs-minuly-mesic",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "minulý měsíc",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "chrono/cs-minuly-tyden",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "minulý týden",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "chrono/cs-obdobi-202601",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "období 202601",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "period_code": "202601"
+    }
+  },
+  {
+    "id": "chrono/cs-poslednich-6-mesicu",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "posledních 6 měsíců",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "chrono/cs-this-year",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "letos",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER"
+    }
+  },
+  {
+    "id": "chrono/cs-yesterday",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "včera",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER"
+    }
+  },
+  {
+    "id": "chrono/due-target",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "due in May",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "sql_contains": [
+        "t.\"due\" >= ap.\"start_date\""
+      ]
+    }
+  },
+  {
+    "id": "chrono/en-calendar-jan-2026",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "January 2026",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "calendar",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "period_code": "202601",
+      "sql_contains": [
+        "period_start({p})",
+        "period_end({p})"
+      ]
+    }
+  },
+  {
+    "id": "chrono/en-december-2026-join",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "December 2026",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "period_code": "202612"
+    }
+  },
+  {
+    "id": "chrono/en-iso-dec31",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "2026-12-31",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "chrono/en-iso-jan1",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "2026-01-01",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "t.\"date\" >= {start}"
+      ]
+    }
+  },
+  {
+    "id": "chrono/en-january-2026-join",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "January 2026",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "period_code": "202601"
+    }
+  },
+  {
+    "id": "chrono/en-last-6-months",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "last 6 months",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "chrono/en-last-week",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "last week",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "chrono/en-named-month-day",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "March 15 2026",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER"
+    }
+  },
+  {
+    "id": "chrono/en-period-code-202601",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "period 202601",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "period_code": "202601"
+    }
+  },
+  {
+    "id": "chrono/en-this-year",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "this year",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "chrono/fiscal-year",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "fiscal year 2026",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER"
+    }
+  },
+  {
+    "id": "chrono/gibberish",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "qwerty nonsense",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "chrono/iso-date",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "2026-03-15",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "t.\"date\" >= {start}",
+        "t.\"date\" < {end}"
+      ]
+    }
+  },
+  {
+    "id": "chrono/last-month",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "last month",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER"
+    }
+  },
+  {
+    "id": "chrono/may-2026-calendar",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "May 2026",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "calendar",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "period_code": "202605",
+      "sql_contains": [
+        "period_start({p})",
+        "period_end({p})"
+      ]
+    }
+  },
+  {
+    "id": "chrono/may-2026-join",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "May 2026",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "period_code": "202605",
+      "sql_contains": [
+        "JOIN \"AccountingPeriod\" AS ap",
+        "ap.\"period\" = {p}"
+      ]
+    }
+  },
+  {
+    "id": "chrono/may-period-join",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "May period",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "period_code": "202605"
+    }
+  },
+  {
+    "id": "chrono/numeric-cs-date",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "15.3.2026",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "sql_contains": [
+        "t.\"date\" >= {start}"
+      ]
+    }
+  },
+  {
+    "id": "chrono/numeric-spaced-cs",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "15. 3. 2026",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER"
+    }
+  },
+  {
+    "id": "chrono/period-code",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "období 202605",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "period_code": "202605"
+    }
+  },
+  {
+    "id": "chrono/yesterday",
+    "tool": "ground_time",
+    "kind": "DATE",
+    "span": "yesterday",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "accounting-period",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER"
+    }
+  },
+  {
+    "id": "geo/ambiguous-contain-ujezd",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "in Újezd",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "AWAITING_CLARIFICATION"
+    }
+  },
+  {
+    "id": "geo/ambiguous-dist-ujezd",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 10 km of Újezd",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "AWAITING_CLARIFICATION"
+    }
+  },
+  {
+    "id": "geo/contain-cs-brno",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "v Brně",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "min_lat"
+      ]
+    }
+  },
+  {
+    "id": "geo/contain-cs-praha",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "v Praze",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "min_lat"
+      ]
+    }
+  },
+  {
+    "id": "geo/contain-en-brno",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "in Brno",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "min_lat",
+        "max_lon"
+      ]
+    }
+  },
+  {
+    "id": "geo/contain-en-praha",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "in Praha",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "min_lat"
+      ]
+    }
+  },
+  {
+    "id": "geo/cs-brno-25km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "do 25 km od Brna",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/cs-brno-obchody-6km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "obchody do 6 km od Brna",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/cs-contain-praha-mesto",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "v Praze",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "min_lat"
+      ]
+    }
+  },
+  {
+    "id": "geo/cs-praha-2km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "do 2 km od Prahy",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-cs-brno-15km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "do 15 km od Brna",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-cs-brno-20km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "do 20 km od Brna",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-cs-brno-3km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "do 3 km od Brna",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-cs-praha-5km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "do 5 km od Prahy",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-en-brno-20km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 20 km of Brno",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-en-brno-2km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 2 km of Brno",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-en-brno-30km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 30 km of Brno",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-en-brno-decimal",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "stores within 1.5 km of Brno",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-en-brno-meters",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 500 m of Brno",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-en-praha-100km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 100 km of Praha",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-en-praha-1km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 1 km of Praha",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-en-praha-250m",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "stores within 250 m of Praha",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-en-praha-5km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "POIs within 5 km of Praha",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-here-brno",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 12 km of here",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": "Brno",
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/dist-here-praha",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 5 km of here",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": "Praha",
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/en-brno-8km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 8 km of Brno",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/en-here-brno-6km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 6 km of here",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": "Brno",
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/en-praha-40km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 40 km of Praha",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/en-praha-shops-3km",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "shops within 3 km of Praha",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "geo_distance_m"
+      ]
+    }
+  },
+  {
+    "id": "geo/en-unknown-narnia",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 15 km of Narnia",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "geo/no-radius-near-here",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "near here",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": "Praha",
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "geo/unknown-contain-atlantis",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "in Atlantis",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "geo/unknown-dist-atlantis",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "within 20 km of Atlantis",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "geo/unrecognized-bare-place",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "Brno",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "geo/unrecognized-nonsense",
+    "tool": "ground_geo",
+    "kind": "LOCATION",
+    "span": "qwerty nonsense",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "geo-brno-praha",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "money/ambiguous-cs-nad-100",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "nad 100",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-ambiguous",
+    "here": null,
+    "expect": {
+      "status": "AWAITING_CLARIFICATION"
+    }
+  },
+  {
+    "id": "money/ambiguous-en-over-5000",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 5000",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-ambiguous",
+    "here": null,
+    "expect": {
+      "status": "AWAITING_CLARIFICATION"
+    }
+  },
+  {
+    "id": "money/cs-do-20-tisic",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "do 20 tisíc",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "money/cs-fx-nad-900-eur",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "nad 900 EUR",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-fx",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "sql_contains": [
+        "fx.\"rate\""
+      ]
+    }
+  },
+  {
+    "id": "money/cs-mezi-1000-5000",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "mezi 1000 a 5000",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "{lower}",
+        "{upper}"
+      ]
+    }
+  },
+  {
+    "id": "money/cs-nad-3-miliony",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "nad 3 miliony",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "> {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/cs-native-nad-300-chf",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "nad 300 CHF",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-native",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "{ccy}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-cs-1-5-mil",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "kolem 1,5 mil",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "{lower}",
+        "{upper}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-cs-2mil",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "2 mil.",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "amount_dom"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-cs-kolem-100k",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "kolem 100k",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        ">= {lower}",
+        "<= {upper}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-cs-nad-100000",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "faktury nad 100 000",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "amount_dom",
+        "> {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-cs-nad-250tis",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "nad 250 tis",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "money/dom-cs-pod-50000",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "pod 50000",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "< {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-cs-pod-million",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "faktury pod 1 000 000",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "< {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-cs-pul-milionu",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "půl milionu",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "money/dom-cs-sto-tisic",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "sto tisíc",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "money/dom-en-2M",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 2M",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "amount_dom",
+        "> {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-en-around-100000",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "around 100000",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "{lower}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-en-at-least-1000",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "at least 1000",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        ">= {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-en-at-most-999",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "at most 999",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "<= {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-en-over-100k-czk",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 100k CZK",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "amount_dom"
+      ]
+    }
+  },
+  {
+    "id": "money/dom-en-over-3bn",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 3 bn",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES"
+    }
+  },
+  {
+    "id": "money/en-1-2M",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 1.2M",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "> {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/en-between-1000-5000",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "between 1000 and 5000",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "{lower}",
+        "{upper}"
+      ]
+    }
+  },
+  {
+    "id": "money/en-foreign-no-fx-jpy",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 100000 JPY",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-amountOnly",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "money/en-fx-over-750-gbp",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 750 GBP",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-fx",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "sql_contains": [
+        "fx.\"rate\""
+      ]
+    }
+  },
+  {
+    "id": "money/en-native-over-800-usd",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 800 USD",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-native",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "\"currency\" = {ccy}"
+      ]
+    }
+  },
+  {
+    "id": "money/en-over-250k-czk",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 250k CZK",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "amount_dom",
+        "> {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/en-under-10000",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "under 10000",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "< {amt}"
+      ]
+    }
+  },
+  {
+    "id": "money/foreign-no-fx-gbp-ungroundable",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "nad 1000 GBP",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-amountOnly",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "money/foreign-no-fx-ungroundable",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 5 000 EUR",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-amountOnly",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "money/fx-cs-nad-10000-usd",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "nad 10000 USD",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-fx",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "sql_contains": [
+        "fx.\"rate\""
+      ]
+    }
+  },
+  {
+    "id": "money/fx-en-current-rate-no-ref-ungroundable",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 5000 EUR at current rate",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-fx",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "money/fx-en-over-5000-eur",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 5 000 EUR",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-fx",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "sql_contains": [
+        "fx.\"rate\"",
+        "{ccy}"
+      ]
+    }
+  },
+  {
+    "id": "money/fx-en-today-rate",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 5000 EUR at today's rate",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T00:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-fx",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "JOIN",
+      "source": "RULES",
+      "sql_contains": [
+        "{ref} >= fx.\"valid_from\""
+      ]
+    }
+  },
+  {
+    "id": "money/native-cs-nad-500-eur",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "nad 500 EUR",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-native",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "{ccy}"
+      ]
+    }
+  },
+  {
+    "id": "money/native-en-over-1000-usd",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "over 1000 USD",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-native",
+    "here": null,
+    "expect": {
+      "status": "OK",
+      "application": "FILTER",
+      "source": "RULES",
+      "sql_contains": [
+        "\"currency\" = {ccy}"
+      ]
+    }
+  },
+  {
+    "id": "money/unrecognized-expensive",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "expensive orders",
+    "locale": "cs-CZ",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  },
+  {
+    "id": "money/unrecognized-pricey",
+    "tool": "ground_money",
+    "kind": "MONEY",
+    "span": "some pricey stuff",
+    "locale": "en-US",
+    "reference_datetime": "2026-05-15T12:00:00+02:00",
+    "timezone": "Europe/Prague",
+    "package": "cnc",
+    "model": "money-domestic",
+    "here": null,
+    "expect": {
+      "status": "UNGROUNDABLE"
+    }
+  }
+]
