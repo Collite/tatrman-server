@@ -133,6 +133,9 @@ message ObjectDescriptor {
   string last_modified = 9;                                 // ISO-8601
   Binding binding = 10;
   reserved 11 to 15;
+  string semantics_kind = 16;                               // RS-33: discovery accelerator — the object's
+                                                            // EntitySemantics.kind (empty if none), so list_objects
+                                                            // surfaces period/poi/fx tables without a per-object sweep
 }
 
 // Bound state of a model object. v0's "synthetic" concept made first-class.
@@ -438,6 +441,7 @@ message DbTableDetail {
   repeated DbColumnSummary columns = 1;
   repeated string primary_key = 2;
   reserved 3 to 7;
+  EntitySemantics semantics = 8;                            // RS-33 grounding semantics (kind: period_table | poi | …)
 }
 
 message DbViewDetail {
@@ -452,6 +456,7 @@ message DbColumnSummary {
   bool nullable = 3;
   Binding binding = 4;
   reserved 5 to 9;
+  AttributeSemantics semantics = 10;                        // RS-33 — role columns readable in ONE get_object(table)
 }
 
 message DbColumnDetail {
@@ -462,6 +467,7 @@ message DbColumnDetail {
   bool is_foreign_key = 5;
   reserved 6 to 10;
   SearchHints search = 11;                                   // search feature
+  AttributeSemantics semantics = 12;                        // RS-33 grounding semantics (role: period_start | amount | …)
 }
 
 message DbProcedureDetail {
@@ -491,6 +497,33 @@ message DbForeignKeyDetail {
   reserved 3 to 7;
 }
 
+// -- Grounding semantics (grammar 4.2 / ttr-semantics v1; RS-33) --
+//
+// Deterministic-grounding declarations projected from the model's semantics{}
+// blocks, validated upstream (TTR-SEM-2xx; invalid blocks degrade to load issues
+// and are NOT served here). kind/role are STRINGS by design — mirroring
+// ttr-metadata's `semanticsKind: String?` (contracts-v1.5): the vocabulary
+// evolves in ttr-semantics without proto bumps; consumers dispatch on known
+// values and MUST tolerate unknown ones (J-v2 additive). Absent message = no
+// semantics declared on the object. (ai-platform's closed `EntitySemantics`/
+// `AttributeSemantics` enums stay legacy-side and die at the SV-P5 cutover.)
+message EntitySemantics {                  // serves er entities AND db tables
+  string kind = 1;                         // 4.2: "period_table" | "calendar" | "poi" | "fx_rate"
+  map<string, string> params = 2;          // future kind parameters (4.2: always empty)
+}
+
+message AttributeSemantics {               // serves er attributes AND db columns
+  string role = 1;                         // 4.2: period_start|period_end|period_code|event_date|document_date|
+                                           //   posting_date|due_date|valid_from|valid_to|calendar_date|geo_lat|
+                                           //   geo_lon|geo_point|amount|amount_domestic|currency_code|
+                                           //   fx_from_currency|fx_to_currency|fx_rate
+  string code_format = 2;                  // role=period_code only (e.g. "yyyyMM", "yyyyQn"); empty otherwise
+  org.tatrman.plan.v1.QualifiedName period = 3;  // resolved `period:` ref (entity/table of kind period_table);
+                                           //   set only on the date roles that declared it
+  string currency_attribute = 4;           // resolved `currency:` sibling-attribute local name (role=amount only)
+  map<string, string> extras = 5;          // future role keys (4.2: always empty)
+}
+
 // -- ER schema details --
 
 message EntityDetail {
@@ -501,6 +534,7 @@ message EntityDetail {
   LocalizedString display_label = 5;                        // Phase 2.2 (G5) — per-language entity name
   SearchHints search = 6;                                   // search feature
   reserved 7 to 9;
+  EntitySemantics semantics = 10;                           // RS-33 grounding semantics (kind: period_table | poi | …)
 }
 
 message AttributeDetail {
@@ -517,6 +551,7 @@ message AttributeDetail {
   reserved 5;                                               // was `search_hint` — replaced by structured `search` block (field 8)
   reserved "search_hint";
   reserved 9 to 10;
+  AttributeSemantics semantics = 11;                        // RS-33 grounding semantics (role: period_start | amount | …)
 }
 
 message RelationDetail {
