@@ -1,0 +1,26 @@
+[
+  { "name": "iso-date",            "span": "2026-03-15",          "periodTable": true,  "expect": { "status": "OK", "application": "FILTER", "source": "RULES", "sqlContains": ["t.\"date\" >= {start}", "t.\"date\" < {end}"] } },
+  { "name": "numeric-cs-date",     "span": "15.3.2026",           "periodTable": true,  "expect": { "status": "OK", "application": "FILTER", "sqlContains": ["t.\"date\" >= {start}"] } },
+  { "name": "numeric-spaced-cs",   "span": "15. 3. 2026",         "periodTable": true,  "expect": { "status": "OK", "application": "FILTER" } },
+  { "name": "en-named-month-day",  "span": "March 15 2026",       "periodTable": true,  "expect": { "status": "OK", "application": "FILTER" } },
+  { "name": "cs-genitive-day",     "span": "15. května 2026",     "periodTable": true,  "expect": { "status": "OK", "application": "FILTER" } },
+
+  { "name": "may-2026-join",       "span": "May 2026",            "periodTable": true,  "expect": { "status": "OK", "application": "JOIN", "source": "RULES", "periodCode": "202605", "sqlContains": ["JOIN \"AccountingPeriod\" AS ap", "ap.\"period\" = {p}"] } },
+  { "name": "may-period-join",     "span": "May period",          "periodTable": true,  "expect": { "status": "OK", "application": "JOIN", "periodCode": "202605" } },
+  { "name": "cs-adjective-period", "span": "květnové období",     "periodTable": true,  "expect": { "status": "OK", "application": "JOIN", "periodCode": "202605" } },
+  { "name": "period-code",         "span": "období 202605",       "periodTable": true,  "expect": { "status": "OK", "application": "JOIN", "periodCode": "202605" } },
+
+  { "name": "may-2026-calendar",   "span": "May 2026",            "periodTable": false, "expect": { "status": "OK", "application": "FILTER", "periodCode": "202605", "sqlContains": ["period_start({p})", "period_end({p})"] } },
+
+  { "name": "fiscal-year",         "span": "fiscal year 2026",    "periodTable": true,  "expect": { "status": "OK", "application": "FILTER" } },
+  { "name": "yesterday",           "span": "yesterday",           "periodTable": true,  "expect": { "status": "OK", "application": "FILTER" } },
+  { "name": "cs-yesterday",        "span": "včera",               "periodTable": true,  "expect": { "status": "OK", "application": "FILTER" } },
+  { "name": "last-month",          "span": "last month",          "periodTable": true,  "expect": { "status": "OK", "application": "FILTER" } },
+  { "name": "cs-this-year",        "span": "letos",               "periodTable": true,  "expect": { "status": "OK", "application": "FILTER" } },
+  { "name": "cs-last-n-months",    "span": "poslední 3 měsíce",   "periodTable": true,  "expect": { "status": "OK", "application": "FILTER" } },
+
+  { "name": "due-target",          "span": "due in May",          "periodTable": true,  "expect": { "status": "OK", "application": "JOIN", "sqlContains": ["t.\"due\" >= ap.\"start_date\""] } },
+
+  { "name": "gibberish",           "span": "qwerty nonsense",     "periodTable": true,  "expect": { "status": "UNGROUNDABLE" } },
+  { "name": "ambiguous-future-mo", "span": "December",            "periodTable": true,  "expect": { "status": "AWAITING_CLARIFICATION" } }
+]

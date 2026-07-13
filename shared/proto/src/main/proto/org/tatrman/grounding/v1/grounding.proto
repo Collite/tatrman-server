@@ -1,0 +1,193 @@
+// SPDX-License-Identifier: Apache-2.0
+// =============================================================================
+// TTR — Deterministic Grounding wire format (org.tatrman.grounding.v1)
+//
+// Shared by all three grounding services (chrono, geo, money); each implements
+// the same GroundingService with domain-specific behavior. One proto keeps the
+// tools/ttr-grounding-mcp wrapper generic.
+//
+// Recipes reuse org.tatrman.plan.v1 (Expression, ParameterBinding, QualifiedName,
+// JoinType) wholesale — the Translator's MAP_TO_PHYSICAL handles DB mapping.
+//
+// Renamed from com.tatrman.grounding.v1 in RG-P3 (J-v2). RS-21 wart fix:
+// ResponseMessage now imports from the common package (org.tatrman.common.v1)
+// instead of the metadata package — the ai-platform coupling ("no common
+// package in this repo") no longer holds; tatrman-server owns
+// org/tatrman/common/v1/response_message.proto.
+// =============================================================================
+
+syntax = "proto3";
+
+package org.tatrman.grounding.v1;
+
+option java_package = "org.tatrman.grounding.v1";
+option java_multiple_files = true;
+
+import "org/tatrman/plan/v1/plan.proto";                  // Expression, QualifiedName, JoinType
+import "org/tatrman/plan/v1/parameters.proto";            // ParameterBinding
+import "org/tatrman/common/v1/response_message.proto";    // ResponseMessage (RS-21 wart fix)
+
+// -----------------------------------------------------------------------------
+// Service
+// -----------------------------------------------------------------------------
+
+service GroundingService {
+  rpc Ground (GroundRequest) returns (GroundResponse);
+  rpc GetStatus (GetStatusRequest) returns (GetStatusResponse);
+}
+
+// -----------------------------------------------------------------------------
+// Request
+// -----------------------------------------------------------------------------
+
+message GroundRequest {
+  string span_text = 1;               // the entity span, verbatim ("May period", "20km from Brno")
+  string question_text = 2;           // full user question for context
+  EntityKind kind = 3;                // DATE_TIME | LOCATION | MONEY (router hint; service validates)
+  string package = 4;                 // metadata package scope, e.g. "cnc"
+  GroundingContext context = 5;
+  // Optional anchoring — Golem may pass the fact entity/columns already in play.
+  repeated org.tatrman.plan.v1.QualifiedName anchor_candidates = 6;
+  string correlation_id = 7;
+  oneof continuation {                // HITL resume, mirrors Resolver's pattern
+    string clarification_answer_id = 8;
+  }
+}
+
+enum EntityKind {
+  ENTITY_KIND_UNSPECIFIED = 0;
+  DATE_TIME = 1;
+  LOCATION = 2;
+  MONEY = 3;
+}
+
+message GroundingContext {
+  string reference_datetime = 1;      // ISO-8601 with offset; ALWAYS from the agent turn context, never "now" in-service
+  string timezone = 2;                // IANA, e.g. "Europe/Prague"
+  string locale = 3;                  // BCP-47, e.g. "cs-CZ"
+  string default_currency = 4;        // ISO-4217, e.g. "CZK"
+  string here_place_ref = 5;          // resolvable place id/name meaning "here"
+  FxPolicy fx_policy = 6;
+  double tolerance_pct = 7;           // "around X" half-width, e.g. 10.0
+  map<string, string> extras = 15;    // forward-compatible tenant knobs
+}
+
+enum FxPolicy {
+  FX_POLICY_UNSPECIFIED = 0;
+  TRANSACTION_DATE = 1;
+  CURRENT = 2;
+}
+
+// -----------------------------------------------------------------------------
+// Response
+// -----------------------------------------------------------------------------
+
+message GroundResponse {
+  Status status = 1;
+  GroundingResult result = 2;                    // set when status = OK
+  repeated ClarificationOption options = 3;      // set when status = AWAITING_CLARIFICATION
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    OK = 1;
+    AWAITING_CLARIFICATION = 2;
+    UNGROUNDABLE = 3;
+  }
+}
+
+// The "B+preview" contract. sql_preview is DERIVED from the recipe (single source
+// of truth) — services render it from the same Expression tree.
+message GroundingResult {
+  Normalized normalized = 1;          // always present on OK
+  oneof application {
+    ValueBinding values = 2;          // params only; caller decides placement
+    FilterRecipe filter = 3;          // condition to AND into WHERE
+    JoinRecipe join = 4;              // support-entity join + filter
+  }
+  string sql_preview = 5;             // generic Calcite-parsable SQL rendering; named params as {name}
+  float confidence = 6;               // 0..1
+  Source source = 7;
+  string explanation = 8;             // one-line human-readable rationale
+
+  enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    RULES = 1;
+    LLM = 2;
+  }
+}
+
+message Normalized {
+  oneof value {
+    DateTimeInterval interval = 1;    // start inclusive, end EXCLUSIVE, ISO-8601
+    GeoPoint point = 2;               // WGS84 lat/lon (+ optional radius_m)
+    GeoShape shape = 3;               // WKT + source attribution (OSM / RUIAN) + fetched_at
+    MoneyValue money = 4;             // amount(s) + currency + tolerance bounds
+  }
+}
+
+// start inclusive, end EXCLUSIVE (conditions use `< end`, never `<=`), both ISO-8601.
+message DateTimeInterval {
+  string start = 1;                   // inclusive
+  string end = 2;                     // exclusive
+}
+
+message GeoPoint {
+  double lat = 1;                     // WGS84
+  double lon = 2;                     // WGS84
+  double radius_m = 3;                // optional radius in meters (0 = point only)
+}
+
+message GeoShape {
+  string wkt = 1;                     // boundary geometry as WKT (WGS84)
+  string source = 2;                  // attribution, e.g. "OSM/Nominatim" | "CUZK/RUIAN"
+  string fetched_at = 3;              // ISO-8601 — staleness of the cached polygon
+}
+
+message MoneyValue {
+  string amount = 1;                  // decimal string (precision-preserving)
+  string currency = 2;                // ISO-4217
+  string lower_bound = 3;             // inclusive lower bound when tolerance applied (empty = none)
+  string upper_bound = 4;             // inclusive upper bound when tolerance applied (empty = none)
+}
+
+message ValueBinding {
+  repeated org.tatrman.plan.v1.ParameterBinding parameters = 1;
+}
+
+message FilterRecipe {
+  org.tatrman.plan.v1.Expression condition = 1;        // uses ParameterRef, catalog functions
+  repeated org.tatrman.plan.v1.ParameterBinding parameters = 2;
+  org.tatrman.plan.v1.QualifiedName anchor_column = 3; // the column the condition constrains
+}
+
+message JoinRecipe {
+  org.tatrman.plan.v1.QualifiedName entity = 1;        // e.g. cnc/ER/entity/AccountingPeriod
+  org.tatrman.plan.v1.JoinType join_type = 2;          // INNER default
+  org.tatrman.plan.v1.Expression on_condition = 3;     // e.g. trx.date BETWEEN ap.start AND ap.end
+  org.tatrman.plan.v1.Expression filter = 4;           // e.g. ap.period = {p}
+  repeated org.tatrman.plan.v1.ParameterBinding parameters = 5;
+  string suggested_alias = 6;                            // "ap"
+}
+
+message ClarificationOption {
+  string id = 1;                      // echoed back via GroundRequest.clarification_answer_id
+  string label = 2;                   // "May 2026 (202605)"
+  Normalized normalized = 3;          // what picking it means
+}
+
+// -----------------------------------------------------------------------------
+// Status / capability probe
+// -----------------------------------------------------------------------------
+//
+// GetStatus surfaces per-service readiness and capability probes (risk register:
+// e.g. geo reports "postgis"/"nominatim" availability; each service reports
+// LLM-fallback wiring).
+message GetStatusRequest {}
+
+message GetStatusResponse {
+  bool ready = 1;
+  string service = 2;                 // "chrono" | "geo" | "money"
+  map<string, string> capabilities = 3; // e.g. {"postgis":"true","nominatim":"false","llm_fallback":"true","metadata":"ok"}
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
+}

@@ -1,0 +1,60 @@
+model er
+
+// Grounding Phase 1 (grammar 4.2) — the `semantics { }` block on entities and
+// attributes. Covers every attribute role and every entity kind once; the
+// db-side table/column attachment surface lives in 60-semantics-db.ttrm (the
+// one-model-per-file rule keeps er and db in separate golden fixtures).
+
+def entity AccountingPeriod {
+    semantics { kind: period_table },
+    attributes: [
+        def attribute start_date { type: date, semantics { role: period_start } },
+        def attribute end_date { type: date, semantics { role: period_end } },
+        def attribute period { type: { type: varchar, length: 6 }, semantics { role: period_code, code_format: "yyyyMM" } }
+    ]
+}
+
+def entity Transaction {
+    attributes: [
+        def attribute txn_date { type: date, semantics { role: event_date, period: AccountingPeriod } },
+        def attribute doc_date { type: date, semantics { role: document_date } },
+        def attribute posted { type: date, semantics { role: posting_date } },
+        def attribute due { type: date, semantics { role: due_date } },
+        def attribute amount { type: decimal, semantics { role: amount, currency: currency_code } },
+        def attribute amount_dom { type: decimal, semantics { role: amount_domestic } },
+        def attribute currency_code { type: { type: varchar, length: 3 }, semantics { role: currency_code } }
+    ]
+}
+
+def entity PoiLatLon {
+    semantics { kind: poi },
+    attributes: [
+        def attribute lat { type: decimal, semantics { role: geo_lat } },
+        def attribute lon { type: decimal, semantics { role: geo_lon } }
+    ]
+}
+
+def entity PoiPoint {
+    semantics { kind: poi },
+    attributes: [
+        def attribute point { type: text, semantics { role: geo_point } }
+    ]
+}
+
+def entity CalendarDim {
+    semantics { kind: calendar },
+    attributes: [
+        def attribute day { type: date, semantics { role: calendar_date } }
+    ]
+}
+
+def entity FxRate {
+    semantics { kind: fx_rate },
+    attributes: [
+        def attribute from_ccy { type: { type: varchar, length: 3 }, semantics { role: fx_from_currency } },
+        def attribute to_ccy { type: { type: varchar, length: 3 }, semantics { role: fx_to_currency } },
+        def attribute rate { type: decimal, semantics { role: fx_rate } },
+        def attribute valid_from { type: date, semantics { role: valid_from } },
+        def attribute valid_to { type: date, semantics { role: valid_to } }
+    ]
+}
