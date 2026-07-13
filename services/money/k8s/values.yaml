@@ -1,0 +1,64 @@
+# Default values for money (RG-P3 grounding · MONEY). Env-agnostic: sane defaults, NO cluster
+# knowledge. Deploying environments override image, telemetry, the metadata gRPC target, the
+# default currency, and the optional llm-gateway fallback.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/collite/money
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+ports:
+  http: 7122
+  grpc: 7222
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: "1"
+
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: money
+
+# Metadata (Veles) gRPC target — money discovers amount/currency columns + the fx_rate table.
+metadata:
+  host: veles
+  grpcPort: 7261
+
+# Fallback currency when the request context carries no default_currency (DF v1 reality: CZK).
+defaultCurrency: CZK
+
+# Rules-only by default; empty url ⇒ rules-only (a recognizer-miss returns UNGROUNDABLE).
+llmFallback:
+  enabled: false
+  gatewayUrl: ""
+
+useFixtureModel: false
+
+extraEnv: []
+
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 2
+  periodSeconds: 3
+  failureThreshold: 20
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

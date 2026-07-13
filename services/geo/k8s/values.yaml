@@ -1,0 +1,83 @@
+# Default values for geo (RG-P3 grounding · LOCATION). Env-agnostic: sane defaults, NO cluster
+# knowledge. Deploying environments override image, telemetry, the metadata gRPC target, the
+# Nominatim geocoder endpoint, the durable boundary-cache Postgres, and the llm-gateway fallback.
+#
+# Q-19: the chart ships NO default Nominatim endpoint — public OSM Nominatim policy restricts
+# production use, so a deploying env must point `nominatim.baseUrl` at a self-hosted instance.
+# Unset ⇒ the geo capability reports dark and fails loud, never wrong (RS-19 / RG-GND-001).
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/collite/geo
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+ports:
+  http: 7121
+  grpc: 7221
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 384Mi
+    cpu: 150m
+  limits:
+    memory: 768Mi
+    cpu: "1"
+
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: geo
+
+# Metadata (Veles) gRPC target — geo discovers geo_lat/geo_lon columns + the POI entity.
+metadata:
+  host: veles
+  grpcPort: 7261
+
+# Nominatim geocoder — NO default (see Q-19 above). Self-host and set baseUrl to enable geocoding.
+nominatim:
+  baseUrl: ""
+  userAgent: "tatrman-geo/1.0"
+
+# Durable boundary cache (PostGIS/Postgres). Disabled ⇒ in-memory cache. Enable + point at a
+# service-local Postgres to persist geocoded boundaries across restarts. Password via secretEnv.
+db:
+  enabled: false
+  host: ""
+  port: 5432
+  name: geo
+  user: geo
+  boundaryCacheTtlDays: 90
+
+# Secret-backed env (valueFrom.secretKeyRef); optional so the pod boots without it (in-memory mode).
+secretEnv:
+  - { name: GEO_DB_PASSWORD, secretName: geo-db, secretKey: password, optional: true }
+
+llmFallback:
+  enabled: false
+  gatewayUrl: ""
+
+useFixtureModel: false
+
+extraEnv: []
+
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 2
+  periodSeconds: 3
+  failureThreshold: 20
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
