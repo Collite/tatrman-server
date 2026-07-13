@@ -6,6 +6,7 @@ import org.tatrman.grounding.v1.GroundResponse
 import org.tatrman.grounding.v1.GroundingContext
 import org.tatrman.grounding.v1.GroundingResult
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.tatrman.money.client.GatewayResponseFormat
@@ -107,6 +108,14 @@ class MoneyOutcomesSpec :
             svc(fallback = FakeLlmGateway("not json"))
                 .ground(request("some pricey stuff"))
                 .status shouldBe GroundResponse.Status.UNGROUNDABLE
+        }
+
+        "D-T4: a rules-hit with a gateway present stays RULES and never calls the LLM" {
+            val gateway = FakeLlmGateway(VALID_LLM_RESULT)
+            val r = svc(fallback = gateway).ground(request("faktury nad 100 000"))
+            r.status shouldBe GroundResponse.Status.OK
+            r.result.source shouldBe GroundingResult.Source.RULES
+            gateway.lastUserPrompt.shouldBeNull() // fallback fires only on a rules-miss / low-confidence
         }
     })
 
