@@ -9,6 +9,7 @@ import io.grpc.Status
 import io.grpc.StatusException
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.tatrman.geo.client.GatewayResponseFormat
@@ -176,6 +177,20 @@ class GeoOutcomesSpec :
                     llmFallback = FakeLlmGateway("not json"),
                 )
             svc.ground(request("qwerty nonsense")).status shouldBe GroundResponse.Status.UNGROUNDABLE
+        }
+
+        "D-T4: a rules-hit with a gateway present stays RULES and never calls the LLM" {
+            val gateway = FakeLlmGateway(VALID_LLM_RESULT)
+            val svc =
+                GeoGroundingService(
+                    FakeMetadataClient.poi("cnc"),
+                    placeResolver = StaticPlaceResolver.czCities(),
+                    llmFallback = gateway,
+                )
+            val r = svc.ground(request("within 20 km of Brno"))
+            r.status shouldBe GroundResponse.Status.OK
+            r.result.source shouldBe GroundingResult.Source.RULES
+            gateway.lastUserPrompt.shouldBeNull() // fallback fires only on a rules-miss / low-confidence
         }
     })
 

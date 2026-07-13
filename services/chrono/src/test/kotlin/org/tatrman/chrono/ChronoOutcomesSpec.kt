@@ -6,6 +6,7 @@ import org.tatrman.grounding.v1.GroundResponse
 import org.tatrman.grounding.v1.GroundingContext
 import org.tatrman.grounding.v1.GroundingResult
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.tatrman.chrono.client.GatewayResponseFormat
 import org.tatrman.chrono.client.LlmGatewayClient
@@ -77,6 +78,15 @@ class ChronoOutcomesSpec :
             val svc =
                 ChronoGroundingService(FakeMetadataClient.accounting("cnc"), llmFallback = FakeLlmGateway("not json"))
             svc.ground(request("three weeks after Easter")).status shouldBe GroundResponse.Status.UNGROUNDABLE
+        }
+
+        "D-T4: a rules-hit with a gateway present stays RULES and never calls the LLM" {
+            val gateway = FakeLlmGateway(VALID_LLM_RESULT)
+            val svc = ChronoGroundingService(FakeMetadataClient.accounting("cnc"), llmFallback = gateway)
+            val r = svc.ground(request("yesterday"))
+            r.status shouldBe GroundResponse.Status.OK
+            r.result.source shouldBe GroundingResult.Source.RULES
+            gateway.lastUserPrompt.shouldBeNull() // fallback fires only on a rules-miss / low-confidence
         }
     })
 
