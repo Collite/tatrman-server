@@ -89,6 +89,12 @@ dependencies {
     implementation(libs.kotlin.mcp.sdk)
     implementation(libs.typesafe.config)
     implementation(libs.kotlinx.coroutines.core)
+
+    // RG-P3.S2.T6 — kind-named capability manifests + registration with capabilities-mcp.
+    implementation(libs.jackson.databind)
+    implementation(libs.jackson.module.kotlin)
+    implementation(libs.jackson.dataformat.yaml)
+    implementation(project(":shared:libs:kotlin:capabilities-client"))
     // JsonFormat — the both-directions camelCase mirror between the tool args/output and the
     // GroundRequest/GroundResponse protos (contracts §2).
     implementation(libs.protobuf.java.util)
