@@ -36,6 +36,9 @@ class RecipeBuilder(
 ) {
     private companion object {
         const val FACT_ALIAS = "t"
+
+        /** A `yyyyQn` quarter period code (Q-18), e.g. "2026Q2" — distinct from the `yyyyMM` month code. */
+        val QUARTER_CODE = Regex("""(\d{4})Q([1-4])""")
     }
 
     suspend fun build(
@@ -76,10 +79,14 @@ class RecipeBuilder(
 
         return if (recognition.kind == ChronoKind.PERIOD) {
             val code = reformatCode(recognition.periodCode!!, pt?.codeFormat ?: "yyyyMM")
-            if (pt.hasColumns()) {
-                joinRecipe(pt!!, factCol, code, recognition, normalized, span)
-            } else {
-                periodFunctionRecipe(anchor, factCol, code, recognition, normalized, span)
+            when {
+                pt.hasColumns() -> joinRecipe(pt!!, factCol, code, recognition, normalized, span)
+                // A yyyyQn quarter (Q-18) can't lower through the period_start/period_end catalog
+                // functions (the translator supports only yyyyMM/yyyyMMdd), so a table-less quarter
+                // degrades to the honest calendar-quarter datetime-bounds FilterRecipe.
+                isQuarterCode(recognition.periodCode) ->
+                    intervalRecipe(anchor, factCol, startIso, endIso, recognition, normalized, span)
+                else -> periodFunctionRecipe(anchor, factCol, code, recognition, normalized, span)
             }
         } else {
             intervalRecipe(anchor, factCol, startIso, endIso, recognition, normalized, span)
@@ -229,10 +236,18 @@ class RecipeBuilder(
      * Supports the common `yyyyMM` / `yyyy-MM` / `yyyy/MM` shapes; unknown formats pass through
      * the canonical code unchanged.
      */
+    private fun isQuarterCode(code: String): Boolean = QUARTER_CODE.matches(code)
+
     private fun reformatCode(
         canonical: String,
         format: String,
     ): String {
+        // Quarter codes (yyyyQn) are their own canonical form — the monthly reformatting below doesn't
+        // apply. Honour the common separator variants; default to the compact yyyyQn.
+        QUARTER_CODE.matchEntire(canonical)?.let { m ->
+            val (year, q) = m.destructured
+            return if (format == "yyyy-Qn" || format == "yyyy-Q") "$year-Q$q" else "${year}Q$q"
+        }
         if (canonical.length != 6) return canonical
         val year = canonical.substring(0, 4)
         val month = canonical.substring(4, 6)
