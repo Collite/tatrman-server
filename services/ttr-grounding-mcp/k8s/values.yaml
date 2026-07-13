@@ -1,0 +1,62 @@
+# Default values for ttr-grounding-mcp (RG-P3 · the kind-named MCP tools over chrono/geo/money).
+# HTTP-only (MCP StreamableHTTP on the http port; no gRPC server) — it is a gRPC CLIENT of the three
+# grounding services. Env-agnostic: deploying environments override image, telemetry, and the three
+# backend gRPC targets.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/collite/ttr-grounding-mcp
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# HTTP only — the MCP endpoint + probes. No grpc port (the wrapper serves MCP over HTTP).
+ports:
+  http: 7153
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 192Mi
+    cpu: 100m
+  limits:
+    memory: 384Mi
+    cpu: 500m
+
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: ttr-grounding-mcp
+
+# The three deterministic grounding backends the MCP tools delegate to (Ground(kind=…)).
+backends:
+  chrono:
+    host: chrono
+    grpcPort: 7220
+  geo:
+    host: geo
+    grpcPort: 7221
+  money:
+    host: money
+    grpcPort: 7222
+
+extraEnv: []
+
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 2
+  periodSeconds: 3
+  failureThreshold: 20
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

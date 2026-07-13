@@ -1,0 +1,64 @@
+# Default values for chrono (RG-P3 grounding · DATE_TIME). Env-agnostic: sane defaults, NO cluster
+# knowledge. Deploying environments override image, telemetry, the metadata gRPC target, and the
+# optional llm-gateway fallback.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/collite/chrono
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# HTTP port (health/ready/status probes) + gRPC port (the GroundingService the agent/mcp calls).
+ports:
+  http: 7120
+  grpc: 7220
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: "1"
+
+telemetry:
+  enabled: false
+  endpoint: ""
+  serviceName: chrono
+
+# Metadata (Veles) gRPC target — chrono discovers period tables / date-role columns over meta.v1.
+metadata:
+  host: veles
+  grpcPort: 7261
+
+# Rules-only by default; set url (+ enabled) to arm the llm-gateway fallback for spans the rules
+# path can't ground. Empty url ⇒ rules-only (a recognizer-miss returns UNGROUNDABLE, never an LLM call).
+llmFallback:
+  enabled: false
+  gatewayUrl: ""
+
+# Boots without a metadata client when true (smoke/test only). Production leaves false.
+useFixtureModel: false
+
+extraEnv: []
+
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 2
+  periodSeconds: 3
+  failureThreshold: 20
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
