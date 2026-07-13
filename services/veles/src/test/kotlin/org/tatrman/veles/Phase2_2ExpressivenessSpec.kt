@@ -64,7 +64,7 @@ class Phase2_2ExpressivenessSpec :
             val factQn =
                 org.tatrman.ttr.metadata.model.QualifiedName(
                     schemaCode = org.tatrman.ttr.metadata.model.SchemaCode.CNC,
-                    `package` = "cnc",
+                    `package` = "",
                     namespace = "role",
                     name = "fact",
                 )
@@ -78,7 +78,7 @@ class Phase2_2ExpressivenessSpec :
             val qn =
                 QualifiedName
                     .newBuilder()
-                    .setPackage("cnc")
+                    .setPackage("")
                     .setSchemaCode(org.tatrman.plan.v1.SchemaCode.CNC)
                     .setNamespace("role")
                     .setName("fact")
@@ -118,7 +118,7 @@ class Phase2_2ExpressivenessSpec :
                                 val qn =
                                     org.tatrman.ttr.metadata.model.QualifiedName(
                                         schemaCode = org.tatrman.ttr.metadata.model.SchemaCode.CNC,
-                                        `package` = "cnc",
+                                        `package` = "",
                                         namespace = "role",
                                         name = def.name,
                                     )
@@ -144,13 +144,15 @@ class Phase2_2ExpressivenessSpec :
                 )
             val reconciler = ModelReconciler(ModelDescriptor(id = "p22", name = "p22", description = ""))
             val result = reconciler.reconcile(sources.map { it.load() })
-            val protectedRejection = result.errors.any { it.message.contains("protected qname 'cnc.cnc.role.fact'") }
+            // ttr-metadata 0.9.4 (RG-P3.S0 pin bump): stock roles are unpackaged
+            // (package=""), so the protected qname dotted form is `cnc.role.fact`.
+            val protectedRejection = result.errors.any { it.message.contains("protected qname 'cnc.role.fact'") }
             protectedRejection shouldBe true
             // Stock label survived.
             val factQn =
                 org.tatrman.ttr.metadata.model.QualifiedName(
                     schemaCode = org.tatrman.ttr.metadata.model.SchemaCode.CNC,
-                    `package` = "cnc",
+                    `package` = "",
                     namespace = "role",
                     name = "fact",
                 )

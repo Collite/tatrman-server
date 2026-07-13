@@ -2,6 +2,7 @@
 package org.tatrman.veles.grpc
 
 import org.tatrman.meta.v1.AttributeDetail
+import org.tatrman.meta.v1.AttributeSemantics
 import org.tatrman.meta.v1.AttributeJoinPair
 import org.tatrman.meta.v1.Binding as BindingProto
 import org.tatrman.meta.v1.BindingType
@@ -16,6 +17,7 @@ import org.tatrman.meta.v1.ModelBundleAttribute
 import org.tatrman.meta.v1.ModelBundleEntity
 import org.tatrman.meta.v1.ModelBundleQuery
 import org.tatrman.meta.v1.EntityDetail
+import org.tatrman.meta.v1.EntitySemantics
 import org.tatrman.meta.v1.Er2CncRoleMappingDetail
 import org.tatrman.meta.v1.EdgeResult
 import org.tatrman.meta.v1.RefreshRequest
@@ -112,6 +114,7 @@ import org.tatrman.veles.parse.QueryParseState
 import org.tatrman.ttr.metadata.search.SearchQuery
 import io.opentelemetry.api.trace.Tracer
 import org.tatrman.ttr.metadata.registry.MetadataRegistry
+import org.tatrman.ttr.semantics.semanticsblock.ResolvedAttributeSemantics
 
 /**
  * Metadata service gRPC surface.
@@ -995,7 +998,12 @@ private fun ModelObject.toObjectDescriptor(): ObjectDescriptor =
         .setKind(kind)
         .setSourceFile(sourceFile)
         .setBinding(toProtoBinding(binding))
-        .build()
+        // RS-33 discovery accelerator: surface the object's semantics kind (er
+        // entity / db table) so list_objects finds period/poi/fx tables cheaply.
+        .also { b ->
+            val kind = (this as? Entity)?.semanticsKind ?: (this as? DbTable)?.semanticsKind
+            if (!kind.isNullOrEmpty()) b.semanticsKind = kind
+        }.build()
 
 private fun toProtoBinding(b: DomainBinding): BindingProto =
     when (b) {
@@ -1014,6 +1022,31 @@ private fun toProtoBinding(b: DomainBinding): BindingProto =
                 .setReason(b.reason)
                 .build()
     }
+
+// ----- RG-P3.S0 grounding-semantics projection (RS-33) -----
+//
+// Projects the typed model's grammar-4.2 semantics onto meta.v1. kind/role stay
+// strings (open vocabulary in ttr-semantics); an unresolved/invalid block is
+// dropped upstream (semantics == null / semanticsKind == null) and surfaces as a
+// TTR-SEM load issue — Veles serves the object WITHOUT semantics, never guesses.
+
+private fun entitySemanticsProto(kind: String): EntitySemantics = EntitySemantics.newBuilder().setKind(kind).build()
+
+/**
+ * A resolved attribute/column semantics → the wire message. `owner` is the
+ * declaring object's qname; the resolved `period:`/`currency:` refs carry only a
+ * local `path`, so the cross-ref qname is rebuilt in the owner's schema/namespace
+ * (same-model refs — the period table lives beside the fact entity).
+ */
+private fun ResolvedAttributeSemantics.toProto(
+    owner: org.tatrman.ttr.metadata.model.QualifiedName,
+): AttributeSemantics {
+    val b = AttributeSemantics.newBuilder().setRole(role)
+    codeFormat?.takeIf { it.isNotEmpty() }?.let { b.codeFormat = it }
+    period?.path?.takeIf { it.isNotEmpty() }?.let { b.period = owner.copy(name = it).toProto() }
+    currency?.path?.takeIf { it.isNotEmpty() }?.let { b.currencyAttribute = it }
+    return b.build()
+}
 
 // ----- Phase 2.2 detail builders -----
 
@@ -1052,6 +1085,7 @@ private fun Entity.toEntityDetail(): EntityDetail =
         .addAllAliases(aliases)
         .also { if (!displayLabel.isEmpty) it.displayLabel = displayLabel.toProto() }
         .also { if (!search.isEmpty) it.search = search.toProto() }
+        .also { if (!semanticsKind.isNullOrEmpty()) it.semantics = entitySemanticsProto(semanticsKind!!) }
         .build()
 
 /**
@@ -1117,6 +1151,7 @@ private fun Attribute.toAttributeDetail(): AttributeDetail =
         .also { builder ->
             valueLabels.forEach { (code, text) -> builder.putValueLabels(code, text.toProto()) }
         }.also { if (!search.isEmpty) it.search = search.toProto() }
+        .also { s -> semantics?.let { s.semantics = it.toProto(entity) } }
         .build()
 
 private fun Role.toRoleDetail(): RoleDetail =
@@ -1272,6 +1307,7 @@ private fun DbColumn.toColumnSummary(): DbColumnSummary =
         .setDataType(dataType)
         .setNullable(nullable)
         .setBinding(toProtoBinding(binding))
+        .also { s -> semantics?.let { s.semantics = it.toProto(table) } }
         .build()
 
 private fun DbTable.toDbTableDetail(): DbTableDetail =
@@ -1279,6 +1315,7 @@ private fun DbTable.toDbTableDetail(): DbTableDetail =
         .newBuilder()
         .addAllColumns(columns.map { it.toColumnSummary() })
         .addAllPrimaryKey(primaryKey)
+        .also { if (!semanticsKind.isNullOrEmpty()) it.semantics = entitySemanticsProto(semanticsKind!!) }
         .build()
 
 private fun DbView.toDbViewDetail(): DbViewDetail =
@@ -1311,6 +1348,7 @@ private fun DbColumn.toDbColumnDetail(): DbColumnDetail =
         .setIsPrimaryKey(isPrimaryKey)
         .setIsForeignKey(isForeignKey)
         .also { if (!search.isEmpty) it.search = search.toProto() }
+        .also { s -> semantics?.let { s.semantics = it.toProto(table) } }
         .build()
 
 private fun DbForeignKey.toDbForeignKeyDetail(): DbForeignKeyDetail =

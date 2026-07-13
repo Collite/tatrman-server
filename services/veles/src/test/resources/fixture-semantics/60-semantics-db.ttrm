@@ -1,0 +1,21 @@
+model db schema dbo
+
+// Grounding Phase 1 (grammar 4.2) — the db-only period / POI tables. Proves the
+// `semantics { }` attachment surface on `table` and `column` (the er-side entity
+// / attribute surface lives in 59-semantics.ttrm).
+
+def table accounting_period {
+    semantics { kind: period_table },
+    columns: [
+        def column start_date { type: date, semantics { role: period_start } },
+        def column end_date { type: date, semantics { role: period_end } },
+        def column period { type: { type: varchar, length: 6 }, semantics { role: period_code, code_format: "yyyyMM" } }
+    ]
+}
+
+def table poi {
+    semantics { kind: poi },
+    columns: [
+        def column point { type: text, semantics { role: geo_point } }
+    ]
+}
