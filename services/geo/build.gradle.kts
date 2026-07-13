@@ -68,6 +68,7 @@ jib {
 
 dependencies {
     implementation(libs.tatrman.ttr.translator)
+    implementation(project(":shared:libs:kotlin:ttr-grounding-core"))
     implementation(project(":shared:libs:kotlin:ktor-configurator"))
     implementation(project(":shared:libs:kotlin:otel-config"))
     implementation(project(":shared:libs:kotlin:logging-config"))

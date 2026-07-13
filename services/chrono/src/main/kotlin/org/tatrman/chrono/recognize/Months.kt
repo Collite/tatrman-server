@@ -1,5 +1,7 @@
 package org.tatrman.chrono.recognize
 
+import org.tatrman.text.Normalization
+
 /**
  * Month-name recognition for cs + en. Czech is heavily inflected — a date says "15. května"
  * (genitive) and an adjective period says "květnové období" — so we match by the longest
@@ -97,7 +99,7 @@ object Months {
      * 1..12, or null. Diacritics are stripped first; "may"/"máj"/"květen" all resolve to 5.
      */
     fun find(text: String): Int? {
-        val norm = Diacritics.strip(text).lowercase()
+        val norm = Normalization.fold(text)
         // whole-token exact matches first (handles the short/ambiguous "may", "maj", abbrevs)
         val tokens = norm.split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() }
         for (t in tokens) {

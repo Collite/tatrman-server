@@ -429,4 +429,35 @@ class KernelCharacterizationTest :
                 SqlRenderer.render(rebuilt) shouldBe expectedSql
             }
         }
+
+        // renderJoin centralises the JoinRecipe sql_preview the three services used to hand-assemble.
+        "renderJoin emits JOIN \"entity\" AS alias ON <on> WHERE <filter> from the Expression trees" {
+            val on =
+                pe.and(
+                    pe.eq(pe.col("fx", "from_ccy", "text"), pe.param("ccy", "text")),
+                    pe.eq(pe.col("fx", "to_ccy", "text"), pe.param("domestic", "text")),
+                )
+            val filter =
+                pe.ge(
+                    pe.mul(pe.col("t", "amount", "decimal"), pe.col("fx", "rate", "decimal")),
+                    pe.param("amt", "decimal"),
+                )
+            SqlRenderer.renderJoin("FxRate", "fx", on, filter) shouldBe
+                "JOIN \"FxRate\" AS fx ON fx.\"from_ccy\" = {ccy} AND fx.\"to_ccy\" = {domestic} " +
+                "WHERE t.\"amount\" * fx.\"rate\" >= {amt}"
+        }
+
+        "renderJoin matches the chrono period-table and geo POI join shapes" {
+            SqlRenderer.renderJoin(
+                "AccountingPeriod",
+                "ap",
+                pe.and(
+                    pe.ge(pe.col("t", "date"), pe.col("ap", "start_date")),
+                    pe.lt(pe.col("t", "date"), pe.col("ap", "end_date")),
+                ),
+                pe.eq(pe.col("ap", "period", "text"), pe.param("code", "text")),
+            ) shouldBe
+                "JOIN \"AccountingPeriod\" AS ap ON t.\"date\" >= ap.\"start_date\" AND t.\"date\" < ap.\"end_date\" " +
+                "WHERE ap.\"period\" = {code}"
+        }
     })

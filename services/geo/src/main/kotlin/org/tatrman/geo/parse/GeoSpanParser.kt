@@ -1,5 +1,7 @@
 package org.tatrman.geo.parse
 
+import org.tatrman.text.Normalization
+
 /** What the span asks for geographically. */
 sealed interface GeoQuery {
     val confidence: Double
@@ -44,7 +46,7 @@ class GeoSpanParser {
     fun parse(span: String): GeoQuery? {
         val trimmed = span.trim()
         if (trimmed.isEmpty()) return null
-        val n = Diacritics.strip(trimmed).lowercase()
+        val n = Normalization.fold(trimmed)
         val here = hereRe.containsMatchIn(n)
         val radius = radiusMeters(trimmed)
         val place =
@@ -98,7 +100,7 @@ class GeoSpanParser {
         for (word in raw.trim().split(Regex("\\s+"))) {
             val cleaned = word.trim('.', ',', '?', '!', ';', ':')
             if (cleaned.isEmpty()) continue
-            if (Diacritics.strip(cleaned).lowercase() in PLACE_STOP_WORDS) break
+            if (Normalization.fold(cleaned) in PLACE_STOP_WORDS) break
             kept += cleaned
             if (kept.size >= MAX_PLACE_WORDS) break
         }

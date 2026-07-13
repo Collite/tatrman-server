@@ -1,5 +1,6 @@
 package org.tatrman.chrono.recognize
 
+import org.tatrman.text.Normalization
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
@@ -19,7 +20,7 @@ class DateRecognizer {
         span: String,
         reference: LocalDate,
     ): ChronoRecognition? {
-        val n = Diacritics.strip(span).lowercase().trim()
+        val n = Normalization.fold(span).trim()
         if (n.isEmpty()) return null
         val target = detectTarget(n)
         val base =
