@@ -80,6 +80,7 @@ include(":services:ttr-llm-gateway")
 include(":services:chrono")
 include(":services:money")
 include(":services:geo")
+include(":services:ttr-grounding-mcp")
 
 // Engine workers (JVM; the Polars worker is Python — out of the Gradle build)
 include(":workers:ttr-worker-postgres")
