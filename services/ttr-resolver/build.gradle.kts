@@ -71,6 +71,17 @@ dependencies {
     // RG-* diagnostics registry (RG-RES-001 degrade / RG-RES-002 bad resume token).
     implementation(project(":shared:libs:kotlin:ttr-diagnostics"))
 
+    // RG-P6.S1 — the `resolve.bind:v1` MCP door (RS-27: the door exposes the
+    // deterministic core only). MCP SDK + a CIO surface for streamable HTTP; the
+    // shared fail-closed OBO identity gate (Decision B); protobuf JSON for faithful
+    // ResolveResponse→structuredContent marshalling. NONE of these is an LLM client
+    // (verifyNoLlmDependency stays green).
+    implementation(project(":shared:libs:kotlin:mcp-identity"))
+    implementation(libs.kotlin.mcp.sdk)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.cors)
+    implementation(libs.protobuf.java.util)
+
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.content.negotiation)
