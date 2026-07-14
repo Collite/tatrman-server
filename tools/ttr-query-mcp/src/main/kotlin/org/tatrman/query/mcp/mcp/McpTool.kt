@@ -4,7 +4,7 @@ package org.tatrman.query.mcp.mcp
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
-import org.tatrman.query.mcp.identity.UserIdentity
+import org.tatrman.mcp.identity.UserIdentity
 
 /**
  * Adapter shape for an MCP tool registered with this service. Each concrete

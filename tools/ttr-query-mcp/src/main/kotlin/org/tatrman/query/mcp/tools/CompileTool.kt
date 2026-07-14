@@ -24,7 +24,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import org.slf4j.LoggerFactory
 import org.tatrman.query.mcp.QueryMcpConfig
-import org.tatrman.query.mcp.identity.UserIdentity
+import org.tatrman.mcp.identity.UserIdentity
 import org.tatrman.query.mcp.mcp.MessageEntry
 import org.tatrman.query.mcp.mcp.McpTool
 import org.tatrman.query.mcp.mcp.PipelineWarnings

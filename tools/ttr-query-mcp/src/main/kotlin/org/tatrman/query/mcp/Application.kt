@@ -30,7 +30,7 @@ import io.ktor.server.application.call
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import org.tatrman.query.mcp.mcp.InstrumentedTool
-import org.tatrman.query.mcp.mcp.RequestContext
+import org.tatrman.mcp.identity.RequestContext
 import org.tatrman.query.mcp.mcp.ToolRegistry
 import org.tatrman.query.mcp.mcp.installQueryMcp
 import org.tatrman.query.mcp.tools.CompileTool

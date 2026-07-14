@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-package org.tatrman.query.mcp.identity
+package org.tatrman.mcp.identity
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain

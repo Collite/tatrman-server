@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.slf4j.LoggerFactory
-import org.tatrman.query.mcp.identity.UserIdentity
+import org.tatrman.mcp.identity.UserIdentity
 import shared.otel.withSpan
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger

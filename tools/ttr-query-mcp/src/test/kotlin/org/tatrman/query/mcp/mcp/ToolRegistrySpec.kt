@@ -11,7 +11,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
-import org.tatrman.query.mcp.identity.UserIdentity
+import org.tatrman.mcp.identity.UserIdentity
 
 class ToolRegistrySpec :
     StringSpec({

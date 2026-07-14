@@ -9,7 +9,8 @@ import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import org.slf4j.LoggerFactory
 import org.tatrman.query.mcp.QueryMcpConfig
-import org.tatrman.query.mcp.identity.IdentityGate
+import org.tatrman.mcp.identity.IdentityGate
+import org.tatrman.mcp.identity.RequestContext
 
 private val logger = LoggerFactory.getLogger("query-mcp.transport")
 

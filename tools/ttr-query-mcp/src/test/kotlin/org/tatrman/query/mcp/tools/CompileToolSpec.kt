@@ -24,8 +24,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.tatrman.query.mcp.QueryMcpConfig
-import org.tatrman.query.mcp.identity.IdentitySource
-import org.tatrman.query.mcp.identity.UserIdentity
+import org.tatrman.mcp.identity.IdentitySource
+import org.tatrman.mcp.identity.UserIdentity
 import org.tatrman.query.mcp.upstream.TranslatorClient
 import org.tatrman.query.mcp.upstream.ValidatorClient
 

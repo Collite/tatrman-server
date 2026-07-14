@@ -30,8 +30,8 @@ import org.tatrman.query.client.TranslatorTranslateClient
 import org.tatrman.query.client.ValidatorClient
 import org.tatrman.query.grpc.QueryServiceImpl
 import org.tatrman.query.mcp.QueryMcpConfig
-import org.tatrman.query.mcp.identity.IdentityGate
-import org.tatrman.query.mcp.identity.UserIdentity
+import org.tatrman.mcp.identity.IdentityGate
+import org.tatrman.mcp.identity.UserIdentity
 import org.tatrman.query.mcp.tools.QueryTool
 import org.tatrman.query.mcp.upstream.MetadataServiceClient
 import org.tatrman.query.mcp.upstream.QueryRunnerClient
@@ -232,7 +232,7 @@ class TokenExpiryComponentSpec :
                     UserIdentity(
                         id = "alice",
                         roles = setOf("analyst"),
-                        source = org.tatrman.query.mcp.identity.IdentitySource.TOKEN,
+                        source = org.tatrman.mcp.identity.IdentitySource.TOKEN,
                     )
 
                 val res = tool.execute(callToolRequest(), identity = identity)

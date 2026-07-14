@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-package org.tatrman.query.mcp.identity
+package org.tatrman.mcp.identity
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -15,16 +15,14 @@ import java.util.Base64
  *  1. `Authorization: Bearer <jwt>` — preferred for production. Extracts the
  *     `preferred_username` claim, falling back to `sub`. Roles come from
  *     `realm_access.roles` (Keycloak convention).
- *  2. `X-User-Id` request header — service-to-service shortcut used by the
- *     existing v0 MCP servers.
+ *  2. `X-User-Id` request header — service-to-service shortcut.
  *  3. Tool-arg `user_id` — trusted-network shortcut.
  *
  * **v1 limitation.** This decodes the JWT *without verifying its signature*.
  * Production deployments are expected to terminate inbound auth at an
- * ingress / sidecar that validates the token before it reaches query-mcp;
+ * ingress / sidecar that validates the token before it reaches the MCP door;
  * this resolver only extracts claims for downstream context-passing.
- * Signature validation lives outside this service. Documented in
- * tools/query-mcp/docs/technical/query-mcp-service.md.
+ * Signature validation lives outside this library.
  */
 object IdentityResolver {
     private val parser =
@@ -105,9 +103,10 @@ object IdentityResolver {
 
     /**
      * Local-dev admin shortcut: a user_id prefixed `admin:` is treated as an admin and emits both
-     * `admin` (legacy / `UserIdentity.isAdmin`) and `query-platform-admin` (DF-V02 canonical role
-     * the validator gates `apply_security = false` on). Production callers carry these roles from
-     * the JWT's `realm_access.roles` and don't rely on this convention.
+     * `admin` (legacy / [UserIdentity.isAdmin]) and `query-platform-admin` (the DF-V02 canonical
+     * role the query-mcp validator gates `apply_security = false` on — a consumer-specific
+     * convention preserved from the pre-lift edge; a future change can parameterize per-consumer
+     * admin roles). Production callers carry these roles from the JWT's `realm_access.roles`.
      */
     private fun rolesFromIdConvention(userId: String): Set<String> =
         if (userId.startsWith("admin:")) setOf("admin", "query-platform-admin") else emptySet()

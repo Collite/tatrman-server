@@ -55,6 +55,7 @@ include(":shared:proto-llm")
 include(":shared:libs:kotlin:otel-config")
 include(":shared:libs:kotlin:logging-config")
 include(":shared:libs:kotlin:ktor-configurator")
+include(":shared:libs:kotlin:mcp-identity")
 include(":shared:libs:kotlin:db-common")
 include(":shared:libs:kotlin:data-formatter")
 // RG-P0.S3 — S-2 shared normalization (fold) + RG-* diagnostics registry.

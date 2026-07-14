@@ -29,7 +29,7 @@ import shared.formatter.core.FormatOptions
 import shared.formatter.core.OutputFormat
 import shared.formatter.core.RowNumbering
 import org.tatrman.query.mcp.QueryMcpConfig
-import org.tatrman.query.mcp.identity.UserIdentity
+import org.tatrman.mcp.identity.UserIdentity
 import org.tatrman.query.mcp.mcp.MessageEntry
 import org.tatrman.query.mcp.mcp.McpTool
 import org.tatrman.query.mcp.mcp.PipelineWarnings

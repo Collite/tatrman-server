@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-package org.tatrman.query.mcp.identity
+package org.tatrman.mcp.identity
 
 /**
- * The OBO identity gate for the query-mcp edge (fork Stage 3.5; kantheon-security
- * §2 / §2.1). A pure decision over the three identity sources so the security-critical
- * fail-closed behavior is unit-testable, independent of the MCP transport plumbing.
+ * The OBO identity gate for an MCP door edge (kantheon-security §2 / §2.1). A pure
+ * decision over the three identity sources so the security-critical fail-closed
+ * behavior is unit-testable, independent of the MCP transport plumbing.
  *
  * Rules (in order):
  *   1. **No spoofing** — if a valid Bearer token is present AND a `user_id` arg

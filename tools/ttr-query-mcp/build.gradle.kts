@@ -90,6 +90,7 @@ dependencies {
     implementation(project(":shared:libs:kotlin:otel-config"))
     implementation(project(":shared:libs:kotlin:logging-config"))
     implementation(project(":shared:libs:kotlin:ktor-configurator"))
+    implementation(project(":shared:libs:kotlin:mcp-identity"))
 
     implementation(libs.grpc.kotlin.stub)
     implementation(libs.grpc.netty.shaded)

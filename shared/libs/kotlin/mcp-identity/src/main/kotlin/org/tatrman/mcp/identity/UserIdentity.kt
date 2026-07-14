@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-package org.tatrman.query.mcp.identity
+package org.tatrman.mcp.identity
 
 /** Where the resolved identity came from. */
 enum class IdentitySource {
@@ -14,10 +14,10 @@ enum class IdentitySource {
 }
 
 /**
- * Resolved caller identity. `roles` is the (possibly empty) set of roles
- * the validator / sql-security can use for policy decisions; v1 derives a
- * single `admin` role from the `admin:` user_id prefix convention used by
- * the validator (Phase 1.6).
+ * Resolved caller identity. `roles` is the (possibly empty) set of roles a
+ * consumer's policy layer (validator / sql-security / admin-gated endpoints) can
+ * use for decisions; the `admin:` user_id prefix convention derives a single
+ * `admin` role in local dev (see [IdentityResolver]).
  */
 data class UserIdentity(
     val id: String,

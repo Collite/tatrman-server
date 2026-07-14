@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-package org.tatrman.query.mcp.identity
+package org.tatrman.mcp.identity
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
@@ -8,8 +8,8 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import java.util.Base64
 
 /**
- * Fork Stage 3.5 T4 — the OBO identity gate at the query-mcp edge
- * (kantheon-security §2 / §2.1). Agents must call with the user's OBO token;
+ * The shared OBO identity gate (RG-P6.S1, lifted from the query-mcp edge;
+ * kantheon-security §2 / §2.1). Agents must call with the user's OBO token;
  * the gate fails closed on missing identity and on token-vs-arg spoofing.
  */
 class IdentityGateSpec :
