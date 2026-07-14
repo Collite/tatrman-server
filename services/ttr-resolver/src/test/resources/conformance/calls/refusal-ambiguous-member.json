@@ -1,0 +1,16 @@
+{
+  "id": "refusal-ambiguous-member",
+  "description": "Two members tie within the ambiguity gap for one span (e.g. 'DF' → DF ADNAK | DF BELUS). The core clarifies; the door surfaces distinct options + an opaque resume token and NEVER guesses a binding (RS-27 refuse-over-guess).",
+  "turns": [
+    {
+      "tool": "resolve.bind:v1",
+      "args": { "conversation_id": "c-amb-1", "text": "kolik za DF" },
+      "scenario": "ambiguous_member",
+      "expect": {
+        "outcome": "clarification",
+        "no_binding_below_threshold": true,
+        "min_options": 2
+      }
+    }
+  ]
+}

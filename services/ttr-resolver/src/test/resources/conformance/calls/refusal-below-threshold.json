@@ -1,0 +1,15 @@
+{
+  "id": "refusal-below-threshold",
+  "description": "Every fuzzy match for the span scores below the bind threshold. The core binds nothing (an empty resolution); the door surfaces that honestly and NEVER guesses a below-threshold binding (RS-27 refuse-over-guess).",
+  "turns": [
+    {
+      "tool": "resolve.bind:v1",
+      "args": { "conversation_id": "c-bt-1", "text": "kolik za neznamy pojem" },
+      "scenario": "below_threshold",
+      "expect": {
+        "outcome": "empty",
+        "no_binding_below_threshold": true
+      }
+    }
+  ]
+}
