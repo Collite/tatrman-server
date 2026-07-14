@@ -63,6 +63,11 @@ dependencies {
     api(libs.otel.logback.appender)
     implementation(project(":shared:libs:kotlin:logging-config"))
 
+    // S-2 — the one normalization spec (`fold`). Span proposal folds declared
+    // anchor words the same way ttr-fuzzy/the grounding kernel do; determinism
+    // and cross-service parity require the byte-identical fold. Dependency-free leaf.
+    implementation(project(":shared:libs:kotlin:ttr-text"))
+
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.content.negotiation)

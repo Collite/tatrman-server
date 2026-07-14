@@ -14,7 +14,12 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
+import org.tatrman.resolver.client.GrpcFuzzyClient
+import org.tatrman.resolver.client.GrpcNlpClient
 import org.tatrman.resolver.grpc.ResolverGrpcService
+import org.tatrman.resolver.model.ResolverRegistry
+import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.pipeline.ResolverPipeline
 import shared.ktor.KtorConfigFactory
 import shared.ktor.KtorServerBootstrap
 import shared.ktor.installKtorServerBase
@@ -37,7 +42,37 @@ fun Application.module(config: Config) {
     val reflectionEnabled =
         config.hasPath("grpc.reflection-enabled") && config.getBoolean("grpc.reflection-enabled")
 
-    val resolverService = ResolverGrpcService()
+    // Upstream clients — ttr-nlp (parse + capability matrix) and ttr-fuzzy
+    // (vocabulary match). NEITHER is an LLM (RS-23). The snapshot-fed registry is
+    // S2; S1 starts from a config-thresholded, empty-entity-type default that a
+    // per-request `Registry` override fills (RS-24) — the pipeline is exercised
+    // end-to-end by ResolverPipelineTest via the client seams.
+    val nlpClient =
+        GrpcNlpClient(config.getString("nlp.host"), config.getInt("nlp.port"), config.getLong("nlp.deadline-seconds"))
+    val fuzzyClient =
+        GrpcFuzzyClient(
+            config.getString("fuzzy.host"),
+            config.getInt("fuzzy.port"),
+            config.getLong("fuzzy.deadline-seconds"),
+        )
+
+    val defaultThresholds =
+        ResolverThresholds(
+            bind = config.getDouble("resolver.threshold-bind"),
+            ambiguityGap = config.getDouble("resolver.threshold-ambiguity-gap"),
+            exact = config.getDouble("resolver.threshold-exact"),
+            maxOptions = config.getInt("resolver.max-options"),
+        )
+    val defaultRegistry =
+        ResolverRegistry(
+            entityTypes = emptyList(),
+            locales = emptyList(),
+            thresholds = defaultThresholds,
+            snapshotHash = "",
+        )
+
+    val pipeline = ResolverPipeline(nlpClient, fuzzyClient, defaultRegistry, siblings = emptyMap())
+    val resolverService = ResolverGrpcService(pipeline)
 
     val grpcServer =
         NettyServerBuilder
@@ -73,5 +108,7 @@ fun Application.module(config: Config) {
     monitor.subscribe(ApplicationStopping) {
         log.info("Shutting down resolver gRPC server")
         grpcServer.shutdown()
+        nlpClient.close()
+        fuzzyClient.close()
     }
 }

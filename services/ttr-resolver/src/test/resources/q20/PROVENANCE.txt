@@ -1,0 +1,3 @@
+corpus dir commit: afd4cae53aa6866bcfafd82514d66b6e62d424fa
+e931689cd9cb2f977bd574452aad99690b46038f282cbcbc07c87877827eb6c1  seed.jsonl (      50 lines)
+d0e8b17fa6e989ff9e17bd4a035825946e2b551802d1edd38d3bd163676331f5  ucetnictvi_entities_only.jsonl (      12 lines)

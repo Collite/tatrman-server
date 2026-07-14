@@ -1,0 +1,393 @@
+{
+  "summary": {
+    "vocab_size": 42,
+    "A_matcher_oracle_spans": {
+      "tp": 10,
+      "fp": 0,
+      "fn": 2,
+      "precision": 1.0,
+      "recall": 0.833,
+      "f1": 0.909
+    },
+    "B_all_spans": {
+      "value_extraction": {
+        "tp": 8,
+        "fp": 8,
+        "fn": 4,
+        "precision": 0.5,
+        "recall": 0.667,
+        "f1": 0.571
+      },
+      "ucetnictvi": {
+        "tp": 3,
+        "fp": 11,
+        "fn": 2,
+        "precision": 0.214,
+        "recall": 0.6,
+        "f1": 0.316
+      },
+      "awaiting_withheld": "0/5",
+      "seed_spurious_binds": 33,
+      "seed_questions_with_spurious": 26
+    },
+    "C_anchored_fallback": {
+      "value_extraction": {
+        "tp": 10,
+        "fp": 0,
+        "fn": 2,
+        "precision": 1.0,
+        "recall": 0.833,
+        "f1": 0.909
+      },
+      "ucetnictvi": {
+        "tp": 4,
+        "fp": 4,
+        "fn": 1,
+        "precision": 0.5,
+        "recall": 0.8,
+        "f1": 0.615
+      },
+      "awaiting_withheld": "1/5",
+      "seed_spurious_binds": 0,
+      "seed_questions_with_spurious": 0
+    },
+    "code_vs_name": [
+      {
+        "probe": "FAP",
+        "expect_entity": "QTYPDOK",
+        "kind": "code",
+        "decision": "bind",
+        "top": "FAP(QTYPDOK,code) 1.000",
+        "correct": true
+      },
+      {
+        "probe": "DF ADNAK",
+        "expect_entity": "QSTRED_DF",
+        "kind": "name",
+        "decision": "bind",
+        "top": "DF ADNAK(QSTRED_DF,name) 1.050",
+        "correct": true
+      },
+      {
+        "probe": "MAJETEK",
+        "expect_entity": "QXXUKAZMU",
+        "kind": "code_or_name",
+        "decision": "bind_entity",
+        "top": "MAJETEK(QXXUKAZMU,name) 1.000",
+        "correct": true
+      },
+      {
+        "probe": "Kancelář VY",
+        "expect_entity": "QSTRED_DF",
+        "kind": "name",
+        "decision": "bind_entity",
+        "top": "Kancelář AD(QSTRED_DF,name) 1.000",
+        "correct": true
+      },
+      {
+        "probe": "VY KANCELAR",
+        "expect_entity": "QXXUKAZMU",
+        "kind": "name",
+        "decision": "bind",
+        "top": "VY KANCELAR(QXXUKAZMU,name) 1.050",
+        "correct": true
+      }
+    ]
+  },
+  "value_extraction_detail_anchored": [
+    {
+      "q": "Vypiš účetní záznamy pro středisko DF ADNAK za období 2026.03 podle účetní hodnoty",
+      "gold": {
+        "df adnak": [
+          "db.dbo.QSTRED_DF.KOD_STR",
+          "db.dbo.QSTRED_DF.NAZEV_STR"
+        ]
+      },
+      "produced": {}
+    },
+    {
+      "q": "Zobraz středisko Kancelář AD",
+      "gold": {
+        "kancelář ad": [
+          "db.dbo.QSTRED_DF.KOD_STR",
+          "db.dbo.QSTRED_DF.NAZEV_STR"
+        ]
+      },
+      "produced": {
+        "kancelář": [
+          "db.dbo.QSTRED_DF.KOD_STR",
+          "db.dbo.QSTRED_DF.NAZEV_STR"
+        ]
+      }
+    },
+    {
+      "q": "Náklady ukazatele MAJETEK za 2025.12",
+      "gold": {
+        "majetek": [
+          "db.dbo.QXXUKAZMU.KOD_UKAZMU",
+          "db.dbo.QXXUKAZMU.NAZEV_UKAZMU"
+        ]
+      },
+      "produced": {
+        "majetek": [
+          "db.dbo.QXXUKAZMU.KOD_UKAZMU",
+          "db.dbo.QXXUKAZMU.NAZEV_UKAZMU"
+        ]
+      }
+    },
+    {
+      "q": "Doklady typu FAP za leden 2026",
+      "gold": {
+        "fap": [
+          "db.dbo.QTYPDOK.NAZEV_TYPDOK",
+          "db.dbo.QTYPDOK.TYP_DOK"
+        ]
+      },
+      "produced": {
+        "typu fap": [
+          "db.dbo.QTYPDOK.NAZEV_TYPDOK",
+          "db.dbo.QTYPDOK.TYP_DOK"
+        ]
+      }
+    },
+    {
+      "q": "Středisko SM ADNAK a ukazatel Majetek pobočky",
+      "gold": {
+        "sm adnak": [
+          "db.dbo.QSTRED_DF.KOD_STR",
+          "db.dbo.QSTRED_DF.NAZEV_STR"
+        ],
+        "majetek pobočky": [
+          "db.dbo.QXXUKAZMU.KOD_UKAZMU",
+          "db.dbo.QXXUKAZMU.NAZEV_UKAZMU"
+        ]
+      },
+      "produced": {
+        "sm adnak": [
+          "db.dbo.QSTRED_DF.KOD_STR",
+          "db.dbo.QSTRED_DF.NAZEV_STR"
+        ],
+        "majetek pobočky": [
+          "db.dbo.QXXUKAZMU.KOD_UKAZMU",
+          "db.dbo.QXXUKAZMU.NAZEV_UKAZMU"
+        ]
+      }
+    },
+    {
+      "q": "Vypiš všechny účetní záznamy za období 2026.01",
+      "gold": {},
+      "produced": {}
+    }
+  ],
+  "ucetnictvi_detail_anchored": [
+    {
+      "q": "Vypiš účetní záznamy pro středisko DF ADNAK za období 2026.03",
+      "want": [
+        "QSTRED_DF"
+      ],
+      "got": [
+        "QSTRED_DF"
+      ],
+      "binds": [
+        "DF ADNAK->QSTRED_DF(1.05)"
+      ]
+    },
+    {
+      "q": "Vypiš účetní záznamy pro středisko Kancelář VY za období 2026.03",
+      "want": [
+        "QSTRED_DF"
+      ],
+      "got": [
+        "QSTRED_DF"
+      ],
+      "binds": [
+        "Kancelář VY období 2026.03->QSTRED_DF(0.51)"
+      ]
+    },
+    {
+      "q": "Vypiš účetní záznamy pro ukazatel VY KANCELAR za období 2026.03",
+      "want": [
+        "QXXUKAZMU"
+      ],
+      "got": [],
+      "binds": []
+    },
+    {
+      "q": "Vypiš účetní záznamy pro ukazatel Kancelar VY za období 2026.03",
+      "want": [
+        "QXXUKAZMU"
+      ],
+      "got": [
+        "QXXUKAZMU"
+      ],
+      "binds": [
+        "Kancelar->QXXUKAZMU(1.00)"
+      ]
+    },
+    {
+      "q": "Zobraz vývoj nákladů pro středisko DF ADNAK za rok 2026",
+      "want": [
+        "QSTRED_DF"
+      ],
+      "got": [
+        "QSTRED_DF"
+      ],
+      "binds": [
+        "DF ADNAK rok 2026->QSTRED_DF(0.54)"
+      ]
+    },
+    {
+      "q": "A teď porovnej s vývojem nákladů v roce 2025",
+      "want": [],
+      "got": [],
+      "binds": []
+    },
+    {
+      "q": "Detail dokladu pro zápis 12345",
+      "want": [],
+      "got": [],
+      "binds": []
+    },
+    {
+      "q": "Vypiš účetní záznamy pro středisko Praha za období 2026.03",
+      "awaiting": true,
+      "withheld": false,
+      "pinned": [
+        "Praha->QSTRED_DF"
+      ],
+      "entity_only": []
+    },
+    {
+      "q": "Zobraz vývoj nákladů pro středisko VY",
+      "awaiting": true,
+      "withheld": false,
+      "pinned": [
+        "VY->QSTRED_DF"
+      ],
+      "entity_only": []
+    },
+    {
+      "q": "Účetní záznamy pro ukazatel Náklady",
+      "awaiting": true,
+      "withheld": false,
+      "pinned": [
+        "Náklady->QXXUKAZMU"
+      ],
+      "entity_only": []
+    },
+    {
+      "q": "Detail zápisu pro středisko DF",
+      "awaiting": true,
+      "withheld": true,
+      "pinned": [],
+      "entity_only": [
+        "DF->QSTRED_DF"
+      ]
+    },
+    {
+      "q": "Vypiš účetní záznamy pro ukazatel Mzdy a Kancelář",
+      "awaiting": true,
+      "withheld": false,
+      "pinned": [
+        "Mzdy->QXXUKAZMU"
+      ],
+      "entity_only": []
+    }
+  ],
+  "overgen_examples_all_spans": [
+    {
+      "q": "Který zákazník má fakturu číslo 12345?",
+      "spurious": [
+        "fakturu číslo->QTYPDOK(0.55)"
+      ]
+    },
+    {
+      "q": "Zobraz všechny faktury od zákazníka Microsoft",
+      "spurious": [
+        "faktury->QTYPDOK(1.00)"
+      ]
+    },
+    {
+      "q": "Kde sídlí dodavatel ACME Corp?",
+      "spurious": [
+        "Corp->QXXUKAZMU(0.50)"
+      ]
+    },
+    {
+      "q": "Kolik faktur má zákazník Samsung?",
+      "spurious": [
+        "faktur->QTYPDOK(1.00)"
+      ]
+    },
+    {
+      "q": "Platby od zákazníka Google za Q1 2024",
+      "spurious": [
+        "Platby->QSTRED_DF(0.50)"
+      ]
+    },
+    {
+      "q": "Smlouvy s platností do konce roku 2024",
+      "spurious": [
+        "roku->QTYPDOK(0.67)",
+        "konce->QSTRED_DF(0.50)"
+      ]
+    },
+    {
+      "q": "Pošli fakturu na adresu Alfa Corp",
+      "spurious": [
+        "fakturu->QTYPDOK(1.00)",
+        "adresu->QXXUKAZMU(0.50)",
+        "Corp->QXXUKAZMU(0.50)"
+      ]
+    },
+    {
+      "q": "Jaká je celková suma objednávek za březen?",
+      "spurious": [
+        "suma->QSTRED_DF(0.50)"
+      ]
+    },
+    {
+      "q": "Zobraz historii plateb zákazníka Netflix",
+      "spurious": [
+        "plateb->QSTRED_DF(0.50)"
+      ]
+    },
+    {
+      "q": "Kontakty na obchodního partnera Meta",
+      "spurious": [
+        "partnera->QTYPDOK(0.50)",
+        "Meta->QXXUKAZMU(0.50)"
+      ]
+    },
+    {
+      "q": "Platby přijaté v červenci 2024",
+      "spurious": [
+        "Platby přijaté->QTYPDOK(0.66)"
+      ]
+    },
+    {
+      "q": "EAN kód produktu Samsung Galaxy S24",
+      "spurious": [
+        "Galaxy->QXXUKAZMU(0.57)"
+      ]
+    },
+    {
+      "q": "Město dodání pro objednávku 54321",
+      "spurious": [
+        "dodání->QTYPDOK(0.50)"
+      ]
+    },
+    {
+      "q": "Kolik dnů je po splatnosti faktura 11111?",
+      "spurious": [
+        "splatnosti faktura->QTYPDOK(0.59)"
+      ]
+    },
+    {
+      "q": "Seznam poboček v Moravskoslezském kraji",
+      "spurious": [
+        "Seznam poboček->QXXUKAZMU(0.53)"
+      ]
+    }
+  ]
+}
