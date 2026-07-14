@@ -2,6 +2,7 @@
 package org.tatrman.resolver.pipeline
 
 import org.slf4j.LoggerFactory
+import org.tatrman.diagnostics.RgDiagnostics
 import org.tatrman.nlp.v1.AnalyzeRequest
 import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.nlp.v1.NlpOp
@@ -11,6 +12,11 @@ import org.tatrman.resolver.client.NlpClient
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverRegistry
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.registry.SnapshotRegistry
+import org.tatrman.resolver.token.ResumeOption
+import org.tatrman.resolver.token.ResumePayload
+import org.tatrman.resolver.token.ResumeTokenCodec
+import org.tatrman.resolver.token.ResumeTokenException
 import org.tatrman.resolver.v1.AwaitingClarification
 import org.tatrman.resolver.v1.BindingProvenance
 import org.tatrman.resolver.v1.Candidate
@@ -26,71 +32,83 @@ import org.tatrman.resolver.v1.Span
 import org.tatrman.resolver.v1.Universal
 
 /**
- * The deterministic resolver pipeline (RG-P5.S1.T5): parse → extractUniversal →
+ * The deterministic resolver pipeline (RG-P5): parse → extractUniversal →
  * proposeDomainSpans (anchored, Q-20) → gateSpans (one BatchMatch) → assemble a
  * `Resolution | AwaitingClarification`. ZERO LLM — the only upstreams are ttr-nlp
  * (parse + capability matrix) and ttr-fuzzy (vocabulary match), neither an LLM;
  * NoLlmDependencyTest guards the module.
  *
- * The registry is the caller's `Registry` override when present, else the
- * [defaultRegistry] (snapshot-fed in S2). The HMAC resume path + capability-driven
- * degrade land in S2; S1 handles the fresh-question path and echoes the capability
- * matrix honestly.
+ * S2 additions: the registry is snapshot-fed ([registry], RS-24) with the caller's
+ * per-request `Registry` override winning; a clarification is offered under a
+ * signed HMAC resume token and a resume with a matching pin binds at confidence
+ * 1.0 with **no re-fuzzy** (RS-26); the capability matrix drives degrade — an
+ * unsupported language falls to the fold+fuzzy floor with every binding
+ * `degraded=true` + RG-RES-001, and the `capabilities` echo reports what actually
+ * backed the resolve (F-T3 honesty, RS-25).
  */
 class ResolverPipeline(
     private val nlp: NlpClient,
     private val fuzzy: FuzzyClient,
-    private val defaultRegistry: ResolverRegistry,
+    private val registry: SnapshotRegistry,
     private val siblings: SiblingCatalog,
+    private val tokenCodec: ResumeTokenCodec,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     private val analyzeOps =
         listOf(NlpOp.TOKENIZE, NlpOp.LEMMATIZE, NlpOp.POS_TAG, NlpOp.DEP_PARSE, NlpOp.NER, NlpOp.DETECT_LANGUAGE)
 
-    suspend fun resolve(request: ResolveRequest): ResolveResponse {
-        if (!request.hasFresh()) {
-            // S2 owns the HMAC resume path; S1 serves fresh questions only.
-            log.info(
-                "resume path is S2 (HMAC tokens) — returning empty resolution for conversation_id={}",
-                request.conversationId,
-            )
-            return ResolveResponse
-                .newBuilder()
-                .setResolution(Resolution.getDefaultInstance())
-                .setTraceId(request.conversationId)
-                .setCapabilities(Capabilities.getDefaultInstance())
-                .build()
+    suspend fun resolve(request: ResolveRequest): ResolveResponse =
+        when {
+            request.hasResume() -> resumeResolve(request)
+            request.hasFresh() -> freshResolve(request)
+            else -> {
+                log.info("empty resolve request conversation_id={}", request.conversationId)
+                ResolveResponse
+                    .newBuilder()
+                    .setResolution(Resolution.getDefaultInstance())
+                    .setTraceId(request.conversationId)
+                    .setCapabilities(Capabilities.getDefaultInstance())
+                    .build()
+            }
         }
 
+    // --- fresh path ---------------------------------------------------------
+
+    private suspend fun freshResolve(request: ResolveRequest): ResolveResponse {
         val fresh = request.fresh
         val locale = fresh.locale
         val parse = nlp.analyze(analyzeRequest(fresh.text, locale))
         val status = runCatching { nlp.getStatus() }.getOrNull()
-        val capabilities = capabilitiesOf(parse, status)
+        val assessment = assess(parse, status)
 
-        val registry =
+        val resolverRegistry =
             if (request.hasRegistry()) {
                 fromProto(
                     request.registry,
-                    defaultRegistry.thresholds,
+                    registry.current().thresholds,
                 )
             } else {
-                defaultRegistry
+                registry.current()
             }
 
-        val universals = UniversalExtraction.extractUniversal(parse)
-        val candidates = SpanProposal.proposeDomainSpans(parse, registry.entityTypes)
-        val batchReq = GateSpans.buildBatchRequest(candidates, locale.ifBlank { null }, registry.thresholds.maxOptions)
+        val universals = if (assessment.csNer) UniversalExtraction.extractUniversal(parse) else emptyList()
+        val candidates = SpanProposal.proposeDomainSpans(parse, resolverRegistry.entityTypes)
+        val batchReq =
+            GateSpans.buildBatchRequest(
+                candidates,
+                locale.ifBlank { null },
+                resolverRegistry.thresholds.maxOptions,
+            )
         val batchResp = fuzzy.batchMatch(batchReq)
         val outcome =
             GateSpans.gate(
                 candidates,
                 batchResp,
-                registry.entityTypes,
-                registry.thresholds,
+                resolverRegistry.entityTypes,
+                resolverRegistry.thresholds,
                 siblings,
-                registry.snapshotHash,
+                resolverRegistry.snapshotHash,
             )
 
         val builder =
@@ -99,12 +117,109 @@ class ResolverPipeline(
                 .setParse(parse)
                 .setTraceId(parse.traceId.ifBlank { request.conversationId })
                 .setElapsedMs(parse.elapsedMs)
-                .setCapabilities(capabilities)
+                .setCapabilities(capabilities(assessment))
 
         when (outcome) {
-            is Clarify -> builder.awaiting = awaitingOf(outcome)
-            is Bound -> builder.resolution = resolutionOf(universals, outcome, parse)
+            is Clarify -> builder.awaiting = awaitingOf(outcome, request.conversationId, parse.traceId)
+            is Bound -> builder.resolution = resolutionOf(universals, outcome, parse, assessment.degradedFloor)
         }
+        return builder.build()
+    }
+
+    // --- resume path (RS-26) ------------------------------------------------
+
+    private fun resumeResolve(request: ResolveRequest): ResolveResponse {
+        val resume = request.resume
+        // A bad token is RG-RES-002 — refuse over guess; the gRPC layer maps the throw.
+        val payload = tokenCodec.verify(resume.token).getOrThrow()
+        val option =
+            payload.options.firstOrNull { it.id == resume.selectedOptionId }
+                ?: throw ResumeTokenException(
+                    "selected_option_id '${resume.selectedOptionId}' is not in the signed option set",
+                )
+
+        // A signed pin binds at confidence 1.0 with NO re-fuzzy (fuzzy is not called).
+        val binding = pinnedBinding(option)
+        return ResolveResponse
+            .newBuilder()
+            .setTraceId(payload.conversationId)
+            .setResolution(
+                Resolution
+                    .newBuilder()
+                    .addBindings(binding)
+                    .setConfidence(1.0)
+                    .setRationale("resumed via signed pin (${option.id})"),
+            ).setCapabilities(Capabilities.newBuilder().setFuzzyReady(true))
+            .build()
+    }
+
+    private fun pinnedBinding(option: ResumeOption): EntityBinding {
+        val domain =
+            Domain
+                .newBuilder()
+                .setEntityTypeRef(option.targetRef?.substringBefore('#') ?: "")
+                .setRawText(option.label)
+                .setResolvedLabel(option.label)
+        if (option.resolvedId != null) domain.resolvedId = option.resolvedId
+        if (option.targetRef !=
+            null
+        ) {
+            domain.addCandidates(
+                Candidate
+                    .newBuilder()
+                    .setTargetRef(option.targetRef)
+                    .setScore(1.0)
+                    .setResolvedLabel(option.label),
+            )
+        }
+        return EntityBinding
+            .newBuilder()
+            .setDomain(domain)
+            .setProvenance(
+                BindingProvenance
+                    .newBuilder()
+                    .setVocabularySource(if (option.resolvedId != null) "MEMBER" else "VOCABULARY")
+                    .setAlgorithm("hmac-pin")
+                    .setScore(1.0),
+            ).build()
+    }
+
+    // --- capability assessment (RS-25) --------------------------------------
+
+    /**
+     * What actually backed this resolve, honestly (F-T3). A capability counts as
+     * available if the matrix advertises it OR the parse itself carried it. An
+     * unsupported language (no dep parse AND no NER either way) is the fold+fuzzy
+     * floor — every binding is then degraded.
+     */
+    private data class Assessment(
+        val language: String,
+        val csNer: Boolean,
+        val depParse: Boolean,
+        val degradedFloor: Boolean,
+    )
+
+    private fun assess(
+        parse: AnalyzeResponse,
+        status: StatusResponse?,
+    ): Assessment {
+        val lang = parse.detectedLanguage.ifBlank { parse.language }
+        val caps = status?.capabilitiesList.orEmpty().filter { it.language.equals(lang, ignoreCase = true) }
+        val csNer = caps.any { it.op == NlpOp.NER } || parse.entitiesList.isNotEmpty()
+        val depParse = caps.any { it.op == NlpOp.DEP_PARSE } || parse.tokensList.any { it.depHead > 0 }
+        return Assessment(lang, csNer, depParse, degradedFloor = !csNer && !depParse)
+    }
+
+    private fun capabilities(a: Assessment): Capabilities {
+        val builder =
+            Capabilities
+                .newBuilder()
+                .setLanguage(a.language)
+                .setCsNer(a.csNer)
+                .setDepParse(a.depParse)
+                .setFuzzyReady(true)
+                .setDegraded(a.degradedFloor)
+        if (a.degradedFloor) builder.addDegradedReasons(RgDiagnostics.render("RG-RES-001", "span" to "(all)"))
         return builder.build()
     }
 
@@ -121,40 +236,26 @@ class ResolverPipeline(
             .addAllOps(analyzeOps)
             .build()
 
-    private fun capabilitiesOf(
-        parse: AnalyzeResponse,
-        status: StatusResponse?,
-    ): Capabilities {
-        val lang = parse.detectedLanguage.ifBlank { parse.language }
-        val caps = status?.capabilitiesList.orEmpty()
-        val csNer = caps.any { it.op == NlpOp.NER && it.language.equals(lang, ignoreCase = true) }
-        val depParse = caps.any { it.op == NlpOp.DEP_PARSE && it.language.equals(lang, ignoreCase = true) }
-        return Capabilities
-            .newBuilder()
-            .setLanguage(lang)
-            .setCsNer(csNer)
-            .setDepParse(depParse)
-            .setFuzzyReady(true) // full capability-driven degrade lands in S2 (RS-25)
-            .setDegraded(false)
-            .build()
-    }
-
     private fun resolutionOf(
         universals: List<UniversalBinding>,
         bound: Bound,
         parse: AnalyzeResponse,
+        degraded: Boolean,
     ): Resolution {
         val nerVersions = parse.usedList.filter { it.op.equals("NER", ignoreCase = true) }
         val builder = Resolution.newBuilder().setConfidence(bound.confidence)
-        for (u in universals) builder.addBindings(universalBinding(u, nerVersions))
-        for (b in bound.bindings) builder.addBindings(domainBinding(b, parse))
-        builder.rationale = "deterministic bind: ${universals.size} universal, ${bound.bindings.size} domain"
+        for (u in universals) builder.addBindings(universalBinding(u, nerVersions, degraded))
+        for (b in bound.bindings) builder.addBindings(domainBinding(b, parse, degraded))
+        builder.rationale =
+            "deterministic bind: ${universals.size} universal, ${bound.bindings.size} domain" +
+            if (degraded) " (degraded floor)" else ""
         return builder.build()
     }
 
     private fun universalBinding(
         u: UniversalBinding,
         nerVersions: List<org.tatrman.nlp.v1.EngineVersion>,
+        degraded: Boolean,
     ): EntityBinding =
         EntityBinding
             .newBuilder()
@@ -173,11 +274,13 @@ class ResolverPipeline(
                     .setAlgorithm("ner")
                     .setScore(1.0)
                     .addAllModelVersions(nerVersions),
-            ).build()
+            ).setDegraded(degraded)
+            .build()
 
     private fun domainBinding(
         b: DomainBinding,
         parse: AnalyzeResponse,
+        degraded: Boolean,
     ): EntityBinding {
         val domain =
             Domain
@@ -217,19 +320,34 @@ class ResolverPipeline(
                     .setScore(b.score)
                     .setSnapshotHash(b.snapshotHash)
                     .addAllModelVersions(parse.usedList),
-            ).setDegraded(false)
+            ).setDegraded(degraded)
             .build()
     }
 
-    private fun awaitingOf(clarify: Clarify): AwaitingClarification {
+    private fun awaitingOf(
+        clarify: Clarify,
+        conversationId: String,
+        parseRef: String,
+    ): AwaitingClarification {
         val builder = AwaitingClarification.newBuilder()
+        val signedOptions = mutableListOf<ResumeOption>()
         for (o in clarify.options) {
             val opt = Option.newBuilder().setId(o.id).setLabel(o.label)
             if (o.resolvedId != null) opt.resolvedId = o.resolvedId
             if (o.targetRef != null) opt.targetRef = o.targetRef
             builder.addOptions(opt)
+            signedOptions += ResumeOption(o.id, o.label, o.targetRef, o.resolvedId)
         }
-        // resume_token stays empty in S1 — HMAC signing lands in S2.T3/T4 (RS-26).
+        // Sign the EXACT offered set so a resume can only pick from it (RS-26).
+        val payload =
+            ResumePayload(
+                conversationId = conversationId,
+                parseRef = parseRef,
+                options = signedOptions,
+                issuedAt = System.currentTimeMillis() / 1000,
+                keyId = tokenCodec.activeKeyId,
+            )
+        builder.resumeToken = tokenCodec.sign(payload)
         return builder.build()
     }
 

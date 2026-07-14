@@ -21,9 +21,12 @@ import org.tatrman.nlp.v1.StatusResponse
 import org.tatrman.nlp.v1.Token
 import org.tatrman.resolver.client.FuzzyClient
 import org.tatrman.resolver.client.NlpClient
-import org.tatrman.resolver.model.ResolverRegistry
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.pipeline.ResolverPipeline
+import org.tatrman.resolver.registry.DeclaredVocabulary
+import org.tatrman.resolver.registry.SnapshotRegistry
+import org.tatrman.resolver.registry.StubRegistrySource
+import org.tatrman.resolver.token.ResumeTokenCodec
 import org.tatrman.resolver.v1.EntityType
 import org.tatrman.resolver.v1.FreshQuestion
 import org.tatrman.resolver.v1.Registry
@@ -72,11 +75,12 @@ class ResolverPipelineTest :
                 .setRegistry(registryOverride)
                 .build()
 
-        val emptyDefault = ResolverRegistry(emptyList(), emptyList(), ResolverThresholds.LIVE, "")
+        val emptyDefault = SnapshotRegistry(StubRegistrySource(DeclaredVocabulary(), ""), ResolverThresholds.LIVE)
+        val codec = ResumeTokenCodec(mapOf("k1" to ByteArray(32) { it.toByte() }), activeKeyId = "k1")
 
         "hero: Octavie (MEMBER) + pražských pobočkách (VOCABULARY) bind, DATE universal, ZERO LLM" {
             val fuzzy = FakeFuzzy(HERO_BATCH)
-            val pipeline = ResolverPipeline(FakeNlp(heroParse()), fuzzy, emptyDefault, emptyMap())
+            val pipeline = ResolverPipeline(FakeNlp(heroParse()), fuzzy, emptyDefault, emptyMap(), codec)
 
             val resp = runBlocking { pipeline.resolve(freshRequest()) }
 
@@ -105,11 +109,95 @@ class ResolverPipelineTest :
             resp.capabilities.depParse.shouldBeTrue()
         }
 
-        "resume path (no fresh) is the S2 HMAC gap — returns an empty resolution, not a crash" {
-            val pipeline = ResolverPipeline(FakeNlp(heroParse()), FakeFuzzy(HERO_BATCH), emptyDefault, emptyMap())
+        "an empty request (neither fresh nor resume) returns an empty resolution, not a crash" {
+            val pipeline =
+                ResolverPipeline(FakeNlp(heroParse()), FakeFuzzy(HERO_BATCH), emptyDefault, emptyMap(), codec)
             val resp = runBlocking { pipeline.resolve(ResolveRequest.newBuilder().setConversationId("c-2").build()) }
             resp.hasResolution().shouldBeTrue()
             resp.resolution.bindingsList shouldBe emptyList()
+        }
+
+        "resume with a signed pin binds at confidence 1.0 with NO re-fuzzy (RS-26)" {
+            val fuzzy = FakeFuzzy(HERO_BATCH)
+            val pipeline = ResolverPipeline(FakeNlp(heroParse()), fuzzy, emptyDefault, emptyMap(), codec)
+            val token =
+                codec.sign(
+                    org.tatrman.resolver.token.ResumePayload(
+                        conversationId = "c-3",
+                        parseRef = "trace-hero",
+                        options =
+                            listOf(
+                                org.tatrman.resolver.token
+                                    .ResumeOption("M:df-adnak", "DF ADNAK", resolvedId = "df-adnak"),
+                            ),
+                        issuedAt = 1_752_000_000,
+                        keyId = "k1",
+                    ),
+                )
+            val req =
+                ResolveRequest
+                    .newBuilder()
+                    .setConversationId("c-3")
+                    .setResume(
+                        org.tatrman.resolver.v1.ResumeAnswer
+                            .newBuilder()
+                            .setToken(
+                                token,
+                            ).setSelectedOptionId("M:df-adnak"),
+                    ).build()
+
+            val resp = runBlocking { pipeline.resolve(req) }
+            resp.resolution.confidence shouldBe 1.0
+            resp.resolution.bindingsList
+                .single()
+                .domain.resolvedId shouldBe "df-adnak"
+            fuzzy.calls shouldBe 0 // NO re-fuzzy on a signed pin
+        }
+
+        "a tampered resume token is refused (RG-RES-002)" {
+            val pipeline =
+                ResolverPipeline(FakeNlp(heroParse()), FakeFuzzy(HERO_BATCH), emptyDefault, emptyMap(), codec)
+            val good =
+                codec.sign(
+                    org.tatrman.resolver.token.ResumePayload(
+                        "c-4",
+                        "p",
+                        listOf(
+                            org.tatrman.resolver.token
+                                .ResumeOption("o1", "L"),
+                        ),
+                        1,
+                        "k1",
+                    ),
+                )
+            // graft a signature computed over a DIFFERENT payload → guaranteed mismatch.
+            val otherSig =
+                codec
+                    .sign(
+                        org.tatrman.resolver.token.ResumePayload(
+                            "c-4",
+                            "p",
+                            listOf(
+                                org.tatrman.resolver.token
+                                    .ResumeOption("o1", "L"),
+                            ),
+                            999,
+                            "k1",
+                        ),
+                    ).substringAfter('.')
+            val tampered = good.substringBefore('.') + "." + otherSig
+            val req =
+                ResolveRequest
+                    .newBuilder()
+                    .setResume(
+                        org.tatrman.resolver.v1.ResumeAnswer
+                            .newBuilder()
+                            .setToken(tampered)
+                            .setSelectedOptionId("o1"),
+                    ).build()
+            io.kotest.assertions.throwables.shouldThrow<org.tatrman.resolver.token.ResumeTokenException> {
+                runBlocking { pipeline.resolve(req) }
+            }
         }
     }) {
     private class FakeNlp(

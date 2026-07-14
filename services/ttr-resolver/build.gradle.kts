@@ -68,6 +68,9 @@ dependencies {
     // and cross-service parity require the byte-identical fold. Dependency-free leaf.
     implementation(project(":shared:libs:kotlin:ttr-text"))
 
+    // RG-* diagnostics registry (RG-RES-001 degrade / RG-RES-002 bad resume token).
+    implementation(project(":shared:libs:kotlin:ttr-diagnostics"))
+
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.content.negotiation)

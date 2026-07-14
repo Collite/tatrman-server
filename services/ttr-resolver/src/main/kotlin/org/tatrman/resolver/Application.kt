@@ -17,9 +17,11 @@ import org.slf4j.LoggerFactory
 import org.tatrman.resolver.client.GrpcFuzzyClient
 import org.tatrman.resolver.client.GrpcNlpClient
 import org.tatrman.resolver.grpc.ResolverGrpcService
-import org.tatrman.resolver.model.ResolverRegistry
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.pipeline.ResolverPipeline
+import org.tatrman.resolver.registry.LiveMetadataRegistryAdapter
+import org.tatrman.resolver.registry.SnapshotRegistry
+import org.tatrman.resolver.token.ResumeTokenCodec
 import shared.ktor.KtorConfigFactory
 import shared.ktor.KtorServerBootstrap
 import shared.ktor.installKtorServerBase
@@ -43,10 +45,7 @@ fun Application.module(config: Config) {
         config.hasPath("grpc.reflection-enabled") && config.getBoolean("grpc.reflection-enabled")
 
     // Upstream clients — ttr-nlp (parse + capability matrix) and ttr-fuzzy
-    // (vocabulary match). NEITHER is an LLM (RS-23). The snapshot-fed registry is
-    // S2; S1 starts from a config-thresholded, empty-entity-type default that a
-    // per-request `Registry` override fills (RS-24) — the pipeline is exercised
-    // end-to-end by ResolverPipelineTest via the client seams.
+    // (vocabulary match). NEITHER is an LLM (RS-23).
     val nlpClient =
         GrpcNlpClient(config.getString("nlp.host"), config.getInt("nlp.port"), config.getLong("nlp.deadline-seconds"))
     val fuzzyClient =
@@ -63,15 +62,16 @@ fun Application.module(config: Config) {
             exact = config.getDouble("resolver.threshold-exact"),
             maxOptions = config.getInt("resolver.max-options"),
         )
-    val defaultRegistry =
-        ResolverRegistry(
-            entityTypes = emptyList(),
-            locales = emptyList(),
-            thresholds = defaultThresholds,
-            snapshotHash = "",
-        )
+    // Snapshot-fed registry over the one-channel seam (RS-24). Startup uses the
+    // E3-β step-one live-metadata adapter; a per-request `Registry` override wins.
+    val registry = SnapshotRegistry(LiveMetadataRegistryAdapter(), defaultThresholds)
 
-    val pipeline = ResolverPipeline(nlpClient, fuzzyClient, defaultRegistry, siblings = emptyMap())
+    // HMAC resume-token codec (RS-26). Keys come from config so they rotate by
+    // key_id without a redeploy; the active key signs, all listed keys verify
+    // (rotation window). Key management is chart discipline (S-3).
+    val tokenCodec = buildResumeTokenCodec(config)
+
+    val pipeline = ResolverPipeline(nlpClient, fuzzyClient, registry, siblings = emptyMap(), tokenCodec = tokenCodec)
     val resolverService = ResolverGrpcService(pipeline)
 
     val grpcServer =
@@ -111,4 +111,35 @@ fun Application.module(config: Config) {
         nlpClient.close()
         fuzzyClient.close()
     }
+}
+
+/**
+ * Build the HMAC resume-token codec from config (S-3 key discipline, RS-26).
+ * `resolver.resume-token.keys` is a map key_id → base64url secret; `active-key-id`
+ * signs. In dev, when no keys are configured, mint an ephemeral key so the service
+ * boots — a WARN makes the non-persistence explicit (tokens won't survive restart).
+ */
+private fun buildResumeTokenCodec(config: Config): ResumeTokenCodec {
+    val path = "resolver.resume-token"
+    if (config.hasPath("$path.keys") && !config.getConfig("$path.keys").isEmpty) {
+        val keysConfig = config.getConfig("$path.keys")
+        val keys =
+            keysConfig
+                .root()
+                .keys
+                .associateWith {
+                    java.util.Base64
+                        .getUrlDecoder()
+                        .decode(keysConfig.getString(it))
+                }
+        val active = config.getString("$path.active-key-id")
+        log.info("resume-token codec: {} key(s), active={}", keys.size, active)
+        return ResumeTokenCodec(keys, active)
+    }
+    val ephemeral =
+        java.security.SecureRandom
+            .getInstanceStrong()
+            .generateSeed(32)
+    log.warn("resolver.resume-token.keys unset — using an EPHEMERAL dev key; resume tokens will not survive a restart")
+    return ResumeTokenCodec(mapOf("dev" to ephemeral), activeKeyId = "dev")
 }
