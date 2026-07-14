@@ -379,6 +379,9 @@ class ResolverPipeline(
                 }
             val thresholds =
                 if (reg.hasThresholds()) {
+                    // proto3 scalar default 0 is the "unset" sentinel: a caller can only
+                    // RAISE a threshold from the snapshot fallback, not set it to 0 (a 0
+                    // threshold is meaningless here, so this is intentional).
                     val t = reg.thresholds
                     ResolverThresholds(
                         bind = if (t.bind > 0) t.bind else fallback.bind,

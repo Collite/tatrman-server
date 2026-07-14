@@ -16,9 +16,10 @@ import org.tatrman.resolver.model.ResolverThresholds
  *
  * Determinism rules, ported from the live ENTITIES_ONLY config:
  *  - a match binds only at score ≥ [ResolverThresholds.bind] (0.5);
- *  - an exact match (≥ [ResolverThresholds.exact], 0.9999) dominates — no
- *    ambiguity check, which is how a short exact code (`FAP`) separates from a
- *    near name;
+ *  - an exact match (≥ [ResolverThresholds.exact], 0.9999) dominates the
+ *    sub-exact field — a near name below `exact` is dropped, which is how a short
+ *    exact code (`FAP`) separates from a near name; but two DISTINCT exact matches
+ *    are a genuine tie and still clarify (refuse over guess);
  *  - otherwise contenders within [ResolverThresholds.ambiguityGap] (0.05) of the
  *    top are compared by IDENTITY (MEMBER → resolved_id, VOCABULARY → target_ref):
  *    one identity ⇒ bind; multiple ⇒ instance ambiguity ⇒ clarify (refuse over
@@ -71,7 +72,11 @@ object GateSpans {
             val top = matches.first()
             val contenders =
                 if (top.score >= thresholds.exact) {
-                    listOf(top)
+                    // Exact dominance: a near-name below `exact` is excluded (that's how a
+                    // short exact code separates from a similar name). But two DISTINCT
+                    // exact matches are a genuine tie — keep them both so the identity
+                    // check below can surface it as a clarification, not a silent guess.
+                    matches.filter { it.score >= thresholds.exact }
                 } else {
                     matches.filter { top.score - it.score <= thresholds.ambiguityGap }
                 }

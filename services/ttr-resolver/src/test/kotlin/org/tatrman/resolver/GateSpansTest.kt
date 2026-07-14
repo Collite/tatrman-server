@@ -126,6 +126,44 @@ class GateSpansTest :
             b.entityTypeRef shouldBe "er.qtypdok"
         }
 
+        "two DISTINCT exact matches are a genuine tie → clarify, not a silent bind" {
+            // Both score at exact (0.9999) with different candidate_ids (homonymous rows):
+            // exact dominance must NOT swallow this — it's a real instance ambiguity.
+            val cands = listOf(cand("Praha", 0, 5, listOf("er.branch")))
+            val resp =
+                batch(
+                    fmr(
+                        fm("b-praha-1", "Praha 1", 0.9999, "er.branch", SourceTag.MEMBER),
+                        fm("b-praha-6", "Praha 6", 0.9999, "er.branch", SourceTag.MEMBER),
+                    ),
+                )
+            val clarify =
+                GateSpans
+                    .gate(cands, resp, allTypes, thresholds, emptyMap(), "snap-1")
+                    .shouldBeInstanceOf<Clarify>()
+            clarify.options.map { it.resolvedId } shouldContainExactlyInAnyOrder listOf("b-praha-1", "b-praha-6")
+        }
+
+        "exact dominance still drops a sub-exact near name (single exact contender binds)" {
+            // one match at exact, a second BELOW exact but within the ambiguity gap of it:
+            // the near name is dropped by the exact filter, so it binds without clarifying.
+            val cands = listOf(cand("FAP", 0, 3, listOf("er.qtypdok.kod", "er.qtypdok.nazev")))
+            val resp =
+                batch(
+                    fmr(
+                        fm("code-FAP", "FAP", 0.9999, "er.qtypdok.kod", SourceTag.MEMBER),
+                        fm("near-fap", "FAPx", 0.98, "er.qtypdok.kod", SourceTag.MEMBER),
+                    ),
+                )
+            val b =
+                GateSpans
+                    .gate(cands, resp, allTypes, thresholds, emptyMap(), "snap-1")
+                    .shouldBeInstanceOf<Bound>()
+                    .bindings
+                    .single()
+            b.resolvedId shouldBe "code-FAP"
+        }
+
         "entity-identity dedup: the same resolved id via two spans collapses to one binding" {
             val cands =
                 listOf(

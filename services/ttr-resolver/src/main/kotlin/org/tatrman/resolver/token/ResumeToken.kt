@@ -44,12 +44,20 @@ class ResumeTokenException(
  * Stateless: any replica with the key set verifies + resumes. Keys rotate by
  * `key_id` — [keys] holds every currently-honoured key (old ones stay during the
  * rotation window), [activeKeyId] is what new tokens are signed with. A failure of
- * any kind (malformed, bad signature, unknown/blocked key) is [ResumeTokenException]
- * carrying RG-RES-002 — never a silent accept (refuse-over-guess).
+ * any kind (malformed, bad signature, unknown/blocked key, expired) is
+ * [ResumeTokenException] carrying RG-RES-002 — never a silent accept
+ * (refuse-over-guess).
+ *
+ * [maxAgeSeconds] bounds the replay window: the signed `issued_at` is honoured only
+ * within that age (null ⇒ no expiry). The age check runs AFTER signature
+ * verification — `issued_at` is untrusted until the HMAC clears. [clock] is the
+ * epoch-seconds source (injectable for tests).
  */
 class ResumeTokenCodec(
     private val keys: Map<String, ByteArray>,
     val activeKeyId: String,
+    private val maxAgeSeconds: Long? = null,
+    private val clock: () -> Long = { System.currentTimeMillis() / 1000 },
 ) {
     init {
         require(keys.containsKey(activeKeyId)) { "activeKeyId '$activeKeyId' has no key" }
@@ -72,6 +80,11 @@ class ResumeTokenCodec(
         val key = keys[payload.keyId] ?: return fail("unknown or blocked key_id '${payload.keyId}'")
         // constant-time comparison — no timing oracle on the signature.
         if (!MessageDigest.isEqual(hmac(key, jsonBytes), sig)) return fail("signature mismatch")
+        // Signature cleared → `issued_at` is now trustworthy; enforce the TTL.
+        maxAgeSeconds?.let { maxAge ->
+            val age = clock() - payload.issuedAt
+            if (age > maxAge) return fail("expired (age ${age}s > ${maxAge}s)")
+        }
         return Result.success(payload)
     }
 

@@ -79,4 +79,49 @@ class ResumeTokenTest :
             // and a freshly-signed token uses the active key.
             rotated.verify(rotated.sign(payload("k2"))).getOrThrow().keyId shouldBe "k2"
         }
+
+        "a token past its max-age is refused as RG-RES-002 (bounded replay window)" {
+            // issuedAt = 1_752_000_000; clock is 3601s later with a 3600s window → expired.
+            val codec =
+                ResumeTokenCodec(
+                    mapOf("k1" to k1),
+                    activeKeyId = "k1",
+                    maxAgeSeconds = 3600,
+                    clock = { 1_752_000_000 + 3601 },
+                )
+            val token = codec.sign(payload())
+            val ex = shouldThrow<ResumeTokenException> { codec.verify(token).getOrThrow() }
+            ex.message!!.contains("RG-RES-002") shouldBe true
+            ex.reason.contains("expired") shouldBe true
+        }
+
+        "a token within its max-age still verifies" {
+            val codec =
+                ResumeTokenCodec(
+                    mapOf("k1" to k1),
+                    activeKeyId = "k1",
+                    maxAgeSeconds = 3600,
+                    clock = { 1_752_000_000 + 3599 }, // one second inside the window
+                )
+            codec.verify(codec.sign(payload())).getOrThrow().conversationId shouldBe "c-1"
+        }
+
+        "the age check runs only after the signature clears (a tampered expired token is a sig failure)" {
+            val codec =
+                ResumeTokenCodec(
+                    mapOf("k1" to k1),
+                    activeKeyId = "k1",
+                    maxAgeSeconds = 3600,
+                    clock = { 1_752_000_000 + 999_999 },
+                )
+            val token = codec.sign(payload())
+            val (p, sig) = token.split(".")
+            val tampered = p.dropLast(1) + (if (p.last() == 'A') 'B' else 'A') + "." + sig
+            // A forgery is rejected on integrity (bad signature / unparseable payload) —
+            // and is NEVER reported as "expired", proving issued_at is only read after the
+            // HMAC clears (no trust in an unverified clock).
+            val ex = shouldThrow<ResumeTokenException> { codec.verify(tampered).getOrThrow() }
+            ex.message!!.contains("RG-RES-002") shouldBe true
+            ex.reason.contains("expired") shouldBe false
+        }
     })

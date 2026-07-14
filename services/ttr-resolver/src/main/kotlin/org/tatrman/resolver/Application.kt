@@ -121,6 +121,7 @@ fun Application.module(config: Config) {
  */
 private fun buildResumeTokenCodec(config: Config): ResumeTokenCodec {
     val path = "resolver.resume-token"
+    val maxAge = if (config.hasPath("$path.max-age-seconds")) config.getLong("$path.max-age-seconds") else null
     if (config.hasPath("$path.keys") && !config.getConfig("$path.keys").isEmpty) {
         val keysConfig = config.getConfig("$path.keys")
         val keys =
@@ -133,13 +134,13 @@ private fun buildResumeTokenCodec(config: Config): ResumeTokenCodec {
                         .decode(keysConfig.getString(it))
                 }
         val active = config.getString("$path.active-key-id")
-        log.info("resume-token codec: {} key(s), active={}", keys.size, active)
-        return ResumeTokenCodec(keys, active)
+        log.info("resume-token codec: {} key(s), active={}, max-age={}s", keys.size, active, maxAge)
+        return ResumeTokenCodec(keys, active, maxAgeSeconds = maxAge)
     }
     val ephemeral =
         java.security.SecureRandom
             .getInstanceStrong()
             .generateSeed(32)
     log.warn("resolver.resume-token.keys unset — using an EPHEMERAL dev key; resume tokens will not survive a restart")
-    return ResumeTokenCodec(mapOf("dev" to ephemeral), activeKeyId = "dev")
+    return ResumeTokenCodec(mapOf("dev" to ephemeral), activeKeyId = "dev", maxAgeSeconds = maxAge)
 }

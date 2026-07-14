@@ -30,6 +30,10 @@ class SnapshotRegistry(
     suspend fun current(): ResolverRegistry {
         val h = source.hash()
         cache.get()?.let { if (it.first == h) return it.second }
+        // Check-then-set without a lock: a concurrent first-load may fetch+set twice,
+        // but the projection is a pure function of (hash, snapshot) so both writes
+        // produce an equal registry — last-write-wins is harmless, and we avoid
+        // holding a lock across the suspending fetch().
         val projected = project(source.fetch(), h)
         cache.set(h to projected)
         return projected
