@@ -177,7 +177,8 @@ tasks.assemble {
 val noTransferredProtoClasses by tasks.registering {
     group = "verification"
     description =
-        "Fails if the shared:proto jar bundles plan/transdsl/dfdsl classes (owned by org.tatrman:ttr-plan-proto)."
+        "Fails if the shared:proto jar bundles plan/transdsl/dfdsl classes (owned by " +
+        "org.tatrman:ttr-plan-proto) or llm/v1 classes (owned by :shared:proto-llm)."
     dependsOn(tasks.named("jar"))
     doLast {
         val jarFile =
@@ -187,7 +188,16 @@ val noTransferredProtoClasses by tasks.registering {
                 .archiveFile
                 .get()
                 .asFile
-        val forbidden = listOf("org/tatrman/plan/v1/", "org/tatrman/transdsl/v1/", "org/tatrman/dfdsl/v1/")
+        // llm/v1 is owned by :shared:proto-llm so its gRPC stub stays OFF the classpath
+        // of the 21 zero-LLM services that depend on :shared:proto (RS-23). A stray
+        // re-add of the deleted .proto here would silently re-leak the stub — fail loudly.
+        val forbidden =
+            listOf(
+                "org/tatrman/plan/v1/",
+                "org/tatrman/transdsl/v1/",
+                "org/tatrman/dfdsl/v1/",
+                "org/tatrman/llm/v1/",
+            )
         val offenders =
             ZipFile(jarFile).use { zip ->
                 zip

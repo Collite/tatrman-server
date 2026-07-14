@@ -12,22 +12,24 @@ import io.kotest.matchers.shouldBe
  * This is the RUNTIME backstop; the primary guard is the `verifyNoLlmDependency`
  * Gradle task (wired into `check`), which fails the build if the resolver's
  * runtimeClasspath resolves any LLM client artifact. Here we assert the same at
- * class-load time: no llm-gateway CLIENT and no known external LLM SDK is on the
- * classpath, and no forbidden jar is present.
+ * class-load time: no llm-gateway client/stub and no known external LLM SDK is on
+ * the classpath, and no forbidden jar is present.
  *
- * KNOWN RESIDUAL: the generated `org.tatrman.llm.v1.*` gRPC stub (a callable
- * client) still rides in via the monolithic `:shared:proto`. We cannot forbid it
- * without splitting the llm service into its own proto module (the real fix). So
- * this test guards the *dependency* dimension (no caller module / SDK); the stub's
- * presence is a structural gap called out in the module's build file.
+ * The generated `org.tatrman.llm.v1` gRPC stub is now genuinely OFF this classpath:
+ * the LLM wire contract was split into its own `:shared:proto-llm` module, which
+ * only the ttr-llm-gateway server depends on. So the stub is a hard forbidden class
+ * below (`LlmGatewayServiceGrpcKt`), no longer a documented residual.
  */
 class NoLlmDependencyTest :
     StringSpec({
 
-        // In-house llm-gateway caller classes + external LLM SDK entrypoints. None
+        // The generated llm-gateway gRPC stub (now in :shared:proto-llm, off this
+        // classpath) + in-house caller classes + external LLM SDK entrypoints. None
         // of these may be loadable from the resolver's classpath.
         val forbiddenClasses =
             listOf(
+                "org.tatrman.llm.v1.LlmGatewayServiceGrpcKt",
+                "org.tatrman.llm.v1.LlmGatewayServiceGrpc",
                 "org.tatrman.llm.client.LlmGatewayClient",
                 "org.tatrman.llm.client.LlmGatewayPromptExecutor",
                 "com.openai.client.OpenAIClient",

@@ -49,6 +49,9 @@ include(":tools:_smoke-test")
 
 // Shared wire protos + Kotlin libs
 include(":shared:proto")
+// LLM gateway wire contract — split out of :shared:proto so its gRPC stub does
+// not reach zero-LLM services (RS-23). Only the ttr-llm-gateway server depends on it.
+include(":shared:proto-llm")
 include(":shared:libs:kotlin:otel-config")
 include(":shared:libs:kotlin:logging-config")
 include(":shared:libs:kotlin:ktor-configurator")

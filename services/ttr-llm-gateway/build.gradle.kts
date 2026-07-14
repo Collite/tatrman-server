@@ -131,8 +131,10 @@ dependencies {
     // Response cache (Redis)
     implementation(libs.boot.starter.data.redis)
 
-    // Proto
-    implementation(project(":shared:proto"))
+    // Proto — the LLM gateway wire contract (org.tatrman.llm.v1) is its own module;
+    // this service is its only consumer (implements LlmGatewayService). It uses no
+    // other shared proto, so it does NOT depend on :shared:proto.
+    implementation(project(":shared:proto-llm"))
     implementation(libs.logstash.logback.encoder)
 
     // gRPC

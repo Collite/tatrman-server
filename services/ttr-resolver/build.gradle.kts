@@ -94,9 +94,9 @@ dependencies {
 // runtime classpath resolves ANY LLM client: the in-house llm-gateway client
 // module (`:shared:libs:kotlin:ttr-llm-client`) or a known external LLM SDK.
 // This enforces the invariant at the dependency-graph level; NoLlmDependencyTest
-// is the runtime backstop. (The generated `org.tatrman.llm.v1` gRPC STUB still
-// rides in via the monolithic `:shared:proto` — genuinely removing it needs the
-// llm service split into its own proto module; tracked as the real fix.)
+// is the runtime backstop. (The generated `org.tatrman.llm.v1` gRPC stub was split
+// into its own `:shared:proto-llm` module, so it is no longer on this classpath —
+// NoLlmDependencyTest asserts its absence as a hard forbidden class.)
 val forbiddenLlmCoordinates =
     listOf("ttr-llm-client", "openai", "anthropic", "langchain4j", "langchain", "theokanning")
 
