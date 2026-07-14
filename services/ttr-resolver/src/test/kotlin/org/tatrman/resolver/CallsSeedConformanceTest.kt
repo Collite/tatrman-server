@@ -13,20 +13,13 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import org.tatrman.resolver.mcp.ResolveDoor
-import org.tatrman.resolver.mcp.ResolveDoorHandler
-import org.tatrman.resolver.v1.AwaitingClarification
-import org.tatrman.resolver.v1.Option
-import org.tatrman.resolver.v1.ResolveRequest
-import org.tatrman.resolver.v1.ResolveResponse
-import org.tatrman.resolver.v1.Resolution
 
 /**
  * RG-P6.S2.T2 — the `calls:` core-tier seeds. All fixtures under
- * resources/conformance/calls are well-formed per SCHEMA.md (the durable artifact
- * SV-P4 extends to ~25–40 @100% with the reference Golem), and the drivable seeds
- * run at the door seam now. `seed_only` fixtures (hero E2E, geo-dark) are shape-
- * validated but not driven — their live run needs nlp/fuzzy/grounding (SV-P4).
+ * resources/conformance/calls are well-formed per SCHEMA.md; the drivable seeds run
+ * against the REAL pipeline at the door seam ([ConformancePipeline]). `seed_only`
+ * fixtures (hero E2E, geo-dark) are shape-validated but not driven — their live run
+ * needs nlp/fuzzy/grounding (SV-P4).
  */
 class CallsSeedConformanceTest :
     StringSpec({
@@ -71,33 +64,11 @@ class CallsSeedConformanceTest :
             }
         }
 
-        // The scenario→core map for the drivable seeds (S2 swaps for a live pipeline).
-        fun coreFor(scenario: String?): suspend (ResolveRequest) -> ResolveResponse =
-            { _ ->
-                when (scenario) {
-                    "ambiguous_member" ->
-                        ResolveResponse
-                            .newBuilder()
-                            .setAwaiting(
-                                AwaitingClarification
-                                    .newBuilder()
-                                    .addOptions(Option.newBuilder().setId("M:df-adnak").setLabel("DF ADNAK"))
-                                    .addOptions(Option.newBuilder().setId("M:df-belus").setLabel("DF BELUS"))
-                                    .setResumeToken("tok-clar"),
-                            ).build()
-                    "resume_pin" ->
-                        ResolveResponse
-                            .newBuilder()
-                            .setResolution(
-                                Resolution.newBuilder().setConfidence(1.0).setRationale("resumed via signed pin"),
-                            ).build()
-                    else -> error("unknown scenario '$scenario'")
-                }
-            }
-
-        "clarification round-trip: the signed token carries forward and resumes to a pin binding" {
+        "clarification round-trip: the real signed token carries forward and resumes to a pin binding" {
             val fixture = load("clarification-roundtrip.json")
             val turns = fixture["turns"]!!.jsonArray
+            // ONE codec across both turns so turn 1 verifies turn 0's real HMAC token.
+            val codec = ConformancePipeline.codec()
             var carriedToken: String? = null
 
             for (turnEl in turns) {
@@ -106,7 +77,7 @@ class CallsSeedConformanceTest :
                 // Substitute ${turn0.resumeToken} with the token the prior turn emitted.
                 val args = substituteToken(turn["args"]!!.jsonObject, carriedToken)
 
-                val handler = ResolveDoorHandler(ResolveDoor(coreFor(scenario)), requireIdentity = false)
+                val handler = ConformancePipeline.doorHandler(scenario, codec)
                 val result = runBlocking { handler.handle(args, null, null) }
                 val structured = result.structuredContent.shouldNotBeNull()
 
@@ -117,13 +88,24 @@ class CallsSeedConformanceTest :
                         carriedToken = awaiting["resumeToken"]!!.jsonPrimitive.content
                     }
                     "resolution" -> {
-                        structured["resolution"]!!
-                            .jsonObject["rationale"]!!
-                            .jsonPrimitive.content shouldBe "resumed via signed pin"
+                        val resolution = structured["resolution"]!!.jsonObject
+                        resolution["rationale"]!!.jsonPrimitive.content shouldBe "resumed via signed pin (M:df-adnak)"
+                        // The MEMBER pin reconstructs its Domain — resolved_id AND the
+                        // entity_type_ref that review F restored (was empty before).
+                        val domain =
+                            resolution["bindings"]!!
+                                .jsonArray
+                                .single()
+                                .jsonObject["domain"]!!
+                                .jsonObject
+                        domain["resolvedId"]!!.jsonPrimitive.content shouldBe "df-adnak"
+                        domain["entityTypeRef"]!!.jsonPrimitive.content shouldBe "er.qstred_df"
                     }
                 }
             }
-            carriedToken shouldBe "tok-clar" // the token was actually carried forward
+            // The token was actually a real signed HMAC (not a stub literal), long + dotted.
+            carriedToken.shouldNotBeNull()
+            (carriedToken!!.contains('.') && carriedToken!!.length > 40) shouldBe true
         }
     })
 

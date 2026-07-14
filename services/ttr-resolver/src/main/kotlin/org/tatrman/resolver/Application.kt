@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
+import org.tatrman.mcp.identity.IdentityPolicy
 import org.tatrman.mcp.identity.RequestContext
 import org.tatrman.resolver.client.GrpcFuzzyClient
 import org.tatrman.resolver.client.GrpcNlpClient
@@ -110,10 +111,19 @@ fun Application.module(config: Config) {
     // MCP streamable-HTTP surface isolated from the health server; the OBO gate is
     // fail-closed when `mcp.require-identity` is on (H-2). Zero LLM below the door.
     val doorPort = config.getInt("mcp.port")
+    // Loopback by default (RG-P6 review D): the door must not be reachable off-host
+    // unless a deployment explicitly fronts it with an auth-terminating ingress and
+    // sets `mcp.host = 0.0.0.0`. The JWT is decoded, not signature-verified, here.
+    val doorHost = if (config.hasPath("mcp.host")) config.getString("mcp.host") else "127.0.0.1"
     val requireIdentity = config.getBoolean("mcp.require-identity")
+    // Identity-source policy (RG-P6 review A): production trusts ONLY an OBO Bearer
+    // token. `mcp.trust-network = true` (dev / behind a trusted terminator) re-opens
+    // the `X-User-Id` header, the `user_id` arg, and the `admin:` role convention.
+    val trustNetwork = config.hasPath("mcp.trust-network") && config.getBoolean("mcp.trust-network")
+    val identityPolicy = if (trustNetwork) IdentityPolicy.PERMISSIVE else IdentityPolicy.TOKEN_ONLY
     val requestContext = RequestContext()
     val door = ResolveDoor(pipeline::resolve)
-    val doorHandler = ResolveDoorHandler(door, requireIdentity)
+    val doorHandler = ResolveDoorHandler(door, requireIdentity, identityPolicy)
     val doorServer =
         embeddedServer(
             factory = CIO,
@@ -146,7 +156,7 @@ fun Application.module(config: Config) {
                 connectors.add(
                     EngineConnectorBuilder().apply {
                         port = doorPort
-                        host = "0.0.0.0"
+                        host = doorHost
                     },
                 )
             },
@@ -154,9 +164,11 @@ fun Application.module(config: Config) {
     launch {
         doorServer.start(wait = false)
         log.info(
-            "resolve door (MCP streamable HTTP) started on port {} (require-identity={})",
+            "resolve door (MCP streamable HTTP) started on {}:{} (require-identity={}, trust-network={})",
+            doorHost,
             doorPort,
             requireIdentity,
+            trustNetwork,
         )
     }
 
@@ -185,27 +197,49 @@ fun Application.module(config: Config) {
 
 /**
  * Build the HMAC resume-token codec from config (S-3 key discipline, RS-26).
- * `resolver.resume-token.keys` is a map key_id → base64url secret; `active-key-id`
- * signs. In dev, when no keys are configured, mint an ephemeral key so the service
- * boots — a WARN makes the non-persistence explicit (tokens won't survive restart).
+ * `resolver.resume-token.keys` is a map key_id → base64url secret (≥32 bytes);
+ * `active-key-id` signs. Hardened per RG-P6 review K/L:
+ *  - a missing `max-age-seconds` no longer means "never expires" — it falls back to
+ *    [DEFAULT_RESUME_MAX_AGE_SECONDS] so a dropped config key cannot silently make
+ *    tokens eternal;
+ *  - an empty key set is FAIL-CLOSED (the service refuses to boot) unless
+ *    `allow-ephemeral-key = true` is set explicitly — the ephemeral per-process key
+ *    breaks stateless resume across replicas/restarts, so it is opt-in dev only;
+ *  - configured keys shorter than 32 bytes are rejected (weak HMAC secret).
  */
 private fun buildResumeTokenCodec(config: Config): ResumeTokenCodec {
     val path = "resolver.resume-token"
-    val maxAge = if (config.hasPath("$path.max-age-seconds")) config.getLong("$path.max-age-seconds") else null
+    val maxAge =
+        if (config.hasPath("$path.max-age-seconds")) {
+            config.getLong("$path.max-age-seconds")
+        } else {
+            DEFAULT_RESUME_MAX_AGE_SECONDS
+        }
     if (config.hasPath("$path.keys") && !config.getConfig("$path.keys").isEmpty) {
         val keysConfig = config.getConfig("$path.keys")
         val keys =
             keysConfig
                 .root()
                 .keys
-                .associateWith {
-                    java.util.Base64
-                        .getUrlDecoder()
-                        .decode(keysConfig.getString(it))
+                .associateWith { keyId ->
+                    val secret =
+                        java.util.Base64
+                            .getUrlDecoder()
+                            .decode(keysConfig.getString(keyId))
+                    require(secret.size >= MIN_RESUME_KEY_BYTES) {
+                        "resolver.resume-token.keys.$keyId is ${secret.size}B; need ≥$MIN_RESUME_KEY_BYTES (RS-26)"
+                    }
+                    secret
                 }
         val active = config.getString("$path.active-key-id")
         log.info("resume-token codec: {} key(s), active={}, max-age={}s", keys.size, active, maxAge)
         return ResumeTokenCodec(keys, active, maxAgeSeconds = maxAge)
+    }
+    val allowEphemeral = config.hasPath("$path.allow-ephemeral-key") && config.getBoolean("$path.allow-ephemeral-key")
+    require(allowEphemeral) {
+        "resolver.resume-token.keys is empty and allow-ephemeral-key is not set — refusing to boot on an " +
+            "ephemeral per-process key (stateless resume would break across replicas/restarts). Configure a key, " +
+            "or set resolver.resume-token.allow-ephemeral-key = true for local dev only."
     }
     val ephemeral =
         java.security.SecureRandom
@@ -214,3 +248,9 @@ private fun buildResumeTokenCodec(config: Config): ResumeTokenCodec {
     log.warn("resolver.resume-token.keys unset — using an EPHEMERAL dev key; resume tokens will not survive a restart")
     return ResumeTokenCodec(mapOf("dev" to ephemeral), activeKeyId = "dev", maxAgeSeconds = maxAge)
 }
+
+/** Default replay window when `max-age-seconds` is unset — never "no expiry" (review K). */
+private const val DEFAULT_RESUME_MAX_AGE_SECONDS = 3600L
+
+/** Minimum configured HMAC secret length (review L). */
+private const val MIN_RESUME_KEY_BYTES = 32

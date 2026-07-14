@@ -67,7 +67,11 @@ class IncomingCallLoggingInterceptor : ServerInterceptor {
         val listener = next.startCall(wrappedCall, headers)
         return object : ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT>(listener) {
             override fun onMessage(message: ReqT) {
-                log.info("⇢ {} payload={}", method, formatPayload(message))
+                // The full request payload can carry secrets (e.g. a resume-token bearer
+                // string) — keep it OFF the INFO line and only at DEBUG, and even then
+                // route it through the field redactor (RG-P6 review B).
+                log.info("⇢ {} received", method)
+                if (log.isDebugEnabled) log.debug("⇢ {} payload={}", method, formatPayload(message))
                 super.onMessage(message)
             }
 
@@ -140,12 +144,27 @@ class OutgoingCallLoggingInterceptor : ClientInterceptor {
 /** Cap on a single logged payload — bounds large/streaming messages (e.g. ResultBatch arrow_ipc). */
 private const val MAX_PAYLOAD_CHARS = 4000
 
+/**
+ * Proto field names whose string value is a secret and must never reach a log sink
+ * (RG-P6 review B). `TextFormat.shortDebugString` renders these as `token: "…"`; the
+ * [SECRET_FIELD_REGEX] masks the quoted value in place while keeping the field
+ * visible so a payload dump stays diagnostically useful.
+ */
+private val SECRET_FIELD_NAMES =
+    listOf("token", "resume_token", "authorization", "api_key", "apikey", "secret", "password")
+private val SECRET_FIELD_REGEX =
+    Regex("(?i)\\b(${SECRET_FIELD_NAMES.joinToString("|")})\\b(\\s*:\\s*)\"(?:\\\\.|[^\"\\\\])*\"")
+
+/** Mask secret-bearing field values in a rendered protobuf payload string. */
+internal fun redactSecrets(rendered: String): String =
+    SECRET_FIELD_REGEX.replace(rendered) { m -> "${m.groupValues[1]}${m.groupValues[2]}\"<redacted>\"" }
+
 private fun formatPayload(message: Any?): String {
     val rendered =
         when (message) {
             null -> "<null>"
-            is MessageOrBuilder -> TextFormat.shortDebugString(message)
-            else -> message.toString()
+            is MessageOrBuilder -> redactSecrets(TextFormat.shortDebugString(message))
+            else -> redactSecrets(message.toString())
         }
     return if (rendered.length > MAX_PAYLOAD_CHARS) {
         rendered.take(MAX_PAYLOAD_CHARS) + "…(+${rendered.length - MAX_PAYLOAD_CHARS} chars truncated)"

@@ -120,7 +120,8 @@ class ResolverPipeline(
                 .setCapabilities(capabilities(assessment))
 
         when (outcome) {
-            is Clarify -> builder.awaiting = awaitingOf(outcome, request.conversationId, parse.traceId)
+            is Clarify ->
+                builder.awaiting = awaitingOf(outcome, request.conversationId, parse.traceId, request.callerSubject)
             is Bound -> builder.resolution = resolutionOf(universals, outcome, parse, assessment.degradedFloor)
         }
         return builder.build()
@@ -132,6 +133,15 @@ class ResolverPipeline(
         val resume = request.resume
         // A bad token is RG-RES-002 — refuse over guess; the gRPC layer maps the throw.
         val payload = tokenCodec.verify(resume.token).getOrThrow()
+        // Subject binding (RG-P6 review C): the token was signed to a specific OBO
+        // subject; a different principal (or an empty-subject caller replaying a
+        // user's token) is refused even though the HMAC is valid. Empty==empty is the
+        // dev-network path where no identity was required at issue OR resume.
+        if (payload.subject != request.callerSubject) {
+            throw ResumeTokenException(
+                "resume token was issued to a different caller than the one resuming it",
+            )
+        }
         val option =
             payload.options.firstOrNull { it.id == resume.selectedOptionId }
                 ?: throw ResumeTokenException(
@@ -154,10 +164,13 @@ class ResolverPipeline(
     }
 
     private fun pinnedBinding(option: ResumeOption): EntityBinding {
+        // Prefer the signed entity_type_ref (present for MEMBER options too, RG-P6
+        // review F); fall back to the VOCABULARY target's ref prefix for older tokens.
+        val entityTypeRef = option.entityTypeRef?.ifBlank { null } ?: option.targetRef?.substringBefore('#') ?: ""
         val domain =
             Domain
                 .newBuilder()
-                .setEntityTypeRef(option.targetRef?.substringBefore('#') ?: "")
+                .setEntityTypeRef(entityTypeRef)
                 .setRawText(option.label)
                 .setResolvedLabel(option.label)
         if (option.resolvedId != null) domain.resolvedId = option.resolvedId
@@ -328,6 +341,7 @@ class ResolverPipeline(
         clarify: Clarify,
         conversationId: String,
         parseRef: String,
+        subject: String,
     ): AwaitingClarification {
         val builder = AwaitingClarification.newBuilder()
         val signedOptions = mutableListOf<ResumeOption>()
@@ -335,10 +349,14 @@ class ResolverPipeline(
             val opt = Option.newBuilder().setId(o.id).setLabel(o.label)
             if (o.resolvedId != null) opt.resolvedId = o.resolvedId
             if (o.targetRef != null) opt.targetRef = o.targetRef
+            if (o.entityTypeRef.isNotBlank()) opt.entityTypeRef = o.entityTypeRef
+            opt.span = span(o.spanStart, o.spanEnd, o.spanText)
             builder.addOptions(opt)
-            signedOptions += ResumeOption(o.id, o.label, o.targetRef, o.resolvedId)
+            signedOptions += ResumeOption(o.id, o.label, o.targetRef, o.resolvedId, o.entityTypeRef)
         }
-        // Sign the EXACT offered set so a resume can only pick from it (RS-26).
+        // Sign the EXACT offered set (so a resume can only pick from it, RS-26) AND the
+        // OBO subject it was issued to (so a leaked token can't be replayed by another
+        // principal, RG-P6 review C).
         val payload =
             ResumePayload(
                 conversationId = conversationId,
@@ -346,6 +364,7 @@ class ResolverPipeline(
                 options = signedOptions,
                 issuedAt = System.currentTimeMillis() / 1000,
                 keyId = tokenCodec.activeKeyId,
+                subject = subject,
             )
         builder.resumeToken = tokenCodec.sign(payload)
         return builder.build()
@@ -379,14 +398,25 @@ class ResolverPipeline(
                 }
             val thresholds =
                 if (reg.hasThresholds()) {
-                    // proto3 scalar default 0 is the "unset" sentinel: a caller can only
-                    // RAISE a threshold from the snapshot fallback, not set it to 0 (a 0
-                    // threshold is meaningless here, so this is intentional).
+                    // proto3 scalar default 0 is the "unset" sentinel. A caller may only
+                    // move a safety threshold in the CONSERVATIVE direction — raising
+                    // `bind`/`ambiguity_gap`/`exact` all make the gate MORE likely to
+                    // refuse/clarify. Clamping to `maxOf(override, fallback)` closes the
+                    // refuse-over-guess hole where a per-request `bind = 0.1` lowered the
+                    // 0.5 floor and let near-junk matches bind (RG-P6 review E). `max_options`
+                    // is a display cap, not a safety floor, so it takes any positive value.
                     val t = reg.thresholds
                     ResolverThresholds(
-                        bind = if (t.bind > 0) t.bind else fallback.bind,
-                        ambiguityGap = if (t.ambiguityGap > 0) t.ambiguityGap else fallback.ambiguityGap,
-                        exact = if (t.exact > 0) t.exact else fallback.exact,
+                        bind = if (t.bind > 0) maxOf(t.bind, fallback.bind) else fallback.bind,
+                        ambiguityGap =
+                            if (t.ambiguityGap >
+                                0
+                            ) {
+                                maxOf(t.ambiguityGap, fallback.ambiguityGap)
+                            } else {
+                                fallback.ambiguityGap
+                            },
+                        exact = if (t.exact > 0) maxOf(t.exact, fallback.exact) else fallback.exact,
                         maxOptions = if (t.maxOptions > 0) t.maxOptions else fallback.maxOptions,
                     )
                 } else {

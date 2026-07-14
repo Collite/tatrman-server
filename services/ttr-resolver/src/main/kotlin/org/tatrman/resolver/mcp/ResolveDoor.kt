@@ -50,13 +50,22 @@ class ResolveDoor(
             outputSchema = null,
         )
 
-    suspend fun call(args: JsonObject?): CallToolResult {
+    /**
+     * @param callerSubject the OBO subject id resolved by the fail-closed gate (empty
+     *   on the dev-network no-identity path). It is stamped onto the request so the
+     *   pipeline can sign it into a clarification's resume token and re-check it on
+     *   resume (RG-P6 review C). The door never derives identity itself.
+     */
+    suspend fun call(
+        args: JsonObject?,
+        callerSubject: String = "",
+    ): CallToolResult {
         val conversationId = args.str("conversation_id")
         if (conversationId.isNullOrBlank()) return argError("Missing required argument: conversation_id")
 
         val request =
             try {
-                toRequest(args, conversationId)
+                toRequest(args, conversationId, callerSubject)
             } catch (e: IllegalArgumentException) {
                 return argError("Invalid arguments: ${e.message}")
             }
@@ -70,8 +79,10 @@ class ResolveDoor(
     private fun toRequest(
         args: JsonObject?,
         conversationId: String,
+        callerSubject: String,
     ): ResolveRequest {
         val builder = ResolveRequest.newBuilder().setConversationId(conversationId)
+        if (callerSubject.isNotBlank()) builder.callerSubject = callerSubject
         val resumeToken = args.str("resume_token")
         if (!resumeToken.isNullOrBlank()) {
             val selected =

@@ -15,6 +15,12 @@ data class ResumeOption(
     val label: String,
     val targetRef: String? = null,
     val resolvedId: String? = null,
+    /**
+     * The entity type this option resolves to (RG-P6 review F). A MEMBER option
+     * carries only `resolvedId` and no `targetRef`, so without this the resumed
+     * `Domain.entity_type_ref` was empty and the PK could not be mapped to its table.
+     */
+    val entityTypeRef: String? = null,
 )
 
 /**
@@ -30,6 +36,14 @@ data class ResumePayload(
     val options: List<ResumeOption>,
     val issuedAt: Long,
     val keyId: String,
+    /**
+     * The OBO subject id the clarification was issued to (RG-P6 review C). Signed in
+     * and RE-CHECKED on resume against the resuming caller's identity so a leaked or
+     * shared token cannot be replayed by a different principal. Empty when the door
+     * ran with no required identity (dev-network) — an empty-subject token then only
+     * resumes an empty-subject call.
+     */
+    val subject: String = "",
 )
 
 /** Thrown/returned on any verification failure — always the RG-RES-002 condition. */

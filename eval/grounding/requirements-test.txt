@@ -1,0 +1,6 @@
+# Pinned deps for the HERMETIC grounding conformance leg (RG-P6.S2 / review H).
+# Pinned so the gating tier is reproducible — an unpinned `pip install pytest` let a
+# new upstream release change gate behavior with no code change. A one-time install
+# from these pins is the only network touch; the tests themselves hit no service.
+pytest==8.3.4
+pytest-asyncio==0.24.0

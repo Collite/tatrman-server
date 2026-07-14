@@ -14,54 +14,24 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.tatrman.resolver.mcp.ResolveDoor
-import org.tatrman.resolver.mcp.ResolveDoorHandler
-import org.tatrman.resolver.v1.AwaitingClarification
-import org.tatrman.resolver.v1.Option
-import org.tatrman.resolver.v1.ResolveRequest
-import org.tatrman.resolver.v1.ResolveResponse
-import org.tatrman.resolver.v1.Resolution
 
 /**
- * RG-P6.S1.T3 — the door's signature assertion: refusal-over-guess. Replays the
- * `calls:` conformance seed fixtures (under resources/conformance/calls, the schema
- * S2.T2 extends) through `resolve.bind:v1` and asserts each turn's declared outcome
- * plus the invariant that NO turn ever surfaces a guessed binding — an ambiguous
- * span clarifies, a below-threshold span binds nothing (RS-27).
+ * RG-P6.S1.T3 (hardened in review) — the door's signature assertion: refusal-over-guess.
+ * Replays the `calls:` conformance seed fixtures through `resolve.bind:v1` and asserts
+ * each turn's declared outcome plus the invariant that NO turn ever surfaces a guessed
+ * binding — an ambiguous span clarifies, a below-threshold span binds nothing (RS-27).
  *
- * S1 seed: the `scenario` tag maps to the real-shaped core response here; S2 swaps
- * this stub for a live pipeline run driven by fixture-carried nlp/fuzzy data. The
- * fixtures + the invariant are the durable artifact.
+ * These now drive the REAL [org.tatrman.resolver.pipeline.ResolverPipeline] via
+ * [ConformancePipeline] (SpanProposal → GateSpans → real HMAC codec, hermetic fakes for
+ * nlp/fuzzy). A resolver that guessed a below-threshold bind, or bound an ambiguous span,
+ * would turn these RED — the assertion runs against the actual gate, not a canned response
+ * (RG-P6 review G).
  */
 class RefusalOverGuessConformanceTest :
     StringSpec({
 
         val fixtures = listOf("refusal-ambiguous-member.json", "refusal-below-threshold.json")
         val json = Json { ignoreUnknownKeys = true }
-
-        // The S1 scenario→core map (S2 replaces with a live pipeline run).
-        fun coreFor(scenario: String): suspend (ResolveRequest) -> ResolveResponse =
-            { _ ->
-                when (scenario) {
-                    "ambiguous_member" ->
-                        ResolveResponse
-                            .newBuilder()
-                            .setAwaiting(
-                                AwaitingClarification
-                                    .newBuilder()
-                                    .addOptions(Option.newBuilder().setId("M:df-adnak").setLabel("DF ADNAK"))
-                                    .addOptions(Option.newBuilder().setId("M:df-belus").setLabel("DF BELUS"))
-                                    .setResumeToken("tok-amb"),
-                            ).build()
-                    "below_threshold" ->
-                        ResolveResponse
-                            .newBuilder()
-                            .setResolution(
-                                Resolution.newBuilder().setConfidence(0.0).setRationale("deterministic bind: 0 domain"),
-                            ).build()
-                    else -> error("unknown scenario '$scenario'")
-                }
-            }
 
         // The resolution's bindings array, or empty when the core bound nothing
         // (JsonFormat omits an empty repeated field) — the refuse-over-guess probe.
@@ -89,7 +59,8 @@ class RefusalOverGuessConformanceTest :
                     val scenario = turn["scenario"]!!.jsonPrimitive.content
                     val expect = turn["expect"]!!.jsonObject
 
-                    val handler = ResolveDoorHandler(ResolveDoor(coreFor(scenario)), requireIdentity = false)
+                    // The REAL pipeline for this scenario — the gate actually runs.
+                    val handler = ConformancePipeline.doorHandler(scenario)
                     val result = runBlocking { handler.handle(args, null, null) }
                     val structured = result.structuredContent.shouldNotBeNull()
 

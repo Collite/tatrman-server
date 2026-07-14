@@ -40,6 +40,13 @@ message ResolveRequest {
   optional Registry registry = 4;
   // Reference info only. NO ResolveMode — the NORMAL machinery is gone (RS-23).
   ResolveContext context = 5;
+  // Caller identity (OBO subject id) as resolved by the door's fail-closed gate
+  // (H-2) or the gRPC metadata. It is signed into a clarification's resume token
+  // and RE-CHECKED on resume, so a token issued to user A cannot be replayed by a
+  // different principal (RG-P6 review C). Empty in the dev-network path (no
+  // identity required) — an empty-subject token then only resumes empty-subject
+  // calls. NOT a vocabulary-scoping field (per-user scoping stays a posture, F-T2).
+  string caller_subject = 6;
 }
 
 message FreshQuestion {
@@ -168,6 +175,15 @@ message Option {
   string label = 2;
   string target_ref = 3;   // set for VOCABULARY options
   string resolved_id = 4;  // set for MEMBER options
+  // The entity type this option resolves to. Signed into the resume token and used
+  // to reconstruct the binding on a MEMBER pin — a MEMBER option carries no
+  // target_ref, so without this the resumed Domain.entity_type_ref was empty and
+  // the PK could not be mapped back to its table (RG-P6 review F).
+  string entity_type_ref = 5;
+  // Which surface span this option disambiguates. When a query has more than one
+  // ambiguous span the flat option list would otherwise be unattributable
+  // (RG-P6 review M); every option now names its span.
+  Span span = 6;
 }
 
 // RS-7 matrix echo — what backed this resolve. `degraded_reasons` carries the

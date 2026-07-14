@@ -34,6 +34,7 @@ object IdentityGate {
         userIdHeader: String?,
         argUserId: String?,
         requireIdentity: Boolean,
+        policy: IdentityPolicy = IdentityPolicy.PERMISSIVE,
     ): Decision {
         // DF-Q03: a valid token plus a conflicting user_id arg is a spoof attempt.
         val tokenIdentity = IdentityResolver.parseTokenOrNull(authorizationHeader)
@@ -45,7 +46,7 @@ object IdentityGate {
                         "remove user_id when a Bearer token is supplied.",
             )
         }
-        val identity = IdentityResolver.resolve(authorizationHeader, userIdHeader, argUserId)
+        val identity = IdentityResolver.resolve(authorizationHeader, userIdHeader, argUserId, policy)
         if (requireIdentity && identity == null) {
             return Decision.Reject(
                 code = "missing_user_identity",

@@ -7,7 +7,7 @@ demonstrated" gate; the other two tiers seed the fuller E2E coverage that SV-P4 
 | Tier | Runnable | Gating? | What it asserts |
 |---|---|---|---|
 | **Service-level** | `just conformance-service-level` | **YES** (CI) | The three service-level corpora pass, hermetic + self-contained + **no DFP dependency**. |
-| **E2E core** (`calls:`) | `services/ttr-resolver/.../conformance/calls/` seeds | seeds now; full at SV-P4 | Multi-turn door conversations (refusal-over-guess seeds today; hero / clarification / geo-dark next). |
+| **E2E core** (`calls:`) | `services/ttr-resolver/.../conformance/calls/` seeds (`CallsSeedConformanceTest`, `RefusalOverGuessConformanceTest`, gated) | drivable seeds run vs the REAL pipeline; full at SV-P4 | Multi-turn door conversations. The refusal-over-guess + clarification-round-trip seeds drive the actual `ResolverPipeline` (SpanProposal → GateSpans → HMAC codec) via hermetic nlp/fuzzy fakes; `seed_only` fixtures (hero, geo-dark) are shape-validated pending the live SV-P4 stack. |
 | **Extended** (pilot) | `just eval-grounding` (live) | **NO** (scored-not-gating) | Live grounding eval over the pilot corpus (arrives via RO-19 ask ③). Reports pass-rate; never fails CI. |
 
 ## The gating service-level tier — `just conformance-service-level`
@@ -26,7 +26,10 @@ Runs three **hermetic** service-level corpora (zero live services, zero DFP):
    18 checks): corpus-validity of the 109-case bulk + 21-case e2e corpora, and the pure `report.py`
    scoring logic. The **live** run (`run_eval.py` → grounding-mcp + Golem) is the extended tier, NOT here.
 
-### Corpus provenance (hashes — bump on any deliberate change)
+### Corpus provenance (hashes — ENFORCED; bump on any deliberate change)
+These are verified on every gate run by `just conformance-verify-hashes` (reading
+`conformance/corpus-hashes.sha256`); a silent edit — even whitespace/reordering a
+semantic test would miss — fails the gate (RG-P6 review I). Keep the two lists in sync.
 ```
 ucetnictvi_entities_only.jsonl  d0e8b17fa6e989ff9e17bd4a035825946e2b551802d1edd38d3bd163676331f5
 match-quality-corpus.jsonl      4f4daa416dff6c40227887ff9573903ca489ee8c5fb0e0a5387a52134f1310e2
@@ -36,6 +39,9 @@ e2e-cases.json                  0034ed387f31c1dca8ba1a56b22b72f968193ee5f1aacb0f
 
 ### Why hermetic (no DFP)
 The gate must be green in CI without a deployed stack or any DFP client — that is the SV-P3 promise.
+(The grounding leg's one network touch is a one-time install of the **pinned** test deps in
+`eval/grounding/requirements-test.txt`, skipped once present — no unpinned/floating package, so the
+run stays reproducible; RG-P6 review H.)
 The live end-to-end (parse → fuzzy → grounding → door) is intentionally deferred: the E2E core tier is
 hand-authored `calls:` fixtures (SV-P4 with the reference Golem), and the extended tier scores the pilot
 corpus without gating. What is gated here is **service-level parity against recorded spike/referee

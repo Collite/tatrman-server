@@ -11,6 +11,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import org.tatrman.mcp.identity.IdentityPolicy
 import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.resolver.mcp.ResolveDoor
 import org.tatrman.resolver.mcp.ResolveDoorHandler
@@ -214,5 +215,47 @@ class ResolveDoorTest :
             result.isError shouldBe true
             result.structuredContent.shouldNotBeNull().string("errorCode") shouldBe "identity_conflict"
             core.requests.isEmpty().shouldBeTrue()
+        }
+
+        // RG-P6 review A: under TOKEN_ONLY a caller-supplied user_id (even `admin:`) is
+        // NOT an identity — it can neither satisfy require-identity nor reach the core.
+        "TOKEN_ONLY door: a user_id-only call is refused and never reaches the core" {
+            val core = FakeCore()
+            val handler =
+                ResolveDoorHandler(
+                    ResolveDoor(core::resolve),
+                    requireIdentity = true,
+                    policy = IdentityPolicy.TOKEN_ONLY,
+                )
+
+            val result =
+                runBlocking {
+                    handler.handle(
+                        args("conversation_id" to "c-1", "text" to "kolik", "user_id" to "admin:root"),
+                        null,
+                        null,
+                    )
+                }
+
+            result.isError shouldBe true
+            result.structuredContent.shouldNotBeNull().string("errorCode") shouldBe "missing_user_identity"
+            core.requests.isEmpty().shouldBeTrue()
+        }
+
+        // RG-P6 review C (wiring): the gate's resolved subject is stamped on the request
+        // so the pipeline can sign+re-check it on a resume token.
+        "the resolved OBO subject is threaded into the request as caller_subject" {
+            val core = FakeCore()
+            val handler = ResolveDoorHandler(ResolveDoor(core::resolve), requireIdentity = true)
+
+            runBlocking {
+                handler.handle(
+                    args("conversation_id" to "c-1", "text" to "kolik"),
+                    "Bearer ${unsignedJwt("alice")}",
+                    null,
+                )
+            }
+
+            core.requests.single().callerSubject shouldBe "alice"
         }
     })

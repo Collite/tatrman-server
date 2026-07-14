@@ -40,12 +40,21 @@ data class DomainBinding(
     val snapshotHash: String,
 )
 
-/** One clarification option (internal model; T5 maps it to the `Option` proto). */
+/**
+ * One clarification option (internal model; T5 maps it to the `Option` proto).
+ * Carries [entityTypeRef] so a MEMBER pin can reconstruct its Domain on resume
+ * (RG-P6 review F), and the [spanStart]/[spanEnd]/[spanText] of the surface span it
+ * disambiguates so a multi-span clarification is attributable (RG-P6 review M).
+ */
 data class ClarificationOption(
     val id: String,
     val label: String,
     val resolvedId: String?,
     val targetRef: String?,
+    val entityTypeRef: String,
+    val spanStart: Int,
+    val spanEnd: Int,
+    val spanText: String,
 )
 
 /**

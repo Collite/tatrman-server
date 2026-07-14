@@ -83,17 +83,24 @@ object GateSpans {
 
             val identities = contenders.map { identityKey(it) }.distinct()
             if (identities.size > 1) {
-                // instance ambiguity — offer the distinct contenders, don't bind.
+                // instance ambiguity — offer the distinct contenders, don't bind. Each
+                // option is attributed to THIS span and this span's options are capped
+                // independently, so a second ambiguous span can never be silently dropped
+                // by a global truncation (RG-P6 review M).
                 contenders
                     .distinctBy { identityKey(it) }
                     .take(thresholds.maxOptions)
-                    .forEach { options += toOption(it) }
+                    .forEach { options += toOption(it, cand, entityTypes) }
             } else {
                 bindings += toBinding(cand, top, entityTypes, siblings, snapshotHash)
             }
         }
 
-        if (options.isNotEmpty()) return Clarify(options.take(thresholds.maxOptions))
+        // NOTE: no global re-truncation here — each span's options are already capped
+        // at maxOptions above; a flat `options.take(maxOptions)` would drop later
+        // spans wholesale (RG-P6 review M). Full multi-span RESUME (returning the
+        // already-bound spans alongside a pin) remains a tracked design item.
+        if (options.isNotEmpty()) return Clarify(options)
 
         val deduped = dedupeByIdentity(bindings)
         return Bound(deduped, confidence = deduped.minOfOrNull { it.score } ?: 0.0)
@@ -104,6 +111,12 @@ object GateSpans {
     private fun identityKey(m: FuzzyMatch): String =
         if (m.source == SourceTag.MEMBER) "M:${m.candidateId}" else "V:${m.targetRef}"
 
+    /** The declared entity type owning a match's fuzzy category, or the category itself. */
+    private fun entityRefOf(
+        m: FuzzyMatch,
+        entityTypes: List<ResolverEntityType>,
+    ): String = entityTypes.firstOrNull { m.category in it.categories }?.ref ?: m.category
+
     private fun toBinding(
         cand: DomainSpanCandidate,
         top: FuzzyMatch,
@@ -112,7 +125,7 @@ object GateSpans {
         snapshotHash: String,
     ): DomainBinding {
         val isMember = top.source == SourceTag.MEMBER
-        val entityRef = entityTypes.firstOrNull { top.category in it.categories }?.ref ?: top.category
+        val entityRef = entityRefOf(top, entityTypes)
         return DomainBinding(
             span = cand,
             entityTypeRef = entityRef,
@@ -128,13 +141,21 @@ object GateSpans {
         )
     }
 
-    private fun toOption(m: FuzzyMatch): ClarificationOption {
+    private fun toOption(
+        m: FuzzyMatch,
+        cand: DomainSpanCandidate,
+        entityTypes: List<ResolverEntityType>,
+    ): ClarificationOption {
         val isMember = m.source == SourceTag.MEMBER
         return ClarificationOption(
             id = identityKey(m),
             label = m.candidate,
             resolvedId = if (isMember) m.candidateId else null,
             targetRef = if (!isMember && m.targetRef.isNotBlank()) m.targetRef else null,
+            entityTypeRef = entityRefOf(m, entityTypes),
+            spanStart = cand.start,
+            spanEnd = cand.end,
+            spanText = cand.text,
         )
     }
 

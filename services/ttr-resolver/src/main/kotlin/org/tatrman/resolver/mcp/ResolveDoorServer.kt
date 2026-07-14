@@ -39,12 +39,13 @@ fun Application.installResolveDoor(
                 description = door.tool.description ?: "",
                 inputSchema = door.tool.inputSchema,
             ) { request ->
+                // Snapshot the per-request headers HERE — this lambda runs on the
+                // request's interceptor thread, before `safeMcpTool`'s withTimeout can
+                // dispatch the body onto another pool thread where the ThreadLocal would
+                // be null or (worse) hold a prior request's identity (RG-P6 review 3).
+                val snapshot = requestContext.snapshot()
                 safeMcpTool(RESOLVE_TOOL_NAME, toolTimeoutMs) { req ->
-                    handler.handle(
-                        req.arguments,
-                        requestContext.authHeader.get(),
-                        requestContext.userIdHeader.get(),
-                    )
+                    handler.handle(req.arguments, snapshot.authHeader, snapshot.userIdHeader)
                 }(request)
             }
             logger.info("resolve door bound: tool '{}' (streamable HTTP)", door.tool.name)

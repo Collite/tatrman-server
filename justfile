@@ -63,13 +63,18 @@ eval-grounding-build:
     cd eval/grounding && python3 build_corpus.py
 
 # Grounding HERMETIC tier: corpus-validity + the pure report logic. No deployed
-# stack, no network — this is the part the gating tier runs.
+# stack, no live service — the only network touch is a one-time install of the
+# PINNED test deps (requirements-test.txt, RG-P6 review H), skipped once installed.
 eval-grounding-test:
     #!/usr/bin/env bash
     set -euo pipefail
     cd eval/grounding
     test -d .venv || python3 -m venv .venv
-    .venv/bin/pip -q install pytest pytest-asyncio
+    # Install only when the pinned marker is absent, and always from the pinned file
+    # so a gate run is reproducible (no unpinned/floating pytest).
+    if ! .venv/bin/python -c 'import pytest, pytest_asyncio' 2>/dev/null; then
+        .venv/bin/pip -q install -r requirements-test.txt
+    fi
     .venv/bin/python -m pytest tests/ -q
 
 # The LIVE grounding eval (bulk → grounding-mcp, e2e → Golem /v2/chat). Needs a
@@ -85,8 +90,24 @@ eval-grounding:
 conformance-service-level:
     #!/usr/bin/env bash
     set -euo pipefail
-    ./gradlew :services:ttr-resolver:test --tests '*Q20ParityTest*' :services:ttr-fuzzy:test --tests '*MatchQualityCorpusTest*'
+    just conformance-verify-hashes
+    ./gradlew \
+      :services:ttr-resolver:test --tests '*Q20ParityTest*' \
+        --tests '*CallsSeedConformanceTest*' --tests '*RefusalOverGuessConformanceTest*' \
+      :services:ttr-fuzzy:test --tests '*MatchQualityCorpusTest*'
     just eval-grounding-test
+
+# Pin the three-tier corpora by content hash (RG-P6 review I): the recorded provenance
+# in conformance/README.md is now ENFORCED — a silent corpus edit (even whitespace /
+# reordering that a semantic test would miss) fails the gate here.
+conformance-verify-hashes:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -c conformance/corpus-hashes.sha256
+    else
+        shasum -a 256 -c conformance/corpus-hashes.sha256
+    fi
 
 # ── Release (tag-driven; mirrors tatrman's `package`) ────────────────────────
 

@@ -35,26 +35,39 @@ object IdentityResolver {
      * @param authorizationHeader value of `Authorization` request header (may be null)
      * @param userIdHeader value of `X-User-Id` request header (may be null)
      * @param argUserId `user_id` field from MCP tool args (may be null)
+     * @param policy which sources are trusted (RG-P6 review A); defaults to the
+     *   dev-network [IdentityPolicy.PERMISSIVE]. A production door passes
+     *   [IdentityPolicy.TOKEN_ONLY] so header / arg / `admin:`-prefix identities are
+     *   ignored and only an OBO Bearer token counts.
      * @return resolved identity or null when nothing usable was provided
      */
     fun resolve(
         authorizationHeader: String?,
         userIdHeader: String?,
         argUserId: String?,
+        policy: IdentityPolicy = IdentityPolicy.PERMISSIVE,
     ): UserIdentity? {
-        val fromToken = authorizationHeader?.let { tryParseToken(it) }
+        val fromToken = authorizationHeader?.let { tryParseToken(it, policy) }
         if (fromToken != null) return fromToken
-        val fromHeader = userIdHeader?.takeIf { it.isNotBlank() }
-        if (fromHeader != null) {
-            return UserIdentity(
-                id = fromHeader,
-                roles = rolesFromIdConvention(fromHeader),
-                source = IdentitySource.HEADER,
-            )
+        if (policy.allowHeaderSource) {
+            val fromHeader = userIdHeader?.takeIf { it.isNotBlank() }
+            if (fromHeader != null) {
+                return UserIdentity(
+                    id = fromHeader,
+                    roles = rolesFromIdConvention(fromHeader, policy.allowAdminConvention),
+                    source = IdentitySource.HEADER,
+                )
+            }
         }
-        val fromArg = argUserId?.takeIf { it.isNotBlank() }
-        if (fromArg != null) {
-            return UserIdentity(id = fromArg, roles = rolesFromIdConvention(fromArg), source = IdentitySource.EXPLICIT)
+        if (policy.allowArgSource) {
+            val fromArg = argUserId?.takeIf { it.isNotBlank() }
+            if (fromArg != null) {
+                return UserIdentity(
+                    id = fromArg,
+                    roles = rolesFromIdConvention(fromArg, policy.allowAdminConvention),
+                    source = IdentitySource.EXPLICIT,
+                )
+            }
         }
         return null
     }
@@ -64,9 +77,13 @@ object IdentityResolver {
      * before falling into the priority-order [resolve] path (DF-Q03). Returns null on absent /
      * malformed / non-Bearer headers — caller treats null as "no token in play".
      */
-    fun parseTokenOrNull(authorizationHeader: String?): UserIdentity? = authorizationHeader?.let { tryParseToken(it) }
+    fun parseTokenOrNull(authorizationHeader: String?): UserIdentity? =
+        authorizationHeader?.let { tryParseToken(it, IdentityPolicy.PERMISSIVE) }
 
-    private fun tryParseToken(header: String): UserIdentity? {
+    private fun tryParseToken(
+        header: String,
+        policy: IdentityPolicy,
+    ): UserIdentity? {
         val token =
             header
                 .removePrefix("Bearer ")
@@ -87,7 +104,7 @@ object IdentityResolver {
                 ?: return null
         val roles =
             buildSet {
-                addAll(rolesFromIdConvention(id))
+                addAll(rolesFromIdConvention(id, policy.allowAdminConvention))
                 payloadJson["realm_access"]?.let { ra ->
                     if (ra is JsonObject) {
                         ra["roles"]?.let { rolesEl ->
@@ -107,9 +124,18 @@ object IdentityResolver {
      * role the query-mcp validator gates `apply_security = false` on — a consumer-specific
      * convention preserved from the pre-lift edge; a future change can parameterize per-consumer
      * admin roles). Production callers carry these roles from the JWT's `realm_access.roles`.
+     * Gated by [allowAdminConvention]: a [IdentityPolicy.TOKEN_ONLY] door passes false so a
+     * username prefix can NEVER self-grant admin (RG-P6 review A).
      */
-    private fun rolesFromIdConvention(userId: String): Set<String> =
-        if (userId.startsWith("admin:")) setOf("admin", "query-platform-admin") else emptySet()
+    private fun rolesFromIdConvention(
+        userId: String,
+        allowAdminConvention: Boolean,
+    ): Set<String> =
+        if (allowAdminConvention && userId.startsWith("admin:")) {
+            setOf("admin", "query-platform-admin")
+        } else {
+            emptySet()
+        }
 
     private fun JsonElement.asStringOrNull(): String? =
         runCatching {

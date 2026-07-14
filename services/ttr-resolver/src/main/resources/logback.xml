@@ -1,8 +1,9 @@
 <configuration>
     <!--
       LOG_LEVEL env var controls verbosity of OUR code + the gRPC call interceptors.
-      Default INFO: every incoming RPC is logged with its full payload.
-      Set LOG_LEVEL=DEBUG to additionally see outgoing gRPC calls pre/post-flight.
+      Default INFO: every incoming RPC is logged by method (no payload). Set
+      LOG_LEVEL=DEBUG to additionally log request/response payloads (secret fields
+      such as resume tokens are redacted) and outgoing gRPC calls pre/post-flight.
     -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -17,14 +18,14 @@
         <captureMdcAttributes>*</captureMdcAttributes>
     </appender>
 
-    <root level="DEBUG">
+    <root level="INFO">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="OTEL"/>
     </root>
 
-    <logger name="org.tatrman.resolver" level="${LOG_LEVEL:-DEBUG}"/>
-    <logger name="grpc.in" level="${LOG_LEVEL:-DEBUG}"/>
-    <logger name="grpc.out" level="${LOG_LEVEL:-DEBUG}"/>
+    <logger name="org.tatrman.resolver" level="${LOG_LEVEL:-INFO}"/>
+    <logger name="grpc.in" level="${LOG_LEVEL:-INFO}"/>
+    <logger name="grpc.out" level="${LOG_LEVEL:-INFO}"/>
     <logger name="io.netty" level="INFO"/>
     <!-- grpc's *shaded* netty (io.grpc.netty.shaded.io.grpc.netty.*) is not
          covered by the io.netty pin; pin it so HTTP/2 frame DEBUG doesn't flood. -->
