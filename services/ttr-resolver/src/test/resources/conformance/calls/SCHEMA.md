@@ -9,6 +9,9 @@ here from day one and are extended into the full E2E core tier by SV-P4 (with th
 {
   "id": "kebab-case-id",                 // unique fixture id
   "description": "what this asserts",
+  "seed_only": true,                     // optional. true → a placeholder seed whose LIVE drive is
+                                         //   SV-P4 (needs nlp/fuzzy/grounding or a dark-geo deploy);
+                                         //   the harness validates its shape but does not run it.
   "turns": [
     {
       "tool": "resolve.bind:v1",          // the door tool id (naming ledger)
@@ -21,6 +24,8 @@ here from day one and are extended into the full E2E core tier by SV-P4 (with th
         "outcome": "clarification",       // clarification | resolution | empty | error
         "no_binding_below_threshold": true,   // the refusal-over-guess invariant (always assert true)
         "min_options": 2,                 // clarification only — at least this many distinct options
+        "min_bindings": 2,                // resolution only — at least this many bindings (seed hint)
+        "degraded_allowed": true,         // resolution only — a degraded/floor outcome is acceptable
         "error_code": "INVALID_ARGUMENT"  // error only
       }
     }

@@ -1,0 +1,16 @@
+{
+  "id": "geo-dark-degrade",
+  "description": "A geo span ('pražských pobočkách') when the geo capability is dark: the deterministic core still binds the domain span (branch vocabulary), and the geo grounding fails loud / degrades honestly (RS-19) — never a false 'place not found', never a guessed bind. seed_only — the live drive needs a dark-geo deployment (the extended tier / SV-P4).",
+  "seed_only": true,
+  "turns": [
+    {
+      "tool": "resolve.bind:v1",
+      "args": { "conversation_id": "c-geo-dark", "text": "kolik v pražských pobočkách", "locale": "cs" },
+      "expect": {
+        "outcome": "resolution",
+        "no_binding_below_threshold": true,
+        "degraded_allowed": true
+      }
+    }
+  ]
+}

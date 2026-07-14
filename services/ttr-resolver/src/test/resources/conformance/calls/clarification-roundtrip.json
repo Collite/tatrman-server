@@ -1,0 +1,18 @@
+{
+  "id": "clarification-roundtrip",
+  "description": "An ambiguous member span clarifies; the user's choice resumes via the signed opaque token (carried forward from turn 0) and binds at confidence 1.0 with no re-fuzzy (RS-26). Driven at the door seam.",
+  "turns": [
+    {
+      "tool": "resolve.bind:v1",
+      "args": { "conversation_id": "c-clar", "text": "kolik za DF" },
+      "scenario": "ambiguous_member",
+      "expect": { "outcome": "clarification", "no_binding_below_threshold": true, "min_options": 2 }
+    },
+    {
+      "tool": "resolve.bind:v1",
+      "args": { "conversation_id": "c-clar", "resume_token": "${turn0.resumeToken}", "selected_option_id": "M:df-adnak" },
+      "scenario": "resume_pin",
+      "expect": { "outcome": "resolution", "no_binding_below_threshold": true }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "hero-e2e",
+  "description": "The SV-P3 hero — 'Kolik jsme utržili za Octavie v pražských pobočkách za poslední fiskální čtvrtletí?' resolves end-to-end through the deterministic core: Octavie (MEMBER product) + pražských pobočkách (VOCABULARY branch) bind with provenance, the universal DATE grounds, ZERO LLM. seed_only — the live drive (self-hosted nlp + fuzzy + grounding) is SV-P4 with the reference Golem.",
+  "seed_only": true,
+  "turns": [
+    {
+      "tool": "resolve.bind:v1",
+      "args": {
+        "conversation_id": "c-hero",
+        "text": "Kolik jsme utržili za Octavie v pražských pobočkách za poslední fiskální čtvrtletí?",
+        "locale": "cs",
+        "reference_datetime": "2026-07-14T00:00:00+02:00"
+      },
+      "expect": {
+        "outcome": "resolution",
+        "no_binding_below_threshold": true,
+        "min_bindings": 2
+      }
+    }
+  ]
+}
