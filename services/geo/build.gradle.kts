@@ -69,6 +69,9 @@ jib {
 dependencies {
     implementation(libs.tatrman.ttr.translator)
     implementation(project(":shared:libs:kotlin:ttr-grounding-core"))
+    // S-2 fold — the one shared normalization spec (RG-P6.S2.T4: geo place-key /
+    // resolver fold via ttr-text, no private copy). Explicit (was transitive).
+    implementation(project(":shared:libs:kotlin:ttr-text"))
     implementation(project(":shared:libs:kotlin:ktor-configurator"))
     implementation(project(":shared:libs:kotlin:otel-config"))
     implementation(project(":shared:libs:kotlin:logging-config"))

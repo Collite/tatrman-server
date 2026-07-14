@@ -1,7 +1,7 @@
 package org.tatrman.geo.cache
 
 import org.tatrman.geo.resolve.ResolvedPlace
-import java.text.Normalizer
+import org.tatrman.text.Normalization
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
@@ -9,11 +9,9 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Diacritic-folded cache key for a place name — "Brno" / "brno" / "BRNO" collapse to one key.
  * cs-declension ("Brna" → "brno") is NOT handled by folding; those are carried by [PlaceAliasTable].
+ * Folds via the one shared S-2 spec (RG-P6.S2.T4 — no private fold); trim is geo input cleanup.
  */
-fun foldPlaceKey(s: String): String =
-    Normalizer
-        .normalize(s.trim().lowercase(), Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}+"), "")
+fun foldPlaceKey(s: String): String = Normalization.fold(s.trim())
 
 /**
  * Durable cache of resolved place boundaries (A9.4). The networked resolver consults it before

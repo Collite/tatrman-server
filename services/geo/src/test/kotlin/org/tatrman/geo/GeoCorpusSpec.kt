@@ -14,7 +14,7 @@ import org.tatrman.geo.resolve.PlaceCandidate
 import org.tatrman.geo.resolve.PlaceResolution
 import org.tatrman.geo.resolve.PlaceResolver
 import org.tatrman.geo.resolve.ResolvedPlace
-import java.text.Normalizer
+import org.tatrman.text.Normalization
 
 /**
  * A9.1 golden corpus — one parameterized case per row of `corpus/geo/cases.json`, run through the
@@ -102,10 +102,8 @@ private object CorpusResolver : PlaceResolver {
         return known[key]?.let { PlaceResolution.Found(it) } ?: PlaceResolution.Unknown
     }
 
-    private fun fold(s: String): String =
-        Normalizer
-            .normalize(s.trim().lowercase(), Normalizer.Form.NFD)
-            .replace(Regex("\\p{M}+"), "")
+    // S-2 fold via the shared spec (RG-P6.S2.T4 — no private fold in tests either).
+    private fun fold(s: String): String = Normalization.fold(s.trim())
 }
 
 private fun loadCorpus(): List<CorpusCase> {

@@ -42,3 +42,19 @@ corpus without gating. What is gated here is **service-level parity against reco
 numbers** — the deterministic behavior each service must not regress.
 
 CI: `.github/workflows/ci.yml` job `conformance` runs `just conformance-service-level` on every push/PR.
+
+## S-2 fold audit (RG-P6.S2.T4)
+
+The one normalization spec is `shared/libs/kotlin/ttr-text` → `Normalization.fold` (lower → NFD → strip
+combining marks); its golden vectors (`NormalizationSpec`) are the fixture. **No understanding-layer site
+keeps a private fold.** Call-site status:
+
+| Site | Status |
+|---|---|
+| ttr-fuzzy (`TextNormalizer.fold`) | ✅ shared (RG-P0.S3) |
+| resolver span kernel (`SpanProposal`) | ✅ shared (RG-P5) |
+| chrono / money recognizers | ✅ shared (RG-P3) |
+| geo span parser (`GeoSpanParser`) | ✅ shared |
+| geo `PlaceResolver` / `BoundaryStore.foldPlaceKey` / `GeoCorpusSpec` | ✅ **converged in RG-P6.S2.T4** — private folds removed; `trim()` kept as geo's visible input pre-step; `FoldParitySpec` locks byte-identity to the shared spec. (The old private copies stripped `\p{M}` vs the shared `\p{Mn}` — output-neutral on Czech place names.) |
+| **meta.search** `ttr-metadata` `Tokenizer.fold` (tatrman repo → consumed by veles) | ⚠️ **documented characterization bridge — the one remaining copy.** It folds in a **different operation order** (NFD → strip → lowercase, vs the shared lower → NFD → strip), and lives in a *different repo* + a *published* artifact. Converging it requires: (1) a characterization test over veles's keyword corpus proving the op-order swap is output-neutral there; (2) a `ttr-metadata → org.tatrman:ttr-text` dependency; (3) a `ttr-metadata` republish. Tracked as the T4 follow-up — not swapped blind (behavior + cross-repo + release risk). |
+

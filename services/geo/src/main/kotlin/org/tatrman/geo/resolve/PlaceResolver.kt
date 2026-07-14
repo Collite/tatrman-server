@@ -1,5 +1,7 @@
 package org.tatrman.geo.resolve
 
+import org.tatrman.text.Normalization
+
 /** A place's boundary polygon (WKT, WGS84) + its bounding box — for containment (A9.4). */
 data class Boundary(
     val wkt: String,
@@ -102,17 +104,14 @@ class StaticPlaceResolver(
         name: String,
         pkg: String,
     ): PlaceResolution {
-        val key = fold(name)
+        // S-2 fold via the one shared spec (RG-P6.S2.T4 — no private fold); trim is
+        // geo's input cleanup applied before the shared fold.
+        val key = Normalization.fold(name.trim())
         // exact fold match, else a prefix match to tolerate cs declension ("brna" → "brno" won't
         // prefix-match, so declined forms are seeded explicitly in the test fixture).
         val hit = places[key] ?: places.entries.firstOrNull { key.startsWith(it.key) || it.key.startsWith(key) }?.value
         return hit?.let { PlaceResolution.Found(it) } ?: PlaceResolution.Unknown
     }
-
-    private fun fold(s: String): String =
-        java.text.Normalizer
-            .normalize(s.trim().lowercase(), java.text.Normalizer.Form.NFD)
-            .replace(Regex("\\p{M}+"), "")
 
     companion object {
         /** Brno + Praha (with the common cs declined forms) for the distance-path tests. */
