@@ -29,6 +29,36 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # RG-P6.S2.T1 — the gating service-level conformance tier (the SV-P3 parity
+  # instrument): the three service-level corpora (ENTITIES_ONLY resolver + Q-17
+  # fuzzy + grounding hermetic), self-contained with NO DFP dependency. Green
+  # required. See conformance/README.md.
+  conformance:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: extractions/setup-just@v2
+
+      - name: conformance (service-level, gating)
+        run: just conformance-service-level
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # P2/RO-6 dependency rules (contracts §7). Passes trivially on the S1 skeleton;
   # its real bite is S4 once the spine services + protos have arrived.
   dependency-rules:

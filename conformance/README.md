@@ -1,0 +1,44 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+# Conformance — the three-tier instrument (RG-P6.S2)
+
+The Resolution & Grounding parity instrument (RS-30). Its **gating** tier is the SV-P3 "parity
+demonstrated" gate; the other two tiers seed the fuller E2E coverage that SV-P4 authors.
+
+| Tier | Runnable | Gating? | What it asserts |
+|---|---|---|---|
+| **Service-level** | `just conformance-service-level` | **YES** (CI) | The three service-level corpora pass, hermetic + self-contained + **no DFP dependency**. |
+| **E2E core** (`calls:`) | `services/ttr-resolver/.../conformance/calls/` seeds | seeds now; full at SV-P4 | Multi-turn door conversations (refusal-over-guess seeds today; hero / clarification / geo-dark next). |
+| **Extended** (pilot) | `just eval-grounding` (live) | **NO** (scored-not-gating) | Live grounding eval over the pilot corpus (arrives via RO-19 ask ③). Reports pass-rate; never fails CI. |
+
+## The gating service-level tier — `just conformance-service-level`
+
+Runs three **hermetic** service-level corpora (zero live services, zero DFP):
+
+1. **ENTITIES_ONLY** (resolver) — `Q20ParityTest` over
+   `services/ttr-resolver/src/test/resources/q20/ucetnictvi_entities_only.jsonl` (12 cases).
+   Replays the recorded Q-20 span-gating behavior through the real `GateSpans`. Acceptance baseline
+   from the vendored spike (config C: **P=1.0, ucetnictvi R≥0.8, 0 spurious, awaiting 1/5**).
+   Provenance: `q20-spike-results.json` + `PROVENANCE.txt` (numbers cited, never recomputed).
+2. **Q-17 match-quality** (fuzzy) — `MatchQualityCorpusTest` over
+   `services/ttr-fuzzy/src/test/resources/match-quality-corpus.jsonl` (40 cases: diacritics /
+   inflection / multi-word-order / typos), lemma axis ON, asserting the expected top id per case.
+3. **Grounding hermetic** — `eval/grounding/tests/` (`test_corpus_valid.py` + `test_report.py`,
+   18 checks): corpus-validity of the 109-case bulk + 21-case e2e corpora, and the pure `report.py`
+   scoring logic. The **live** run (`run_eval.py` → grounding-mcp + Golem) is the extended tier, NOT here.
+
+### Corpus provenance (hashes — bump on any deliberate change)
+```
+ucetnictvi_entities_only.jsonl  d0e8b17fa6e989ff9e17bd4a035825946e2b551802d1edd38d3bd163676331f5
+match-quality-corpus.jsonl      4f4daa416dff6c40227887ff9573903ca489ee8c5fb0e0a5387a52134f1310e2
+grounding-cases.json            a54491aa20ee4eac37b68c9b12a74658ed9b88e03051533289ce506e63590100
+e2e-cases.json                  0034ed387f31c1dca8ba1a56b22b72f968193ee5f1aacb0f20aa7336facf77f7
+```
+
+### Why hermetic (no DFP)
+The gate must be green in CI without a deployed stack or any DFP client — that is the SV-P3 promise.
+The live end-to-end (parse → fuzzy → grounding → door) is intentionally deferred: the E2E core tier is
+hand-authored `calls:` fixtures (SV-P4 with the reference Golem), and the extended tier scores the pilot
+corpus without gating. What is gated here is **service-level parity against recorded spike/referee
+numbers** — the deterministic behavior each service must not regress.
+
+CI: `.github/workflows/ci.yml` job `conformance` runs `just conformance-service-level` on every push/PR.

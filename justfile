@@ -55,6 +55,39 @@ test-py path *args:
 lint-py path:
     cd {{path}} && uv run ruff check .
 
+# ── Conformance (RG-P6.S2 — the three-tier instrument) ───────────────────────
+
+# The grounding eval corpus (RG-P3.S2.T7): consolidate the per-service goldens
+# (chrono/geo/money) + the hand-authored supplemental into the bulk + e2e corpora.
+eval-grounding-build:
+    cd eval/grounding && python3 build_corpus.py
+
+# Grounding HERMETIC tier: corpus-validity + the pure report logic. No deployed
+# stack, no network — this is the part the gating tier runs.
+eval-grounding-test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd eval/grounding
+    test -d .venv || python3 -m venv .venv
+    .venv/bin/pip -q install pytest pytest-asyncio
+    .venv/bin/python -m pytest tests/ -q
+
+# The LIVE grounding eval (bulk → grounding-mcp, e2e → Golem /v2/chat). Needs a
+# deployed stack, so it is NOT gating — it is the non-gating extended tier
+# (RG-P6.S2.T3 / SV-P4). Bulk gate: pass-rate ≥ 80%, LLM-fallback ≤ 10%.
+eval-grounding:
+    cd eval/grounding && .venv/bin/python run_eval.py
+
+# RG-P6.S2.T1 — the GATING service-level conformance tier (the SV-P3 instrument):
+# the three service-level corpora — ENTITIES_ONLY (resolver), Q-17 match-quality
+# (fuzzy), grounding hermetic — run self-contained, no DFP dependency. Green is
+# required; CI gates on it. Provenance + corpus hashes: conformance/README.md.
+conformance-service-level:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ./gradlew :services:ttr-resolver:test --tests '*Q20ParityTest*' :services:ttr-fuzzy:test --tests '*MatchQualityCorpusTest*'
+    just eval-grounding-test
+
 # ── Release (tag-driven; mirrors tatrman's `package`) ────────────────────────
 
 # Cut a release tag. Two families, both read the version from the git tag:
