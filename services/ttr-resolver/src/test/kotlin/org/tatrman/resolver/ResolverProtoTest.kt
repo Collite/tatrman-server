@@ -37,8 +37,13 @@ class ResolverProtoTest :
                             .addBindings(
                                 EntityBinding
                                     .newBuilder()
-                                    .setSpan(Span.newBuilder().setStart(6).setEnd(13).setText("Octavie"))
-                                    .setDomain(
+                                    .setSpan(
+                                        Span
+                                            .newBuilder()
+                                            .setStart(6)
+                                            .setEnd(13)
+                                            .setText("Octavie"),
+                                    ).setDomain(
                                         Domain
                                             .newBuilder()
                                             .setEntityTypeRef("md.dimension.product")
@@ -55,8 +60,13 @@ class ResolverProtoTest :
                                     ).setDegraded(false),
                             ).setConfidence(0.97),
                     ).setTraceId("t-1")
-                    .setCapabilities(Capabilities.newBuilder().setLanguage("cs").setCsNer(true).setFuzzyReady(true))
-                    .build()
+                    .setCapabilities(
+                        Capabilities
+                            .newBuilder()
+                            .setLanguage("cs")
+                            .setCsNer(true)
+                            .setFuzzyReady(true),
+                    ).build()
 
             val round = ResolveResponse.parseFrom(response.toByteArray())
             round shouldBe response
@@ -76,8 +86,13 @@ class ResolverProtoTest :
                     .setAwaiting(
                         AwaitingClarification
                             .newBuilder()
-                            .addOptions(Option.newBuilder().setId("o1").setLabel("Praha").setResolvedId("br-1"))
-                            .setResumeToken("payload.signature"),
+                            .addOptions(
+                                Option
+                                    .newBuilder()
+                                    .setId("o1")
+                                    .setLabel("Praha")
+                                    .setResolvedId("br-1"),
+                            ).setResumeToken("payload.signature"),
                     ).build()
             val round = ResolveResponse.parseFrom(awaiting.toByteArray())
             round.hasAwaiting().shouldBeTrue()
@@ -96,8 +111,14 @@ class ResolverProtoTest :
             ResolveRequest.getDescriptor().findFieldByName("resolve_mode").shouldBeNull()
             // No ResolveMode enum/message survives in the file.
             val file = ResolveRequest.getDescriptor().file
-            file.messageTypes.map { it.name }.contains("ResolveMode").shouldBeFalse()
-            file.enumTypes.map { it.name }.contains("ResolveMode").shouldBeFalse()
+            file.messageTypes
+                .map { it.name }
+                .contains("ResolveMode")
+                .shouldBeFalse()
+            file.enumTypes
+                .map { it.name }
+                .contains("ResolveMode")
+                .shouldBeFalse()
         }
     })
 

@@ -22,6 +22,15 @@ service ResolverService {
 }
 
 message ResolveRequest {
+  // RS-23 — the joint-inference surface is removed for good: `function_specs`,
+  // `mode`, and the `ResolveMode` (NORMAL escalation) enum are gone. This is the
+  // deterministic core; reintroducing any of them here is a design error. The
+  // names are reserved so they cannot silently reappear. (This service is
+  // pre-release and its message shape was redesigned, not wire-evolved, so the
+  // old tag NUMBERS were reused by the new fields below — nothing to reserve
+  // there.)
+  reserved "function_specs", "mode";
+
   string conversation_id = 1;
   oneof input {
     FreshQuestion fresh = 2;

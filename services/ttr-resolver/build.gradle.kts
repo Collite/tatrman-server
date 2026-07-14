@@ -84,11 +84,40 @@ dependencies {
     implementation(libs.grpc.netty.shaded)
     implementation(libs.grpc.services)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.cio)
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
     testImplementation(libs.grpc.inprocess)
-    testImplementation(libs.ktor.client.mock)
 }
+
+// RG-P5 — structural ZERO-LLM guard (RS-23). Fail the build if the resolver's
+// runtime classpath resolves ANY LLM client: the in-house llm-gateway client
+// module (`:shared:libs:kotlin:ttr-llm-client`) or a known external LLM SDK.
+// This enforces the invariant at the dependency-graph level; NoLlmDependencyTest
+// is the runtime backstop. (The generated `org.tatrman.llm.v1` gRPC STUB still
+// rides in via the monolithic `:shared:proto` — genuinely removing it needs the
+// llm service split into its own proto module; tracked as the real fix.)
+val forbiddenLlmCoordinates =
+    listOf("ttr-llm-client", "openai", "anthropic", "langchain4j", "langchain", "theokanning")
+
+val verifyNoLlmDependency by tasks.registering {
+    val runtimeClasspath = configurations.named("runtimeClasspath")
+    doLast {
+        val hits =
+            runtimeClasspath
+                .get()
+                .resolvedConfiguration.resolvedArtifacts
+                .map { it.moduleVersion.id }
+                .filter { id ->
+                    forbiddenLlmCoordinates.any { bad ->
+                        id.name.contains(bad, ignoreCase = true) || id.group.contains(bad, ignoreCase = true)
+                    }
+                }.map { "${it.group}:${it.name}:${it.version}" }
+                .distinct()
+        require(hits.isEmpty()) {
+            "ZERO-LLM violation (RS-23): resolver runtimeClasspath resolves LLM client artifact(s): $hits"
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(verifyNoLlmDependency) }
