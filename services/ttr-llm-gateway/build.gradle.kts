@@ -110,6 +110,8 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.pgsql)
     implementation(libs.lettuce.core)
+    implementation(libs.jtokkit) // BPE token estimator — flagged last-resort budget usage (LG-P4·S2, D-4)
+    implementation(libs.auth0.java.jwt) // RS256 verification for the Keycloak admin API (LG-P4·S3)
 
     // Observability
     implementation(libs.slf4j.api)
@@ -132,6 +134,7 @@ dependencies {
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlinx.coroutines.test) // virtual-time retry/backoff specs (LG-P3·S2)
+    testImplementation(libs.auth0.java.jwt) // sign test admin JWTs with generated RS256 keys (LG-P4·S3)
 
     // Component tier (Testcontainers) — the root suite already carries project()/kotest/testcontainers;
     // these are main `implementation` deps the BootComponentSpec references directly (not transitive on
@@ -140,6 +143,12 @@ dependencies {
     "componentTestImplementation"(libs.ktor.server.test.host)
     "componentTestImplementation"(libs.typesafe.config)
     "componentTestImplementation"(libs.postgresql)
+    // governance repos are constructed over DatabaseConnection in the LG-P4·S1 component specs
+    "componentTestImplementation"(project(":shared:libs:kotlin:db-common"))
+    // rate-limit component specs assert Redis state (TTL) via RedisConn.sync() (LG-P4·S2)
+    "componentTestImplementation"(libs.lettuce.core)
     "componentTestImplementation"(libs.wiremock)
     "componentTestImplementation"(libs.kotlinx.serialization.json) // SSE tool-call reassembly (S2 conformance)
+    // sign test admin JWTs for the admin-API component specs (LG-P4·S3)
+    "componentTestImplementation"(libs.auth0.java.jwt)
 }

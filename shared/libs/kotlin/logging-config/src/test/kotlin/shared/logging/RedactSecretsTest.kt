@@ -33,4 +33,14 @@ class RedactSecretsTest :
             val rendered = """conversation_id: "c-1" fresh { text: "kolik za DF" locale: "cs" }"""
             redactSecrets(rendered) shouldBe rendered
         }
+
+        // LG-P4·S1·T5 — a ttrk- virtual key is masked by value, even bare in an exception message (D-1).
+        "a ttrk- virtual key is masked by value in a bare (non-field) message" {
+            val plaintext = "ttrk-" + "aB3_dE6-hI9".repeat(3) + "xyz1234"
+            val rendered = "key issuance insert failed for $plaintext at team golem"
+            val out = redactSecrets(rendered)
+            out shouldNotContain plaintext
+            out shouldContain "ttrk-<redacted>"
+            out shouldContain "team golem" // surrounding diagnostics survive
+        }
     })

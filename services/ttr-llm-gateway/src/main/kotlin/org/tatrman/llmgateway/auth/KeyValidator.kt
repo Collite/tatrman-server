@@ -8,10 +8,14 @@ import org.tatrman.llmgateway.wire.GatewayError
 import org.tatrman.llmgateway.wire.GatewayException
 import java.security.MessageDigest
 
-/** The identity a validated `ttrk-` key resolves to (D-1/D-2: key → team is the attribution primary). */
+/** The identity a validated `ttrk-` key resolves to (D-1/D-2: key → team is the attribution primary).
+ *  Per-key budget/rpm overrides (min-wins, D-3) ride along for the LG-P4·S2 admission checks; the
+ *  config-backed interim leaves them null. */
 data class KeyPrincipal(
     val keyId: String,
     val team: String,
+    val budgetUsdOverride: Double? = null,
+    val rpmOverride: Int? = null,
 )
 
 /**

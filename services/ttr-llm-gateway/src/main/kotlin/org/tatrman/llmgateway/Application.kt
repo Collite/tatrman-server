@@ -17,6 +17,7 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytesWriter
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
@@ -35,19 +36,33 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.slf4j.LoggerFactory
+import org.tatrman.llmgateway.admin.AdminAuth
 import org.tatrman.llmgateway.auth.ConfigKeyValidator
+import org.tatrman.llmgateway.auth.KeyPrincipal
+import org.tatrman.llmgateway.auth.KeyValidator
+import org.tatrman.llmgateway.auth.bearerToken
 import org.tatrman.llmgateway.auth.requireKey
 import org.tatrman.llmgateway.config.ConfigLoader
 import org.tatrman.llmgateway.config.GatewayConfig
 import org.tatrman.llmgateway.engine.CircuitBreaker
 import org.tatrman.llmgateway.engine.InferenceEngine
+import org.tatrman.llmgateway.governance.BudgetService
+import org.tatrman.llmgateway.governance.BudgetUsageRepo
+import org.tatrman.llmgateway.governance.GovernanceLoad
+import org.tatrman.llmgateway.governance.RateLimiter
+import org.tatrman.llmgateway.governance.Settle
+import org.tatrman.llmgateway.governance.TokenEstimator
+import org.tatrman.llmgateway.governance.Usage
 import org.tatrman.llmgateway.provider.PassthroughHandler
 import org.tatrman.llmgateway.provider.ProviderRegistry
+import org.tatrman.llmgateway.provider.RegistryEntry
 import org.tatrman.llmgateway.provider.RegistryResolution
 import org.tatrman.llmgateway.provider.RequestedType
 import org.tatrman.llmgateway.provider.ResponseEnrichment
 import org.tatrman.llmgateway.provider.anthropic.AnthropicHandler
 import org.tatrman.llmgateway.provider.pumpSse
+import org.tatrman.llmgateway.stream.StreamObservation
+import org.tatrman.llmgateway.stream.StreamUsage
 import org.tatrman.llmgateway.stream.TapParser
 import org.tatrman.llmgateway.store.Pg
 import org.tatrman.llmgateway.store.RedisConn
@@ -101,9 +116,6 @@ fun Application.module(
         gateway.governance.teams.size,
     )
 
-    // Data-plane key validation (D-1) — interim seeded-key impl; PG-backed issued keys land LG-P4·S1.
-    val keyValidator = ConfigKeyValidator(gateway.governance)
-
     // Stores (T4). Built only when enabled so the skeleton boots storeless in unit tests; a Redis
     // outage never fails boot (lazy connect), but PG must be up at startup for Flyway to migrate.
     val pg =
@@ -121,6 +133,12 @@ fun Application.module(
         } else {
             null
         }
+
+    // Data-plane key validation (D-1). PG present → the real PG-backed validator (LG-P4·S1): config teams
+    // upserted + seeded keys imported (G-3), then `virtual_keys` lookups behind a ≤30 s cache. Storeless
+    // (Docker-free unit tier / dev) → the config-backed seeded-key validator; no issuance/revocation there.
+    val governance = pg?.let { GovernanceLoad.apply(it.db, gateway.governance) }
+    val keyValidator: KeyValidator = governance?.validator ?: ConfigKeyValidator(gateway.governance)
 
     // Provider layer (LG-P2): one pooled Ktor CIO client; per-provider keys resolved from env (C-5).
     val upstreamClient =
@@ -142,6 +160,66 @@ fun Application.module(
     val circuit = CircuitBreaker(gateway.providers.circuit)
     val engine = InferenceEngine(gateway.providers, circuit)
 
+    // Admission + budgets (LG-P4·S2). Rate limiting rides Redis (fail-open on outage); money budgets ride PG
+    // (so they exist only with a store — storeless boots skip both). Team rpm / budget / cost-center prefixes
+    // come from governance.yaml; per-key overrides ride on the validated KeyPrincipal (min-wins, D-3).
+    val rateLimiter = RateLimiter(redis, metrics)
+    val budgetService =
+        pg?.let {
+            BudgetService(
+                usage = BudgetUsageRepo(it.db),
+                teamBudgets =
+                    gateway.governance.teams
+                        .mapNotNull { t -> t.budget?.let { b -> t.id to b } }
+                        .toMap(),
+                metrics = metrics,
+            )
+        }
+    val teamRpm = gateway.governance.teams.associate { it.id to it.rateLimit?.requestsPerMinute }
+    val teamCostCenter = gateway.governance.teams.associate { it.id to it.costCenterPrefix }
+
+    // Admin key API (LG-P4·S3): Keycloak-JWT gated, over the S1 issuance service. Present only when
+    // configured (an `admin { }` block with the realm public key) AND PG-backed (issuance needs the store).
+    val adminAuth =
+        if (config.hasPath("admin.enabled") &&
+            config.getBoolean("admin.enabled") &&
+            config.hasPath("admin.realmPublicKey")
+        ) {
+            AdminAuth(
+                issuer = config.optStr("admin.issuer"),
+                audience = config.optStr("admin.audience"),
+                realmPublicKeyBase64 = config.getString("admin.realmPublicKey"),
+                requiredRole = config.optStr("admin.role") ?: "llm-gateway-admin",
+            )
+        } else {
+            null
+        }
+    val keyService = governance?.keyService
+
+    // Attribution (D-2, contracts §1.2): X-Cost-Center refines within the key's team and is prefix-validated
+    // (a key can never charge a foreign bucket → 400); absent ⇒ the team default. X-Turn-Ref is trace-only.
+    fun costCenterFor(
+        team: String,
+        header: String?,
+    ): String {
+        val prefix = teamCostCenter[team] ?: team
+        if (header != null && !header.startsWith(prefix)) {
+            throw GatewayException(
+                GatewayError.Validation("X-Cost-Center '$header' must start with the key's team prefix '$prefix'"),
+            )
+        }
+        return header ?: prefix
+    }
+
+    // Admission gate (architecture §3.1 order): rate-limit (hard 429) → money-budget pre-check (hard 429).
+    // Reuses the GatewayError rendering — RateLimit carries Retry-After, BudgetExceeded the x-gateway-reason.
+    fun admit(principal: KeyPrincipal) {
+        val rl = rateLimiter.check(principal.keyId, teamRpm[principal.team], principal.rpmOverride)
+        if (!rl.allowed) throw GatewayException(GatewayError.RateLimit(rl.retryAfterSeconds * 1000))
+        val budget = budgetService?.precheck(principal.team, principal.budgetUsdOverride)
+        if (budget != null && !budget.allowed) throw GatewayException(GatewayError.BudgetExceeded())
+    }
+
     monitor.subscribe(ApplicationStopping) {
         runCatching { pg?.close() }
         runCatching { redis?.close() }
@@ -151,8 +229,48 @@ fun Application.module(
     routing {
         // ── Data plane (virtual key required, D-1) ──────────────────────────────────────────────
         post("/v1/chat/completions") {
-            call.requireKey(keyValidator)
+            val principal = call.requireKey(keyValidator)
+            admit(principal) // rate-limit + budget pre-check (429 on breach) BEFORE any upstream work
             val req = ChatRequest.parse(call.receiveText()) // bad body → SerializationException → 400 (§1.7)
+            val startMs = System.currentTimeMillis()
+            // Attribution (D-2): prefix-validate X-Cost-Center against the key's team (foreign bucket → 400).
+            val costCenter = costCenterFor(principal.team, call.request.headers["X-Cost-Center"])
+
+            // Build + record the settle for one served response (D-4). Usage precedence is applied by the
+            // caller (tap UsageChunk → non-stream usage → estimate); cached always false until LG-P5·S1.
+            fun settle(
+                serving: RegistryEntry,
+                fallbackFrom: String?,
+                stripped: List<String>,
+                tokens: Usage,
+                estimated: Boolean,
+                ttfbMs: Long?,
+            ) = budgetService?.settle(
+                Settle(
+                    keyId = principal.keyId,
+                    teamId = principal.team,
+                    costCenter = costCenter,
+                    turnRef = call.request.headers["X-Turn-Ref"],
+                    requestedModel = req.model ?: "",
+                    servedProvider = serving.target.providerName,
+                    servedModel = serving.target.upstream,
+                    fallbackFrom = fallbackFrom,
+                    strippedParams = stripped,
+                    usage = tokens,
+                    costUsd =
+                        ResponseEnrichment.computeCost(
+                            serving.model,
+                            tokens.promptTokens,
+                            tokens.completionTokens,
+                        ),
+                    estimated = estimated,
+                    cached = false,
+                    ttfbMs = ttfbMs,
+                    durationMs = System.currentTimeMillis() - startMs,
+                    traceId = null,
+                ),
+            )
+
             // Full three-tier resolution (LG-P3·S1): alias → literal → model_tags soft-match. Unknown name →
             // 404; a wrong-type (embedding) match or no-model-no-tags → 400 Validation (never a silent default).
             // requestedModel (req.model) vs served (entry.target.upstream) both flow to the Settle record in P3·S2.
@@ -195,14 +313,44 @@ fun Application.module(
                             call.response.header("X-Gateway-Provider", serving.target.providerName)
                             call.response.header("X-Gateway-Model", serving.target.upstream)
                             val tap = TapParser(serving.target.providerName, serving.target.upstream)
-                            call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
-                                pumpSse(
-                                    frames = open.frames,
-                                    out = this,
-                                    tap = {}, // observations feed settlement/metrics in LG-P5; no consumer yet
-                                    parser = tap,
-                                    model = serving.model,
-                                    heartbeatMillis = gateway.providers.sse.heartbeatSeconds * 1000,
+                            val settleTap = StreamSettleTap()
+                            try {
+                                call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
+                                    pumpSse(
+                                        frames = open.frames,
+                                        out = this,
+                                        tap = { settleTap.observe(it) }, // capture usage + TTFB for the settle
+                                        parser = tap,
+                                        model = serving.model,
+                                        heartbeatMillis = gateway.providers.sse.heartbeatSeconds * 1000,
+                                    )
+                                }
+                            } finally {
+                                // Settle at stream end — success, error, OR client-abandon (D-4). Usage is the
+                                // tap's UsageChunk when it arrived, else a flagged tokenizer estimate.
+                                val streamed = settleTap.usage
+                                val (tokens, estimated) =
+                                    if (streamed != null) {
+                                        Usage(
+                                            streamed.promptTokens,
+                                            streamed.completionTokens,
+                                            streamed.cachedTokens,
+                                        ) to
+                                            false
+                                    } else {
+                                        Usage(
+                                            TokenEstimator.estimatePromptTokens(req.messages, serving.model.name),
+                                            0,
+                                        ) to
+                                            true
+                                    }
+                                settle(
+                                    serving,
+                                    open.fallbackFrom,
+                                    open.strippedParams,
+                                    tokens,
+                                    estimated,
+                                    settleTap.ttfbMs,
                                 )
                             }
                         }
@@ -222,6 +370,15 @@ fun Application.module(
                     val serving = outcome.serving
                     call.response.header("X-Gateway-Provider", serving.target.providerName)
                     call.response.header("X-Gateway-Model", serving.target.upstream)
+                    // Usage precedence (D-4): the upstream `usage` field, else a flagged tokenizer estimate.
+                    val u = outcome.result.usage
+                    val (tokens, estimated) =
+                        if (u != null) {
+                            Usage(u.promptTokens, u.completionTokens) to false
+                        } else {
+                            Usage(TokenEstimator.estimatePromptTokens(req.messages, serving.model.name), 0) to true
+                        }
+                    settle(serving, outcome.fallbackFrom, outcome.strippedParams, tokens, estimated, null)
                     call.respond(HttpStatusCode.OK, ResponseEnrichment.chat(outcome.result, serving.model))
                 }
                 is InferenceEngine.ChainResult.Failed -> {
@@ -232,7 +389,10 @@ fun Application.module(
             }
         }
         post("/v1/embeddings") {
-            call.requireKey(keyValidator)
+            val principal = call.requireKey(keyValidator)
+            admit(principal) // embeddings cost money too — same rate-limit + budget gate as chat
+            // D-2: prefix-validate X-Cost-Center against the key's team (foreign bucket → 400)
+            val costCenter = costCenterFor(principal.team, call.request.headers["X-Cost-Center"])
             // Embeddings ride passthrough end-to-end (B-T5) — raw JsonObject, no B-T2 model.
             val json = Json.parseToJsonElement(call.receiveText()).jsonObject
             val input =
@@ -277,6 +437,29 @@ fun Application.module(
             } else {
                 call.response.header("X-Gateway-Provider", entry.target.providerName)
                 call.response.header("X-Gateway-Model", entry.target.upstream)
+                // Settle embeddings on the input-only usage (no completion tokens). The tokenizer estimate is
+                // chat-message-shaped, so for embeddings we settle the reported tokens or 0 (flagged estimated).
+                val inTokens = result.usage?.promptTokens ?: 0
+                budgetService?.settle(
+                    Settle(
+                        keyId = principal.keyId,
+                        teamId = principal.team,
+                        costCenter = costCenter,
+                        turnRef = call.request.headers["X-Turn-Ref"],
+                        requestedModel = modelName ?: "",
+                        servedProvider = entry.target.providerName,
+                        servedModel = entry.target.upstream,
+                        fallbackFrom = null,
+                        strippedParams = emptyList(),
+                        usage = Usage(inTokens, 0),
+                        costUsd = ResponseEnrichment.computeCost(entry.model, inTokens, 0),
+                        estimated = result.usage == null,
+                        cached = false,
+                        ttfbMs = null,
+                        durationMs = 0,
+                        traceId = null,
+                    ),
+                )
                 call.respond(HttpStatusCode.OK, ResponseEnrichment.embeddings(result, entry.model))
             }
         }
@@ -301,6 +484,95 @@ fun Application.module(
                     }
                 },
             )
+        }
+
+        // ── Admin plane (Keycloak JWT, realm role llm-gateway-admin — LG-P4·S3, contracts §1.8) ──
+        // Registered only when configured + PG-backed. In-service JWT verification is the only gate (D-1).
+        if (adminAuth != null && keyService != null) {
+            post("/admin/keys") {
+                if (!call.adminOk(adminAuth)) return@post
+                val body =
+                    runCatching { Json.parseToJsonElement(call.receiveText()).jsonObject }.getOrNull()
+                        ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            buildJsonObject { put("error", "invalid JSON body") },
+                        )
+                val team = body["team"]?.jsonPrimitive?.contentOrNull
+                val name = body["name"]?.jsonPrimitive?.contentOrNull
+                if (team.isNullOrBlank() || name.isNullOrBlank()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "'team' and 'name' are required") },
+                    )
+                }
+                val issued =
+                    try {
+                        keyService.issueKey(team, name)
+                    } catch (e: IllegalArgumentException) {
+                        return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            buildJsonObject {
+                                put(
+                                    "error",
+                                    e.message ?: "unknown team",
+                                )
+                            },
+                        )
+                    }
+                call.respond(
+                    HttpStatusCode.Created,
+                    buildJsonObject {
+                        put("id", issued.row.id)
+                        put("key", issued.plaintext) // plaintext returned EXACTLY once (D-1)
+                        put("team", issued.row.teamId)
+                        put("name", issued.row.name)
+                        put("created_at", issued.row.createdAt.toString())
+                    },
+                )
+            }
+            get("/admin/keys") {
+                if (!call.adminOk(adminAuth)) return@get
+                val team = call.request.queryParameters["team"]
+                val rows =
+                    if (team !=
+                        null
+                    ) {
+                        keyService.list(team)
+                    } else {
+                        gateway.governance.teams.flatMap { keyService.list(it.id) }
+                    }
+                call.respond(
+                    buildJsonObject {
+                        putJsonArray("data") {
+                            rows.forEach { r ->
+                                add(
+                                    buildJsonObject {
+                                        // NEVER key_hash / plaintext (contracts §1.8)
+                                        put("id", r.id)
+                                        put("team", r.teamId)
+                                        put("name", r.name)
+                                        put("created_at", r.createdAt.toString())
+                                        put("revoked_at", r.revokedAt?.toString())
+                                        put("last_used_at", r.lastUsedAt?.toString())
+                                    },
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+            delete("/admin/keys/{id}") {
+                if (!call.adminOk(adminAuth)) return@delete
+                val id = call.parameters["id"]
+                if (id.isNullOrBlank()) {
+                    return@delete call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "missing key id") },
+                    )
+                }
+                keyService.revoke(id) // idempotent; takes effect within the validator's ≤30 s TTL
+                call.respond(HttpStatusCode.NoContent)
+            }
         }
 
         // ── Ops plane (unauthenticated, cluster-internal) ───────────────────────────────────────
@@ -354,4 +626,44 @@ fun Application.module(
         serverConfig.serverPort,
         serverConfig.telemetryEnabled,
     )
+}
+
+private fun Config.optStr(path: String): String? = if (hasPath(path)) getString(path) else null
+
+/**
+ * Admin-plane gate: verify the Keycloak JWT + role and respond 401/403 on failure (contracts §1.8). Returns
+ * true when the caller may proceed. Admin responses are plain JSON, not the OpenAI error envelope.
+ */
+private suspend fun io.ktor.server.application.ApplicationCall.adminOk(auth: AdminAuth): Boolean =
+    when (auth.authenticate(bearerToken())) {
+        is AdminAuth.Result.Ok -> true
+        AdminAuth.Result.Forbidden -> {
+            respond(
+                HttpStatusCode.Forbidden,
+                buildJsonObject {
+                    put("error", "forbidden")
+                    put("detail", "requires the llm-gateway-admin realm role")
+                },
+            )
+            false
+        }
+        else -> {
+            respond(HttpStatusCode.Unauthorized, buildJsonObject { put("error", "unauthorized") })
+            false
+        }
+    }
+
+/** Captures the settle-relevant tap signals off a live stream (last usage chunk + TTFB) for the finally settle. */
+private class StreamSettleTap {
+    @Volatile var usage: StreamUsage? = null
+
+    @Volatile var ttfbMs: Long? = null
+
+    fun observe(o: StreamObservation) {
+        when (o) {
+            is StreamObservation.FirstToken -> ttfbMs = o.ttfbMs
+            is StreamObservation.UsageChunk -> usage = o.usage
+            else -> {}
+        }
+    }
 }
