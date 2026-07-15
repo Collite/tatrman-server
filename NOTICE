@@ -2,3 +2,19 @@ Tatrman Server
 Copyright 2026 Collite
 
 Licensed under the Apache License, Version 2.0; see the LICENSE file for the full text.
+
+---
+
+This product includes Apache Calcite, transitively distributed via `ttr-translator` into the
+chrono, geo, money, veles, and ttr-validate service images:
+
+Apache Calcite
+Copyright 2012-2026 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+This product is based on source code originally developed
+by DynamoBI Corporation, LucidEra Inc., SQLstream Inc. and others
+under the auspices of the Eigenbase Foundation
+and released as the LucidDB project.
