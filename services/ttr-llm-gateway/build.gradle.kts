@@ -140,6 +140,8 @@ dependencies {
     "componentTestImplementation"(libs.ktor.server.test.host)
     "componentTestImplementation"(libs.typesafe.config)
     "componentTestImplementation"(libs.postgresql)
+    // governance repos are constructed over DatabaseConnection in the LG-P4·S1 component specs
+    "componentTestImplementation"(project(":shared:libs:kotlin:db-common"))
     "componentTestImplementation"(libs.wiremock)
     "componentTestImplementation"(libs.kotlinx.serialization.json) // SSE tool-call reassembly (S2 conformance)
 }

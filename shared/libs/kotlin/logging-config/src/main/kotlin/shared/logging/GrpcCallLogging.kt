@@ -155,9 +155,21 @@ private val SECRET_FIELD_NAMES =
 private val SECRET_FIELD_REGEX =
     Regex("(?i)\\b(${SECRET_FIELD_NAMES.joinToString("|")})\\b(\\s*:\\s*)\"(?:\\\\.|[^\"\\\\])*\"")
 
-/** Mask secret-bearing field values in a rendered protobuf payload string. */
-internal fun redactSecrets(rendered: String): String =
-    SECRET_FIELD_REGEX.replace(rendered) { m -> "${m.groupValues[1]}${m.groupValues[2]}\"<redacted>\"" }
+/**
+ * `ttrk-` virtual-gateway keys (LG-P4·S1, D-1) are masked by VALUE, not field name: a leaked key can
+ * appear bare in an exception message ("insert failed for ttrk-…"), which the field-name pass above would
+ * miss. The `ttrk-` prefix is kept so a log stays diagnostic ("it was a virtual key") without the secret.
+ */
+private val TTRK_KEY_REGEX = Regex("ttrk-[A-Za-z0-9_-]+")
+
+/** Mask secret-bearing field values AND bare `ttrk-` keys in a rendered payload / message string. */
+internal fun redactSecrets(rendered: String): String {
+    val fieldsMasked =
+        SECRET_FIELD_REGEX.replace(
+            rendered,
+        ) { m -> "${m.groupValues[1]}${m.groupValues[2]}\"<redacted>\"" }
+    return TTRK_KEY_REGEX.replace(fieldsMasked) { "ttrk-<redacted>" }
+}
 
 private fun formatPayload(message: Any?): String {
     val rendered =

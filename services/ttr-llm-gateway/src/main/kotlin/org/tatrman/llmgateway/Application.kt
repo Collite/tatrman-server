@@ -36,11 +36,13 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.slf4j.LoggerFactory
 import org.tatrman.llmgateway.auth.ConfigKeyValidator
+import org.tatrman.llmgateway.auth.KeyValidator
 import org.tatrman.llmgateway.auth.requireKey
 import org.tatrman.llmgateway.config.ConfigLoader
 import org.tatrman.llmgateway.config.GatewayConfig
 import org.tatrman.llmgateway.engine.CircuitBreaker
 import org.tatrman.llmgateway.engine.InferenceEngine
+import org.tatrman.llmgateway.governance.GovernanceLoad
 import org.tatrman.llmgateway.provider.PassthroughHandler
 import org.tatrman.llmgateway.provider.ProviderRegistry
 import org.tatrman.llmgateway.provider.RegistryResolution
@@ -101,9 +103,6 @@ fun Application.module(
         gateway.governance.teams.size,
     )
 
-    // Data-plane key validation (D-1) — interim seeded-key impl; PG-backed issued keys land LG-P4·S1.
-    val keyValidator = ConfigKeyValidator(gateway.governance)
-
     // Stores (T4). Built only when enabled so the skeleton boots storeless in unit tests; a Redis
     // outage never fails boot (lazy connect), but PG must be up at startup for Flyway to migrate.
     val pg =
@@ -120,6 +119,16 @@ fun Application.module(
             RedisConn.fromConfig(config).also { log.info("Redis client created") }
         } else {
             null
+        }
+
+    // Data-plane key validation (D-1). PG present → the real PG-backed validator (LG-P4·S1): config teams
+    // upserted + seeded keys imported (G-3), then `virtual_keys` lookups behind a ≤30 s cache. Storeless
+    // (Docker-free unit tier / dev) → the config-backed seeded-key validator; no issuance/revocation there.
+    val keyValidator: KeyValidator =
+        if (pg != null) {
+            GovernanceLoad.apply(pg.db, gateway.governance).validator
+        } else {
+            ConfigKeyValidator(gateway.governance)
         }
 
     // Provider layer (LG-P2): one pooled Ktor CIO client; per-provider keys resolved from env (C-5).
