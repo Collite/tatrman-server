@@ -2,6 +2,7 @@
 package org.tatrman.llmgateway.governance
 
 import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.javatime.date
 import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -35,4 +36,15 @@ object VirtualKeys : Table("virtual_keys") {
     val lastUsedAt = timestampWithTimeZone("last_used_at").nullable()
 
     override val primaryKey = PrimaryKey(id)
+}
+
+/** Calendar-monthly usage counters per team (D-3). Settle is a single atomic upsert-add (see [BudgetUsageRepo]). */
+object BudgetUsage : Table("budget_usage") {
+    val teamId = text("team_id")
+    val month = date("month") // first of month, UTC
+    val usedUsd = decimal("used_usd", 14, 6)
+    val usedTokensIn = long("used_tokens_in")
+    val usedTokensOut = long("used_tokens_out")
+
+    override val primaryKey = PrimaryKey(teamId, month)
 }

@@ -110,6 +110,7 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.pgsql)
     implementation(libs.lettuce.core)
+    implementation(libs.jtokkit) // BPE token estimator — flagged last-resort budget usage (LG-P4·S2, D-4)
 
     // Observability
     implementation(libs.slf4j.api)
@@ -142,6 +143,8 @@ dependencies {
     "componentTestImplementation"(libs.postgresql)
     // governance repos are constructed over DatabaseConnection in the LG-P4·S1 component specs
     "componentTestImplementation"(project(":shared:libs:kotlin:db-common"))
+    // rate-limit component specs assert Redis state (TTL) via RedisConn.sync() (LG-P4·S2)
+    "componentTestImplementation"(libs.lettuce.core)
     "componentTestImplementation"(libs.wiremock)
     "componentTestImplementation"(libs.kotlinx.serialization.json) // SSE tool-call reassembly (S2 conformance)
 }

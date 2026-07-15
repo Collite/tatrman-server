@@ -36,20 +36,30 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.slf4j.LoggerFactory
 import org.tatrman.llmgateway.auth.ConfigKeyValidator
+import org.tatrman.llmgateway.auth.KeyPrincipal
 import org.tatrman.llmgateway.auth.KeyValidator
 import org.tatrman.llmgateway.auth.requireKey
 import org.tatrman.llmgateway.config.ConfigLoader
 import org.tatrman.llmgateway.config.GatewayConfig
 import org.tatrman.llmgateway.engine.CircuitBreaker
 import org.tatrman.llmgateway.engine.InferenceEngine
+import org.tatrman.llmgateway.governance.BudgetService
+import org.tatrman.llmgateway.governance.BudgetUsageRepo
 import org.tatrman.llmgateway.governance.GovernanceLoad
+import org.tatrman.llmgateway.governance.RateLimiter
+import org.tatrman.llmgateway.governance.Settle
+import org.tatrman.llmgateway.governance.TokenEstimator
+import org.tatrman.llmgateway.governance.Usage
 import org.tatrman.llmgateway.provider.PassthroughHandler
 import org.tatrman.llmgateway.provider.ProviderRegistry
+import org.tatrman.llmgateway.provider.RegistryEntry
 import org.tatrman.llmgateway.provider.RegistryResolution
 import org.tatrman.llmgateway.provider.RequestedType
 import org.tatrman.llmgateway.provider.ResponseEnrichment
 import org.tatrman.llmgateway.provider.anthropic.AnthropicHandler
 import org.tatrman.llmgateway.provider.pumpSse
+import org.tatrman.llmgateway.stream.StreamObservation
+import org.tatrman.llmgateway.stream.StreamUsage
 import org.tatrman.llmgateway.stream.TapParser
 import org.tatrman.llmgateway.store.Pg
 import org.tatrman.llmgateway.store.RedisConn
@@ -151,6 +161,33 @@ fun Application.module(
     val circuit = CircuitBreaker(gateway.providers.circuit)
     val engine = InferenceEngine(gateway.providers, circuit)
 
+    // Admission + budgets (LG-P4·S2). Rate limiting rides Redis (fail-open on outage); money budgets ride PG
+    // (so they exist only with a store — storeless boots skip both). Team rpm / budget / cost-center prefixes
+    // come from governance.yaml; per-key overrides ride on the validated KeyPrincipal (min-wins, D-3).
+    val rateLimiter = RateLimiter(redis, metrics)
+    val budgetService =
+        pg?.let {
+            BudgetService(
+                usage = BudgetUsageRepo(it.db),
+                teamBudgets =
+                    gateway.governance.teams
+                        .mapNotNull { t -> t.budget?.let { b -> t.id to b } }
+                        .toMap(),
+                metrics = metrics,
+            )
+        }
+    val teamRpm = gateway.governance.teams.associate { it.id to it.rateLimit?.requestsPerMinute }
+    val teamCostCenter = gateway.governance.teams.associate { it.id to it.costCenterPrefix }
+
+    // Admission gate (architecture §3.1 order): rate-limit (hard 429) → money-budget pre-check (hard 429).
+    // Reuses the GatewayError rendering — RateLimit carries Retry-After, BudgetExceeded the x-gateway-reason.
+    fun admit(principal: KeyPrincipal) {
+        val rl = rateLimiter.check(principal.keyId, teamRpm[principal.team], principal.rpmOverride)
+        if (!rl.allowed) throw GatewayException(GatewayError.RateLimit(rl.retryAfterSeconds * 1000))
+        val budget = budgetService?.precheck(principal.team, principal.budgetUsdOverride)
+        if (budget != null && !budget.allowed) throw GatewayException(GatewayError.BudgetExceeded())
+    }
+
     monitor.subscribe(ApplicationStopping) {
         runCatching { pg?.close() }
         runCatching { redis?.close() }
@@ -160,8 +197,46 @@ fun Application.module(
     routing {
         // ── Data plane (virtual key required, D-1) ──────────────────────────────────────────────
         post("/v1/chat/completions") {
-            call.requireKey(keyValidator)
+            val principal = call.requireKey(keyValidator)
+            admit(principal) // rate-limit + budget pre-check (429 on breach) BEFORE any upstream work
             val req = ChatRequest.parse(call.receiveText()) // bad body → SerializationException → 400 (§1.7)
+            val startMs = System.currentTimeMillis()
+
+            // Build + record the settle for one served response (D-4). Usage precedence is applied by the
+            // caller (tap UsageChunk → non-stream usage → estimate); cached always false until LG-P5·S1.
+            fun settle(
+                serving: RegistryEntry,
+                fallbackFrom: String?,
+                stripped: List<String>,
+                tokens: Usage,
+                estimated: Boolean,
+                ttfbMs: Long?,
+            ) = budgetService?.settle(
+                Settle(
+                    keyId = principal.keyId,
+                    teamId = principal.team,
+                    costCenter = teamCostCenter[principal.team],
+                    turnRef = call.request.headers["X-Turn-Ref"],
+                    requestedModel = req.model ?: "",
+                    servedProvider = serving.target.providerName,
+                    servedModel = serving.target.upstream,
+                    fallbackFrom = fallbackFrom,
+                    strippedParams = stripped,
+                    usage = tokens,
+                    costUsd =
+                        ResponseEnrichment.computeCost(
+                            serving.model,
+                            tokens.promptTokens,
+                            tokens.completionTokens,
+                        ),
+                    estimated = estimated,
+                    cached = false,
+                    ttfbMs = ttfbMs,
+                    durationMs = System.currentTimeMillis() - startMs,
+                    traceId = null,
+                ),
+            )
+
             // Full three-tier resolution (LG-P3·S1): alias → literal → model_tags soft-match. Unknown name →
             // 404; a wrong-type (embedding) match or no-model-no-tags → 400 Validation (never a silent default).
             // requestedModel (req.model) vs served (entry.target.upstream) both flow to the Settle record in P3·S2.
@@ -204,14 +279,44 @@ fun Application.module(
                             call.response.header("X-Gateway-Provider", serving.target.providerName)
                             call.response.header("X-Gateway-Model", serving.target.upstream)
                             val tap = TapParser(serving.target.providerName, serving.target.upstream)
-                            call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
-                                pumpSse(
-                                    frames = open.frames,
-                                    out = this,
-                                    tap = {}, // observations feed settlement/metrics in LG-P5; no consumer yet
-                                    parser = tap,
-                                    model = serving.model,
-                                    heartbeatMillis = gateway.providers.sse.heartbeatSeconds * 1000,
+                            val settleTap = StreamSettleTap()
+                            try {
+                                call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
+                                    pumpSse(
+                                        frames = open.frames,
+                                        out = this,
+                                        tap = { settleTap.observe(it) }, // capture usage + TTFB for the settle
+                                        parser = tap,
+                                        model = serving.model,
+                                        heartbeatMillis = gateway.providers.sse.heartbeatSeconds * 1000,
+                                    )
+                                }
+                            } finally {
+                                // Settle at stream end — success, error, OR client-abandon (D-4). Usage is the
+                                // tap's UsageChunk when it arrived, else a flagged tokenizer estimate.
+                                val streamed = settleTap.usage
+                                val (tokens, estimated) =
+                                    if (streamed != null) {
+                                        Usage(
+                                            streamed.promptTokens,
+                                            streamed.completionTokens,
+                                            streamed.cachedTokens,
+                                        ) to
+                                            false
+                                    } else {
+                                        Usage(
+                                            TokenEstimator.estimatePromptTokens(req.messages, serving.model.name),
+                                            0,
+                                        ) to
+                                            true
+                                    }
+                                settle(
+                                    serving,
+                                    open.fallbackFrom,
+                                    open.strippedParams,
+                                    tokens,
+                                    estimated,
+                                    settleTap.ttfbMs,
                                 )
                             }
                         }
@@ -231,6 +336,15 @@ fun Application.module(
                     val serving = outcome.serving
                     call.response.header("X-Gateway-Provider", serving.target.providerName)
                     call.response.header("X-Gateway-Model", serving.target.upstream)
+                    // Usage precedence (D-4): the upstream `usage` field, else a flagged tokenizer estimate.
+                    val u = outcome.result.usage
+                    val (tokens, estimated) =
+                        if (u != null) {
+                            Usage(u.promptTokens, u.completionTokens) to false
+                        } else {
+                            Usage(TokenEstimator.estimatePromptTokens(req.messages, serving.model.name), 0) to true
+                        }
+                    settle(serving, outcome.fallbackFrom, outcome.strippedParams, tokens, estimated, null)
                     call.respond(HttpStatusCode.OK, ResponseEnrichment.chat(outcome.result, serving.model))
                 }
                 is InferenceEngine.ChainResult.Failed -> {
@@ -241,7 +355,8 @@ fun Application.module(
             }
         }
         post("/v1/embeddings") {
-            call.requireKey(keyValidator)
+            val principal = call.requireKey(keyValidator)
+            admit(principal) // embeddings cost money too — same rate-limit + budget gate as chat
             // Embeddings ride passthrough end-to-end (B-T5) — raw JsonObject, no B-T2 model.
             val json = Json.parseToJsonElement(call.receiveText()).jsonObject
             val input =
@@ -286,6 +401,29 @@ fun Application.module(
             } else {
                 call.response.header("X-Gateway-Provider", entry.target.providerName)
                 call.response.header("X-Gateway-Model", entry.target.upstream)
+                // Settle embeddings on the input-only usage (no completion tokens). The tokenizer estimate is
+                // chat-message-shaped, so for embeddings we settle the reported tokens or 0 (flagged estimated).
+                val inTokens = result.usage?.promptTokens ?: 0
+                budgetService?.settle(
+                    Settle(
+                        keyId = principal.keyId,
+                        teamId = principal.team,
+                        costCenter = teamCostCenter[principal.team],
+                        turnRef = call.request.headers["X-Turn-Ref"],
+                        requestedModel = modelName ?: "",
+                        servedProvider = entry.target.providerName,
+                        servedModel = entry.target.upstream,
+                        fallbackFrom = null,
+                        strippedParams = emptyList(),
+                        usage = Usage(inTokens, 0),
+                        costUsd = ResponseEnrichment.computeCost(entry.model, inTokens, 0),
+                        estimated = result.usage == null,
+                        cached = false,
+                        ttfbMs = null,
+                        durationMs = 0,
+                        traceId = null,
+                    ),
+                )
                 call.respond(HttpStatusCode.OK, ResponseEnrichment.embeddings(result, entry.model))
             }
         }
@@ -363,4 +501,19 @@ fun Application.module(
         serverConfig.serverPort,
         serverConfig.telemetryEnabled,
     )
+}
+
+/** Captures the settle-relevant tap signals off a live stream (last usage chunk + TTFB) for the finally settle. */
+private class StreamSettleTap {
+    @Volatile var usage: StreamUsage? = null
+
+    @Volatile var ttfbMs: Long? = null
+
+    fun observe(o: StreamObservation) {
+        when (o) {
+            is StreamObservation.FirstToken -> ttfbMs = o.ttfbMs
+            is StreamObservation.UsageChunk -> usage = o.usage
+            else -> {}
+        }
+    }
 }
