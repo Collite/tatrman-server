@@ -9,6 +9,9 @@ import io.lettuce.core.SocketOptions
 import io.lettuce.core.api.StatefulRedisConnection
 import java.time.Duration
 
+/** An optional string key: the configured value, or null when the path is absent. */
+private fun Config.stringOrNull(path: String): String? = if (hasPath(path)) getString(path) else null
+
 /**
  * LG-P1·S1·T4 — Redis wrapper (lettuce; this is the FIRST lettuce use in the repo — replaces 1.x
  * Spring `StringRedisTemplate`). Holds a lazily-opened, auto-reconnecting connection so a Redis
@@ -45,13 +48,23 @@ class RedisConn private constructor(
         /** Build (do not connect yet) from the `redis { … }` config block. */
         fun fromConfig(config: Config): RedisConn {
             val redis = config.getConfig("redis")
-            val uri =
+            val builder =
                 RedisURI
                     .Builder
                     .redis(redis.getString("host"), redis.getInt("port"))
                     .withTimeout(Duration.ofSeconds(2))
-                    .build()
-            val client = RedisClient.create(uri)
+            // Optional AUTH (bug #10) — a password-protected or ACL Redis. Omitted keys → no-auth (the
+            // dev/local default). `username` present ⇒ ACL (Redis ≥6); password alone ⇒ legacy requirepass.
+            val password = redis.stringOrNull("password")?.takeIf { it.isNotBlank() }
+            if (password != null) {
+                val username = redis.stringOrNull("username")?.takeIf { it.isNotBlank() }
+                if (username != null) {
+                    builder.withAuthentication(username, password.toCharArray())
+                } else {
+                    builder.withPassword(password.toCharArray())
+                }
+            }
+            val client = RedisClient.create(builder.build())
             client.options =
                 ClientOptions
                     .builder()

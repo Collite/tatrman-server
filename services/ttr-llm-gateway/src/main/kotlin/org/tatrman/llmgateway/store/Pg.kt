@@ -13,12 +13,21 @@ import shared.libs.db.common.DatabaseConnection
  */
 class Pg private constructor(
     val db: DatabaseConnection,
+    private val appRole: String,
 ) {
-    /** Apply Flyway migrations (V1 exists; V2/V3 land in LG-P4/P5). Runs at startup, before serving. */
+    /**
+     * Apply Flyway migrations (V1 exists; V2/V3 land in LG-P4/P5). Runs at startup, before serving.
+     * The runtime DB role is passed as the `${appRole}` placeholder so the table GRANTs target the
+     * configured `db.user` (bug #11) — never a hardcoded name. When the migration user and the app
+     * user are the same (the common single-role deploy) it's a harmless self-grant; when a superuser
+     * migrates a DB whose app connects as a different role (e.g. CNPG owner `llm_gateway`) it grants
+     * that role correctly instead of failing on a non-existent `tatrman`.
+     */
     fun migrate() {
         Flyway
             .configure()
             .dataSource(db.getDataSource())
+            .placeholders(mapOf("appRole" to appRole))
             .load()
             .migrate()
     }
@@ -41,7 +50,7 @@ class Pg private constructor(
         fun fromConfig(config: Config): Pg {
             val db = DatabaseConnection.fromConfig(config, "db")
             db.init()
-            return Pg(db)
+            return Pg(db, config.getConfig("db").getString("user"))
         }
     }
 }

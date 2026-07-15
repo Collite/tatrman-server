@@ -32,4 +32,4 @@ CREATE TABLE IF NOT EXISTS budget_usage (        -- calendar-monthly counters (D
     PRIMARY KEY (team_id, month)
 );
 
-GRANT ALL PRIVILEGES ON TABLE teams, virtual_keys, budget_usage TO tatrman;
+GRANT ALL PRIVILEGES ON TABLE teams, virtual_keys, budget_usage TO "${appRole}";
