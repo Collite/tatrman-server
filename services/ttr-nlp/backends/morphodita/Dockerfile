@@ -89,7 +89,15 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 
 # S-1: launch with the EXPLICIT model id (rest_id `czech` → tagger path). The
 # `<ack>` acknowledgements arg is required by morphodita_server.
+#
+# --log_file: microrestd's rest_server writes a connection log to a file named
+# after the binary (default `morphodita_server.log`) in the CWD. The runtime CWD
+# is `/` and we run as the non-root `appuser`, so the default path is unwritable
+# and the server aborts at startup ("Cannot open log file '...' for writing!").
+# Route the log to /dev/stderr — no filesystem write, and the server's log flows
+# to `kubectl logs` / `docker logs` like the other backends.
 CMD ["sh", "-c", "exec morphodita_server \
   --connection_timeout=${CONNECTION_TIMEOUT} \
   --max_request_size=${MAX_REQUEST_SIZE} \
+  --log_file=/dev/stderr \
   ${PORT} czech /opt/model/${MODEL_ID}.tagger 'ttr-nlp self-hosted MorphoDiTa (CC BY-NC-SA)'"]
