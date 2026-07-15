@@ -1,0 +1,119 @@
+name: Release NLP Backends (GHCR)
+
+# Build + push the four ttr-nlp ENGINE BACKEND images — MorphoDiTa, NameTag 3, Stanza, spaCy —
+# to ghcr.io/collite/ttr-nlp-<backend>:<version>.
+#
+# WHY A SEPARATE, MANUAL-ONLY WORKFLOW (not release-image.yml):
+#   - Each backend is its own image built from services/ttr-nlp/backends/<backend>/ with a
+#     self-contained context (its own baked-model stage); they are not in the module map.
+#   - The UFAL backends (morphodita, nametag3) bake CC BY-NC-SA models — *publishing* the images
+#     is a gated legal item (FI-4, see services/ttr-nlp/README.md). So there is NO push trigger:
+#     every publish is a deliberate human `workflow_dispatch`. spaCy/Stanza carry permissive models.
+#
+# MODEL SOURCE (UFAL backends only) — set these as repo Actions VARIABLES
+# (Settings → Secrets and variables → Actions → Variables; they are public LINDAT URLs, not secrets):
+#   NLP_MORPHODITA_MODEL_URL   (+ optional NLP_MORPHODITA_MODEL_SHA256 to digest-pin the download)
+#   NLP_NAMETAG3_MODEL_URL     (+ optional NLP_NAMETAG3_MODEL_SHA256)
+# spaCy/Stanza need no model arg (models are baked from pip in their Dockerfiles).
+#
+# Auth: GITHUB_TOKEN with packages:write — this repo is in the Collite org, so it can CREATE and push
+# the ghcr.io/collite/ttr-nlp-* packages (a local PAT needs the write:packages scope to do the same).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (no leading v), e.g. 0.9.0'
+        required: true
+        default: '0.9.0'
+      backends:
+        description: '"all" or a space-separated subset: morphodita nametag3 stanza spacy'
+        required: true
+        default: 'all'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_ORG: collite
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          ALL="morphodita nametag3 stanza spacy"
+          REQ="${{ github.event.inputs.backends }}"
+          [ "$REQ" = "all" ] && REQ="$ALL"
+          items=""
+          for b in $REQ; do
+            case " $ALL " in
+              *" $b "*) : ;;
+              *) echo "::error::unknown backend '$b' (valid: $ALL)"; exit 1 ;;
+            esac
+            items="${items}{\"backend\":\"$b\"},"
+          done
+          echo "matrix={\"include\":[${items%,}]}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: cfg
+        shell: bash
+        env:
+          MORPHODITA_URL: ${{ vars.NLP_MORPHODITA_MODEL_URL }}
+          MORPHODITA_SHA: ${{ vars.NLP_MORPHODITA_MODEL_SHA256 }}
+          NAMETAG3_URL: ${{ vars.NLP_NAMETAG3_MODEL_URL }}
+          NAMETAG3_SHA: ${{ vars.NLP_NAMETAG3_MODEL_SHA256 }}
+        run: |
+          set -euo pipefail
+          B="${{ matrix.backend }}"
+          echo "context=services/ttr-nlp/backends/$B" >> "$GITHUB_OUTPUT"
+          echo "image=${REGISTRY}/${IMAGE_ORG}/ttr-nlp-$B" >> "$GITHUB_OUTPUT"
+
+          # UFAL backends require MODEL_URL; MODEL_SHA256 is optional (digest-pin). Only emit an arg
+          # when set — passing an empty MODEL_SHA256 would trip the Dockerfile's checksum guard.
+          url=""; sha=""
+          case "$B" in
+            morphodita) url="$MORPHODITA_URL"; sha="$MORPHODITA_SHA" ;;
+            nametag3)   url="$NAMETAG3_URL";   sha="$NAMETAG3_SHA" ;;
+          esac
+          if { [ "$B" = "morphodita" ] || [ "$B" = "nametag3" ]; } && [ -z "$url" ]; then
+            echo "::error::$B needs its model URL — set repo Actions variable NLP_$(echo "$B" | tr a-z A-Z)_MODEL_URL"
+            exit 1
+          fi
+          {
+            echo "build_args<<__EOF__"
+            [ -n "$url" ] && echo "MODEL_URL=$url"
+            [ -n "$sha" ] && echo "MODEL_SHA256=$sha"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.cfg.outputs.context }}
+          platforms: linux/amd64
+          push: true
+          provenance: false          # plain single-arch manifest, matching the other ttr-* images
+          tags: ${{ steps.cfg.outputs.image }}:${{ github.event.inputs.version }}
+          build-args: ${{ steps.cfg.outputs.build_args }}
