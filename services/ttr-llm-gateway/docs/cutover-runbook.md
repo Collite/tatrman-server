@@ -190,22 +190,79 @@ legacy `prometheus` host value is retired. Four callers on this path, in two key
    `sha256Hex(key)` against `virtual_keys` (a row that exists and is not revoked ⇒ the team's principal).
    `governance.yaml` ships `keys: []`, so the hashes must be put in one of two places — pick one:
 
-   **(a) Direct SQL — no chart change, do it once after §2b is green.** The six teams are upserted into
-   `teams` at boot from the baked `governance.yaml`, so only the key rows are needed. `key_hash` is the
-   SHA-256 hex (not a credential — irreversible; the plaintext stays in the consumer secrets):
+   **(a) Direct SQL — no chart change, the path used in the collite-o1 cutover.** `PgKeyValidator` hashes
+   a presented key with `sha256Hex` (SHA-256, **lowercase hex, over the whole `ttrk-…` string, no
+   trailing newline**) and looks it up in `virtual_keys`.
+
+   **Target DB = the one the gateway itself uses** (§2b `LLM_GATEWAY_DB_*`): database `llm_gateway` on the
+   CNPG `postgres` cluster in ns `data` (`postgres-rw.data.svc:5432`, role `llm_gateway`), table
+   `virtual_keys` (Flyway V2). NOT a sibling DB (iris/pythia/golem/…) on the same cluster.
+
+   ⚠ **Run this AFTER the 2.0 pod is Ready** — that boot applies Flyway V1–V3 (creates `virtual_keys`) and
+   upserts the six teams (`virtual_keys.team_id` FKs `teams`). Too early ⇒ `relation "virtual_keys" does
+   not exist` or an FK violation. Gate on `kubectl -n ttr-server rollout status deploy/llm-gateway`.
 
    ```bash
-   # psql into the CNPG primary, e.g.:  kubectl -n data exec -it postgres-1 -- psql -U llm_gateway -d llm_gateway
+   # the CNPG primary (only the primary is writable)
+   PRIMARY=$(kubectl -n data get pods -l cnpg.io/cluster=postgres \
+     -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.labels.cnpg\.io/instanceRole}{.metadata.labels.role}{"\n"}{end}' \
+     | awk '/primary/{print $1; exit}')
+
+   # each env-consumer's hash straight from the vault (byte-exact, lowercase, no newline)
+   KV=<key-vault-name>
+   for team in kleio kallimachos pinakes; do
+     key=$(az keyvault secret show --vault-name "$KV" --name "ttrk-$team" --query value -o tsv)
+     printf '%-12s %s\n' "$team" "$(printf '%s' "$key" | shasum -a 256 | cut -d' ' -f1)"
+   done
+
+   # paste the three hashes, then seed (re-runnable via ON CONFLICT):
+   kubectl -n data exec -i "$PRIMARY" -- psql -U postgres -d llm_gateway <<'SQL'
    INSERT INTO virtual_keys (id, team_id, name, key_hash, seeded) VALUES
      ('vk_kleio_cutover',       'kleio',       'kleio-cutover',       '<sha256-kleio>',       true),
      ('vk_kallimachos_cutover', 'kallimachos', 'kallimachos-cutover', '<sha256-kallimachos>', true),
-     ('vk_pinakes_cutover',     'pinakes',     'pinakes-cutover',     '<sha256-pinakes>',     true),
-     ('vk_hebe_cutover',        'hebe',        'hebe-cutover',        '<sha256-hebe>',        true)
+     ('vk_pinakes_cutover',     'pinakes',     'pinakes-cutover',     '<sha256-pinakes>',     true)
    ON CONFLICT (key_hash) DO NOTHING;
+   SQL
    ```
 
-   The positive-validator cache TTL is ≤30 s (a new key is live within 30 s). Revoke with
-   `UPDATE virtual_keys SET revoked_at = now() WHERE id = 'vk_<team>_cutover';`.
+   **hebe is the exception** — its key rides the `hebe-dev` provisioning secret (`provision.sh` creates it
+   with `llm-gateway-key` EMPTY), not the vault, and hebe reads that value **verbatim (no trim)**. So one
+   value must be byte-identical in two places — the secret and the DB hash — with no trailing newline:
+
+   ```bash
+   KEY="ttrk-$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"   # mint once; reuse $KEY/$HASH
+   HASH="$(printf '%s' "$KEY" | shasum -a 256 | cut -d' ' -f1)"
+
+   # (i) plaintext into hebe-dev (exact bytes, no newline), then re-read it
+   kubectl -n kantheon patch secret hebe-dev --type merge \
+     -p "{\"data\":{\"llm-gateway-key\":\"$(printf '%s' "$KEY" | base64 | tr -d '\n')\"}}"
+   kubectl -n kantheon rollout restart deploy/hebe
+
+   # (ii) matching hash into virtual_keys (id-upsert — overwrites a prior placeholder hebe row)
+   kubectl -n data exec -i "$PRIMARY" -- psql -U postgres -d llm_gateway <<SQL
+   INSERT INTO virtual_keys (id, team_id, name, key_hash, seeded)
+   VALUES ('vk_hebe_cutover','hebe','hebe-cutover','$HASH',true)
+   ON CONFLICT (id) DO UPDATE SET key_hash = EXCLUDED.key_hash, seeded = true, revoked_at = NULL;
+   SQL
+   ```
+   Durability: `just hebe-provision dev` blanks `llm-gateway-key` again — fold the same `ttrk-hebe` value
+   into the provisioning flow so it survives a re-provision.
+
+   **Verify** (validator positive-cache TTL ≤30 s, so allow ~30 s):
+   ```bash
+   kubectl -n data exec -i "$PRIMARY" -- psql -U postgres -d llm_gateway -c \
+     "SELECT team_id, name, left(key_hash,12)||'…' AS hash, seeded FROM virtual_keys ORDER BY team_id;"
+
+   # end-to-end auth — run-then-logs (reliable; `run --rm -i` can swallow the output):
+   KEY=$(kubectl -n kantheon get secret kleio-llm-gateway-key -o jsonpath='{.data.key}' | base64 -d)
+   kubectl -n ttr-server run keytest --image=curlimages/curl --restart=Never --command -- \
+     curl -sS -o /dev/null -w 'HTTP %{http_code}\n' -H "Authorization: Bearer $KEY" http://llm-gateway:7280/v1/models
+   kubectl -n ttr-server wait --for=jsonpath='{.status.phase}'=Succeeded pod/keytest --timeout=30s
+   kubectl -n ttr-server logs keytest        # → HTTP 200  (401 = hash/newline mismatch or not seeded)
+   kubectl -n ttr-server delete pod keytest
+   ```
+   The durable proof is a `prompt_logs` row with `team=<consumer>` after a live call (a 401 never settles
+   one). Revoke/rotate: `UPDATE virtual_keys SET revoked_at = now() WHERE id = 'vk_<team>_cutover';`.
 
    **(b) Governance ConfigMap override — the designed path (survives a DB wipe; re-imported idempotently
    at boot by `GovernanceLoad`).** Mount a populated `governance.yaml` over the classpath copy. The
