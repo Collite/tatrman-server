@@ -21,5 +21,13 @@ teams:
     costCenterPrefix: "kleio/"
     budget: { id: kleio-monthly, usdPerMonth: 100.0, mode: soft }   # interim
     rateLimit: { id: kleio-rl, requestsPerMinute: 120 }             # interim
+  - id: kallimachos                                                 # P6 consumer: /v1/embeddings
+    costCenterPrefix: "kallimachos/"
+    budget: { id: kallimachos-monthly, usdPerMonth: 100.0, mode: soft }  # interim
+    rateLimit: { id: kallimachos-rl, requestsPerMinute: 120 }            # interim
+  - id: pinakes                                                     # P6 consumer: /v1/chat/completions
+    costCenterPrefix: "pinakes/"
+    budget: { id: pinakes-monthly, usdPerMonth: 100.0, mode: soft } # interim
+    rateLimit: { id: pinakes-rl, requestsPerMinute: 120 }           # interim
 
 keys: []   # seeded at cutover (G-3) — hashes from k8s secrets, never committed

@@ -1,11 +1,18 @@
 # LLM Gateway 1.x → 2.0 — cutover runbook
 
-> Scope: repoint the deployed `ttr-llm-gateway` from the Spring 1.x image to the Ktor 2.0 image
-> with **zero caller changes** (G-3). Authored in LG-P6·S1·T6. The GATE that authorizes running
-> this runbook is LG-P6·S2 — do not execute until every pre-flight below is green.
+> Scope: repoint the deployed `ttr-llm-gateway` from the Spring 1.x image to the Ktor 2.0 image.
+> Authored in LG-P6·S1·T6. The GATE that authorizes running this runbook is LG-P6·S2 — do not
+> execute until every pre-flight below is green.
 >
-> Owners: **Bora** (release + olymp repoint + go/no-go) · ops (soak window, ingress). Consumers
-> stay untouched (Hebe/Kleio/Themis/Iris/pinakes/Pythia).
+> ⚠ **The "zero caller changes" premise is RETIRED (P6·S1 soak, kantheon#16).** 2.0's `/v1` is
+> key-gated where 1.x `/api/v1` was permit-all, and 2.0 dropped the 1.x-only URL/shape variants.
+> So the constellation consumers that call the gateway on the chat/embeddings path **were migrated
+> and now require a ttrk- key**: kleio (`/v1/chat/completions`), kallimachos (`/v1/embeddings`),
+> pinakes (`/v1/chat/completions`) — kantheon `5af7361` (URL/shape) + `504d60a` (auth slice). Their
+> repoint + key wiring is now a **coupled cutover step** (§2a), not a no-op. Golems already target
+> `llm-gateway.ttr-server:7280`.
+>
+> Owners: **Bora** (release + olymp repoint + key seed + go/no-go) · ops (soak window, ingress).
 
 ---
 
@@ -52,6 +59,13 @@ git push --force origin llm-gateway/pre-2.0
       ingress buffering (`proxy_buffering` off on the Service path — config noted in findings).
 - [ ] **Rollback rehearsed** on staging (T6): repoint staging to `:0.9.0`, confirm 1.x serves against
       the migrated PG copy.
+- [ ] **Consumers migrated + key-ready** (P6·S1 soak, kantheon#16). The kleio/kallimachos/pinakes
+      images in the estate are built from kantheon `504d60a`+ (URL/shape migration + `Authorization:
+      Bearer` from `*_LLM_GATEWAY_KEY`). Governance seeds a team per consumer
+      (`kleio`/`kallimachos`/`pinakes` — governance.yaml). Per-team ttrk- keys minted, their SHA-256
+      seeded into the gateway's governance config, and the plaintext in Azure KV for the consumer
+      ExternalSecrets (§2a). Verified once on staging: a real consumer binary authenticates (a 401
+      can't settle a prompt-log row).
 
 ---
 
@@ -65,9 +79,39 @@ git push --force origin llm-gateway/pre-2.0
    be read. `FLUSHDB` the gateway's Redis logical DB (or delete `llm-gateway:chat:*`) at repoint.
 4. **Repoint, one cluster at a time.** In olymp, bump `image.tag` `0.9.0 → 2.0.0` in
    `clusters/collite-o1/apps/llm-gateway/values.yaml`, sync/roll, watch (§4). When green, repeat for
-   `clusters/bp-dsk/apps/llm-gateway/values.yaml`.
+   `clusters/bp-dsk/apps/llm-gateway/values.yaml`. **Apply the consumer repoint (§2a) for the same
+   cluster in the same sync** — the migrated consumers speak 2.0's key-gated `/v1` and cannot fall
+   back to the 1.x gateway, so the gateway flip and the consumer flip must land together.
 5. **Removals** (only after SQ-2 sign-off): gRPC + protos, `/api/v1` (post-Kleio `/v1`), async jobs +
    NATS — land as follow-ups, not inside the repoint.
+
+## 2a. Consumer repoint + key seeding (G-3 — coupled with §2 step 4)
+
+For each consuming service (kleio, kallimachos, pinakes), the olymp per-cluster values must (a) point
+the gateway host at the 2.0 Service and (b) inject its ttrk- key. The gateway Service is `llm-gateway`
+in ns `ttr-server`, port `7280` (the golems already use it); the legacy `prometheus` host value is
+retired.
+
+1. **Mint one ttrk- key per consumer team** (never committed — plaintext lives only in Azure KV):
+
+   ```bash
+   # 256-bit url-safe secret with the ttrk- prefix; print the key and its SHA-256 (the seed hash).
+   for team in kleio kallimachos pinakes; do
+     key="ttrk-$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+     hash="$(printf '%s' "$key" | shasum -a 256 | cut -d' ' -f1)"
+     echo "$team  key=$key  sha256=$hash"
+     az keyvault secret set --vault-name <kv> --name "ttrk-$team" --value "$key" >/dev/null
+   done
+   ```
+
+2. **Seed the SHA-256 hashes** into the gateway's governance `keys:` for the cutover deploy (the
+   `keys:` list stays empty in git — seed via the deploy's governance override / secret, mirroring the
+   P6·S1 staging ConfigMap). One entry per team: `{ team: kleio, name: kleio-cutover, sha256: <hash> }`.
+
+3. **Wire the consumer ExternalSecrets + env** (olymp — see the `lg-p6-consumer-cutover` branch):
+   each consumer gets an ExternalSecret pulling `ttrk-<team>` from the `azure-store` into a k8s Secret,
+   and its values gains `*_LLM_GATEWAY_HOST=llm-gateway.ttr-server`, `*_LLM_GATEWAY_PORT=7280`, and
+   `*_LLM_GATEWAY_KEY` via `secretKeyRef`. pinakes also carries `PINAKES_LLM_GATEWAY_MODEL` (sonnet).
 
 ---
 
@@ -103,4 +147,5 @@ close the effort (memory/STATUS).
 | Release image / RC | Bora |
 | Contract-diff + SQ-2 disposition | Bora (with the P6·S1 evidence) |
 | Soak window + ingress config | ops |
-| olymp repoint + go/no-go + rollback | Bora |
+| Mint ttrk- keys + Azure KV load + governance seed (§2a) | Bora |
+| olymp gateway + consumer repoint (§2 step 4 / §2a) + go/no-go + rollback | Bora |
