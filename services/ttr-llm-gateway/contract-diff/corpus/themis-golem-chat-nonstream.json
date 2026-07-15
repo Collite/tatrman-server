@@ -1,0 +1,28 @@
+{
+  "consumer": "ttr-llm-client (Themis / Golem)",
+  "shape": "chat-nonstream-tier-alias",
+  "method": "POST",
+  "path": "/v1/chat/completions",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "requestBody": {
+    "model": "haiku",
+    "messages": [
+      { "role": "system", "content": "__intent system prompt__" },
+      { "role": "user", "content": "__intent user prompt__" }
+    ],
+    "temperature": 0.0,
+    "max_tokens": 2000
+  },
+  "readsResponseFields": [
+    "choices[0].message.content"
+  ],
+  "origin": "reconstructed-from-source",
+  "sources": [
+    "tatrman-server/shared/libs/kotlin/ttr-llm-client/.../LlmGatewayClient.kt:61,82,109-116,88-92",
+    "tatrman-server/shared/libs/kotlin/ttr-llm-client/.../LlmGatewayPromptExecutor.kt:90-96",
+    "kantheon/agents/golem/.../PlanComposer.kt:17-19 (GolemModels.Cheap = claude-haiku -> \"haiku\")"
+  ],
+  "notes": "Non-streaming, no tools, no auth/cost headers. model is a flat tier alias: haiku|sonnet|opus (default sonnet). usage decoded (OpenAI names) but only choices[0].message.content is read."
+}

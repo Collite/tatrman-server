@@ -1,0 +1,14 @@
+name: usage-final-chunk
+kind: sse
+origin: synthetic
+description: >-
+  stream_options.include_usage: a late frame carries usage with an empty choices[]. The tap extracts
+  it for settlement — prompt_tokens/completion_tokens + prompt_tokens_details.cached_tokens, the exact
+  names Hebe reads today (OpenAiCompatProvider). `cost` is added by the gateway, not the upstream.
+expected:
+  - "Opened"
+  - "FirstToken"
+  - "ContentDelta content=Hi"
+  - "Finish reason=stop"
+  - "UsageChunk prompt=11 completion=3 cached=7"
+  - "Done"

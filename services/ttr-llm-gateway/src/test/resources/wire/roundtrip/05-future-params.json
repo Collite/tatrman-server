@@ -1,0 +1,17 @@
+{
+  "model": "gpt-5-preview",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Search and answer.",
+      "reasoning_effort_hint": "high",
+      "attachments": [{ "kind": "note", "ref": "n-9" }]
+    }
+  ],
+  "verbosity": "high",
+  "web_search_options": {
+    "search_context_size": "medium",
+    "user_location": { "type": "approximate", "country": "SK" }
+  },
+  "prediction": { "type": "content", "content": "draft" }
+}

@@ -1,0 +1,13 @@
+name: error-frame-midstream
+kind: sse
+origin: synthetic
+description: >-
+  One content delta, then an upstream error FRAME after the first token. The before-first-token rule
+  means this cannot retry/fallback — it must surface as an SSE error frame then close. The tap maps
+  the frame body to a GatewayError observation.
+expected:
+  - "Opened"
+  - "FirstToken"
+  - "ContentDelta content=Partial"
+  - "ErrorFrame type=server_error"
+  - "Done"

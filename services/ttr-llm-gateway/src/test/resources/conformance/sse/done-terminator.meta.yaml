@@ -1,0 +1,13 @@
+name: done-terminator
+kind: sse
+origin: synthetic
+description: >-
+  Clean two-token OpenAI chat.completion.chunk stream terminated by `data: [DONE]`. Baseline happy
+  path: role+content delta, a content delta, a final empty delta with finish_reason=stop, then DONE.
+expected:
+  - "Opened"
+  - "FirstToken"
+  - "ContentDelta content=Hello"
+  - "ContentDelta content= world"
+  - "Finish reason=stop"
+  - "Done"
