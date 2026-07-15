@@ -1,0 +1,14 @@
+name: heartbeat-comments
+kind: sse
+origin: synthetic
+description: >-
+  SSE comment frames (": hb") interleaved with data frames. Comments are keep-alives with no event
+  data — the tap must ignore them (not content, not usage, not error) and never mistake one for a
+  token. The gateway also EMITS these on idle (config heartbeatSeconds); here they test the read path.
+expected:
+  - "Opened"
+  - "FirstToken"
+  - "ContentDelta content=Slow"
+  - "ContentDelta content= reply"
+  - "Finish reason=stop"
+  - "Done"

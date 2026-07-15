@@ -1,0 +1,30 @@
+{
+  "consumer": "iris (frontend)",
+  "shape": "responses-conversation-surface",
+  "method": "POST",
+  "path": "/api/v1/chat/responses",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "requestBody": {
+    "model": "__configured_model__",
+    "messages": [
+      { "role": "user", "content": "__prompt__" }
+    ],
+    "conversation": "__conversation_id_optional__"
+  },
+  "readsResponseFields": [
+    "createdAt",
+    "conversationId",
+    "status",
+    "output[]",
+    "reasoning.summary",
+    "content"
+  ],
+  "origin": "reconstructed-from-source",
+  "sources": [
+    "kantheon/frontends/iris/src/services/llmGatewayService.ts:41,68-79,84,99",
+    "kantheon/frontends/iris/src/views/LlmGatewayView.vue:71,30,85,240"
+  ],
+  "notes": "SQ-2 field-surface consumer + Responses API surface. Iris POSTs to /api/v1/chat/responses (the non-standard Responses surface design parked in A-1), sends the `conversation` request field, and its typed contract reads output[]/status/createdAt/conversationId/reasoning.summary/content. 2.0 emits none of these (contracts §1.3 dropped list; Responses API parked). BLOCKS G-2 removal of the conversation/Responses surface until Iris migrates or the surface is retained. ⚑ Bora."
+}

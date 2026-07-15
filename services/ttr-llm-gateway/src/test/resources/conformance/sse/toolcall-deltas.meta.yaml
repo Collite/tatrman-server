@@ -1,0 +1,15 @@
+name: toolcall-deltas
+kind: sse
+origin: synthetic
+description: >-
+  Incremental OpenAI tool_calls: the function name arrives in the first delta; arguments stream across
+  later deltas keyed by tool_calls[].index; finish_reason=tool_calls. The tap must preserve index
+  integrity and concatenate the argument fragments into one valid JSON string.
+expected:
+  - "Opened"
+  - "FirstToken"
+  - "ToolCallDelta index=0 name=get_weather"
+  - "ToolCallDelta index=0 args-fragment-1"
+  - "ToolCallDelta index=0 args-fragment-2"
+  - "Finish reason=tool_calls"
+  - "Done"

@@ -1,0 +1,14 @@
+name: utf8-split
+kind: sse
+origin: synthetic
+description: >-
+  A content delta with multibyte UTF-8 (accented Latin, CJK, and a 4-byte emoji). On replay the byte
+  stream is fragmented INSIDE the 🌍 codepoint, so a tap that decodes each read in isolation corrupts
+  it (the readUTF8Line anti-pattern, design §Risks). A correct tap buffers across reads before decoding.
+splitInsideChar: "🌍"
+expected:
+  - "Opened"
+  - "FirstToken"
+  - "ContentDelta content=café 世界 🌍"
+  - "Finish reason=stop"
+  - "Done"

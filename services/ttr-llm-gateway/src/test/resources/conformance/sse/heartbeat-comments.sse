@@ -1,0 +1,12 @@
+: hb
+
+data: {"id":"chatcmpl-hb1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Slow"},"finish_reason":null}]}
+
+: hb
+
+data: {"id":"chatcmpl-hb1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":" reply"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-hb1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+

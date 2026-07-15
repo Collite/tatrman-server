@@ -1,0 +1,14 @@
+{
+  "model": "gpt-4o",
+  "messages": [
+    { "role": "user", "content": "numbers" }
+  ],
+  "temperature": 1,
+  "top_p": 0.10,
+  "frequency_penalty": 0.0,
+  "presence_penalty": -1e-2,
+  "max_tokens": 1000,
+  "seed": 9007199254740993,
+  "logit_bias": { "50256": -100, "1234": 1.5e2 },
+  "sampling": { "big": 12345678901234567890, "sci": 6.022e23, "trailing": 0.500 }
+}

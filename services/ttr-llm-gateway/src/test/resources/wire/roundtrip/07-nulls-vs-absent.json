@@ -1,0 +1,12 @@
+{
+  "model": "gpt-4o",
+  "messages": [
+    { "role": "user", "content": "nulls" }
+  ],
+  "stop": null,
+  "user": null,
+  "tool_choice": null,
+  "response_format": null,
+  "metadata": { "a": null, "b": "set" },
+  "logprobs": false
+}

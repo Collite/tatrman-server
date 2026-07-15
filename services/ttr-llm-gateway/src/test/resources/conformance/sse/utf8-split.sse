@@ -1,0 +1,6 @@
+data: {"id":"chatcmpl-u1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"café 世界 🌍"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-u1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+

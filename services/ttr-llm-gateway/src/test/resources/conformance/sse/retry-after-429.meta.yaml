@@ -1,0 +1,12 @@
+name: retry-after-429
+kind: http
+origin: synthetic
+description: >-
+  Upstream 429 with a Retry-After header, BEFORE any token. Retryable RATE_LIMIT that must honor
+  Retry-After (C-3). Not an SSE stream — LG-P2 serves this via WireMock; a before-first-token failure
+  surfaces as an HTTP status, never an error frame.
+httpStatus: 429
+retryAfterSeconds: 2
+expectedError: "RateLimit(retryable=true, chainEligible=true, retryAfterMs=2000)"
+expected:
+  - "GatewayError.RateLimit retryAfterMs=2000"

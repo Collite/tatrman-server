@@ -1,0 +1,18 @@
+{
+  "model": "gpt-4.1",
+  "messages": [
+    { "role": "system", "content": "You are terse." },
+    { "role": "user", "content": "Two plus two?" }
+  ],
+  "stream": true,
+  "stream_options": { "include_usage": true },
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "max_tokens": 256,
+  "max_completion_tokens": 256,
+  "n": 1,
+  "stop": ["\n\n"],
+  "seed": 42,
+  "user": "golem/session-abc",
+  "metadata": { "trace": "t-1" }
+}
