@@ -51,9 +51,9 @@ land with **1.0**. Until then, build from source:
 ./gradlew build      # build + test all modules (or: just build / just test)
 ```
 
-For the design corpus — architecture, contracts, and the implementation plan —
-see `docs/ecosystem/server/` in the [`tatrman`](https://github.com/Collite/tatrman)
-repo.
+For architecture and contracts docs, see the companion
+[`tatrman`](https://github.com/Collite/tatrman) repo's `docs/features/` tree
+(e.g. `docs/features/resolution/`, `docs/features/ttr-translator/`).
 
 ## License, governance & contributing
 
