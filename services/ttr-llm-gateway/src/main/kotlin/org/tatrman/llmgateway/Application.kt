@@ -30,6 +30,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -278,9 +279,14 @@ fun Application.module(
             ) {
                 budgetService?.settle(s)
                 promptLog?.enqueue(PromptLogRecord(s, promptText, responseText, status))
-                gwMetrics.tokens(s.teamId, s.servedProvider, s.servedModel, "input", s.usage.promptTokens)
-                gwMetrics.tokens(s.teamId, s.servedProvider, s.servedModel, "output", s.usage.completionTokens)
-                gwMetrics.cost(s.teamId, s.servedProvider, s.servedModel, s.costUsd)
+                // Token/cost counters track REAL upstream spend only. A cache hit settles cached=true (no
+                // upstream call), so — like the budget, which skips it in settle() — it must not inflate
+                // cost_usd_total / tokens_total. The cached flag lives on the prompt-log row for accounting.
+                if (!s.cached) {
+                    gwMetrics.tokens(s.teamId, s.servedProvider, s.servedModel, "input", s.usage.promptTokens)
+                    gwMetrics.tokens(s.teamId, s.servedProvider, s.servedModel, "output", s.usage.completionTokens)
+                    gwMetrics.cost(s.teamId, s.servedProvider, s.servedModel, s.costUsd)
+                }
             }
 
             // Build + fan out the settle for one served (non-cached) response (D-4). Usage precedence is the
@@ -419,12 +425,24 @@ fun Application.module(
                             call.response.header("X-Gateway-Model", serving.target.upstream)
                             val tap = TapParser(serving.target.providerName, serving.target.upstream)
                             val settleTap = StreamSettleTap()
-                            // Reassemble the completion off the same frames so a stream MISS populates the cache.
+                            // Reassemble the completion off the same frames so a stream MISS populates the cache
+                            // AND supplies the prompt-log response text. Skip the per-frame parse entirely when
+                            // neither sink is active (uncacheable model on a storeless boot) — no wasted work.
                             val assembler = StreamBodyAssembler(serving.target.upstream)
+                            val reassemble = cacheKey != null || promptLog != null
                             try {
                                 call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
                                     pumpSse(
-                                        frames = open.frames.onEach { assembler.observe(it) },
+                                        frames =
+                                            if (reassemble) {
+                                                open.frames.onEach {
+                                                    assembler.observe(
+                                                        it,
+                                                    )
+                                                }
+                                            } else {
+                                                open.frames
+                                            },
                                         out = this,
                                         tap = { settleTap.observe(it) }, // capture usage + TTFB for the settle
                                         parser = tap,
@@ -459,7 +477,16 @@ fun Application.module(
                                     estimated,
                                     settleTap.ttfbMs,
                                     assembler.content(),
-                                    if (assembler.completed()) "SUCCESS" else "ERROR",
+                                    // The upstream served if it delivered a clean end (finish_reason) OR any
+                                    // content — a provider that ends without finish_reason, and a client that
+                                    // abandons mid-stream, are NOT upstream errors. ERROR only on a dry attempt.
+                                    if (assembler.completed() ||
+                                        assembler.content().isNotEmpty()
+                                    ) {
+                                        "SUCCESS"
+                                    } else {
+                                        "ERROR"
+                                    },
                                 )
                                 // Store on a clean stream completion (finish_reason seen, content, no tool_calls):
                                 // an errored/abandoned stream leaves finishReason null → not cached.
@@ -814,32 +841,33 @@ private fun currentTraceId(): String? {
     return if (ctx.isValid) ctx.traceId else null
 }
 
-/** Flatten the chat `messages` to plain text for the prompt-log `prompt_text` (FTS source). */
-private fun messagesText(messages: JsonArray): String =
-    messages.joinToString("\n") { m ->
-        when (val content = (m as? JsonObject)?.get("content")) {
-            is JsonPrimitive -> content.contentOrNull ?: ""
-            is JsonArray ->
-                content
-                    .mapNotNull {
-                        (it as? JsonObject)
-                            ?.get(
-                                "text",
-                            )?.jsonPrimitive
-                            ?.contentOrNull
-                    }.joinToString(" ")
-            else -> ""
-        }
+/**
+ * Flatten an OpenAI `content` field to plain text — a string content verbatim, or the `text` parts of a
+ * structured (multimodal/tool) content array joined. Total: a non-`text` primitive or a malformed part is
+ * skipped, never thrown on (this runs on the synchronous request path via [messagesText]).
+ */
+private fun contentText(content: JsonElement?): String =
+    when (content) {
+        is JsonPrimitive -> content.contentOrNull ?: ""
+        is JsonArray ->
+            content
+                .joinToString(" ") {
+                    (it as? JsonObject)?.get("text").let { t ->
+                        (t as? JsonPrimitive)?.contentOrNull
+                            ?: ""
+                    }
+                }.trim()
+        else -> ""
     }
 
-/** The assistant message text from a chat.completion body — the prompt-log `response_text`. */
+/** Flatten the chat `messages` to plain text for the prompt-log `prompt_text` (FTS source). */
+private fun messagesText(messages: JsonArray): String =
+    messages.joinToString("\n") { m -> contentText((m as? JsonObject)?.get("content")) }
+
+/** The assistant message text from a chat.completion body — the prompt-log `response_text` (FTS source). */
 private fun assistantText(body: JsonObject): String {
     val message = (body["choices"] as? JsonArray)?.firstOrNull()?.jsonObject?.get("message") as? JsonObject
-    return when (val c = message?.get("content")) {
-        is JsonPrimitive -> c.contentOrNull ?: ""
-        null -> ""
-        else -> c.toString()
-    }
+    return contentText(message?.get("content"))
 }
 
 /**

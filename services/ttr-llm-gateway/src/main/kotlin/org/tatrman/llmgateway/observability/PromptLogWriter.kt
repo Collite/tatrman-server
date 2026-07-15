@@ -3,8 +3,11 @@ package org.tatrman.llmgateway.observability
 
 import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.exposed.v1.core.BooleanColumnType
@@ -41,8 +44,10 @@ class PromptLogWriter(
 ) {
     private val channel = Channel<PromptLogRecord>(capacity)
 
-    init {
-        scope.launch {
+    // Drain on Dispatchers.IO: the writer runs blocking Exposed/JDBC per row, which must not sit on the
+    // request-serving dispatcher (it would park a data-plane thread for the length of each insert).
+    private val writer =
+        scope.launch(Dispatchers.IO) {
             for (rec in channel) {
                 runCatching { insert(rec) }.onFailure {
                     log.warn("prompt-log write failed", it)
@@ -50,7 +55,6 @@ class PromptLogWriter(
                 }
             }
         }
-    }
 
     /** Non-blocking offer. A full queue drops the row (never blocks the caller). */
     fun enqueue(rec: PromptLogRecord) {
@@ -62,7 +66,15 @@ class PromptLogWriter(
         }
     }
 
-    fun close() = channel.close()
+    /**
+     * Close the queue and briefly wait for the writer to drain already-queued rows, so a graceful stop
+     * flushes in-flight logs BEFORE the caller closes the PG pool. Bounded, so a stuck insert can't hang
+     * shutdown — anything past the deadline is abandoned (log loss is survivable, F-1).
+     */
+    fun close() {
+        channel.close()
+        runBlocking { withTimeoutOrNull(DRAIN_TIMEOUT_MS) { writer.join() } }
+    }
 
     private fun insert(r: PromptLogRecord) {
         val s = r.settle
@@ -100,6 +112,7 @@ class PromptLogWriter(
     }
 
     private companion object {
+        const val DRAIN_TIMEOUT_MS = 5_000L
         val log = LoggerFactory.getLogger(PromptLogWriter::class.java)
         val INSERT_SQL =
             """

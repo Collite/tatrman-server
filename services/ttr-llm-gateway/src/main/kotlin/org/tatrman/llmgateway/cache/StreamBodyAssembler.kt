@@ -4,11 +4,10 @@ package org.tatrman.llmgateway.cache
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -34,19 +33,17 @@ class StreamBodyAssembler(
     fun observe(frame: SseFrame) {
         val data = frame.data?.trim() ?: return
         if (data.isEmpty() || data == "[DONE]") return
-        val obj = runCatching { Json.parseToJsonElement(data).jsonObject }.getOrNull() ?: return
-        if (id == null) id = obj["id"]?.jsonPrimitive?.contentOrNull
-        if (created == null) created = obj["created"]?.jsonPrimitive?.longOrNull
+        // Runs in the live-stream hot path (onEach): stay TOTAL — a malformed frame must never throw and
+        // abort the client's stream, so every field access is a null-returning `as?`, not a throwing cast.
+        val obj = runCatching { Json.parseToJsonElement(data) as? JsonObject }.getOrNull() ?: return
+        if (id == null) id = (obj["id"] as? JsonPrimitive)?.contentOrNull
+        if (created == null) created = (obj["created"] as? JsonPrimitive)?.longOrNull
         (obj["usage"] as? JsonObject)?.let { usage = it }
-        val choice = (obj["choices"] as? JsonArray)?.firstOrNull()?.jsonObject ?: return
+        val choice = (obj["choices"] as? JsonArray)?.firstOrNull() as? JsonObject ?: return
         val delta = choice["delta"] as? JsonObject
-        delta
-            ?.get("content")
-            ?.jsonPrimitive
-            ?.contentOrNull
-            ?.let { content.append(it) }
+        (delta?.get("content") as? JsonPrimitive)?.contentOrNull?.let { content.append(it) }
         if (delta?.get("tool_calls") != null) sawToolCalls = true
-        choice["finish_reason"]?.jsonPrimitive?.contentOrNull?.let { finishReason = it }
+        (choice["finish_reason"] as? JsonPrimitive)?.contentOrNull?.let { finishReason = it }
     }
 
     /** Cacheable only when we assembled real content and no tool_calls (which we don't reassemble yet). */
