@@ -61,11 +61,12 @@ git push --force origin llm-gateway/pre-2.0
       the migrated PG copy.
 - [ ] **Consumers migrated + key-ready** (P6·S1 soak, kantheon#16). The kleio/kallimachos/pinakes
       images in the estate are built from kantheon `504d60a`+ (URL/shape migration + `Authorization:
-      Bearer` from `*_LLM_GATEWAY_KEY`). Governance seeds a team per consumer
-      (`kleio`/`kallimachos`/`pinakes` — governance.yaml). Per-team ttrk- keys minted, their SHA-256
-      seeded into the gateway's governance config, and the plaintext in Azure KV for the consumer
-      ExternalSecrets (§2a). Verified once on staging: a real consumer binary authenticates (a 401
-      can't settle a prompt-log row).
+      Bearer` from `*_LLM_GATEWAY_KEY`); **hebe** was already 2.0-native (openai-compat GatewayClient
+      with Bearer + `X-Cost-Center`, k8s profile `llm.source = gateway`) — config-only switch. Governance
+      seeds a team per consumer (`kleio`/`kallimachos`/`pinakes`/`hebe` — governance.yaml). Per-team
+      ttrk- keys minted, their SHA-256 seeded into the gateway's governance config, and the plaintext in
+      Azure KV (kleio/kallimachos/pinakes) or the `hebe-dev` secret (hebe). Verified once on staging: a
+      real consumer binary authenticates (a 401 can't settle a prompt-log row).
 
 ---
 
@@ -87,20 +88,32 @@ git push --force origin llm-gateway/pre-2.0
 
 ## 2a. Consumer repoint + key seeding (G-3 — coupled with §2 step 4)
 
-For each consuming service (kleio, kallimachos, pinakes), the olymp per-cluster values must (a) point
-the gateway host at the 2.0 Service and (b) inject its ttrk- key. The gateway Service is `llm-gateway`
-in ns `ttr-server`, port `7280` (the golems already use it); the legacy `prometheus` host value is
-retired.
+Every consuming service must (a) point its gateway host at the 2.0 Service and (b) present a ttrk- key.
+The gateway Service is `llm-gateway` in ns `ttr-server`, port `7280` (the golems already use it); the
+legacy `prometheus` host value is retired. Four callers on this path, in two key-delivery styles:
 
-1. **Mint one ttrk- key per consumer team** (never committed — plaintext lives only in Azure KV):
+- **kleio, kallimachos, pinakes** — env-configured (`*_LLM_GATEWAY_HOST/PORT/KEY`); the key rides a
+  per-consumer **ClusterExternalSecret** from the vault into the kantheon ns (olymp branch
+  `lg-p6-consumer-cutover`).
+- **hebe** — toml-configured (`[llm] base_url`, `api_key_secret`); already 2.0-native (k8s profile =
+  `llm.source = gateway`, so it sends Bearer + `X-Cost-Center hebe/<instance>`). Its key is the
+  `llm-gateway-key` field of the **`hebe-dev` provisioning secret** (`just hebe-provision dev`), not a
+  ClusterExternalSecret. Its `base_url` gains the `/v1` segment and `embedding_model` moves to `ada-002`
+  (the only served embedding model; 1536-dim, no vector migration). Golems already target the 2.0
+  Service and are unaffected.
+
+1. **Mint one ttrk- key per consumer team** (never committed — plaintext lives only in Azure KV; hebe's
+   goes into `hebe-dev` via provision.sh instead). Teams `kleio`/`kallimachos`/`pinakes`/`hebe` all
+   exist in governance.yaml:
 
    ```bash
    # 256-bit url-safe secret with the ttrk- prefix; print the key and its SHA-256 (the seed hash).
-   for team in kleio kallimachos pinakes; do
+   for team in kleio kallimachos pinakes hebe; do
      key="ttrk-$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
      hash="$(printf '%s' "$key" | shasum -a 256 | cut -d' ' -f1)"
      echo "$team  key=$key  sha256=$hash"
-     az keyvault secret set --vault-name <kv> --name "ttrk-$team" --value "$key" >/dev/null
+     # kleio/kallimachos/pinakes → vault; hebe's key goes into the hebe-dev secret via provision.sh.
+     [ "$team" = hebe ] || az keyvault secret set --vault-name <kv> --name "ttrk-$team" --value "$key" >/dev/null
    done
    ```
 
