@@ -32,12 +32,20 @@ WORKDIR /opt
 RUN git clone --depth 1 --branch ${NAMETAG3_VERSION} https://github.com/ufal/nametag3.git
 
 # CPU-only torch from the PyTorch CPU index; transformers + the runtime deps
-# nametag3_server needs (NOT the training extras keras/tensorboard/datasets/peft).
-# NOTE: pin the exact set from nametag3 v3.2.0's requirements at first build;
-# this is the inference-only floor validated against the Q-10 spike image.
+# nametag3_server imports at STARTUP. The startup import chain
+# (nametag3_server → nametag3_dataset / nametag3_dataset_collection /
+# nametag3_model → …) loads keras, peft and ufal.udpipe unconditionally at module
+# level, so they are runtime deps, NOT training extras — omitting them aborts the
+# server on boot (`ModuleNotFoundError: keras` / `peft` / `ufal`). keras 3 runs on
+# its torch backend here (nametag3_server sets KERAS_BACKEND=torch before import;
+# we also pin it via ENV below), so NO tensorflow is pulled in. The genuinely
+# training-only deps stay out: datasets, tensorboard, langcodes, language_data.
+# The server speaks raw http.server/socketserver — flask/gunicorn are never
+# imported, so they are not installed. Pins track nametag3 v3.2.0's requirements.
 RUN pip install --upgrade pip \
     && pip install --index-url https://download.pytorch.org/whl/cpu torch \
-    && pip install "transformers>=4.40" "tokenizers" "numpy" "seqeval" "flask" "gunicorn"
+    && pip install "transformers>=4.40" "tokenizers" "numpy" "seqeval" \
+       "keras~=3.13.1" "peft" "ufal.udpipe~=1.3.1.1"
 
 # ===== models: bake the fine-tuned model + the RobeCzech PLM =====
 FROM deps AS models
@@ -78,7 +86,8 @@ ENV MODEL_ID=${MODEL_ID} \
     PORT=8001 \
     HF_HOME=/opt/hf-cache \
     HF_HUB_OFFLINE=1 \
-    TRANSFORMERS_OFFLINE=1
+    TRANSFORMERS_OFFLINE=1 \
+    KERAS_BACKEND=torch
 
 COPY --from=deps /usr/local /usr/local
 COPY --from=deps /opt/nametag3 /opt/nametag3
