@@ -67,11 +67,25 @@ changes ⇒ caught.
 - `origin` must be `captured` **only** once a real response is stored; reconstructed request bodies stay
   `reconstructed-from-source`.
 
-## SQ-2 status (the removal warrant — see the S2 task Findings for full evidence)
+## SQ-2 status (the removal warrant — re-swept LG-P6·S1·T4 2026-07-15; see the S1 task Findings)
 
-- **Async jobs surface** — zero external callers → safe to remove (G-2).
-- **`/v1/conversations` endpoint** — zero callers → safe to remove.
-- **Conversation / Responses *field* surface — NOT clean.** `iris` (frontend) sends `conversation` and
-  reads `output[]/status/createdAt/conversationId/reasoning.summary/content` via `/api/v1/chat/responses`;
-  `pinakes` reads top-level `content` via `/v1/chat`. **Blocks** removal of that field/Responses surface
-  until both migrate or the surface is retained. ⚑ Bora — reopens G-2 / LG-D3.
+Verified against kantheon `master` (all consumers live there) + olymp/modeler/tatrman `master`.
+
+- **Async jobs surface** — zero external callers → safe to remove (G-2). ✓
+- **`/v1/conversations` endpoint** — zero callers → safe to remove. ✓
+- **`/api/v1/*` prefix — 🔴 BLOCKED, and cutover-breaking.** `kleio` still `POST /api/v1/chat/completions`
+  (`agents/kleio/.../HttpClients.kt:149`, wired) and `kallimachos` `POST /api/v1/embeddings`
+  (`services/kallimachos/.../LlmGatewayEmbeddingsClient.kt:69`, wired) on **master** — 2.0 exposes only
+  `/v1/*`, so both 404 on cutover. The Kleio `/api/v1`→`/v1` migration is on branch `lg-p0-kleio`, NOT master.
+- **Top-level `content` + custom `/v1/chat` — 🔴 BLOCKED.** `pinakes` `POST /v1/chat` reads top-level
+  `content` (`services/pinakes/.../LlmGatewayClient.kt:46,51`, wired) — 404 on cutover. `kleio` also keeps a
+  top-level-`content` fallback.
+- **Responses *field* surface (`output[]/status/createdAt/conversationId/reasoning.summary`, `conversation`
+  req)** — the sole consumer is Iris' `LlmGatewayView.vue`/`llmGatewayService.ts`, which is **orphaned**
+  (not in `router/index.ts`; live Iris goes via iris-bff). Removable in-tree, but ⚑ Bora: delete rather
+  than leave latent.
+
+⚑ **Net: G-3 ("zero caller changes") is not achievable as-is** — `kleio`, `kallimachos`, `pinakes` must
+migrate to the standard `/v1/*` surface first, OR 2.0 keeps `/api/v1/*` + `/v1/chat` compat shims for the
+migration window. Bora's disposition (reopens G-2 / LG-D3). Corpus TODO: add a `kallimachos-embeddings`
+entry (missing — it was not in the P0 consumer set).
