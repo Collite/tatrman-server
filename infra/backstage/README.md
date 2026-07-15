@@ -17,7 +17,7 @@ Yarn toolchain (a documented build exception, like ttr-llm-gateway's Spring Boot
   a `catalog.locations` file entry; replaces ai-platform's example catalog.
 - `docs/catalog-info.yaml`, `templates/agent-starter/template.yaml`, `app-config.local.yaml`
   (`doc.aip.localhost` → `doc.kantheon.localhost`), the OIDC username-transform comment in
-  `packages/backend/src/index.ts` — all swept off DF-Partner / ai-platform.
+  `packages/backend/src/index.ts` — all rebranded off the prior client-specific naming and ai-platform.
 
 ## Build / run
 
@@ -30,4 +30,4 @@ yarn start
 The image is built and tagged `kantheon/backstage` (port 7007) at deploy; deploy manifests fork
 from `deployment/apps/backstage`. The `yarn tsc && yarn build` + Backstage component tests run in
 CI (the Node toolchain is not exercised on the local Rancher path); this stage's deterministic
-local gate is YAML/catalog well-formedness + the `df-partner|ai-platform` sweep.
+local gate is YAML/catalog well-formedness + a residual prior-naming sweep (client name + `ai-platform`).
