@@ -18,6 +18,7 @@ data class VirtualKeyRow(
     val seeded: Boolean,
     val budgetUsd: Double?,
     val rpmLimit: Int?,
+    val createdAt: OffsetDateTime,
     val revokedAt: OffsetDateTime?,
     val lastUsedAt: OffsetDateTime?,
 )
@@ -41,6 +42,7 @@ class VirtualKeyRepo(
         rpmLimit: Int? = null,
     ): VirtualKeyRow {
         val newId = "vk_" + Ulid.next()
+        val createdAt = now()
         db.query {
             VirtualKeys.insert {
                 it[id] = newId
@@ -50,9 +52,10 @@ class VirtualKeyRepo(
                 it[VirtualKeys.seeded] = seeded
                 it[VirtualKeys.budgetUsd] = budgetUsd?.toBigDecimal()
                 it[VirtualKeys.rpmLimit] = rpmLimit
+                it[VirtualKeys.createdAt] = createdAt
             }
         }
-        return VirtualKeyRow(newId, teamId, name, keyHash, seeded, budgetUsd, rpmLimit, null, null)
+        return VirtualKeyRow(newId, teamId, name, keyHash, seeded, budgetUsd, rpmLimit, createdAt, null, null)
     }
 
     /** Lookup by SHA-256 hex (key_hash is UNIQUE). Returns the row regardless of revocation. */
@@ -112,6 +115,7 @@ class VirtualKeyRepo(
             seeded = this[VirtualKeys.seeded],
             budgetUsd = this[VirtualKeys.budgetUsd]?.toDouble(),
             rpmLimit = this[VirtualKeys.rpmLimit],
+            createdAt = this[VirtualKeys.createdAt],
             revokedAt = this[VirtualKeys.revokedAt],
             lastUsedAt = this[VirtualKeys.lastUsedAt],
         )

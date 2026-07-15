@@ -93,6 +93,7 @@ hadoop                    = "3.3.6"
 aws-sdk-s3                = "2.32.5"
 lettuce                   = "6.8.0.RELEASE"
 jtokkit                   = "1.1.0"   # BPE token estimator — LG-P4·S2 last-resort budget usage (D-4)
+auth0-java-jwt            = "4.4.0"   # RS256 JWT verification for the LG admin API (LG-P4·S3, Keycloak realm key)
 
 # gRPC — kantheon v1 prefers MCP over gRPC for new services, but `logging-config`
 # carries gRPC interceptors for cross-service reuse. Only the kotlin-stub is exposed
@@ -336,6 +337,9 @@ lettuce-core                        = { module = "io.lettuce:lettuce-core",     
 
 # jtokkit — BPE tokenizer for the LG gateway's flagged last-resort budget estimate (LG-P4·S2, D-4).
 jtokkit                             = { module = "com.knuddels:jtokkit",                                 version.ref = "jtokkit" }
+
+# auth0 java-jwt — RS256 verification of Keycloak admin tokens on the LG admin API (LG-P4·S3).
+auth0-java-jwt                      = { module = "com.auth0:java-jwt",                                    version.ref = "auth0-java-jwt" }
 
 # Apache POI / Parquet / Hadoop — data-formatter XLSX + Parquet output
 apache-poi-ooxml                    = { module = "org.apache.poi:poi-ooxml",                              version.ref = "apache-poi" }

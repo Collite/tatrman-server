@@ -17,6 +17,7 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytesWriter
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
@@ -35,9 +36,11 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.slf4j.LoggerFactory
+import org.tatrman.llmgateway.admin.AdminAuth
 import org.tatrman.llmgateway.auth.ConfigKeyValidator
 import org.tatrman.llmgateway.auth.KeyPrincipal
 import org.tatrman.llmgateway.auth.KeyValidator
+import org.tatrman.llmgateway.auth.bearerToken
 import org.tatrman.llmgateway.auth.requireKey
 import org.tatrman.llmgateway.config.ConfigLoader
 import org.tatrman.llmgateway.config.GatewayConfig
@@ -134,12 +137,8 @@ fun Application.module(
     // Data-plane key validation (D-1). PG present → the real PG-backed validator (LG-P4·S1): config teams
     // upserted + seeded keys imported (G-3), then `virtual_keys` lookups behind a ≤30 s cache. Storeless
     // (Docker-free unit tier / dev) → the config-backed seeded-key validator; no issuance/revocation there.
-    val keyValidator: KeyValidator =
-        if (pg != null) {
-            GovernanceLoad.apply(pg.db, gateway.governance).validator
-        } else {
-            ConfigKeyValidator(gateway.governance)
-        }
+    val governance = pg?.let { GovernanceLoad.apply(it.db, gateway.governance) }
+    val keyValidator: KeyValidator = governance?.validator ?: ConfigKeyValidator(gateway.governance)
 
     // Provider layer (LG-P2): one pooled Ktor CIO client; per-provider keys resolved from env (C-5).
     val upstreamClient =
@@ -179,6 +178,39 @@ fun Application.module(
     val teamRpm = gateway.governance.teams.associate { it.id to it.rateLimit?.requestsPerMinute }
     val teamCostCenter = gateway.governance.teams.associate { it.id to it.costCenterPrefix }
 
+    // Admin key API (LG-P4·S3): Keycloak-JWT gated, over the S1 issuance service. Present only when
+    // configured (an `admin { }` block with the realm public key) AND PG-backed (issuance needs the store).
+    val adminAuth =
+        if (config.hasPath("admin.enabled") &&
+            config.getBoolean("admin.enabled") &&
+            config.hasPath("admin.realmPublicKey")
+        ) {
+            AdminAuth(
+                issuer = config.optStr("admin.issuer"),
+                audience = config.optStr("admin.audience"),
+                realmPublicKeyBase64 = config.getString("admin.realmPublicKey"),
+                requiredRole = config.optStr("admin.role") ?: "llm-gateway-admin",
+            )
+        } else {
+            null
+        }
+    val keyService = governance?.keyService
+
+    // Attribution (D-2, contracts §1.2): X-Cost-Center refines within the key's team and is prefix-validated
+    // (a key can never charge a foreign bucket → 400); absent ⇒ the team default. X-Turn-Ref is trace-only.
+    fun costCenterFor(
+        team: String,
+        header: String?,
+    ): String {
+        val prefix = teamCostCenter[team] ?: team
+        if (header != null && !header.startsWith(prefix)) {
+            throw GatewayException(
+                GatewayError.Validation("X-Cost-Center '$header' must start with the key's team prefix '$prefix'"),
+            )
+        }
+        return header ?: prefix
+    }
+
     // Admission gate (architecture §3.1 order): rate-limit (hard 429) → money-budget pre-check (hard 429).
     // Reuses the GatewayError rendering — RateLimit carries Retry-After, BudgetExceeded the x-gateway-reason.
     fun admit(principal: KeyPrincipal) {
@@ -201,6 +233,8 @@ fun Application.module(
             admit(principal) // rate-limit + budget pre-check (429 on breach) BEFORE any upstream work
             val req = ChatRequest.parse(call.receiveText()) // bad body → SerializationException → 400 (§1.7)
             val startMs = System.currentTimeMillis()
+            // Attribution (D-2): prefix-validate X-Cost-Center against the key's team (foreign bucket → 400).
+            val costCenter = costCenterFor(principal.team, call.request.headers["X-Cost-Center"])
 
             // Build + record the settle for one served response (D-4). Usage precedence is applied by the
             // caller (tap UsageChunk → non-stream usage → estimate); cached always false until LG-P5·S1.
@@ -215,7 +249,7 @@ fun Application.module(
                 Settle(
                     keyId = principal.keyId,
                     teamId = principal.team,
-                    costCenter = teamCostCenter[principal.team],
+                    costCenter = costCenter,
                     turnRef = call.request.headers["X-Turn-Ref"],
                     requestedModel = req.model ?: "",
                     servedProvider = serving.target.providerName,
@@ -357,6 +391,8 @@ fun Application.module(
         post("/v1/embeddings") {
             val principal = call.requireKey(keyValidator)
             admit(principal) // embeddings cost money too — same rate-limit + budget gate as chat
+            // D-2: prefix-validate X-Cost-Center against the key's team (foreign bucket → 400)
+            val costCenter = costCenterFor(principal.team, call.request.headers["X-Cost-Center"])
             // Embeddings ride passthrough end-to-end (B-T5) — raw JsonObject, no B-T2 model.
             val json = Json.parseToJsonElement(call.receiveText()).jsonObject
             val input =
@@ -408,7 +444,7 @@ fun Application.module(
                     Settle(
                         keyId = principal.keyId,
                         teamId = principal.team,
-                        costCenter = teamCostCenter[principal.team],
+                        costCenter = costCenter,
                         turnRef = call.request.headers["X-Turn-Ref"],
                         requestedModel = modelName ?: "",
                         servedProvider = entry.target.providerName,
@@ -448,6 +484,95 @@ fun Application.module(
                     }
                 },
             )
+        }
+
+        // ── Admin plane (Keycloak JWT, realm role llm-gateway-admin — LG-P4·S3, contracts §1.8) ──
+        // Registered only when configured + PG-backed. In-service JWT verification is the only gate (D-1).
+        if (adminAuth != null && keyService != null) {
+            post("/admin/keys") {
+                if (!call.adminOk(adminAuth)) return@post
+                val body =
+                    runCatching { Json.parseToJsonElement(call.receiveText()).jsonObject }.getOrNull()
+                        ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            buildJsonObject { put("error", "invalid JSON body") },
+                        )
+                val team = body["team"]?.jsonPrimitive?.contentOrNull
+                val name = body["name"]?.jsonPrimitive?.contentOrNull
+                if (team.isNullOrBlank() || name.isNullOrBlank()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "'team' and 'name' are required") },
+                    )
+                }
+                val issued =
+                    try {
+                        keyService.issueKey(team, name)
+                    } catch (e: IllegalArgumentException) {
+                        return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            buildJsonObject {
+                                put(
+                                    "error",
+                                    e.message ?: "unknown team",
+                                )
+                            },
+                        )
+                    }
+                call.respond(
+                    HttpStatusCode.Created,
+                    buildJsonObject {
+                        put("id", issued.row.id)
+                        put("key", issued.plaintext) // plaintext returned EXACTLY once (D-1)
+                        put("team", issued.row.teamId)
+                        put("name", issued.row.name)
+                        put("created_at", issued.row.createdAt.toString())
+                    },
+                )
+            }
+            get("/admin/keys") {
+                if (!call.adminOk(adminAuth)) return@get
+                val team = call.request.queryParameters["team"]
+                val rows =
+                    if (team !=
+                        null
+                    ) {
+                        keyService.list(team)
+                    } else {
+                        gateway.governance.teams.flatMap { keyService.list(it.id) }
+                    }
+                call.respond(
+                    buildJsonObject {
+                        putJsonArray("data") {
+                            rows.forEach { r ->
+                                add(
+                                    buildJsonObject {
+                                        // NEVER key_hash / plaintext (contracts §1.8)
+                                        put("id", r.id)
+                                        put("team", r.teamId)
+                                        put("name", r.name)
+                                        put("created_at", r.createdAt.toString())
+                                        put("revoked_at", r.revokedAt?.toString())
+                                        put("last_used_at", r.lastUsedAt?.toString())
+                                    },
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+            delete("/admin/keys/{id}") {
+                if (!call.adminOk(adminAuth)) return@delete
+                val id = call.parameters["id"]
+                if (id.isNullOrBlank()) {
+                    return@delete call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "missing key id") },
+                    )
+                }
+                keyService.revoke(id) // idempotent; takes effect within the validator's ≤30 s TTL
+                call.respond(HttpStatusCode.NoContent)
+            }
         }
 
         // ── Ops plane (unauthenticated, cluster-internal) ───────────────────────────────────────
@@ -502,6 +627,31 @@ fun Application.module(
         serverConfig.telemetryEnabled,
     )
 }
+
+private fun Config.optStr(path: String): String? = if (hasPath(path)) getString(path) else null
+
+/**
+ * Admin-plane gate: verify the Keycloak JWT + role and respond 401/403 on failure (contracts §1.8). Returns
+ * true when the caller may proceed. Admin responses are plain JSON, not the OpenAI error envelope.
+ */
+private suspend fun io.ktor.server.application.ApplicationCall.adminOk(auth: AdminAuth): Boolean =
+    when (auth.authenticate(bearerToken())) {
+        is AdminAuth.Result.Ok -> true
+        AdminAuth.Result.Forbidden -> {
+            respond(
+                HttpStatusCode.Forbidden,
+                buildJsonObject {
+                    put("error", "forbidden")
+                    put("detail", "requires the llm-gateway-admin realm role")
+                },
+            )
+            false
+        }
+        else -> {
+            respond(HttpStatusCode.Unauthorized, buildJsonObject { put("error", "unauthorized") })
+            false
+        }
+    }
 
 /** Captures the settle-relevant tap signals off a live stream (last usage chunk + TTFB) for the finally settle. */
 private class StreamSettleTap {
