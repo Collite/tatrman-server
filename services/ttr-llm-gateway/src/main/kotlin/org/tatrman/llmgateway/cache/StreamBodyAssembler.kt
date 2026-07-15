@@ -55,6 +55,9 @@ class StreamBodyAssembler(
     /** A finish_reason means the stream ended cleanly — guards against caching an errored/abandoned stream. */
     fun completed(): Boolean = finishReason != null
 
+    /** The assembled assistant text so far — the prompt-log response text on the streaming path. */
+    fun content(): String = content.toString()
+
     fun assembled(): JsonObject =
         buildJsonObject {
             put("id", id ?: "cached")

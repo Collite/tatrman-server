@@ -96,6 +96,7 @@ class RetryPolicy(
         errorConverter: ErrorConverter,
         req: ChatRequest,
         budget: BudgetClock,
+        onRetry: (reason: String) -> Unit = {}, // metric hook: called once per scheduled retry (§6)
     ): AttemptOutcome {
         var attempt = 0
         while (true) {
@@ -115,6 +116,7 @@ class RetryPolicy(
                     transportError(e)
                 }
             val wait = nextDelay(error, attempt, budget.elapsedMs()) ?: return AttemptOutcome.Exhausted(error)
+            onRetry(error::class.simpleName ?: "?")
             delay(wait)
             if (budget.expired()) return AttemptOutcome.Exhausted(error)
         }

@@ -10,7 +10,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
+import io.opentelemetry.api.trace.Tracer
 import org.tatrman.llmgateway.config.ProvidersConfig
+import org.tatrman.llmgateway.observability.GatewayMetrics
+import shared.otel.withSpan
 import org.tatrman.llmgateway.provider.ProviderResult
 import org.tatrman.llmgateway.provider.RegistryEntry
 import org.tatrman.llmgateway.provider.UpstreamStreamException
@@ -31,8 +34,27 @@ class InferenceEngine(
     private val circuit: CircuitBreaker,
     private val nowMs: () -> Long = { System.currentTimeMillis() },
     private val retry: RetryPolicy = RetryPolicy(providers.retry),
+    private val metrics: GatewayMetrics? = null, // §6 retries/fallbacks (optional so tests/storeless skip)
+    private val tracer: Tracer? = null, // §6 `llm-gateway.attempt` spans, children of the request span
 ) {
     private val budgetMs = providers.retry.wallClockBudgetMs
+
+    /** Wrap one provider attempt in an `llm-gateway.attempt {provider,model,attempt_no}` span (siblings, §6). */
+    private suspend fun <T> attemptSpan(
+        entry: RegistryEntry,
+        attemptNo: Int,
+        block: suspend () -> T,
+    ): T =
+        tracer?.withSpan(
+            "llm-gateway.attempt",
+            attributes =
+                mapOf(
+                    "provider" to entry.target.providerName,
+                    "model" to entry.target.upstream,
+                    "attempt_no" to attemptNo.toString(),
+                ),
+            block = block,
+        ) ?: block()
 
     // ── non-stream ────────────────────────────────────────────────────────────────────────────────────
 
@@ -59,14 +81,25 @@ class InferenceEngine(
         // Default stands only if EVERY entry is circuit-open (all skipped, none attempted) → 502 unavailable.
         var lastError: GatewayError = GatewayError.Provider5xx(503)
         var lastAttempted = chain.first()
+        var attemptNo = 0
         for (entry in chain) {
             val handler = entry.handler ?: continue
             if (circuit.shouldSkip(entry.target.providerName)) continue
             lastAttempted = entry
-            when (val outcome = retry.run(handler, entry.target, entry.key, entry.errorConverter, req, budget)) {
+            attemptNo++
+            val onRetry = { reason: String ->
+                metrics?.retry(entry.target.providerName, reason)
+                Unit
+            }
+            val outcome =
+                attemptSpan(entry, attemptNo) {
+                    retry.run(handler, entry.target, entry.key, entry.errorConverter, req, budget, onRetry)
+                }
+            when (outcome) {
                 is AttemptOutcome.Success -> {
                     circuit.recordSuccess(entry.target.providerName)
                     val from = if (entry === chain.first()) null else chain.first().model.name
+                    if (from != null) metrics?.fallback(from, entry.model.name)
                     logCrossing(from, entry, outcome.result.stripped)
                     return ChainResult.Ok(outcome.result, entry, from, outcome.result.stripped)
                 }
@@ -111,11 +144,13 @@ class InferenceEngine(
         // Default stands only if EVERY entry is circuit-open (all skipped, none attempted) → 502 unavailable.
         var lastError: GatewayError = GatewayError.Provider5xx(503)
         var lastAttempted = chain.first()
+        var attemptNo = 0
         for (entry in chain) {
             if (entry.handler == null) continue
             if (circuit.shouldSkip(entry.target.providerName)) continue
             lastAttempted = entry
-            when (val outcome = attemptEntryStream(entry, req, budget, scope)) {
+            attemptNo++
+            when (val outcome = attemptSpan(entry, attemptNo) { attemptEntryStream(entry, req, budget, scope) }) {
                 is EntryStream.FirstFrame -> {
                     // ⚑ Circuit success is recorded at first-frame: a provider that reliably delivers one
                     // frame then dies mid-stream reads as a success and never trips its breaker. Acceptable
@@ -123,6 +158,7 @@ class InferenceEngine(
                     // circuit signal. Revisit if mid-stream degradation needs to open a circuit (LG-P5).
                     circuit.recordSuccess(entry.target.providerName)
                     val from = if (entry === chain.first()) null else chain.first().model.name
+                    if (from != null) metrics?.fallback(from, entry.model.name)
                     logCrossing(from, entry, emptyList())
                     return StreamOpen.Attached(entry, from, emptyList(), outcome.frames.consumeAsFlow())
                 }
@@ -160,6 +196,7 @@ class InferenceEngine(
             if (probe.error == null) return EntryStream.FirstFrame(probe.channel!!)
             val wait =
                 retry.nextDelay(probe.error, attempt, budget.elapsedMs()) ?: return EntryStream.Exhausted(probe.error)
+            metrics?.retry(entry.target.providerName, probe.error::class.simpleName ?: "?")
             delay(wait)
             if (budget.expired()) return EntryStream.Exhausted(probe.error)
         }

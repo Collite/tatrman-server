@@ -23,12 +23,16 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
+import io.opentelemetry.api.OpenTelemetry
+import io.opentelemetry.instrumentation.ktor.v3_0.KtorServerTelemetry
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -60,6 +64,9 @@ import org.tatrman.llmgateway.governance.RateLimiter
 import org.tatrman.llmgateway.governance.Settle
 import org.tatrman.llmgateway.governance.TokenEstimator
 import org.tatrman.llmgateway.governance.Usage
+import org.tatrman.llmgateway.observability.GatewayMetrics
+import org.tatrman.llmgateway.observability.PromptLogRecord
+import org.tatrman.llmgateway.observability.PromptLogWriter
 import org.tatrman.llmgateway.provider.PassthroughHandler
 import org.tatrman.llmgateway.provider.ProviderRegistry
 import org.tatrman.llmgateway.provider.ProviderResult
@@ -102,6 +109,7 @@ fun main() {
 fun Application.module(
     config: Config,
     gateway: GatewayConfig = ConfigLoader.loadFromResources(),
+    otelOverride: OpenTelemetry? = null, // tests inject an in-memory-exporter SDK; prod builds the OTLP one
 ) {
     val serverConfig = KtorConfigFactory.fromConfig(config, "ttr-llm-gateway", 7280)
     installKtorServerBase(serverConfig)
@@ -109,13 +117,18 @@ fun Application.module(
     install(StatusPages) { installGatewayErrorHandling() }
 
     // OTLP trace/metric/log export + the Logback→OTLP bridge; noop when telemetry is disabled.
-    createOpenTelemetrySdk(
-        OtelEndpointConfig(
-            serviceName = "ttr-llm-gateway",
-            protocol = System.getenv("LLM_GATEWAY_OTEL_PROTOCOL") ?: "grpc",
-        ),
-        enabled = serverConfig.telemetryEnabled,
-    )
+    val otel =
+        otelOverride ?: createOpenTelemetrySdk(
+            OtelEndpointConfig(
+                serviceName = "ttr-llm-gateway",
+                protocol = System.getenv("LLM_GATEWAY_OTEL_PROTOCOL") ?: "grpc",
+            ),
+            enabled = serverConfig.telemetryEnabled,
+        )
+    // Server span per request + W3C traceparent extraction (F-1: continue the caller's trace — the 1.x
+    // gateway DROPPED the inbound context; this is the named fix). Manual attempt spans nest under it.
+    install(KtorServerTelemetry) { setOpenTelemetry(otel) }
+    val tracer = otel.getTracer("ttr-llm-gateway")
 
     val metrics = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
     log.info(
@@ -167,7 +180,11 @@ fun Application.module(
 
     // Resilience engine (LG-P3·S2): typed retries + fallback chains + per-instance circuit-breaker-lite.
     val circuit = CircuitBreaker(gateway.providers.circuit)
-    val engine = InferenceEngine(gateway.providers, circuit)
+    // Gateway metric set (LG-P5·S2, §6); circuit_state gauges over the observed providers.
+    val gwMetrics = GatewayMetrics(metrics).also { it.registerCircuitGauges(gateway.providers.providers.keys, circuit) }
+    val engine = InferenceEngine(gateway.providers, circuit, metrics = gwMetrics, tracer = tracer)
+    // Prompt-log sink (F-1): async write-behind over PG. Present only with a store.
+    val promptLog = pg?.let { PromptLogWriter(it.db, this, metrics) }
 
     // Admission + budgets (LG-P4·S2). Rate limiting rides Redis (fail-open on outage); money budgets ride PG
     // (so they exist only with a store — storeless boots skip both). Team rpm / budget / cost-center prefixes
@@ -235,6 +252,7 @@ fun Application.module(
     }
 
     monitor.subscribe(ApplicationStopping) {
+        runCatching { promptLog?.close() }
         runCatching { pg?.close() }
         runCatching { redis?.close() }
         runCatching { upstreamClient.close() }
@@ -250,8 +268,23 @@ fun Application.module(
             // Attribution (D-2): prefix-validate X-Cost-Center against the key's team (foreign bucket → 400).
             val costCenter = costCenterFor(principal.team, call.request.headers["X-Cost-Center"])
 
-            // Build + record the settle for one served response (D-4). Usage precedence is applied by the
-            // caller (tap UsageChunk → non-stream usage → estimate); cached always false until LG-P5·S1.
+            val promptText = messagesText(req.messages)
+
+            // One Settle record, three sinks (§5.5): budget, prompt-log (async), metrics (tokens+cost).
+            fun dispatch(
+                s: Settle,
+                responseText: String,
+                status: String,
+            ) {
+                budgetService?.settle(s)
+                promptLog?.enqueue(PromptLogRecord(s, promptText, responseText, status))
+                gwMetrics.tokens(s.teamId, s.servedProvider, s.servedModel, "input", s.usage.promptTokens)
+                gwMetrics.tokens(s.teamId, s.servedProvider, s.servedModel, "output", s.usage.completionTokens)
+                gwMetrics.cost(s.teamId, s.servedProvider, s.servedModel, s.costUsd)
+            }
+
+            // Build + fan out the settle for one served (non-cached) response (D-4). Usage precedence is the
+            // caller's (tap UsageChunk → non-stream usage → estimate).
             fun settle(
                 serving: RegistryEntry,
                 fallbackFrom: String?,
@@ -259,7 +292,9 @@ fun Application.module(
                 tokens: Usage,
                 estimated: Boolean,
                 ttfbMs: Long?,
-            ) = budgetService?.settle(
+                responseText: String,
+                status: String = "SUCCESS",
+            ) = dispatch(
                 Settle(
                     keyId = principal.keyId,
                     teamId = principal.team,
@@ -281,8 +316,10 @@ fun Application.module(
                     cached = false,
                     ttfbMs = ttfbMs,
                     durationMs = System.currentTimeMillis() - startMs,
-                    traceId = null,
+                    traceId = currentTraceId(),
                 ),
+                responseText,
+                status,
             )
 
             // Full three-tier resolution (LG-P3·S1): alias → literal → model_tags soft-match. Unknown name →
@@ -326,13 +363,16 @@ fun Application.module(
                 }
             if (cacheKey != null && cacheMode != "bypass" && cacheMode != "refresh") {
                 val hit = responseCache.get(cacheKey)
-                if (hit != null) {
+                if (hit == null) {
+                    gwMetrics.cacheMiss()
+                } else {
+                    gwMetrics.cacheHit()
                     // A hit is still a request: the rate-limit token was spent in admit(); settle-as-cached
                     // records the SAVED cost (echoed) but adds nothing to budget_usage (Settle.cached=true).
                     call.response.header("X-Gateway-Provider", hit.servedProvider) // original serving provider (P-2)
                     call.response.header("X-Gateway-Model", hit.servedModel)
                     call.response.header("X-Gateway-Cache", "hit")
-                    budgetService?.settle(
+                    dispatch(
                         Settle(
                             keyId = principal.keyId,
                             teamId = principal.team,
@@ -349,8 +389,10 @@ fun Application.module(
                             cached = true,
                             ttfbMs = 0,
                             durationMs = System.currentTimeMillis() - startMs,
-                            traceId = null,
+                            traceId = currentTraceId(),
                         ),
+                        assistantText(hit.body),
+                        "SUCCESS",
                     )
                     if (req.stream) {
                         call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
@@ -416,6 +458,8 @@ fun Application.module(
                                     tokens,
                                     estimated,
                                     settleTap.ttfbMs,
+                                    assembler.content(),
+                                    if (assembler.completed()) "SUCCESS" else "ERROR",
                                 )
                                 // Store on a clean stream completion (finish_reason seen, content, no tool_calls):
                                 // an errored/abandoned stream leaves finishReason null → not cached.
@@ -477,7 +521,15 @@ fun Application.module(
                         } else {
                             Usage(TokenEstimator.estimatePromptTokens(req.messages, serving.model.name), 0) to true
                         }
-                    settle(serving, outcome.fallbackFrom, outcome.strippedParams, tokens, estimated, null)
+                    settle(
+                        serving,
+                        outcome.fallbackFrom,
+                        outcome.strippedParams,
+                        tokens,
+                        estimated,
+                        null,
+                        assistantText(outcome.result.body),
+                    )
                     val enriched = ResponseEnrichment.chat(outcome.result, serving.model)
                     // Store on a successful miss (also runs for bypass/refresh — they skip the read, not the store).
                     if (cacheKey != null) {
@@ -559,7 +611,7 @@ fun Application.module(
                 // Settle embeddings on the input-only usage (no completion tokens). The tokenizer estimate is
                 // chat-message-shaped, so for embeddings we settle the reported tokens or 0 (flagged estimated).
                 val inTokens = result.usage?.promptTokens ?: 0
-                budgetService?.settle(
+                val embSettle =
                     Settle(
                         keyId = principal.keyId,
                         teamId = principal.team,
@@ -576,9 +628,13 @@ fun Application.module(
                         cached = false,
                         ttfbMs = null,
                         durationMs = 0,
-                        traceId = null,
-                    ),
-                )
+                        traceId = currentTraceId(),
+                    )
+                budgetService?.settle(embSettle)
+                // embeddings have no text response
+                promptLog?.enqueue(PromptLogRecord(embSettle, input.toString(), "", "SUCCESS"))
+                gwMetrics.tokens(principal.team, entry.target.providerName, entry.target.upstream, "input", inTokens)
+                gwMetrics.cost(principal.team, entry.target.providerName, entry.target.upstream, embSettle.costUsd)
                 call.respond(HttpStatusCode.OK, ResponseEnrichment.embeddings(result, entry.model))
             }
         }
@@ -748,6 +804,43 @@ fun Application.module(
 }
 
 private fun Config.optStr(path: String): String? = if (hasPath(path)) getString(path) else null
+
+/** The current OTel trace id (32-hex) for the prompt-log row, or null when there is no active/valid span. */
+private fun currentTraceId(): String? {
+    val ctx =
+        io.opentelemetry.api.trace.Span
+            .current()
+            .spanContext
+    return if (ctx.isValid) ctx.traceId else null
+}
+
+/** Flatten the chat `messages` to plain text for the prompt-log `prompt_text` (FTS source). */
+private fun messagesText(messages: JsonArray): String =
+    messages.joinToString("\n") { m ->
+        when (val content = (m as? JsonObject)?.get("content")) {
+            is JsonPrimitive -> content.contentOrNull ?: ""
+            is JsonArray ->
+                content
+                    .mapNotNull {
+                        (it as? JsonObject)
+                            ?.get(
+                                "text",
+                            )?.jsonPrimitive
+                            ?.contentOrNull
+                    }.joinToString(" ")
+            else -> ""
+        }
+    }
+
+/** The assistant message text from a chat.completion body — the prompt-log `response_text`. */
+private fun assistantText(body: JsonObject): String {
+    val message = (body["choices"] as? JsonArray)?.firstOrNull()?.jsonObject?.get("message") as? JsonObject
+    return when (val c = message?.get("content")) {
+        is JsonPrimitive -> c.contentOrNull ?: ""
+        null -> ""
+        else -> c.toString()
+    }
+}
 
 /**
  * Admin-plane gate: verify the Keycloak JWT + role and respond 401/403 on failure (contracts §1.8). Returns
