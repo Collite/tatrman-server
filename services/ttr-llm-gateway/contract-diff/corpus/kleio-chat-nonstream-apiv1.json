@@ -1,0 +1,25 @@
+{
+  "consumer": "kleio",
+  "shape": "chat-nonstream-grounded-synthesis",
+  "method": "POST",
+  "path": "/api/v1/chat/completions",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "requestBody": {
+    "model": "__configured_model__",
+    "messages": [
+      { "role": "system", "content": "__system prompt__" },
+      { "role": "user", "content": "Question: ...\n\nRetrieved chunks (cite by part/page id):\n[part 12, page 3] ..." }
+    ]
+  },
+  "readsResponseFields": [
+    "choices[0].message.content",
+    "content"
+  ],
+  "origin": "reconstructed-from-source",
+  "sources": [
+    "kantheon/agents/kleio/.../HttpClients.kt:133-146,149,171-186"
+  ],
+  "notes": "The ONLY consumer of /api/v1/chat/completions (path migrates to /v1 in S2-T6, HttpClients.kt:149). Minimal 2-field body. Reads choices[0].message.content with a top-level `content` fallback; no usage. After migration, /api/v1/chat/completions has zero consumers."
+}

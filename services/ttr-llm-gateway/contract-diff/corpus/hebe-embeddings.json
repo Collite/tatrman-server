@@ -1,0 +1,22 @@
+{
+  "consumer": "hebe",
+  "shape": "embeddings",
+  "method": "POST",
+  "path": "/v1/embeddings",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer __REDACTED_EMBEDDINGS_KEY__"
+  },
+  "requestBody": {
+    "model": "text-embedding-3-small",
+    "input": ["first chunk of text", "second chunk of text"]
+  },
+  "readsResponseFields": [
+    "data[].embedding[]"
+  ],
+  "origin": "reconstructed-from-source",
+  "sources": [
+    "kantheon/agents/hebe/modules/memory/.../OpenAiCompatEmbeddingProvider.kt:50-71"
+  ],
+  "notes": "Embeddings ride passthrough (B-T5). Separate client — no cost-center/turn-ref headers."
+}

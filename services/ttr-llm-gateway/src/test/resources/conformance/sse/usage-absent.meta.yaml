@@ -1,0 +1,13 @@
+name: usage-absent
+kind: sse
+origin: synthetic
+description: >-
+  A stream with NO usage chunk (upstream omitted it despite content). Settlement must fall back to a
+  tokenizer estimate flagged estimated=true (D-4 precedence: tap usage -> body usage -> estimate). The
+  tap emits no UsageChunk; the engine supplies the estimate downstream.
+expected:
+  - "Opened"
+  - "FirstToken"
+  - "ContentDelta content=No usage here"
+  - "Finish reason=stop"
+  - "Done"

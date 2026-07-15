@@ -1,0 +1,9 @@
+{
+  "model": "claude-haiku",
+  "messages": [
+    { "role": "user", "content": "Ħëllö 世界 🌍 — café naïve Straße, é combining, RTL ‏שלום‎, emoji ZWJ 👩‍👩‍👧‍👦" },
+    { "role": "assistant", "content": "Prijímam. Ďakujem. 🙏" }
+  ],
+  "user": "tïm/söör-42",
+  "metadata": { "note": "ключ — ценность", "emoji": "✅❌⚠️" }
+}

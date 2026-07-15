@@ -1,0 +1,81 @@
+# LLM Gateway 2.0 model catalog (contracts §2.1). Migrated from 1.x models.yaml + rules.conf 2026-07-14
+# (LG-P1·S1·T3). Tier aliases (haiku/sonnet/claude-haiku) and rules.conf aliases (gpt-4/fast) are folded
+# into `aliases:` on the concrete models — NOT duplicate rows (1.x faked tier-1 with dup rows; C-1 tier 1).
+#
+# ⚠ INTERIM PRICING: 1.x carried a single legacy `cost` per model; 2.0 requires split input/output
+# per-1M-token prices. Until Bora supplies the real numbers, input = output = the 1.x cost (flagged
+# per row). Embeddings are input-only. Replace before cutover (pre-cutover checklist).
+models:
+  - id: azure-gpt-4o
+    name: gpt-4o
+    aliases: ["gpt-4"]            # rules.conf: "gpt-4" -> gpt-4o
+    provider: azure
+    upstream: gpt-4o
+    type: chat
+    tags: ["smart", "complex", "coding"]
+    pricing: { input: 10.0, output: 10.0 }   # interim (1.x cost=10)
+    cacheTtlSeconds: 3600
+    fallback: []                 # chains populated in LG-P3
+
+  - id: azure-gpt-4o-mini
+    name: gpt-4o-mini
+    aliases: ["fast"]            # rules.conf: "fast" -> gpt-4o-mini
+    provider: azure
+    upstream: gpt-4o-mini
+    type: chat
+    tags: ["fast", "cheap", "chat"]
+    pricing: { input: 1.0, output: 1.0 }     # interim (1.x cost=1)
+    cacheTtlSeconds: 3600
+    fallback: []
+
+  - id: azure-ada-002
+    name: ada-002
+    provider: azure
+    upstream: text-embedding-ada-002
+    type: embedding
+    tags: ["embedding"]
+    pricing: { input: 1.0 }                   # interim (1.x cost=1); embeddings are input-only
+    cacheTtlSeconds: 0
+    fallback: []
+
+  - id: azure-gpt-41
+    name: gpt-4.1
+    provider: azure
+    upstream: tatrman-gpt-4.1
+    type: chat
+    tags: ["tatrman"]
+    pricing: { input: 10.0, output: 10.0 }   # interim (1.x cost=10)
+    cacheTtlSeconds: 3600
+    fallback: []
+
+  - id: anthropic-opus-4-7
+    name: claude-opus-4-7
+    provider: anthropic
+    upstream: claude-opus-4-7
+    type: chat
+    tags: ["smart", "complex", "coding", "frontier"]
+    pricing: { input: 15.0, output: 15.0 }   # interim (1.x cost=15)
+    cacheTtlSeconds: 3600
+    fallback: []
+
+  - id: anthropic-sonnet-4-6
+    name: claude-sonnet-4-6
+    aliases: ["sonnet"]         # tier alias (Themis FAST)
+    provider: anthropic
+    upstream: claude-sonnet-4-6
+    type: chat
+    tags: ["balanced", "default"]
+    pricing: { input: 3.0, output: 3.0 }     # interim (1.x cost=3)
+    cacheTtlSeconds: 3600
+    fallback: []
+
+  - id: anthropic-haiku-4-5
+    name: claude-haiku-4-5
+    aliases: ["haiku", "claude-haiku"]   # tier aliases (Themis CHEAP; Golem GolemModels.Cheap)
+    provider: anthropic
+    upstream: claude-haiku-4-5
+    type: chat
+    tags: ["fast", "cheap"]
+    pricing: { input: 1.0, output: 1.0 }     # interim (1.x cost=1)
+    cacheTtlSeconds: 3600
+    fallback: []

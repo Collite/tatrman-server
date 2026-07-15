@@ -1,0 +1,25 @@
+# LLM Gateway 2.0 governance config (contracts §2.3). Teams = attribution buckets for the constellation
+# consumers. Budgets/limits are DEFAULTS (per-key overrides min-win, D-3/LG-D5).
+#
+# ⚠ INTERIM: budget/rate-limit numbers are placeholders pending Bora — mode is `soft` so nothing blocks
+# (D-6 soft default). `keys:` is empty on purpose: seeded key SHA-256 hashes are imported at cutover from
+# the k8s secrets (G-3, pre-cutover checklist) — never commit plaintext or a fake hash here.
+teams:
+  - id: golem
+    costCenterPrefix: "golem/"
+    budget: { id: golem-monthly, usdPerMonth: 100.0, mode: soft }   # interim
+    rateLimit: { id: golem-rl, requestsPerMinute: 120 }             # interim
+  - id: hebe
+    costCenterPrefix: "hebe/"
+    budget: { id: hebe-monthly, usdPerMonth: 100.0, mode: soft }    # interim
+    rateLimit: { id: hebe-rl, requestsPerMinute: 120 }              # interim
+  - id: themis
+    costCenterPrefix: "themis/"
+    budget: { id: themis-monthly, usdPerMonth: 100.0, mode: soft }  # interim
+    rateLimit: { id: themis-rl, requestsPerMinute: 120 }            # interim
+  - id: kleio
+    costCenterPrefix: "kleio/"
+    budget: { id: kleio-monthly, usdPerMonth: 100.0, mode: soft }   # interim
+    rateLimit: { id: kleio-rl, requestsPerMinute: 120 }             # interim
+
+keys: []   # seeded at cutover (G-3) — hashes from k8s secrets, never committed

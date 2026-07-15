@@ -1,0 +1,10 @@
+name: anthropic-529
+kind: http
+origin: synthetic
+description: >-
+  Anthropic's non-standard 529 "overloaded" before any token — must map to Provider5xx (retryable +
+  chain-eligible), NOT a generic client error. Named explicitly in design C-3.
+httpStatus: 529
+expectedError: "Provider5xx(status=529, retryable=true, chainEligible=true)"
+expected:
+  - "GatewayError.Provider5xx status=529"

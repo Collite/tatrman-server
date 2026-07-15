@@ -1,0 +1,6 @@
+data: {"id":"chatcmpl-e1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Partial"},"finish_reason":null}]}
+
+data: {"error":{"message":"upstream terminated the response","type":"server_error","code":null}}
+
+data: [DONE]
+
