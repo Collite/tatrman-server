@@ -21,7 +21,7 @@
 | Fact | Evidence |
 |---|---|
 | Prod runs the **1.x** image today | olymp `clusters/{collite-o1,bp-dsk}/apps/llm-gateway/values.yaml` → `image.tag: "0.9.0"`; no `ttr-llm-gateway/v*` release tag pushed yet |
-| Cutover = an **image-tag bump** (same Service, same chart) | chart `services/ttr-llm-gateway/k8s`, `config.json chartRevision: master`; only `image.tag` changes |
+| Cutover = **image tag + a 2.0 env/probe rewire** (same Service + chart, new values) | the shipped chart is 1.x Spring-shaped — actuator probes, `POSTGRESQL_*`/`SERVER_PORT` env, `secretEnv` = 1.x key names, no Redis/governance. 2.0 (Ktor) reads `LLM_GATEWAY_*` + serves `/health/*`, so the flip needs the §2b values, not just `image.tag` (verified: a bare tag bump left 2.0 storeless — Redis disabled) |
 | Release path builds `ghcr.io/collite/ttr-llm-gateway:<v>` via Jib | `.github/workflows/release-image.yml` — push tag `ttr-llm-gateway/v2.0.0` (or dispatch); RC tags e.g. `2.0.0-rc.1` are fine on GHCR |
 | **Rollback is schema-safe** — 1.x tolerates the 2.0 migrations | V2 = new tables only (`teams`/`virtual_keys`/`budget_usage`, all `CREATE TABLE IF NOT EXISTS`); V3 = `ADD COLUMN IF NOT EXISTS`, every new column nullable or `DEFAULT FALSE`; the 1.x writer `PostgresPromptLogRepository` inserts an **explicit** column list (`user_id…created_at`) that omits every new column; 1.x persistence is **Spring Data JDBC**, not JPA/Hibernate → **no `ddl-auto` schema validation runs at startup**, so extra columns/tables cannot fail 1.x boot |
 | 2.0 keeps the 1.x columns populated | `PromptLogWriter` writes `user_id/model_name/provider/prompt_text/response_text/tokens_prompt/tokens_completion/duration_ms/status` — 1.x reads stay valid on rows written during the 2.0 window |
@@ -76,15 +76,83 @@ git push --force origin llm-gateway/pre-2.0
    `version=2.0.0 modules=ttr-llm-gateway`). Confirm `ghcr.io/collite/ttr-llm-gateway:2.0.0` exists.
 2. **Migrations** — already applied additively during soak (V2/V3). No cutover-time DDL. Confirm the
    prod PG is at V3.
-3. **Flush the Redis cache (G-1).** The 2.0 `CacheEnvelope` format is new; stale 1.x entries must not
-   be read. `FLUSHDB` the gateway's Redis logical DB (or delete `llm-gateway:chat:*`) at repoint.
-4. **Repoint, one cluster at a time.** In olymp, bump `image.tag` `0.9.0 → 2.0.0` in
-   `clusters/collite-o1/apps/llm-gateway/values.yaml`, sync/roll, watch (§4). When green, repeat for
-   `clusters/bp-dsk/apps/llm-gateway/values.yaml`. **Apply the consumer repoint (§2a) for the same
-   cluster in the same sync** — the migrated consumers speak 2.0's key-gated `/v1` and cannot fall
-   back to the 1.x gateway, so the gateway flip and the consumer flip must land together.
+3. **Flush the Redis cache (G-1) — only after Redis is wired (§2b).** 2.0's `CacheEnvelope` format is
+   new. The `data`-ns Redis is **shared with Charon**, so do NOT `FLUSHDB`; delete only the gateway's
+   cache namespace (`llm-gateway:chat:*`; the rate-limiter's `llm-gateway:rl:*` and Charon's keys stay
+   intact):
+   ```bash
+   PW=$(kubectl -n data get secret redis-auth -o jsonpath='{.data.password}' | base64 -d)
+   kubectl -n data exec deploy/redis -- env REDISCLI_AUTH="$PW" sh -c \
+     "redis-cli --scan --pattern 'llm-gateway:chat:*' | xargs -r redis-cli UNLINK"
+   ```
+   (`FLUSHDB` is fine ONLY for a dedicated gateway Redis, e.g. the staging `llmgw-redis`.)
+4. **Deploy 2.0 per §2b — NOT a bare image-tag bump — one cluster at a time**, then apply the consumer
+   flip (§2a) in the same sync. The shipped chart is Spring-1.x-shaped (actuator probes, `POSTGRESQL_*`
+   env, no Redis/governance); a tag bump alone leaves 2.0 **storeless with probes it doesn't serve**
+   (this is why Redis reads as disabled after a plain bump). Do `clusters/collite-o1/…` first, watch
+   (§4), then `clusters/bp-dsk/…`. The migrated consumers speak 2.0's key-gated `/v1` with no 1.x
+   fallback, so the gateway flip and the consumer flip must land together.
 5. **Removals** (only after SQ-2 sign-off): gRPC + protos, `/api/v1` (post-Kleio `/v1`), async jobs +
    NATS — land as follow-ups, not inside the repoint.
+
+## 2b. Wire the 2.0 gateway deployment (olymp `apps/llm-gateway/values.yaml`)
+
+⚠ The shipped chart (`services/ttr-llm-gateway/k8s` + shared `ttr-service`) is the **1.x Spring**
+chart: probes hit `/actuator/health/*`, env renders `POSTGRESQL_*`/`SERVER_PORT`, `secretEnv` names the
+1.x provider keys, and nothing wires Redis or governance. The Ktor 2.0 image ignores all of that and
+reads a different surface, so the flip needs values changes, not just `image.tag`. Values shown for
+**bp-dsk** (collite-o1 identical bar hostnames).
+
+**i. Distribute the DB + Redis creds into `ttr-server`** — an env `secretKeyRef` cannot cross
+namespaces, and both creds live in `data`. Add two ClusterExternalSecrets in
+`clusters/<cluster>/platform/auth/` (mirror `clusterexternalsecret-ghcr-pull.yaml`, whose
+`namespaceSelectors` already include `ttr-server`) so ESO materializes, in `ttr-server`:
+`pg-llm-gateway-cred` (vault key `pg-llm-gateway` → `password`) and `redis-auth` (vault key
+`redis-auth` → `password`).
+
+**ii. `apps/llm-gateway/values.yaml`** — drop the 1.x `extraEnv: SPRING_PROFILES_ACTIVE=test`, then:
+
+```yaml
+image:
+  tag: "2.0.0"
+  pullPolicy: IfNotPresent            # immutable release tag
+
+# Ktor health endpoints — NOT Spring actuator. The chart defaults (/actuator/health/*) 404 on 2.0,
+# so the pod never goes Ready. 2.0 is a fast starter; the long Spring startup budget can shrink.
+startupProbe:   { path: /health/ready, initialDelaySeconds: 5,  periodSeconds: 5,  failureThreshold: 30 }
+readinessProbe: { path: /health/ready, initialDelaySeconds: 5,  periodSeconds: 5,  failureThreshold: 10 }
+livenessProbe:  { path: /health/live,  initialDelaySeconds: 20, periodSeconds: 15 }
+
+# 2.0 provider-key env names (providers.conf `keyEnv`). NOTE azure = AZURE_OPENAI_KEY, not the 1.x
+# AZURE_OPENAI_API_KEY. optional:true so a keyless / WireMock bring-up still boots.
+secretEnv:
+  - { name: AZURE_OPENAI_KEY,  secretName: llm-gateway-secrets, secretKey: azure-openai-key,   optional: true }
+  - { name: ANTHROPIC_API_KEY, secretName: llm-gateway-secrets, secretKey: anthropic-api-key,  optional: true }
+  - { name: OPENAI_API_KEY,    secretName: llm-gateway-secrets, secretKey: openai-api-key,      optional: true }
+  - { name: GEMINI_API_KEY,    secretName: llm-gateway-secrets, secretKey: gemini-api-key,      optional: true }
+
+extraEnv:
+  # Postgres — prompt-logs, governance/keys, budgets. NAME/USER are the CNPG db + owner (`llm_gateway`),
+  # NOT the app defaults (`llmgateway`/`tatrman`). The #11 fix grants to db.user → a self-grant here.
+  - { name: LLM_GATEWAY_DB_ENABLED, value: "true" }
+  - { name: LLM_GATEWAY_DB_HOST,    value: "postgres-rw.data.svc.cluster.local" }
+  - { name: LLM_GATEWAY_DB_PORT,    value: "5432" }
+  - { name: LLM_GATEWAY_DB_NAME,    value: "llm_gateway" }
+  - { name: LLM_GATEWAY_DB_USER,    value: "llm_gateway" }
+  - name: LLM_GATEWAY_DB_PASSWORD
+    valueFrom: { secretKeyRef: { name: pg-llm-gateway-cred, key: password } }
+  # Redis — cache + rate-limit. The #10 fix adds the password support this needs.
+  - { name: LLM_GATEWAY_REDIS_ENABLED, value: "true" }
+  - { name: LLM_GATEWAY_REDIS_HOST,    value: "redis.data.svc.cluster.local" }
+  - { name: LLM_GATEWAY_REDIS_PORT,    value: "6379" }
+  - name: LLM_GATEWAY_REDIS_PASSWORD
+    valueFrom: { secretKeyRef: { name: redis-auth, key: password } }
+  - { name: OTEL_ENABLED_LLM_GATEWAY, value: "true" }   # optional
+```
+
+**iii. Verify after the roll:** `kubectl -n ttr-server exec deploy/llm-gateway -- wget -qO- localhost:7280/health/ready`
+returns `200` with PG+Redis probed; `kubectl -n ttr-server logs deploy/llm-gateway | grep -i flyway`
+shows V1–V3 applied. **iv. Seed the key hashes → §2a step 2** (needs the DB from ii).
 
 ## 2a. Consumer repoint + key seeding (G-3 — coupled with §2 step 4)
 
@@ -117,14 +185,76 @@ legacy `prometheus` host value is retired. Four callers on this path, in two key
    done
    ```
 
-2. **Seed the SHA-256 hashes** into the gateway's governance `keys:` for the cutover deploy (the
-   `keys:` list stays empty in git — seed via the deploy's governance override / secret, mirroring the
-   P6·S1 staging ConfigMap). One entry per team: `{ team: kleio, name: kleio-cutover, sha256: <hash> }`.
+2. **Seed the SHA-256 hashes into the gateway** (the `sha256=` values from step 1). Needs the DB from
+   §2b — with the DB up, `module()` uses `PgKeyValidator`, which validates a presented `ttrk-` key by
+   `sha256Hex(key)` against `virtual_keys` (a row that exists and is not revoked ⇒ the team's principal).
+   `governance.yaml` ships `keys: []`, so the hashes must be put in one of two places — pick one:
 
-3. **Wire the consumer ExternalSecrets + env** (olymp — see the `lg-p6-consumer-cutover` branch):
-   each consumer gets an ExternalSecret pulling `ttrk-<team>` from the `azure-store` into a k8s Secret,
-   and its values gains `*_LLM_GATEWAY_HOST=llm-gateway.ttr-server`, `*_LLM_GATEWAY_PORT=7280`, and
-   `*_LLM_GATEWAY_KEY` via `secretKeyRef`. pinakes also carries `PINAKES_LLM_GATEWAY_MODEL` (sonnet).
+   **(a) Direct SQL — no chart change, do it once after §2b is green.** The six teams are upserted into
+   `teams` at boot from the baked `governance.yaml`, so only the key rows are needed. `key_hash` is the
+   SHA-256 hex (not a credential — irreversible; the plaintext stays in the consumer secrets):
+
+   ```bash
+   # psql into the CNPG primary, e.g.:  kubectl -n data exec -it postgres-1 -- psql -U llm_gateway -d llm_gateway
+   INSERT INTO virtual_keys (id, team_id, name, key_hash, seeded) VALUES
+     ('vk_kleio_cutover',       'kleio',       'kleio-cutover',       '<sha256-kleio>',       true),
+     ('vk_kallimachos_cutover', 'kallimachos', 'kallimachos-cutover', '<sha256-kallimachos>', true),
+     ('vk_pinakes_cutover',     'pinakes',     'pinakes-cutover',     '<sha256-pinakes>',     true),
+     ('vk_hebe_cutover',        'hebe',        'hebe-cutover',        '<sha256-hebe>',        true)
+   ON CONFLICT (key_hash) DO NOTHING;
+   ```
+
+   The positive-validator cache TTL is ≤30 s (a new key is live within 30 s). Revoke with
+   `UPDATE virtual_keys SET revoked_at = now() WHERE id = 'vk_<team>_cutover';`.
+
+   **(b) Governance ConfigMap override — the designed path (survives a DB wipe; re-imported idempotently
+   at boot by `GovernanceLoad`).** Mount a populated `governance.yaml` over the classpath copy. The
+   library chart's volume hooks are empty by default, so add them once (`services/ttr-llm-gateway/k8s/
+   templates/_volumes.tpl`):
+
+   ```yaml
+   {{- define "ttr-service.volumeMounts" -}}
+   - { name: governance, mountPath: /app/resources/governance.yaml, subPath: governance.yaml }
+   {{- end -}}
+   {{- define "ttr-service.volumes" -}}
+   - { name: governance, configMap: { name: llm-gateway-governance } }
+   {{- end -}}
+   ```
+   ```yaml
+   # ConfigMap in ttr-server (hashes are not credentials → a ConfigMap is fine; plaintext never here).
+   apiVersion: v1
+   kind: ConfigMap
+   metadata: { name: llm-gateway-governance, namespace: ttr-server }
+   data:
+     governance.yaml: |
+       teams:            # the 6 teams verbatim from the image's governance.yaml
+         - { id: golem,  costCenterPrefix: "golem/",  budget: { id: golem-monthly,  usdPerMonth: 100.0, mode: soft }, rateLimit: { id: golem-rl,  requestsPerMinute: 120 } }
+         # … hebe, themis, kleio, kallimachos, pinakes …
+       keys:
+         - { team: kleio,       name: kleio-cutover,       sha256: <sha256-kleio> }
+         - { team: kallimachos, name: kallimachos-cutover, sha256: <sha256-kallimachos> }
+         - { team: pinakes,     name: pinakes-cutover,     sha256: <sha256-pinakes> }
+         - { team: hebe,        name: hebe-cutover,        sha256: <sha256-hebe> }
+   ```
+
+3. **Wire the consumer env + key secrets** — done for bp-dsk on olymp branch `lg-p6-consumer-cutover`
+   (mirror it for collite-o1). Two delivery styles:
+
+   - **kleio / kallimachos / pinakes** — a `ClusterExternalSecret` per consumer
+     (`clusters/<cluster>/platform/auth/clusterexternalsecret-<c>-llm-gateway-key.yaml`) pulls
+     `ttrk-<team>` from `azure-store` into a `<c>-llm-gateway-key` Secret in the kantheon ns, and
+     `apps/<c>/values.yaml extraEnv` gets:
+     ```yaml
+     - { name: <C>_LLM_GATEWAY_HOST, value: "llm-gateway.ttr-server" }
+     - { name: <C>_LLM_GATEWAY_PORT, value: "7280" }
+     - name: <C>_LLM_GATEWAY_KEY
+       valueFrom: { secretKeyRef: { name: <c>-llm-gateway-key, key: key } }
+     ```
+     (`<C>` = `KLEIO`/`KALLIMACHOS`/`PINAKES`; register each ExternalSecret in the auth
+     `kustomization.yaml`. pinakes keeps its `sonnet` default in app config.)
+   - **hebe** — no ExternalSecret: put the `ttrk-hebe` plaintext in the `hebe-dev` provisioning secret
+     under key `llm-gateway-key` (via `just hebe-provision dev`). `apps/hebe/values.yaml` toml sets
+     `base_url = "http://llm-gateway.ttr-server:7280/v1"` and `embedding_model = "ada-002"`.
 
 ---
 
