@@ -51,6 +51,7 @@ data class SseConfig(
 data class CacheConfig(
     val enabled: Boolean,
     val keyPrefix: String,
+    val maxBodyBytes: Long = 256 * 1024, // skip caching a body larger than this (E-1); metric on skip
 )
 
 /** Map a resolved HOCON [Config] (root of `providers.conf`) into [ProvidersConfig]. */
@@ -94,7 +95,11 @@ fun providersFrom(config: Config): ProvidersConfig {
         sse = SseConfig(heartbeatSeconds = config.getConfig("sse").getLong("heartbeatSeconds")),
         cache =
             config.getConfig("cache").let {
-                CacheConfig(enabled = it.getBoolean("enabled"), keyPrefix = it.getString("keyPrefix"))
+                CacheConfig(
+                    enabled = it.getBoolean("enabled"),
+                    keyPrefix = it.getString("keyPrefix"),
+                    maxBodyBytes = if (it.hasPath("maxBodyBytes")) it.getLong("maxBodyBytes") else 256 * 1024,
+                )
             },
     )
 }

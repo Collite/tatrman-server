@@ -23,7 +23,9 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
+import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -42,6 +44,11 @@ import org.tatrman.llmgateway.auth.KeyPrincipal
 import org.tatrman.llmgateway.auth.KeyValidator
 import org.tatrman.llmgateway.auth.bearerToken
 import org.tatrman.llmgateway.auth.requireKey
+import org.tatrman.llmgateway.cache.CacheEnvelope
+import org.tatrman.llmgateway.cache.CacheKey
+import org.tatrman.llmgateway.cache.CacheReplay
+import org.tatrman.llmgateway.cache.ResponseCache
+import org.tatrman.llmgateway.cache.StreamBodyAssembler
 import org.tatrman.llmgateway.config.ConfigLoader
 import org.tatrman.llmgateway.config.GatewayConfig
 import org.tatrman.llmgateway.engine.CircuitBreaker
@@ -55,10 +62,12 @@ import org.tatrman.llmgateway.governance.TokenEstimator
 import org.tatrman.llmgateway.governance.Usage
 import org.tatrman.llmgateway.provider.PassthroughHandler
 import org.tatrman.llmgateway.provider.ProviderRegistry
+import org.tatrman.llmgateway.provider.ProviderResult
 import org.tatrman.llmgateway.provider.RegistryEntry
 import org.tatrman.llmgateway.provider.RegistryResolution
 import org.tatrman.llmgateway.provider.RequestedType
 import org.tatrman.llmgateway.provider.ResponseEnrichment
+import org.tatrman.llmgateway.provider.UpstreamUsage
 import org.tatrman.llmgateway.provider.anthropic.AnthropicHandler
 import org.tatrman.llmgateway.provider.pumpSse
 import org.tatrman.llmgateway.stream.StreamObservation
@@ -177,6 +186,11 @@ fun Application.module(
         }
     val teamRpm = gateway.governance.teams.associate { it.id to it.rateLimit?.requestsPerMinute }
     val teamCostCenter = gateway.governance.teams.associate { it.id to it.costCenterPrefix }
+
+    // Exact-match response cache (LG-P5·S1, E-1). Best-effort over Redis (a down Redis just misses); keyed
+    // by the logical (resolved) model so fallback-served responses cache under the caller's name.
+    val responseCache = ResponseCache(redis, gateway.providers.cache, metrics)
+    val cacheCfg = gateway.providers.cache
 
     // Admin key API (LG-P4·S3): Keycloak-JWT gated, over the S1 issuance service. Present only when
     // configured (an `admin { }` block with the realm public key) AND PG-backed (issuance needs the store).
@@ -301,6 +315,55 @@ fun Application.module(
             // The fallback chain (self first) + the resilience engine own retry/fallback/circuit (LG-P3·S2).
             val chain = registry.chainFor(entry)
 
+            // Exact-match cache (LG-P5·S1, E-1): keyed by the logical (resolved) model. `bypass`/`refresh`
+            // skip the read (both still store on the miss below); a positive catalog TTL gates cacheability.
+            val cacheMode = call.request.headers["X-Gateway-Cache"]
+            val cacheKey =
+                if (cacheCfg.enabled && entry.model.cacheTtlSeconds > 0) {
+                    CacheKey.of(cacheCfg.keyPrefix, entry.model.name, req)
+                } else {
+                    null
+                }
+            if (cacheKey != null && cacheMode != "bypass" && cacheMode != "refresh") {
+                val hit = responseCache.get(cacheKey)
+                if (hit != null) {
+                    // A hit is still a request: the rate-limit token was spent in admit(); settle-as-cached
+                    // records the SAVED cost (echoed) but adds nothing to budget_usage (Settle.cached=true).
+                    call.response.header("X-Gateway-Provider", hit.servedProvider) // original serving provider (P-2)
+                    call.response.header("X-Gateway-Model", hit.servedModel)
+                    call.response.header("X-Gateway-Cache", "hit")
+                    budgetService?.settle(
+                        Settle(
+                            keyId = principal.keyId,
+                            teamId = principal.team,
+                            costCenter = costCenter,
+                            turnRef = call.request.headers["X-Turn-Ref"],
+                            requestedModel = req.model ?: "",
+                            servedProvider = hit.servedProvider,
+                            servedModel = hit.servedModel,
+                            fallbackFrom = null,
+                            strippedParams = emptyList(),
+                            usage = Usage(hit.promptTokens, hit.completionTokens, hit.cachedTokens),
+                            costUsd = hit.costUsd,
+                            estimated = false,
+                            cached = true,
+                            ttfbMs = 0,
+                            durationMs = System.currentTimeMillis() - startMs,
+                            traceId = null,
+                        ),
+                    )
+                    if (req.stream) {
+                        call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
+                            writeStringUtf8(CacheReplay.streamEvents(hit)) // synthetic 2-event replay (§1.4)
+                            flush()
+                        }
+                    } else {
+                        call.respond(HttpStatusCode.OK, CacheReplay.nonStreamBody(hit))
+                    }
+                    return@post
+                }
+            }
+
             if (req.stream) {
                 // Before-first-token rule (design §3.2): the whole attempt loop runs BEFORE the SSE writer
                 // attaches. openStream peeks the first frame per attempt in THIS coroutineScope (bound to the
@@ -314,10 +377,12 @@ fun Application.module(
                             call.response.header("X-Gateway-Model", serving.target.upstream)
                             val tap = TapParser(serving.target.providerName, serving.target.upstream)
                             val settleTap = StreamSettleTap()
+                            // Reassemble the completion off the same frames so a stream MISS populates the cache.
+                            val assembler = StreamBodyAssembler(serving.target.upstream)
                             try {
                                 call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
                                     pumpSse(
-                                        frames = open.frames,
+                                        frames = open.frames.onEach { assembler.observe(it) },
                                         out = this,
                                         tap = { settleTap.observe(it) }, // capture usage + TTFB for the settle
                                         parser = tap,
@@ -352,6 +417,40 @@ fun Application.module(
                                     estimated,
                                     settleTap.ttfbMs,
                                 )
+                                // Store on a clean stream completion (finish_reason seen, content, no tool_calls):
+                                // an errored/abandoned stream leaves finishReason null → not cached.
+                                if (cacheKey != null && assembler.completed() && assembler.cacheable()) {
+                                    val cost =
+                                        ResponseEnrichment.computeCost(
+                                            serving.model,
+                                            tokens.promptTokens,
+                                            tokens.completionTokens,
+                                        )
+                                    val enriched =
+                                        ResponseEnrichment.chat(
+                                            ProviderResult(
+                                                200,
+                                                assembler.assembled(),
+                                                UpstreamUsage(tokens.promptTokens, tokens.completionTokens),
+                                                null,
+                                            ),
+                                            serving.model,
+                                        )
+                                    responseCache.put(
+                                        cacheKey,
+                                        CacheEnvelope(
+                                            enriched,
+                                            serving.target.providerName,
+                                            serving.target.upstream,
+                                            tokens.promptTokens,
+                                            tokens.completionTokens,
+                                            tokens.cachedTokens,
+                                            cost,
+                                            System.currentTimeMillis(),
+                                        ),
+                                        entry.model.cacheTtlSeconds,
+                                    )
+                                }
                             }
                         }
                         is InferenceEngine.StreamOpen.Failed -> {
@@ -379,7 +478,27 @@ fun Application.module(
                             Usage(TokenEstimator.estimatePromptTokens(req.messages, serving.model.name), 0) to true
                         }
                     settle(serving, outcome.fallbackFrom, outcome.strippedParams, tokens, estimated, null)
-                    call.respond(HttpStatusCode.OK, ResponseEnrichment.chat(outcome.result, serving.model))
+                    val enriched = ResponseEnrichment.chat(outcome.result, serving.model)
+                    // Store on a successful miss (also runs for bypass/refresh — they skip the read, not the store).
+                    if (cacheKey != null) {
+                        val cost =
+                            ResponseEnrichment.computeCost(serving.model, tokens.promptTokens, tokens.completionTokens)
+                        responseCache.put(
+                            cacheKey,
+                            CacheEnvelope(
+                                enriched,
+                                serving.target.providerName,
+                                serving.target.upstream,
+                                tokens.promptTokens,
+                                tokens.completionTokens,
+                                tokens.cachedTokens,
+                                cost,
+                                System.currentTimeMillis(),
+                            ),
+                            entry.model.cacheTtlSeconds,
+                        )
+                    }
+                    call.respond(HttpStatusCode.OK, enriched)
                 }
                 is InferenceEngine.ChainResult.Failed -> {
                     call.response.header("X-Gateway-Provider", outcome.lastAttempted.target.providerName)
