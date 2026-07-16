@@ -53,8 +53,11 @@ class MorphoditaEngine:
             data = {
                 "data": text,
                 # S-1: explicit model id — never blank (the default-picking bug
-                # class this phase kills). Single-model self-hosted servers
-                # ignore it; Lindat selects on it.
+                # class this phase kills). morphodita_server does an EXACT-match
+                # lookup on this against its registered rest_id and returns 400 on
+                # a mismatch (it does NOT ignore it) — so the self-hosted backend
+                # must register the tagger under this same pinned id (see the
+                # backend Dockerfile). Lindat selects on it too.
                 "model": self._backend.model,
                 "input": "untokenized",
                 "output": "vertical",

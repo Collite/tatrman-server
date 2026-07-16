@@ -87,8 +87,11 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -fsS -X POST "http://127.0.0.1:${PORT}/tag" --data-urlencode "data=Ahoj" \
       --data "output=vertical" --data "input=untokenized" >/dev/null || exit 1
 
-# S-1: launch with the EXPLICIT model id (rest_id `czech` → tagger path). The
-# `<ack>` acknowledgements arg is required by morphodita_server.
+# S-1: register the tagger under the PINNED model id as its rest_id (NOT a generic
+# `czech`). The front addresses MorphoDiTa with `model=${MODEL_ID}` (S-1, no blank
+# default); morphodita_server does an exact-match lookup on that rest_id and returns
+# 400 "Requested model '…' does not exist" on any mismatch — so the rest_id MUST equal
+# the id the front sends. The `<ack>` acknowledgements arg is required by the server.
 #
 # --log_file: microrestd's rest_server writes a connection log to a file named
 # after the binary (default `morphodita_server.log`) in the CWD. The runtime CWD
@@ -100,4 +103,4 @@ CMD ["sh", "-c", "exec morphodita_server \
   --connection_timeout=${CONNECTION_TIMEOUT} \
   --max_request_size=${MAX_REQUEST_SIZE} \
   --log_file=/dev/stderr \
-  ${PORT} czech /opt/model/${MODEL_ID}.tagger 'ttr-nlp self-hosted MorphoDiTa (CC BY-NC-SA)'"]
+  ${PORT} ${MODEL_ID} /opt/model/${MODEL_ID}.tagger 'ttr-nlp self-hosted MorphoDiTa (CC BY-NC-SA)'"]
