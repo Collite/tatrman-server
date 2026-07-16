@@ -55,74 +55,84 @@ fun Application.configureRoutes(
     val logger = LoggerFactory.getLogger("fuzzy.routes")
 
     routing {
-        secured(config) {
-            post("/match") {
-                try {
-                    val request = call.receive<MatchRequestDto>()
-                    val userId = call.request.header("X-User-Id") ?: "unknown"
-                    logger.info(
-                        "Incoming match request: query='{}', category='{}', algorithm='{}', limit={} userId={}",
-                        request.query,
-                        request.category,
-                        request.algorithm,
-                        request.limit,
-                        userId,
-                    )
-
-                    val category = if (request.category.isNullOrBlank()) null else request.category
-                    val steps =
-                        cascadeFrom(
-                            request.algorithms.map { CascadeStep(AlgorithmType.fromString(it.algorithm), it.minScore) },
+        // Scoped to /match: `secured` installs its interceptor on THIS route node, not the
+        // routing root — otherwise the check would leak to every sibling route (incl. the
+        // /health + /ready probes). Ktor interceptors apply to a node and its children.
+        route("/match") {
+            secured(config) {
+                post {
+                    try {
+                        val request = call.receive<MatchRequestDto>()
+                        val userId = call.request.header("X-User-Id") ?: "unknown"
+                        logger.info(
+                            "Incoming match request: query='{}', category='{}', algorithm='{}', limit={} userId={}",
+                            request.query,
+                            request.category,
                             request.algorithm,
+                            request.limit,
+                            userId,
                         )
 
-                    val outcome =
-                        fuzzyMatcher.matchCascade(
-                            query = request.query,
-                            category = category,
-                            steps = steps,
-                            limit = if (request.limit > 0) request.limit else 10,
-                        )
-
-                    logger.info(
-                        "Match request completed: query='{}', category='{}', matchedAlgorithm='{}', results_count={} userId={}",
-                        request.query,
-                        request.category,
-                        outcome.matchedAlgorithm?.name ?: "",
-                        outcome.matches.size,
-                        userId,
-                    )
-
-                    val matches =
-                        outcome.matches.map {
-                            FuzzyMatch(
-                                candidateId = it.candidateId,
-                                candidate = it.candidate,
-                                score = it.score,
-                                category = it.category,
-                                source = it.source.name,
-                                targetRef = it.targetRef,
-                                provenance =
-                                    org.fuzzy.common.Provenance(
-                                        producer = it.provenance.producer,
-                                        method = it.provenance.method,
-                                        rawScore = it.provenance.rawScore,
-                                    ),
+                        val category = if (request.category.isNullOrBlank()) null else request.category
+                        val steps =
+                            cascadeFrom(
+                                request.algorithms.map {
+                                    CascadeStep(
+                                        AlgorithmType.fromString(it.algorithm),
+                                        it.minScore,
+                                    )
+                                },
+                                request.algorithm,
                             )
-                        }
 
-                    call.respond(
-                        FuzzyMatchResponse(
-                            matches = matches,
-                            matchedAlgorithm = outcome.matchedAlgorithm?.name ?: "",
-                        ),
-                    )
-                } catch (e: Exception) {
-                    LoggingUtils.logError(logger, "Error processing match request", e)
-                    call.respond(
-                        HttpStatusCode.InternalServerError,
-                        FuzzyMatchResponse(isError = true, error = e.message ?: "Unknown error"),
-                    )
+                        val outcome =
+                            fuzzyMatcher.matchCascade(
+                                query = request.query,
+                                category = category,
+                                steps = steps,
+                                limit = if (request.limit > 0) request.limit else 10,
+                            )
+
+                        logger.info(
+                            "Match request completed: query='{}', category='{}', matchedAlgorithm='{}', results_count={} userId={}",
+                            request.query,
+                            request.category,
+                            outcome.matchedAlgorithm?.name ?: "",
+                            outcome.matches.size,
+                            userId,
+                        )
+
+                        val matches =
+                            outcome.matches.map {
+                                FuzzyMatch(
+                                    candidateId = it.candidateId,
+                                    candidate = it.candidate,
+                                    score = it.score,
+                                    category = it.category,
+                                    source = it.source.name,
+                                    targetRef = it.targetRef,
+                                    provenance =
+                                        org.fuzzy.common.Provenance(
+                                            producer = it.provenance.producer,
+                                            method = it.provenance.method,
+                                            rawScore = it.provenance.rawScore,
+                                        ),
+                                )
+                            }
+
+                        call.respond(
+                            FuzzyMatchResponse(
+                                matches = matches,
+                                matchedAlgorithm = outcome.matchedAlgorithm?.name ?: "",
+                            ),
+                        )
+                    } catch (e: Exception) {
+                        LoggingUtils.logError(logger, "Error processing match request", e)
+                        call.respond(
+                            HttpStatusCode.InternalServerError,
+                            FuzzyMatchResponse(isError = true, error = e.message ?: "Unknown error"),
+                        )
+                    }
                 }
             }
         }
@@ -131,23 +141,26 @@ fun Application.configureRoutes(
         // via X-Roles after H-2 OBO, or an admin API key). Forces an immediate
         // reload of the candidate cache instead of waiting for the interval.
         // Consumers that call /refresh (e.g. Golem) must now present admin identity.
-        adminOnly(config) {
-            post("/refresh") {
-                runCatching { stringRepository.forceRefresh() }.fold(
-                    onSuccess = {
-                        call.respond(buildJsonObject { put("status", JsonPrimitive("ok")) })
-                    },
-                    onFailure = { e ->
-                        LoggingUtils.logError(logger, "Error processing refresh request", e)
-                        call.respond(
-                            HttpStatusCode.InternalServerError,
-                            buildJsonObject {
-                                put("status", JsonPrimitive("failed"))
-                                put("error", JsonPrimitive(e.message ?: "Unknown error"))
-                            },
-                        )
-                    },
-                )
+        // Scoped to /refresh (see /match note): the admin interceptor must NOT reach root.
+        route("/refresh") {
+            adminOnly(config) {
+                post {
+                    runCatching { stringRepository.forceRefresh() }.fold(
+                        onSuccess = {
+                            call.respond(buildJsonObject { put("status", JsonPrimitive("ok")) })
+                        },
+                        onFailure = { e ->
+                            LoggingUtils.logError(logger, "Error processing refresh request", e)
+                            call.respond(
+                                HttpStatusCode.InternalServerError,
+                                buildJsonObject {
+                                    put("status", JsonPrimitive("failed"))
+                                    put("error", JsonPrimitive(e.message ?: "Unknown error"))
+                                },
+                            )
+                        },
+                    )
+                }
             }
         }
     }

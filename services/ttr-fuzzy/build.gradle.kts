@@ -109,4 +109,5 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.grpc.inprocess)
     testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.ktor.server.test.host)
 }
