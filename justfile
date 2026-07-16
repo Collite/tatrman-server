@@ -11,9 +11,9 @@
 
 set shell := ["bash", "-uc"]
 
-# The 17 container-image modules release-image.yml builds (per-module `<module>/v*`
+# The 22 container-image modules release-image.yml builds (per-module `<module>/v*`
 # tag → ghcr.io/collite/<module>). Kept in lockstep with release-image.yml's map.
-image_modules := "veles ttr-query ttr-translate ttr-validate ttr-dispatch ttr-fuzzy ttr-llm-gateway ttr-nlp ttr-meta-mcp ttr-query-mcp ttr-fuzzy-mcp ttr-nlp-mcp ttr-worker-postgres ttr-worker-mssql ttr-worker-polars ttr-identity health"
+image_modules := "veles ttr-query ttr-translate ttr-validate ttr-dispatch ttr-fuzzy ttr-llm-gateway ttr-nlp chrono geo money ttr-grounding-mcp ttr-resolver ttr-meta-mcp ttr-query-mcp ttr-fuzzy-mcp ttr-nlp-mcp ttr-worker-postgres ttr-worker-mssql ttr-worker-polars ttr-identity health"
 
 # List available recipes
 default:
