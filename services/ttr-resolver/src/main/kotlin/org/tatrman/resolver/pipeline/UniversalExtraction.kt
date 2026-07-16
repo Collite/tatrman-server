@@ -25,7 +25,8 @@ data class UniversalBinding(
 object UniversalExtraction {
     fun extractUniversal(parse: AnalyzeResponse): List<UniversalBinding> =
         parse.entitiesList.mapNotNull { e ->
-            val type: UniversalEntityType = UniversalClassifier.classify(e.label) ?: return@mapNotNull null
+            val type: UniversalEntityType =
+                UniversalClassifier.classify(e.label, e.normalizedValue) ?: return@mapNotNull null
             UniversalBinding(
                 start = e.charStart,
                 end = e.charEnd,

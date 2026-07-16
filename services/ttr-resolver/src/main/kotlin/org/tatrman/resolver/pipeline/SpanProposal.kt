@@ -288,7 +288,10 @@ object SpanProposal {
     // UniversalClassifier — the same classification UniversalExtraction types by,
     // so the exclusion set and the universal bindings agree by construction.
     private fun universalCharRanges(entities: List<NerEntity>): List<IntRange> =
-        entities.filter { UniversalClassifier.isUniversal(it.label) }.map { it.charStart until it.charEnd }
+        entities.filter { UniversalClassifier.isUniversal(it.label, it.normalizedValue) }.map {
+            it.charStart until
+                it.charEnd
+        }
 
     private fun isUniversal(
         token: Token,

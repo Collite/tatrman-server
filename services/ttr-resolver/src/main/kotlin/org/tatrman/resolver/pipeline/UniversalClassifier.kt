@@ -54,14 +54,29 @@ object UniversalClassifier {
         )
 
     /**
-     * The universal type of [label], or `null` if the label is domain-eligible
+     * The universal type of an NER entity, or `null` if it is domain-eligible
      * (institution/object) and must be gated against declared vocabulary instead.
+     *
+     * [normalizedValue] carries the raw CNEC container code as `cnec:<code>` (NameTag 3
+     * preserves it there) and, WHEN PRESENT, WINS over [label]. This matters because the
+     * ttr-nlp NameTag front collapses BOTH objects/other-proper names (`o*` — domain-eligible,
+     * the fuzzy gate owns them) AND numbers (`n*` — universal MISC) into the single coarse
+     * label `"MISC"`, erasing the distinction the domain path needs. Classifying on the raw
+     * container letter keeps them apart — the RG hero's `op`-tagged "Octavie" reaches
+     * `er.product` instead of binding as a universal MISC (while `no`-tagged numbers stay MISC).
+     * Entities without a `cnec:` code (other engines' coarse labels) fall back to [label].
      */
-    fun classify(label: String): UniversalEntityType? {
+    fun classify(
+        label: String,
+        normalizedValue: String = "",
+    ): UniversalEntityType? {
+        cnecContainer(normalizedValue)?.let { return CNEC_UNIVERSAL[it] }
+
         val up = label.trim().uppercase()
         if (up.isEmpty()) return null
         if (COARSE.containsKey(up)) return COARSE[up]
-        // CNEC container/type codes: short, lowercase (e.g. "th", "gu", "ps", "no").
+        // CNEC container/type codes handed over as the label itself: short, lowercase
+        // (e.g. "th", "gu", "ps", "no").
         val raw = label.trim()
         if (raw.length in 1..2 && raw.all { it.isLowerCase() }) {
             return CNEC_UNIVERSAL[raw.first()]
@@ -70,6 +85,16 @@ object UniversalClassifier {
         return null
     }
 
-    /** True iff [label] denotes a universal span (excluded from domain proposal). */
-    fun isUniversal(label: String): Boolean = classify(label) != null
+    /** The CNEC container letter from a `cnec:<code>` normalized_value, or `null` if absent. */
+    private fun cnecContainer(normalizedValue: String): Char? {
+        val v = normalizedValue.trim()
+        if (!v.startsWith("cnec:")) return null
+        return v.removePrefix("cnec:").firstOrNull()?.lowercaseChar()
+    }
+
+    /** True iff the entity denotes a universal span (excluded from domain proposal). */
+    fun isUniversal(
+        label: String,
+        normalizedValue: String = "",
+    ): Boolean = classify(label, normalizedValue) != null
 }
