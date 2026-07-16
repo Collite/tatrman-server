@@ -31,8 +31,11 @@ _resolve name:
         echo "{{name}}"
         exit 0
     fi
-    path=$(find services workers tools infra shared/libs/kotlin shared/libs/python \
-        -mindepth 1 -maxdepth 1 -type d -name "{{name}}" -print -quit 2>/dev/null)
+    roots=()
+    for d in services workers tools infra shared/libs/kotlin shared/libs/python; do
+        [ -d "$d" ] && roots+=("$d")
+    done
+    path=$(find "${roots[@]}" -mindepth 1 -maxdepth 1 -type d -name "{{name}}" -print -quit 2>/dev/null || true)
     if [ -z "$path" ]; then
         echo "❌ Module '{{name}}' not found under services/, workers/, tools/, infra/, shared/libs/{kotlin,python}/" >&2
         exit 1
