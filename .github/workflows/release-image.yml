@@ -97,7 +97,10 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ]; then
             REF="${{ github.ref_name }}"
             NAME=$(echo "$REF" | rev | cut -d'/' -f2- | rev)
-            VERSION=$(echo "$REF" | rev | cut -d'/' -f1 | rev | sed 's/^v//')
+            # -RELEASE is a tag-level marker only (2026-07-16, justfile sync) — this
+            # module has no external registry beyond ghcr, so the marker gates
+            # nothing here, but the pushed image tag must still be bare x.y.z.
+            VERSION=$(echo "$REF" | rev | cut -d'/' -f1 | rev | sed 's/^v//; s/-RELEASE$//')
             NAMES=("$NAME")
           else
             VERSION="${{ github.event.inputs.version }}"

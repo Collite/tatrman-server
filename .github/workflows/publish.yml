@@ -14,14 +14,18 @@ name: Publish server libraries (GH Packages)
 # Version comes from the tag via -Ptatrman-server.version (the build reads that
 # gradle property, NOT -Pversion). RO-24: never re-cut an existing version.
 #
-# Lane gating (SV — Central quota, 2026-07-13, mirrors tatrman/publish.yml):
-# EVERY tag publishes to the GitHub Packages staging lane; ONLY a bare x.y.z
-# version also publishes to Maven Central. A prerelease suffix (e.g.
-# v0.9.5-rc.1, v0.9.5-dev.3) marks a WIP cut: internal consumers (kantheon)
-# pin it from GH Packages, and the Central step is skipped — Central's free
-# tier (~1,167 files / ~78 MB / ~7 releases per month, 3-month rolling
-# average) cannot absorb fast-iteration publishing. See tatrman's
-# PUBLISHING.md § Release lanes for the full rationale.
+# Lane gating (SV — Central quota, 2026-07-13, mirrors tatrman/publish.yml;
+# polarity flipped 2026-07-16 — justfile sync): EVERY tag publishes to the
+# GitHub Packages staging lane. A tag additionally publishes to Maven Central
+# ONLY when it carries an explicit `-RELEASE` marker (e.g.
+# `server-libs/v0.9.2-RELEASE`) — the marker is stripped before the version
+# reaches any registry (Central gets bare `0.9.2`, same as GH Packages).
+# Un-marked bare tags (`server-libs/v0.9.5`) are now internal-only: most cuts
+# are fast-iteration internal patches for kantheon to pin, so a public release
+# must be marked explicitly rather than inferred from the absence of a
+# prerelease suffix. Central's free tier (~1,167 files / ~78 MB / ~7 releases
+# per month, 3-month rolling average) still can't absorb fast-iteration
+# publishing. See tatrman's PUBLISHING.md § Release lanes for the full rationale.
 
 on:
   push:
@@ -75,14 +79,16 @@ jobs:
         id: ver
         run: |
           TAG="${{ github.ref_name }}"
-          VERSION="${TAG##*/v}"
-          # Lane gating: a prerelease suffix (anything after a '-', semver §9)
-          # keeps the release on the GH Packages staging lane only. Bare x.y.z
-          # is a public release and also goes to Maven Central.
-          if [[ "$VERSION" == *-* ]]; then
-            PUBLIC=false
-          else
+          RAW_VERSION="${TAG##*/v}"
+          # -RELEASE is a tag-level marker only — strip it before the version
+          # reaches any registry. Its presence, not the absence of a prerelease
+          # suffix, is what gates the Central lane (2026-07-16 polarity flip).
+          if [[ "$RAW_VERSION" == *-RELEASE ]]; then
             PUBLIC=true
+            VERSION="${RAW_VERSION%-RELEASE}"
+          else
+            PUBLIC=false
+            VERSION="$RAW_VERSION"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "public=${PUBLIC}" >> "$GITHUB_OUTPUT"
@@ -108,9 +114,10 @@ jobs:
       # the GH Packages lane above stays green in the interim. Secret names ARE the
       # Gradle property names so they flow straight through as `ORG_GRADLE_PROJECT_*` env.
       #
-      # ALSO skipped for prerelease versions (public=false above) — WIP cuts stay
-      # on the GH Packages staging lane to protect the Central monthly quota.
-      # Only bare x.y.z reaches Maven Central.
+      # ALSO skipped unless the tag carried a `-RELEASE` marker (public=false
+      # above) — un-marked internal patches stay on the GH Packages staging lane
+      # to protect the Central monthly quota. Only a `-RELEASE` tag reaches Maven
+      # Central, published there under the stripped bare x.y.z version.
       - name: Publish to Maven Central (Central Portal)
         env:
           GITHUB_ACTOR: ${{ github.actor }}
