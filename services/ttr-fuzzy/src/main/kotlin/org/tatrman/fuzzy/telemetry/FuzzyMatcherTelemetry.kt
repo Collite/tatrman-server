@@ -22,12 +22,18 @@ class FuzzyTelemetry {
 
     init {
         val protocol = System.getenv("FUZZY_MATCHER_OTEL_PROTOCOL") ?: "grpc"
+        // Gate the OTel SDK on the same flag the chart derives from `telemetry.enabled`
+        // (OFF by default). Without this, `createOpenTelemetrySdk` defaults to enabled=true and
+        // always builds OTLP exporters that spam "Failed to export" against a non-existent
+        // collector at localhost:4317. The other services pass `enabled` from config the same way.
+        val enabled = System.getenv("OTEL_ENABLED_FUZZY")?.toBooleanStrictOrNull() ?: false
         val otelSdk =
             createOpenTelemetrySdk(
                 OtelEndpointConfig(
                     serviceName = "fuzzy",
                     protocol = protocol,
                 ),
+                enabled = enabled,
             )
         openTelemetry = otelSdk
         tracer = otelSdk.getTracer("fuzzy")
