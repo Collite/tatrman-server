@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "categories": {
+    "er.product": [
+      { "id": "p-octavia", "value": "Octavia" },
+      { "id": "p-fabia", "value": "Fabia" },
+      { "id": "p-superb", "value": "Superb" }
+    ],
+    "er.branch": [
+      { "id": "term-pobocka", "value": "pobočka", "targetRef": "er.branch#term-pobocka" }
+    ]
+  }
+}

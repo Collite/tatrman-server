@@ -45,6 +45,10 @@ object FuzzyCatalog {
     private data class CatalogEntry(
         val id: String,
         val value: String,
+        // Optional VOCABULARY tag: when set, the entry is a declared lexicon term
+        // (source=VOCABULARY) carrying this target_ref — e.g. a branch/measure term —
+        // instead of a data MEMBER. Absent ⇒ MEMBER (Candidate.fromValues).
+        val targetRef: String? = null,
     )
 
     /**
@@ -74,7 +78,13 @@ object FuzzyCatalog {
             }
         val out =
             parsed.categories.mapValues { (_, entries) ->
-                entries.map { Candidate.fromValues(it.id, it.value) }
+                entries.map {
+                    if (it.targetRef != null) {
+                        Candidate.vocabulary(it.id, it.value, it.targetRef)
+                    } else {
+                        Candidate.fromValues(it.id, it.value)
+                    }
+                }
             }
         log.info(
             "Fuzzy catalog loaded from $resourcePath: ${out.size} categories, ${out.values.sumOf {
