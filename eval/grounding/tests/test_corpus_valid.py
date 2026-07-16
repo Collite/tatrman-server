@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A14.1 — corpus is well-formed, ref-clock-pinned, cs+en, ≥100 bulk / ~20 e2e.
 
 Runs with no deployed stack: it validates the committed corpus shape and that the

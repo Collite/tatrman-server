@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.money.recipe
 
 import org.tatrman.grounding.v1.GroundingResult

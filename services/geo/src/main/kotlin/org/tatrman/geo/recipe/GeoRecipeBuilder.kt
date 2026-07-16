@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.geo.recipe
 
 import org.tatrman.grounding.v1.FilterRecipe

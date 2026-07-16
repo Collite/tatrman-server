@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.geo.resolve
 
 import com.github.tomakehurst.wiremock.WireMockServer

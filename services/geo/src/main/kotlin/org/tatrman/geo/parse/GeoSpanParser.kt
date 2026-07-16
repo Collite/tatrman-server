@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.geo.parse
 
 import org.tatrman.text.Normalization

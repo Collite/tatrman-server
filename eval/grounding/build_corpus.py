@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A14.1 — consolidate the per-service golden corpora into the standalone
 grounding eval corpus.
 

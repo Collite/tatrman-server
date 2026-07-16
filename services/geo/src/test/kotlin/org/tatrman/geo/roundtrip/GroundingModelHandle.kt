@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.geo.roundtrip
 
 import org.tatrman.plan.v1.QualifiedName

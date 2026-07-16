@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.chrono.obs
 
 import org.tatrman.grounding.v1.EntityKind

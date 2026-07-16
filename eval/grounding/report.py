@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A14.2 — pure evaluation + aggregation core for the grounding eval runner.
 
 Dict-in / dict-out, no I/O and no network, so it unit-tests without a deployed

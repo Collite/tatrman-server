@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A14.2 — pure report/eval core, unit-tested without a deployed stack."""
 from __future__ import annotations
 

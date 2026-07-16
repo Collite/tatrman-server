@@ -1,0 +1,20 @@
+apiVersion: v2
+name: ttr-resolver
+description: |
+  The Tatrman ttr-resolver service (RG-P5/P6 · the deterministic resolve core + the
+  `resolve.bind:v1` MCP door) — an env-agnostic Helm chart. Holds no cluster knowledge:
+  image, replicas, resources, telemetry endpoint, the nlp/fuzzy gRPC targets, and the
+  HMAC resume-token key wiring are all values. Per-environment values live in the
+  deploying repo. Reuses the ttr-service library chart, mirroring services/ttr-grounding-mcp/k8s.
+
+  Ports: HTTP (probes + REST) and gRPC (the resolve RPC). The `resolve.bind:v1` MCP door
+  binds loopback by default (RG-P6 review D: the JWT is decoded, not signature-verified in
+  the door, so it must not be off-host-reachable unless a deployment fronts it with an
+  auth-terminating ingress) — it is NOT exposed as a Service port here.
+type: application
+version: 0.1.0
+appVersion: "dev"
+dependencies:
+  - name: ttr-service
+    version: 0.1.0
+    repository: "file://../../../shared/charts/ttr-service"

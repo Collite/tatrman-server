@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A14.2 — grounding eval runner (E2E, against a deployed stack).
 
 Two tiers (see `SCHEMA.md`):
