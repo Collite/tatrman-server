@@ -101,6 +101,8 @@ dependencies {
     testImplementation(libs.mockk)
     // In-process gRPC server (review-004 R3.2 — live GetPrompts round-trip).
     testImplementation(libs.grpc.inprocess)
+    // Ktor testApplication host — drives VelesReadRoutes over HTTP (the ttr-llm-gateway pattern).
+    testImplementation(libs.ktor.server.test.host)
 
     // Component tier (WS-C1 T4) — loads the **real bundled `model-ttr/` tree** (not a synthetic
     // fixture) through the live ttr-metadata reconciler and asserts the shipped TPC-DS curated

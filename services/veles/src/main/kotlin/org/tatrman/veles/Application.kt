@@ -31,6 +31,7 @@ import org.tatrman.ttr.metadata.source.ModelSource
 import org.tatrman.ttr.metadata.source.ModelStorage
 import org.tatrman.ttr.metadata.source.SourceSnapshot
 import org.tatrman.veles.export.metadataExportRoutes
+import org.tatrman.veles.read.velesReadRoutes
 // YamlImportSource was removed in Phase 2.1 — kantheon is TTR-only (see buildSourceFromConfig).
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
 import java.util.concurrent.TimeUnit
@@ -315,6 +316,7 @@ fun Application.module(config: Config) {
             )
         }
         metadataExportRoutes(registry)
+        velesReadRoutes(registry, searchRegistryWithAll, searchIndexHolder)
     }
 
     monitor.subscribe(ApplicationStopping) {
