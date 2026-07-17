@@ -1,0 +1,45 @@
+{{- /*
+Install-time boundary-cache priming Job (RG-P3.S2.T2). A Helm post-install/upgrade
+hook that runs org.tatrman.geo.cache.PrimingRunner over `boundaryPrime.places`, reusing
+the geo image and the SAME env (nominatim + durable db) as the service via `geo.env`, plus
+GEO_PRIME_PLACES. Best-effort: a Nominatim outage is counted, not fatal, so the hook does
+not block the release. Rendered only when boundaryPrime.enabled.
+*/}}
+{{- if .Values.boundaryPrime.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ttr-service.fullname" . }}-boundary-prime
+  labels:
+    {{- include "ttr-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: boundary-prime
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: {{ .Values.boundaryPrime.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "ttr-service.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: boundary-prime
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: boundary-prime
+          image: {{ include "ttr-service.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.boundaryPrime.command | nindent 12 }}
+          env:
+            {{- include "geo.env" . | nindent 12 }}
+            - name: GEO_PRIME_PLACES
+              value: {{ .Values.boundaryPrime.places | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}

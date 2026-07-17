@@ -1,0 +1,121 @@
+apiVersion: v2
+name: tatrman-server
+description: |
+  The Tatrman Server umbrella chart — one product, one install (SV-P4·S2, RO-12).
+  Subsumes the full service roster (the query spine + the SV-P3·F1 understanding
+  layer + the MCP doors + identity/health + the optional developer portal) as
+  subcharts, each a thin wrapper over the shared `ttr-service` library chart. The
+  per-service charts under `<component>/k8s` remain the deployable units olymp
+  pins for the private pilot; THIS chart is the public product artifact (→ GHCR
+  OCI at S2·T7).
+
+  Every service is toggled by `<name>.enabled`; the understanding layer and the
+  developer portal ship enabled/opt-in per the values contract (see README /
+  values-contract.md). Images default to `global.image.tag` (the single product-tag
+  knob) unless a service overrides `<name>.image.tag`.
+type: application
+# Chart version = the PACKAGING (bumped when the chart changes). Finalized at T7.
+version: 0.9.0
+# appVersion = the PRODUCT version (RO-24: this is where the product version lives).
+appVersion: "0.9.4"
+
+# The roster. Each is a file:// per-service chart; `condition` lets values-minimal
+# render the spine alone. `helm dependency update` (scripts/helm-deps.sh) vendors
+# each — the resulting charts/ + Chart.lock are gitignored build artifacts.
+dependencies:
+  # ── Query spine ─────────────────────────────────────────────────────────────
+  - name: veles
+    version: "0.1.0"
+    repository: "file://../../services/veles/k8s"
+    condition: veles.enabled
+  - name: query
+    version: "0.1.0"
+    repository: "file://../../services/ttr-query/k8s"
+    condition: query.enabled
+  - name: translate
+    version: "0.1.0"
+    repository: "file://../../services/ttr-translate/k8s"
+    condition: translate.enabled
+  - name: validate
+    version: "0.1.0"
+    repository: "file://../../services/ttr-validate/k8s"
+    condition: validate.enabled
+  - name: dispatch
+    version: "0.1.0"
+    repository: "file://../../services/ttr-dispatch/k8s"
+    condition: dispatch.enabled
+  - name: llm-gateway
+    version: "0.1.0"
+    repository: "file://../../services/ttr-llm-gateway/k8s"
+    condition: llm-gateway.enabled
+  - name: mssql
+    version: "0.1.0"
+    repository: "file://../../workers/ttr-worker-mssql/k8s"
+    condition: mssql.enabled
+  - name: postgres
+    version: "0.1.0"
+    repository: "file://../../workers/ttr-worker-postgres/k8s"
+    condition: postgres.enabled
+  - name: polars
+    version: "0.1.0"
+    repository: "file://../../workers/ttr-worker-polars/k8s"
+    condition: polars.enabled
+  # ── Understanding layer (SV-P3·F1) ──────────────────────────────────────────
+  - name: fuzzy
+    version: "0.1.0"
+    repository: "file://../../services/ttr-fuzzy/k8s"
+    condition: fuzzy.enabled
+  - name: nlp
+    version: "0.1.0"
+    repository: "file://../../services/ttr-nlp/k8s"
+    condition: nlp.enabled
+  - name: chrono
+    version: "0.1.0"
+    repository: "file://../../services/chrono/k8s"
+    condition: chrono.enabled
+  - name: geo
+    version: "0.1.0"
+    repository: "file://../../services/geo/k8s"
+    condition: geo.enabled
+  - name: money
+    version: "0.1.0"
+    repository: "file://../../services/money/k8s"
+    condition: money.enabled
+  - name: ttr-grounding-mcp
+    version: "0.1.0"
+    repository: "file://../../services/ttr-grounding-mcp/k8s"
+    condition: ttr-grounding-mcp.enabled
+  - name: ttr-resolver
+    version: "0.1.0"
+    repository: "file://../../services/ttr-resolver/k8s"
+    condition: ttr-resolver.enabled
+  # ── MCP doors ───────────────────────────────────────────────────────────────
+  - name: query-mcp
+    version: "0.1.0"
+    repository: "file://../../tools/ttr-query-mcp/k8s"
+    condition: query-mcp.enabled
+  - name: veles-mcp
+    version: "0.1.0"
+    repository: "file://../../tools/ttr-meta-mcp/k8s"
+    condition: veles-mcp.enabled
+  - name: fuzzy-mcp
+    version: "0.1.0"
+    repository: "file://../../tools/ttr-fuzzy-mcp/k8s"
+    condition: fuzzy-mcp.enabled
+  - name: nlp-mcp
+    version: "0.1.0"
+    repository: "file://../../tools/ttr-nlp-mcp/k8s"
+    condition: nlp-mcp.enabled
+  # ── Identity / health / portal ──────────────────────────────────────────────
+  - name: whois
+    version: "0.1.0"
+    repository: "file://../../infra/ttr-identity/k8s"
+    condition: whois.enabled
+  - name: health
+    version: "0.1.0"
+    repository: "file://../../infra/health/k8s"
+    condition: health.enabled
+  - name: backstage
+    version: "0.1.0"
+    repository: "file://../../infra/backstage/k8s"
+    condition: backstage.enabled

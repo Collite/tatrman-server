@@ -33,9 +33,21 @@ app.kubernetes.io/name: {{ include "ttr-service.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
-{{/* Resolved image reference. */}}
+{{/*
+Resolved image reference. Tag precedence: per-service `image.tag` (a module override)
+→ umbrella-wide `global.image.tag` (the SV-P4 umbrella's single product-tag knob;
+nil/absent for a standalone per-service deploy) → the chart's own `appVersion`. The
+`global` read is nil-safe so a chart rendered on its own (no umbrella, no `global`)
+falls straight through to appVersion — unchanged from before this fallback existed.
+*/}}
 {{- define "ttr-service.image" -}}
-{{- $tag := .Values.image.tag | default .Chart.AppVersion -}}
+{{- $globalTag := "" -}}
+{{- with .Values.global -}}
+{{- with .image -}}
+{{- $globalTag = .tag | default "" -}}
+{{- end -}}
+{{- end -}}
+{{- $tag := .Values.image.tag | default $globalTag | default .Chart.AppVersion -}}
 {{- printf "%s:%s" .Values.image.repository $tag -}}
 {{- end -}}
 

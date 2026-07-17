@@ -1,0 +1,12 @@
+# Golden fixture: SPINE ONLY. The understanding layer (SV-P3·F1) disabled — proves
+# the product installs as just the query path. Everything not listed keeps its
+# values.yaml default (spine services stay enabled).
+fuzzy: { enabled: false }
+fuzzy-mcp: { enabled: false }
+nlp: { enabled: false }
+nlp-mcp: { enabled: false }
+chrono: { enabled: false }
+geo: { enabled: false }
+money: { enabled: false }
+ttr-grounding-mcp: { enabled: false }
+ttr-resolver: { enabled: false }

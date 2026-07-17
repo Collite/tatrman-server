@@ -239,6 +239,21 @@ conformance-verify-hashes:
         shasum -a 256 -c conformance/corpus-hashes.sha256
     fi
 
+# ── charts — the SV-P4 umbrella (helm/tatrman-server) ───────────────────────────
+#
+# The product install: one umbrella chart subsuming the full service roster as
+# file:// subcharts over the ttr-service library. `just charts` is the CI gate;
+# scripts/helm-deps.sh vendors the (gitignored) subchart deps offline.
+
+# Lint the umbrella + verify golden templates are current (the `helm` CI gate).
+charts:
+    helm lint helm/tatrman-server
+    scripts/helm-golden.sh --check
+
+# Regenerate the golden template output (after an intended chart change; review the diff).
+charts-golden:
+    scripts/helm-golden.sh
+
 # ── publish — unified release entry point ───────────────────────────────────────
 #
 # Tags the repo; the matching GitHub Actions workflow does the actual

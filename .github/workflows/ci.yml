@@ -155,3 +155,23 @@ jobs:
           else
             echo "grep-gate: clean"
           fi
+
+  # SV-P4·S2·T1 — the umbrella-chart gate. `helm lint` + a golden-template drift
+  # check: scripts/helm-golden.sh vendors the file:// subchart deps (offline) and
+  # diffs three pinned values fixtures (spine-only · everything · honest-degrade)
+  # against committed golden output. A chart change not reflected in golden fails
+  # here — regenerate with `scripts/helm-golden.sh` and review the diff. Helm is
+  # pinned to match the version golden was generated with (output is version-sensitive).
+  helm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.2.1
+      - name: helm lint
+        run: helm lint helm/tatrman-server
+      - name: golden templates (drift check)
+        run: scripts/helm-golden.sh --check

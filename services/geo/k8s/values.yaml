@@ -63,6 +63,19 @@ db:
 secretEnv:
   - { name: GEO_DB_PASSWORD, secretName: geo-db, secretKey: password, optional: true }
 
+# Install-time boundary-cache priming (RG-P3.S2.T2 · org.tatrman.geo.cache.PrimingRunner).
+# A best-effort Helm post-install/upgrade hook Job that warms the durable boundary cache
+# from `places` (comma/newline-separated place names — the model POI names + distinct member
+# cities) so those places resolve even when Nominatim is later unreachable. Off by default;
+# needs `db.enabled` (a durable store) and a reachable `nominatim.baseUrl` to be useful — an
+# outage during priming is counted, not fatal. `command` overrides the geo image's default
+# entrypoint to run the primer main class (the jib classpath layout).
+boundaryPrime:
+  enabled: false
+  places: ""
+  backoffLimit: 2
+  command: ["java", "-cp", "@/app/jib-classpath-file", "org.tatrman.geo.cache.PrimingRunner"]
+
 llmFallback:
   enabled: false
   gatewayUrl: ""

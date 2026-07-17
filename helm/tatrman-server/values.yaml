@@ -1,0 +1,129 @@
+# Tatrman Server umbrella — default values (SV-P4·S2).
+#
+# This file is the DEFAULT product install: the full query spine + the SV-P3·F1
+# understanding layer, with the licence-encumbered and heavyweight bits opt-in.
+# Every service is `<name>.enabled`; per-service tuning lives in that service's own
+# chart values (services/<x>/k8s/values.yaml) and is overridden by nesting under the
+# same key here. See helm/tatrman-server/values-contract.md for the documented keys.
+#
+# Value KEYS are the chart names, which differ from the image/dir names for a few
+# services (identity → `whois`, ttr-query → `query`, ttr-meta-mcp → `veles-mcp`, …).
+# The mapping is in the values contract.
+
+# ── The single product-tag knob ───────────────────────────────────────────────
+# Applied to every service image unless that service sets `image.tag`. Finalized
+# against published digests at T7; per-service overrides below carry the F1 tags.
+global:
+  image:
+    tag: "0.9.4"
+
+# ── Identity / OIDC contract (T3) ─────────────────────────────────────────────
+# The reference IdP is Keycloak-shaped. These keys DESCRIBE the token issuer a
+# deployment fronts the MCP doors with; the verify-before-pipeline DUTY (mcp-surface
+# §3.4, H-2) is the deployment's to discharge — see `verification`. Claim conventions
+# are FIXED by the OBO contract (mcp-surface §3): user id = preferred_username → sub;
+# roles = realm_access.roles. Other IdPs map to the same two facts.
+auth:
+  issuerUrl: ""   # e.g. https://idp.example.com/realms/tatrman  (auto-derived when devIdp.enabled)
+  audience: ""    # the API audience the doors expect in the token
+  jwksUri: ""     # e.g. {issuerUrl}/protocol/openid-connect/certs
+  realm: "tatrman"
+  # Where the verify-before-pipeline duty is discharged:
+  #   ingress — an auth-terminating ingress/sidecar verifies the signature; the doors
+  #             extract claims (the live pilot's conforming arrangement — mcp-surface §3.4)
+  #   in-door — the doors verify the token signature themselves (requireIdentity stays on)
+  # The mechanism is free; the guarantee is contractual. Default = the pilot's arrangement.
+  verification: "ingress"
+  # Trusted-network shortcuts (X-User-Id header, user_id arg) are OUTSIDE the OBO
+  # contract (mcp-surface §3.5): OFF by default. A deployment enabling them does so on
+  # its own authority; they are ignored whenever a bearer token resolves.
+  trustedNetworkShortcuts: false
+
+# ── Dev Keycloak — QUICKSTART ONLY, off by default ────────────────────────────
+# A throwaway in-cluster Keycloak (a seeded `tatrman` realm + a public `tatrman-agent`
+# client + a `demo`/`demo` user) so the quickstart has a working IdP without an
+# external one. NOT FOR PRODUCTION — insecure admin creds, dev-mode HTTP, no TLS.
+# When enabled, `auth.issuerUrl`/`jwksUri` auto-derive to the in-cluster URL (NOTES.txt).
+devIdp:
+  enabled: false
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "26.0"
+    pullPolicy: IfNotPresent
+  admin:
+    username: "admin"
+    password: "admin"   # DEV ONLY — never a real secret
+  httpPort: 8080
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 1Gi }
+
+# ── Query spine (values-minimal = this set alone) ─────────────────────────────
+veles: { enabled: true }
+query: { enabled: true }
+translate: { enabled: true }
+validate: { enabled: true }
+dispatch: { enabled: true }
+llm-gateway: { enabled: true }
+mssql: { enabled: true }
+postgres: { enabled: true }
+polars: { enabled: true }
+whois: { enabled: true }
+health: { enabled: true }
+query-mcp: { enabled: true }
+veles-mcp: { enabled: true }
+
+# ── Understanding layer (SV-P3·F1) ────────────────────────────────────────────
+fuzzy: { enabled: true }
+fuzzy-mcp: { enabled: true }
+nlp-mcp: { enabled: true }
+chrono: { enabled: true }
+money: { enabled: true }
+ttr-grounding-mcp: { enabled: true }
+
+nlp:
+  enabled: true
+  # Real F1 publish tag (per-service override of the product tag).
+  image:
+    tag: "0.9.2"
+  # FI-4 opt-in (S0 disposition 2026-07-17): ttr-nlp degrades gracefully when the
+  # UFAL backends are absent, so the CC BY-NC-SA UFAL engines ship OFF by default.
+  # Enabling them is a per-install licence decision (see values contract). The
+  # permissive-licence backends stay on so the default install has working NLP.
+  # The backends template renders its own image tag (not via the global knob), so
+  # each carries the ttr-nlp-* image-family tag explicitly.
+  backends:
+    morphodita: { enabled: false, image: { tag: "0.9.2" } }  # UFAL CC BY-NC-SA — opt-in
+    nametag3: { enabled: false, image: { tag: "0.9.2" } }    # UFAL CC BY-NC-SA — opt-in
+    stanza: { enabled: true, image: { tag: "0.9.2" } }       # Apache-2.0
+    spacy: { enabled: true, image: { tag: "0.9.2" } }        # MIT
+
+geo:
+  enabled: true
+  # No Nominatim endpoint by default (Q-19): geo renders but geocoding is "dark by
+  # policy" until an install points nominatim.baseUrl at a self-hosted instance.
+  # The public OSM endpoint is NOT a valid production target.
+  nominatim:
+    baseUrl: ""
+
+ttr-resolver:
+  enabled: true
+  # Real F1 publish tag.
+  image:
+    tag: "0.9.2"
+  # The HMAC resume-token key is a K8s Secret ref, no default (fail-closed unless an
+  # install supplies it or flips allowEphemeralKey for a throwaway cluster). The
+  # `resolve.bind:v1` MCP door stays loopback + require-identity (RG-P6 review D).
+  resumeToken:
+    activeKeyId: ""
+    allowEphemeralKey: false
+
+# ── Developer portal (RO-22) — upstream image, opt-in ─────────────────────────
+# Backstage ships in-chart but OFF by default: it is an upstream (non-Collite) image
+# outside the acceptance bar. Enable + supply its app-config to use it.
+backstage: { enabled: false }
+
+# ── Designer viewer (RO-9) — NOT YET a subchart ───────────────────────────────
+# Deferred to S2·T5: the viewer lives in tatrman (packages/designer) and its Veles
+# `ModelDataSource` adapter is MISSING (S0·T4 audit). It ships in-chart but outside
+# the acceptance bar; wiring is sized as days, tracked in T5. No dependency here yet.

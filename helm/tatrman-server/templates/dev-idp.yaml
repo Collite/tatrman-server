@@ -1,0 +1,130 @@
+{{- /*
+Dev Keycloak (SV-P4·S2·T3) — QUICKSTART ONLY, gated on devIdp.enabled (default off).
+A throwaway IdP so the quickstart has a working token issuer without an external one.
+
+  ⚠  NOT FOR PRODUCTION. Dev-mode HTTP (no TLS), insecure admin credentials in plain
+     env, an auto-imported realm with a password-grant public client and a demo user.
+     A real deployment points auth.issuerUrl/jwksUri at its own Keycloak and leaves
+     devIdp.enabled=false. This template renders NOTHING unless explicitly enabled.
+
+Seeds realm `{{ .Values.auth.realm }}`: a public client `tatrman-agent`
+(direct-access-grants on, for the quickstart's `curl` token fetch) and a `demo`/`demo`
+user with the realm role `user` — so tokens carry preferred_username + realm_access.roles
+per the OBO claim conventions (mcp-surface §3).
+*/}}
+{{- if .Values.devIdp.enabled }}
+{{- $name := printf "%s-keycloak" .Release.Name }}
+{{- $realm := .Values.auth.realm }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-realm
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/part-of: tatrman-server
+    app.kubernetes.io/component: dev-idp
+data:
+  {{ $realm }}-realm.json: |
+    {
+      "realm": {{ $realm | quote }},
+      "enabled": true,
+      "sslRequired": "none",
+      "roles": { "realm": [ { "name": "user" }, { "name": "admin" } ] },
+      "clients": [
+        {
+          "clientId": "tatrman-agent",
+          "enabled": true,
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "redirectUris": [ "*" ],
+          "webOrigins": [ "*" ]
+        }
+      ],
+      "users": [
+        {
+          "username": "demo",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [ { "type": "password", "value": "demo", "temporary": false } ],
+          "realmRoles": [ "user" ]
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/part-of: tatrman-server
+    app.kubernetes.io/component: dev-idp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+        app.kubernetes.io/part-of: tatrman-server
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: keycloak
+          image: "{{ .Values.devIdp.image.repository }}:{{ .Values.devIdp.image.tag }}"
+          imagePullPolicy: {{ .Values.devIdp.image.pullPolicy }}
+          args: [ "start-dev", "--import-realm", "--http-port={{ .Values.devIdp.httpPort }}" ]
+          env:
+            # Keycloak 26 bootstrap-admin env. DEV ONLY.
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: {{ .Values.devIdp.admin.username | quote }}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              value: {{ .Values.devIdp.admin.password | quote }}
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          ports:
+            - name: http
+              containerPort: {{ .Values.devIdp.httpPort }}
+          readinessProbe:
+            httpGet: { path: /health/ready, port: {{ .Values.devIdp.httpPort }} }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 40
+          livenessProbe:
+            httpGet: { path: /health/live, port: {{ .Values.devIdp.httpPort }} }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.devIdp.resources | nindent 12 }}
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm-import
+          configMap:
+            name: {{ $name }}-realm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/part-of: tatrman-server
+    app.kubernetes.io/component: dev-idp
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+  ports:
+    - name: http
+      port: {{ .Values.devIdp.httpPort }}
+      targetPort: {{ .Values.devIdp.httpPort }}
+{{- end }}

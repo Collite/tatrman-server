@@ -1,0 +1,1204 @@
+---
+# Source: tatrman-server/charts/dispatch/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: dispatch
+  labels:
+    app.kubernetes.io/name: dispatch
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: dispatch-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: dispatch
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7290
+      targetPort: 7290
+    - name: grpc
+      port: 7291
+      targetPort: 7291
+
+---
+# Source: tatrman-server/charts/health/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: health
+  labels:
+    app.kubernetes.io/name: health
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: health-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: health
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7000
+      targetPort: 7000
+
+---
+# Source: tatrman-server/charts/llm-gateway/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-gateway
+  labels:
+    app.kubernetes.io/name: llm-gateway
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: llm-gateway-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: llm-gateway
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7280
+      targetPort: 7280
+    - name: grpc
+      port: 9090
+      targetPort: 9090
+
+---
+# Source: tatrman-server/charts/mssql/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mssql
+  labels:
+    app.kubernetes.io/name: mssql
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: mssql-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mssql
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7295
+      targetPort: 7295
+    - name: grpc
+      port: 7296
+      targetPort: 7296
+
+---
+# Source: tatrman-server/charts/polars/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: polars
+  labels:
+    app.kubernetes.io/name: polars
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: polars-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: polars
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7300
+      targetPort: 7300
+    - name: grpc
+      port: 7301
+      targetPort: 7301
+
+---
+# Source: tatrman-server/charts/postgres/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: postgres-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7302
+      targetPort: 7302
+    - name: grpc
+      port: 7303
+      targetPort: 7303
+
+---
+# Source: tatrman-server/charts/query-mcp/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: query-mcp
+  labels:
+    app.kubernetes.io/name: query-mcp
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: query-mcp-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: query-mcp
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7307
+      targetPort: 7307
+
+---
+# Source: tatrman-server/charts/query/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: query
+  labels:
+    app.kubernetes.io/name: query
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: query-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: query
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7305
+      targetPort: 7305
+    - name: grpc
+      port: 7306
+      targetPort: 7306
+
+---
+# Source: tatrman-server/charts/translate/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: translate
+  labels:
+    app.kubernetes.io/name: translate
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: translate-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: translate
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7275
+      targetPort: 7275
+    - name: grpc
+      port: 7276
+      targetPort: 7276
+
+---
+# Source: tatrman-server/charts/validate/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: validate
+  labels:
+    app.kubernetes.io/name: validate
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: validate-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: validate
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7285
+      targetPort: 7285
+    - name: grpc
+      port: 7286
+      targetPort: 7286
+
+---
+# Source: tatrman-server/charts/veles-mcp/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: veles-mcp
+  labels:
+    app.kubernetes.io/name: veles-mcp
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: veles-mcp-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: veles-mcp
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7262
+      targetPort: 7262
+
+---
+# Source: tatrman-server/charts/veles/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: veles
+  labels:
+    app.kubernetes.io/name: veles
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: veles-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: veles
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7260
+      targetPort: 7260
+    - name: grpc
+      port: 7261
+      targetPort: 7261
+
+---
+# Source: tatrman-server/charts/whois/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: whois
+  labels:
+    app.kubernetes.io/name: whois
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: whois-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: whois
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7110
+      targetPort: 7110
+
+---
+# Source: tatrman-server/charts/dispatch/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dispatch
+  labels:
+    app.kubernetes.io/name: dispatch
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: dispatch-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dispatch
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dispatch
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: dispatch
+          image: "ghcr.io/collite/ttr-dispatch:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7290
+            - name: grpc
+              containerPort: 7291
+          env:
+            - name: DISPATCH_SERVER_PORT
+              value: "7290"
+            - name: DISPATCH_SERVER_GRPC_PORT
+              value: "7291"
+            - name: OTEL_SERVICE_NAME
+              value: "dispatch"
+            - name: OTEL_ENABLED_DISPATCH
+              value: "false"
+            - name: DISPATCH_WORKER_MSSQL_ENDPOINT
+              value: mssql:7296
+            - name: DISPATCH_WORKER_POLARS_ENDPOINT
+              value: polars:7301
+            - name: DISPATCH_WORKER_POSTGRES_ENDPOINT
+              value: postgres:7303
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7290
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7290
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/health/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: health
+  labels:
+    app.kubernetes.io/name: health
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: health-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: health
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: health
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: health
+          image: "ghcr.io/collite/health:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7000
+          env:
+            - name: HEALTH_CHECK_SERVICE_PORT
+              value: "7000"
+            - name: OTEL_SERVICE_NAME
+              value: "health-check-service"
+            - name: OTEL_ENABLED_HEALTH
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 7000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 7000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+
+---
+# Source: tatrman-server/charts/llm-gateway/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-gateway
+  labels:
+    app.kubernetes.io/name: llm-gateway
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: llm-gateway-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-gateway
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llm-gateway
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: llm-gateway
+          image: "ghcr.io/collite/ttr-llm-gateway:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7280
+            - name: grpc
+              containerPort: 9090
+          env:
+            - name: SERVER_PORT
+              value: "7280"
+            - name: POSTGRESQL_HOST
+              value: "postgres"
+            - name: POSTGRESQL_PORT
+              value: "5432"
+            - name: OTEL_SERVICE_NAME
+              value: "llm-gateway"
+            - name: AZURE_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llm-gateway-secrets
+                  key: azure-openai-api-key
+                  optional: true
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llm-gateway-secrets
+                  key: anthropic-api-key
+                  optional: true
+          startupProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 7280
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 40
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 7280
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 7280
+            initialDelaySeconds: 45
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1536Mi
+            requests:
+              cpu: 250m
+              memory: 768Mi
+
+---
+# Source: tatrman-server/charts/mssql/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mssql
+  labels:
+    app.kubernetes.io/name: mssql
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: mssql-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mssql
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mssql
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: mssql
+          image: "ghcr.io/collite/ttr-worker-mssql:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7295
+            - name: grpc
+              containerPort: 7296
+          env:
+            - name: MSSQL_SERVER_PORT
+              value: "7295"
+            - name: MSSQL_SERVER_GRPC_PORT
+              value: "7296"
+            - name: OTEL_SERVICE_NAME
+              value: "mssql"
+            - name: OTEL_ENABLED_MSSQL
+              value: "false"
+            - name: TRANSLATE_SERVER
+              value: translate
+            - name: TRANSLATE_SERVER_GRPC_PORT
+              value: "7276"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7295
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7295
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/polars/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polars
+  labels:
+    app.kubernetes.io/name: polars
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: polars-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: polars
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: polars
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: polars
+          image: "ghcr.io/collite/ttr-worker-polars:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7300
+            - name: grpc
+              containerPort: 7301
+          env:
+            - name: POLARS_SERVER_PORT
+              value: "7300"
+            - name: POLARS_SERVER_GRPC_PORT
+              value: "7301"
+            - name: OTEL_SERVICE_NAME
+              value: "polars"
+            - name: OTEL_ENABLED_POLARS
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7300
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7300
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/postgres/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: postgres-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: postgres
+          image: "ghcr.io/collite/ttr-worker-postgres:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7302
+            - name: grpc
+              containerPort: 7303
+          env:
+            - name: POSTGRES_SERVER_PORT
+              value: "7302"
+            - name: POSTGRES_SERVER_GRPC_PORT
+              value: "7303"
+            - name: OTEL_SERVICE_NAME
+              value: "postgres"
+            - name: OTEL_ENABLED_POSTGRES
+              value: "false"
+            - name: TRANSLATE_SERVER
+              value: translate
+            - name: TRANSLATE_SERVER_GRPC_PORT
+              value: "7276"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7302
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7302
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/query-mcp/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: query-mcp
+  labels:
+    app.kubernetes.io/name: query-mcp
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: query-mcp-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: query-mcp
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: query-mcp
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: query-mcp
+          image: "ghcr.io/collite/ttr-query-mcp:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7307
+          env:
+            - name: QUERY_MCP_SERVER_PORT
+              value: "7307"
+            - name: QUERY_MCP_REQUIRE_IDENTITY
+              value: "true"
+            - name: OTEL_SERVICE_NAME
+              value: "query-mcp"
+            - name: OTEL_ENABLED_QUERY_MCP
+              value: "false"
+            - name: QUERY_SERVER
+              value: query
+            - name: TRANSLATE_SERVER
+              value: translate
+            - name: VALIDATE_SERVER
+              value: validate
+            - name: VELES_SERVER
+              value: veles
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7307
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7307
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/query/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: query
+  labels:
+    app.kubernetes.io/name: query
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: query-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: query
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: query
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: query
+          image: "ghcr.io/collite/ttr-query:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7305
+            - name: grpc
+              containerPort: 7306
+          env:
+            - name: QUERY_SERVER_PORT
+              value: "7305"
+            - name: QUERY_SERVER_GRPC_PORT
+              value: "7306"
+            - name: OTEL_SERVICE_NAME
+              value: "query"
+            - name: OTEL_ENABLED_QUERY
+              value: "false"
+            - name: TRANSLATE_SERVER
+              value: translate
+            - name: VALIDATE_SERVER
+              value: validate
+            - name: DISPATCH_SERVER
+              value: dispatch
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7305
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7305
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/translate/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: translate
+  labels:
+    app.kubernetes.io/name: translate
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: translate-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: translate
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: translate
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: translate
+          image: "ghcr.io/collite/ttr-translate:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7275
+            - name: grpc
+              containerPort: 7276
+          env:
+            - name: TRANSLATE_SERVER_PORT
+              value: "7275"
+            - name: TRANSLATE_SERVER_GRPC_PORT
+              value: "7276"
+            - name: OTEL_SERVICE_NAME
+              value: "translate"
+            - name: OTEL_ENABLED_TRANSLATE
+              value: "false"
+            - name: VELES_GRPC_HOST
+              value: veles
+            - name: VELES_GRPC_PORT
+              value: "7261"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7275
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7275
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/validate/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: validate
+  labels:
+    app.kubernetes.io/name: validate
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: validate-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: validate
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: validate
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: validate
+          image: "ghcr.io/collite/ttr-validate:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7285
+            - name: grpc
+              containerPort: 7286
+          env:
+            - name: VALIDATE_SERVER_PORT
+              value: "7285"
+            - name: VALIDATE_SERVER_GRPC_PORT
+              value: "7286"
+            - name: OTEL_SERVICE_NAME
+              value: "validate"
+            - name: OTEL_ENABLED_VALIDATE
+              value: "false"
+            - name: VELES_HOST
+              value: veles
+            - name: VELES_GRPC_PORT
+              value: "7261"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7285
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7285
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/veles-mcp/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veles-mcp
+  labels:
+    app.kubernetes.io/name: veles-mcp
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: veles-mcp-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: veles-mcp
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: veles-mcp
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: veles-mcp
+          image: "ghcr.io/collite/ttr-meta-mcp:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7262
+          env:
+            - name: VELES_MCP_SERVER_PORT
+              value: "7262"
+            - name: OTEL_SERVICE_NAME
+              value: "veles-mcp"
+            - name: OTEL_ENABLED_VELES_MCP
+              value: "false"
+            - name: VELES_PROTOCOL
+              value: grpc
+            - name: VELES_GRPC_HOST
+              value: veles
+            - name: VELES_GRPC_PORT
+              value: "7261"
+            - name: CAPABILITIES_MCP_URL
+              value: http://capabilities-mcp.kantheon:7501
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7262
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7262
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+
+---
+# Source: tatrman-server/charts/veles/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veles
+  labels:
+    app.kubernetes.io/name: veles
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: veles-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: veles
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: veles
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: veles
+          image: "ghcr.io/collite/veles:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7260
+            - name: grpc
+              containerPort: 7261
+          env:
+            - name: VELES_HTTP_PORT
+              value: "7260"
+            - name: VELES_GRPC_PORT
+              value: "7261"
+            - name: METADATA_GIT_REMOTE_URI
+              value: "https://github.com/Tatrman/ai-models.git"
+            - name: OTEL_SERVICE_NAME
+              value: "veles"
+            - name: OTEL_ENABLED_METADATA
+              value: "false"
+            - name: METADATA_GIT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: veles-github-pat
+                  key: token
+                  optional: true
+            - name: PROMPTS_GIT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: veles-github-pat
+                  key: token
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7260
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7260
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/whois/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whois
+  labels:
+    app.kubernetes.io/name: whois
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: whois-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: whois
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: whois
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: whois
+          image: "ghcr.io/collite/ttr-identity:0.9.4"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7110
+          env:
+            - name: WHOIS_SERVER_PORT
+              value: "7110"
+            - name: WHOIS_REPOSITORY_TYPE
+              value: "json"
+            - name: OTEL_SERVICE_NAME
+              value: "whois"
+            - name: OTEL_ENABLED_WHOIS
+              value: "false"
+            - name: WHOIS_DB_HOST
+              value: kantheon-postgres
+            - name: WHOIS_DB_PORT
+              value: "5432"
+            - name: WHOIS_DB_NAME
+              value: whois
+            - name: WHOIS_DB_USER
+              value: whois
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7110
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7110
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi

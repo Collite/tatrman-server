@@ -1,0 +1,35 @@
+# Golden fixture: EVERYTHING. Spine + understanding layer + UFAL backends + the
+# developer portal + the dev IdP + geo boundary-priming — the maximal render.
+# Exercises every opt-in path (UFAL backends on, a self-hosted Nominatim endpoint,
+# a durable boundary cache + priming Job, a resolver resume-key secret ref, dev IdP).
+backstage: { enabled: true }
+
+# Dev Keycloak (quickstart IdP) — enabled here purely for golden coverage.
+devIdp: { enabled: true }
+
+nlp:
+  backends:
+    # UFAL CC BY-NC-SA engines enabled — an install that has cleared the licence.
+    morphodita: { enabled: true }
+    nametag3: { enabled: true }
+
+geo:
+  # A self-hosted Nominatim (the only valid production shape) — geocoding "lit".
+  nominatim:
+    baseUrl: "http://nominatim.ttr-server.svc.cluster.local:8080"
+  # A durable boundary cache + an install-time priming Job over a few CZ cities.
+  db:
+    enabled: true
+    host: "geo-db"
+  boundaryPrime:
+    enabled: true
+    places: "Praha,Brno,Ostrava"
+
+ttr-resolver:
+  # A real HMAC resume-token key by Secret ref (the production shape; no ephemeral).
+  resumeToken:
+    activeKeyId: "k1"
+  secretEnv:
+    - name: RESOLVER_RESUME_KEY_K1
+      secretName: resolver-resume-keys
+      secretKey: k1

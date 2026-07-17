@@ -56,9 +56,12 @@ agents/themis/eval/results/
 *.bak
 *.orig
 
-# Helm: vendored library-chart deps are rebuilt by `just validate-charts`
+# Helm: vendored library/subchart deps are rebuilt by scripts/helm-deps.sh
+# (per-service charts + the SV-P4 umbrella). The golden/ output IS committed.
 **/k8s/charts/
 **/k8s/Chart.lock
+helm/tatrman-server/charts/
+helm/tatrman-server/Chart.lock
 
 # RG-P1.S1 — ttr-nlp Python proto stubs (regenerated from shared/proto via
 # services/ttr-nlp/scripts/gen_proto.py; canonical source is the .proto file).

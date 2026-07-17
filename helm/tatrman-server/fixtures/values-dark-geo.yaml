@@ -1,0 +1,11 @@
+# Golden fixture: HONEST DEGRADE. Two capabilities off — geo dark (capability
+# disabled entirely) and the UFAL NLP backends off (nlp front degrades to the
+# permissive-licence engines, does not die). Everything else stays on. Proves the
+# chart renders a coherent stack when capabilities are withheld, rather than
+# erroring or silently pulling absent images.
+geo: { enabled: false }
+
+nlp:
+  backends:
+    morphodita: { enabled: false }
+    nametag3: { enabled: false }
