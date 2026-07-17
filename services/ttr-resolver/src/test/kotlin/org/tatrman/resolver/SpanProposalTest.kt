@@ -86,6 +86,55 @@ class SpanProposalTest :
             cands.any { it.start < 82 && it.end > 55 }.shouldBeFalse()
         }
 
+        "(c) a domain-eligible NER entity tagged as a common NOUN (cnec:op) still proposes" {
+            // Live morphology tags a product name like `Octavie` NNFP4/NOUN (not PROPN), so the
+            // anchored/PROPN paths miss it — but NameTag flags it `op` (object) → domain-eligible,
+            // so path (c) admits it as a candidate gated against all declared types.
+            val parse =
+                AnalyzeResponse
+                    .newBuilder()
+                    .addAllTokens(
+                        listOf(
+                            tok("Kolik", 0, 5, "kolik", "ADV", 3, "advmod"),
+                            tok("za", 6, 8, "za", "ADP", 3, "case"),
+                            tok("Octavie", 9, 16, "Octavia", "NOUN", 0, "obl"),
+                        ),
+                    ).addEntities(
+                        NerEntity
+                            .newBuilder()
+                            .setText("Octavie")
+                            .setCharStart(9)
+                            .setCharEnd(16)
+                            .setLabel("MISC")
+                            .setNormalizedValue("cnec:op")
+                            .setSourceEngine("nametag3")
+                            .build(),
+                    ).build()
+            val cands = SpanProposal.proposeDomainSpans(parse, listOf(branch, product))
+            val octavie = cands.single { it.text == "Octavie" }
+            octavie.anchored shouldBe false
+            octavie.gatedEntityRefs shouldContainExactlyInAnyOrder listOf("er.branch", "er.product")
+        }
+
+        "(c) a universal NER entity (cnec:gu geo) is NOT proposed as a domain candidate" {
+            val parse =
+                AnalyzeResponse
+                    .newBuilder()
+                    .addAllTokens(listOf(tok("Praha", 0, 5, "Praha", "PROPN", 0, "root")))
+                    .addEntities(
+                        NerEntity
+                            .newBuilder()
+                            .setText("Praha")
+                            .setCharStart(0)
+                            .setCharEnd(5)
+                            .setLabel("LOCATION")
+                            .setNormalizedValue("cnec:gu")
+                            .build(),
+                    ).build()
+            SpanProposal.proposeDomainSpans(parse, listOf(branch, product)).any { it.start < 5 && it.end > 0 } shouldBe
+                false
+        }
+
         "anchored value: `středisko` governing `DF ADNAK` proposes the value gated to QSTRED_DF only" {
             // "Zobraz středisko DF ADNAK" — 0 Zobraz(root) 1 středisko(obj,lemma) 2 DF(PROPN,flat→4)
             // 3 ADNAK(PROPN,nmod→2)

@@ -128,6 +128,33 @@ class TestNormalMode:
         assert ops_stamped == ["LEMMATIZE", "NER", "POS_TAG"]
         assert is_s1_clean(result.used)
 
+    def test_multi_engine_tokens_merge_to_one_per_span(self, monkeypatch):
+        # Regression: morphodita (morphology) and stanza (dep parse) each return their
+        # OWN token stream for the same words. The orchestrator must merge them span-by-span
+        # into ONE token per word — lemma from the LEMMATIZE engine (morphodita), the parse
+        # from stanza — not concatenate. Duplicates break the resolver's 1-based dep_head index.
+        registry = EngineRegistry(_config())
+        morpho_tokens = [
+            Token(text="Octavie", char_start=22, char_end=29, lemma="Octavia", upos="NOUN", xpos="NNFP4"),
+            Token(text="pobočkách", char_start=42, char_end=51, lemma="pobočka", upos="NOUN"),
+        ]
+        stanza_tokens = [  # same spans, weaker lemma, but carries the dependency parse
+            Token(text="Octavie", char_start=22, char_end=29, lemma="octavie", upos="NOUN", dep_head=3, dep_relation="obl"),
+            Token(text="pobočkách", char_start=42, char_end=51, lemma="pobočká", upos="NOUN", dep_head=3, dep_relation="obl"),
+        ]
+        _stub(monkeypatch, registry, "morphodita", EngineResult(tokens=morpho_tokens))
+        _stub(monkeypatch, registry, "stanza", EngineResult(tokens=stanza_tokens))
+        orch = Orchestrator(_config(), registry)
+
+        result = orch.analyze("Octavie ... pobočkách", "cs", {NlpOp.LEMMATIZE, NlpOp.DEP_PARSE})
+
+        # ONE token per span, in char order — not four duplicated tokens.
+        assert [(t.char_start, t.char_end) for t in result.tokens] == [(22, 29), (42, 51)]
+        octavie = result.tokens[0]
+        assert octavie.lemma == "Octavia"      # from the LEMMATIZE engine (morphodita)
+        assert octavie.dep_relation == "obl"   # from the parse engine (stanza)
+        assert octavie.dep_head == 3
+
     def test_engine_hint_respected(self, monkeypatch):
         registry = EngineRegistry(_config())
         _stub(monkeypatch, registry, "stanza", EngineResult(tokens=_HERO_TOKENS))

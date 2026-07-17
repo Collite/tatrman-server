@@ -15,7 +15,7 @@ import logging
 import secrets
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Set
 
 from nlp_service.config import AppConfig, load_config
@@ -215,7 +215,44 @@ class Orchestrator:
                 entities_by_span[span] = ent
 
         final_entities = list(entities_by_span.values())
-        final_tokens = sorted(all_tokens, key=lambda t: t.char_start)
+
+        # Merge tokens to ONE per span. Each engine's analyze() returns its OWN token
+        # stream, so extending them (the old behaviour) emitted every word once per
+        # engine — duplicating the whole sentence and breaking the 1-based dep_head
+        # indexing the resolver's anchoring relies on. Route each field to the engine
+        # that SERVED its op (lemma←LEMMATIZE, upos/xpos/feats←POS_TAG); take the
+        # dependency parse from whichever engine produced it (dep_relation set). Mirrors
+        # the entity span-dedup above.
+        def _tokens_by_span(engine_name: str) -> Dict[tuple[int, int], Token]:
+            res = engine_results.get(engine_name or "")
+            return {(t.char_start, t.char_end): t for t in (res.tokens if res else [])}
+
+        lemma_src = _tokens_by_span(served_ops_engine.get(NlpOp.LEMMATIZE, ""))
+        pos_src = _tokens_by_span(served_ops_engine.get(NlpOp.POS_TAG, ""))
+        dep_src: Dict[tuple[int, int], Token] = {}
+        for res in engine_results.values():
+            for t in res.tokens:
+                span = (t.char_start, t.char_end)
+                if t.dep_relation and span not in dep_src:
+                    dep_src[span] = t
+
+        merged_by_span: Dict[tuple[int, int], Token] = {}
+        for t in all_tokens:
+            span = (t.char_start, t.char_end)
+            if span in merged_by_span:
+                continue
+            lemma_t, pos_t, dep_t = lemma_src.get(span), pos_src.get(span), dep_src.get(span)
+            merged_by_span[span] = replace(
+                t,
+                lemma=(lemma_t.lemma if lemma_t and lemma_t.lemma else t.lemma),
+                upos=(pos_t.upos if pos_t and pos_t.upos else t.upos),
+                xpos=(pos_t.xpos if pos_t and pos_t.xpos else t.xpos),
+                feats=(pos_t.feats if pos_t and pos_t.feats else t.feats),
+                dep_head=(dep_t.dep_head if dep_t else t.dep_head),
+                dep_relation=(dep_t.dep_relation if dep_t else t.dep_relation),
+            )
+
+        final_tokens = sorted(merged_by_span.values(), key=lambda t: t.char_start)
         final_sentences = sorted(set(all_sentences), key=lambda s: s[0])
         final_paragraphs = sorted(set(all_paragraphs), key=lambda p: p[0])
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)

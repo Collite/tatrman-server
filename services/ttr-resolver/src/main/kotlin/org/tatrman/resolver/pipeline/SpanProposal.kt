@@ -14,7 +14,7 @@ import org.tatrman.text.Normalization.fold
  * entity-type anchor, gating it against that entity's vocabulary alone. That
  * recovered P=1.0 and killed over-generation (33→0) with ZERO LLM.
  *
- * Three deterministic candidate sources:
+ * Deterministic candidate sources:
  *   (a) **anchored subtrees** — for each declared anchor word found in the parse,
  *       the anchor's own nominal phrase (`pražských pobočkách` as ONE candidate)
  *       plus each nominal/proper-noun argument it governs (`středisko DF ADNAK`
@@ -23,13 +23,19 @@ import org.tatrman.text.Normalization.fold
  *       universal-tagged, gated against ALL declared types. Admits data values
  *       like `Octavie` without re-admitting common-noun junk (the 33 spurious in
  *       config B were common nouns: `záznamy`, `roce`, `vývoj nákladů`).
- *   (c) **n-gram floor (R4-γ)** — only when there is no dep parse (degraded
+ *   (c) **domain-eligible NER entities** — a NER span the classifier does NOT type
+ *       as universal (CNEC objects/institutions: `op` products, `if` orgs) is a
+ *       domain candidate gated against ALL declared types, EVEN when the POS tagger
+ *       calls it a common NOUN (so (a)/(b) miss it). Live morphology tags a product
+ *       name like `Octavie` NNFP4/NOUN while NameTag flags it `op`; fuzzy is the filter.
+ *   (d) **n-gram floor (R4-γ)** — only when there is no dep parse (degraded
  *       language): content n-grams (1..[MAX_NGRAM]) over non-stopword,
  *       non-universal tokens, gated against ALL types.
  *
  * Universal-typed NER spans (person/geo/time/number) are removed before domain
- * gating (spike §1). Institutions/objects stay domain-eligible — a domain value
- * like `DF ADNAK` is `io`-tagged, so NER is not the domain filter; fuzzy is.
+ * gating (spike §1). Institutions/objects stay domain-eligible and are actively
+ * proposed by (c) — a domain value like `DF ADNAK` is `io`-tagged, so NER is not the
+ * domain filter; fuzzy is.
  */
 object SpanProposal {
     private const val MAX_NGRAM = 3
@@ -152,6 +158,19 @@ object SpanProposal {
             if (runIdx.isEmpty()) return@forEachIndexed
             out += candidate(runIdx, tokens, allRefs, allCategories, anchored = false)
             coveredTokens += runIdx
+        }
+
+        // (c) domain-eligible NER entities. A NER span the classifier does NOT type as
+        // universal — CNEC objects/institutions (`op` products, `if` orgs) — is a domain
+        // candidate even when the POS tagger calls it a common NOUN, so the anchored/PROPN
+        // paths above miss it (RG hero: live morphology tags "Octavie" NNFP4/NOUN, yet
+        // NameTag flags it `op`). Gated against ALL declared types; fuzzy stays the filter.
+        // Skipped where an already-emitted candidate covers the entity's span.
+        for (e in parse.entitiesList) {
+            if (UniversalClassifier.isUniversal(e.label, e.normalizedValue)) continue
+            if (out.any { it.start <= e.charStart && it.end >= e.charEnd }) continue
+            out +=
+                DomainSpanCandidate(e.text, e.charStart, e.charEnd, allRefs, allCategories.distinct(), anchored = false)
         }
 
         return dedupe(out)
