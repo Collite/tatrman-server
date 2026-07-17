@@ -1543,7 +1543,7 @@ spec:
     spec:
       containers:
         - name: nametag3
-          image: "ghcr.io/collite/ttr-nlp-nametag3:0.9.2"
+          image: "ghcr.io/collite/ttr-nlp-nametag3:0.9.1"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1587,7 +1587,7 @@ spec:
     spec:
       containers:
         - name: spacy
-          image: "ghcr.io/collite/ttr-nlp-spacy:0.9.2"
+          image: "ghcr.io/collite/ttr-nlp-spacy:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1631,7 +1631,7 @@ spec:
     spec:
       containers:
         - name: stanza
-          image: "ghcr.io/collite/ttr-nlp-stanza:0.9.2"
+          image: "ghcr.io/collite/ttr-nlp-stanza:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2528,14 +2528,24 @@ spec:
           ports:
             - name: http
               containerPort: 8080
-          readinessProbe:
-            httpGet: { path: /health/ready, port: 8080 }
-            initialDelaySeconds: 15
+            # Keycloak 25+ serves /health/* (and metrics) on a SEPARATE management
+            # interface — port 9000 by default — not the main HTTP port. The probes
+            # target it (KC_HEALTH_ENABLED=true above turns the health checks on).
+            - name: management
+              containerPort: 9000
+          # A cold dev-mode Keycloak (Quarkus augmentation + realm import) takes ~90-120s;
+          # a startupProbe holds liveness/readiness off until it's actually up, so a slow
+          # start isn't mistaken for a liveness failure (which would restart-loop it).
+          startupProbe:
+            httpGet: { path: /health/started, port: 9000 }
             periodSeconds: 5
-            failureThreshold: 40
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 9000 }
+            periodSeconds: 5
+            failureThreshold: 6
           livenessProbe:
-            httpGet: { path: /health/live, port: 8080 }
-            initialDelaySeconds: 30
+            httpGet: { path: /health/live, port: 9000 }
             periodSeconds: 15
           resources:
             limits:

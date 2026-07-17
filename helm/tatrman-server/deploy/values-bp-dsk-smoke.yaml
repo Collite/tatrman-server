@@ -1,34 +1,46 @@
 # SV-P4·S2·T7 — bp-dsk install SMOKE overlay (NOT part of the values contract).
 #
-# A cluster-specific overlay for the pragmatic T7 gate: prove the umbrella chart
-# installs and a coherent subset reaches Ready on bp-dsk, plus the dev IdP. Install
-# into a FRESH namespace (not the ArgoCD-managed `ttr-server`) so it can't collide
-# with the F1 pilot. Real per-environment values belong in the deploy repo (olymp);
-# this file is a documented smoke recipe.
+# The pragmatic T7 gate: prove the umbrella chart installs and a coherent subset
+# reaches Ready on bp-dsk. Install into a FRESH namespace (not the ArgoCD-managed
+# `ttr-server`) so it can't collide with the F1 pilot. Real per-environment values
+# belong in the deploy repo (olymp); this file is a documented smoke recipe.
 #
-#   helm install ttr helm/tatrman-server -n ttr-umbrella --create-namespace \
-#     -f helm/tatrman-server/deploy/values-bp-dsk-smoke.yaml
+#   helm upgrade --install ttr helm/tatrman-server -n ttr-umbrella --create-namespace \
+#     -f helm/tatrman-server/deploy/values-bp-dsk-smoke.yaml --kube-context dsk
 #
-# Expected Ready: veles, query, translate, validate, dispatch, whois, health, the
-# understanding layer (fuzzy, nlp + UFAL backends, chrono, geo, money, resolver),
-# and the dev Keycloak. Deliberately OFF for the smoke (need external backing the
-# chart can't self-provide, or the kantheon capabilities-mcp registry):
-#   - workers (mssql/postgres/polars) + llm-gateway → need target DBs / an LLM provider
-#   - the MCP doors → register with capabilities-mcp (a kantheon service, not in the
-#     product) — the standalone-registration story is the flagged T7 ⚑ (→ S7).
+# Node reality: bp-dsk is a single 8-CPU node whose CPU is largely RESERVED (not used)
+# by the running F1 pilot, so pods at the chart's default 250m requests don't schedule.
+# This overlay drops requests to the olymp bp-dsk floor (25m / 256Mi) so the subset fits.
+#
+# Subset = the light query spine + identity/health + the dev IdP — the "installs and
+# comes up" proof. OFF for the smoke: the heavy/UFAL NLP + understanding layer (F1
+# already proved it live here), the workers/llm-gateway (need DBs), and the MCP doors
+# (register with the kantheon capabilities-mcp — the flagged standalone ⚑). Full
+# governed round-trip → S7 on a non-capacity-bound cluster.
 
-# Dev Keycloak (quickstart IdP) — on for the smoke.
 devIdp:
   enabled: true
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
 
-# UFAL backends ON (bp-dsk is private — FI-4 waived) so Czech NLP actually works,
-# matching the F1 live proof.
-nlp:
-  backends:
-    morphodita: { enabled: true }
-    nametag3: { enabled: true }
+# ── Enabled subset — low requests so they schedule alongside the pilot ─────────
+veles:     { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
+query:     { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
+translate: { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
+validate:  { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
+whois:     { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
+health:    { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
+# dispatch OFF: its readiness connects to the workers (disabled here) — can't be Ready
+# in a worker-less smoke. Part of the query spine; exercised with workers in S7.
+dispatch:  { enabled: false }
 
-# ── OFF for the smoke (external backing / capabilities-mcp) ────────────────────
+# ── OFF for the smoke ─────────────────────────────────────────────────────────
+fuzzy: { enabled: false }
+nlp: { enabled: false }
+chrono: { enabled: false }
+geo: { enabled: false }
+money: { enabled: false }
+ttr-resolver: { enabled: false }
 mssql: { enabled: false }
 postgres: { enabled: false }
 polars: { enabled: false }
@@ -38,9 +50,3 @@ veles-mcp: { enabled: false }
 fuzzy-mcp: { enabled: false }
 nlp-mcp: { enabled: false }
 ttr-grounding-mcp: { enabled: false }
-
-# NOTE: veles loads its model from METADATA_GIT_REMOTE_URI (default
-# github.com/Tatrman/ai-models.git). If veles stays 503 (no model), set
-# `veles.metadata.gitRemoteUri` + a PAT via `veles.secretEnv` to the same source
-# the F1 pilot uses. geo stays dark (no nominatim.baseUrl) — that's honest, not a
-# boot failure.

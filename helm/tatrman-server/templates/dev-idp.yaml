@@ -91,14 +91,24 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.devIdp.httpPort }}
-          readinessProbe:
-            httpGet: { path: /health/ready, port: {{ .Values.devIdp.httpPort }} }
-            initialDelaySeconds: 15
+            # Keycloak 25+ serves /health/* (and metrics) on a SEPARATE management
+            # interface — port 9000 by default — not the main HTTP port. The probes
+            # target it (KC_HEALTH_ENABLED=true above turns the health checks on).
+            - name: management
+              containerPort: 9000
+          # A cold dev-mode Keycloak (Quarkus augmentation + realm import) takes ~90-120s;
+          # a startupProbe holds liveness/readiness off until it's actually up, so a slow
+          # start isn't mistaken for a liveness failure (which would restart-loop it).
+          startupProbe:
+            httpGet: { path: /health/started, port: 9000 }
             periodSeconds: 5
-            failureThreshold: 40
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 9000 }
+            periodSeconds: 5
+            failureThreshold: 6
           livenessProbe:
-            httpGet: { path: /health/live, port: {{ .Values.devIdp.httpPort }} }
-            initialDelaySeconds: 30
+            httpGet: { path: /health/live, port: 9000 }
             periodSeconds: 15
           resources:
             {{- toYaml .Values.devIdp.resources | nindent 12 }}
