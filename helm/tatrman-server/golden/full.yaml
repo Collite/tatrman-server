@@ -701,7 +701,7 @@ spec:
     spec:
       containers:
         - name: backstage
-          image: "backstage:0.9.4"
+          image: "backstage:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -789,7 +789,7 @@ spec:
     spec:
       containers:
         - name: chrono
-          image: "ghcr.io/collite/chrono:0.9.4"
+          image: "ghcr.io/collite/chrono:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -862,7 +862,7 @@ spec:
     spec:
       containers:
         - name: dispatch
-          image: "ghcr.io/collite/ttr-dispatch:0.9.4"
+          image: "ghcr.io/collite/ttr-dispatch:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -931,7 +931,7 @@ spec:
     spec:
       containers:
         - name: fuzzy-mcp
-          image: "ghcr.io/collite/ttr-fuzzy-mcp:0.9.4"
+          image: "ghcr.io/collite/ttr-fuzzy-mcp:0.9.1"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1059,7 +1059,7 @@ spec:
     spec:
       containers:
         - name: geo
-          image: "ghcr.io/collite/geo:0.9.4"
+          image: "ghcr.io/collite/geo:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1154,7 +1154,7 @@ spec:
     spec:
       containers:
         - name: health
-          image: "ghcr.io/collite/health:0.9.4"
+          image: "ghcr.io/collite/health:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1213,7 +1213,7 @@ spec:
     spec:
       containers:
         - name: llm-gateway
-          image: "ghcr.io/collite/ttr-llm-gateway:0.9.4"
+          image: "ghcr.io/collite/ttr-llm-gateway:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1295,7 +1295,7 @@ spec:
     spec:
       containers:
         - name: money
-          image: "ghcr.io/collite/money:0.9.4"
+          image: "ghcr.io/collite/money:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1370,7 +1370,7 @@ spec:
     spec:
       containers:
         - name: mssql
-          image: "ghcr.io/collite/ttr-worker-mssql:0.9.4"
+          image: "ghcr.io/collite/ttr-worker-mssql:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1437,7 +1437,7 @@ spec:
     spec:
       containers:
         - name: nlp-mcp
-          image: "ghcr.io/collite/ttr-nlp-mcp:0.9.4"
+          image: "ghcr.io/collite/ttr-nlp-mcp:0.9.1"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1739,7 +1739,7 @@ spec:
     spec:
       containers:
         - name: polars
-          image: "ghcr.io/collite/ttr-worker-polars:0.9.4"
+          image: "ghcr.io/collite/ttr-worker-polars:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1802,7 +1802,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: "ghcr.io/collite/ttr-worker-postgres:0.9.4"
+          image: "ghcr.io/collite/ttr-worker-postgres:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1869,7 +1869,7 @@ spec:
     spec:
       containers:
         - name: query-mcp
-          image: "ghcr.io/collite/ttr-query-mcp:0.9.4"
+          image: "ghcr.io/collite/ttr-query-mcp:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1938,7 +1938,7 @@ spec:
     spec:
       containers:
         - name: query
-          image: "ghcr.io/collite/ttr-query:0.9.4"
+          image: "ghcr.io/collite/ttr-query:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2007,7 +2007,7 @@ spec:
     spec:
       containers:
         - name: translate
-          image: "ghcr.io/collite/ttr-translate:0.9.4"
+          image: "ghcr.io/collite/ttr-translate:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2074,7 +2074,7 @@ spec:
     spec:
       containers:
         - name: ttr-grounding-mcp
-          image: "ghcr.io/collite/ttr-grounding-mcp:0.9.4"
+          image: "ghcr.io/collite/ttr-grounding-mcp:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2237,7 +2237,7 @@ spec:
     spec:
       containers:
         - name: validate
-          image: "ghcr.io/collite/ttr-validate:0.9.4"
+          image: "ghcr.io/collite/ttr-validate:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2304,7 +2304,7 @@ spec:
     spec:
       containers:
         - name: veles-mcp
-          image: "ghcr.io/collite/ttr-meta-mcp:0.9.4"
+          image: "ghcr.io/collite/ttr-meta-mcp:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2371,7 +2371,7 @@ spec:
     spec:
       containers:
         - name: veles
-          image: "ghcr.io/collite/veles:0.9.4"
+          image: "ghcr.io/collite/veles:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2448,7 +2448,7 @@ spec:
     spec:
       containers:
         - name: whois
-          image: "ghcr.io/collite/ttr-identity:0.9.4"
+          image: "ghcr.io/collite/ttr-identity:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2580,7 +2580,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: boundary-prime
-          image: "ghcr.io/collite/geo:0.9.4"
+          image: "ghcr.io/collite/geo:0.9.0"
           imagePullPolicy: IfNotPresent
           command:
             - java

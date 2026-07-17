@@ -11,11 +11,14 @@
 # The mapping is in the values contract.
 
 # ── The single product-tag knob ───────────────────────────────────────────────
-# Applied to every service image unless that service sets `image.tag`. Finalized
-# against published digests at T7; per-service overrides below carry the F1 tags.
+# Applied to every service image unless that service sets `image.tag`. Reconciled at
+# T7 against the real published GHCR tags (the olymp/bp-dsk deployed truth): the base
+# line is 0.9.0; the SV-P3·F1 services carry newer tags as per-service overrides below
+# (fuzzy 0.9.4, fuzzy-mcp/nlp-mcp 0.9.1, nlp/resolver/backends 0.9.2). appVersion (the
+# product marker) stays 0.9.4; per-service image tags are what actually pull.
 global:
   image:
-    tag: "0.9.4"
+    tag: "0.9.0"
 
 # ── Identity / OIDC contract (T3) ─────────────────────────────────────────────
 # The reference IdP is Keycloak-shaped. These keys DESCRIBE the token issuer a
@@ -73,10 +76,10 @@ health: { enabled: true }
 query-mcp: { enabled: true }
 veles-mcp: { enabled: true }
 
-# ── Understanding layer (SV-P3·F1) ────────────────────────────────────────────
-fuzzy: { enabled: true }
-fuzzy-mcp: { enabled: true }
-nlp-mcp: { enabled: true }
+# ── Understanding layer (SV-P3·F1) — per-service tags override the 0.9.0 base ──
+fuzzy: { enabled: true, image: { tag: "0.9.4" } }
+fuzzy-mcp: { enabled: true, image: { tag: "0.9.1" } }
+nlp-mcp: { enabled: true, image: { tag: "0.9.1" } }
 chrono: { enabled: true }
 money: { enabled: true }
 ttr-grounding-mcp: { enabled: true }
