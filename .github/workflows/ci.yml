@@ -5,6 +5,10 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  # Manual + nightly triggers for the heavy `helm-install` kind gate (SV-P4·S2·T7).
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'
 
 jobs:
   build:
@@ -175,3 +179,37 @@ jobs:
         run: helm lint helm/tatrman-server
       - name: golden templates (drift check)
         run: scripts/helm-golden.sh --check
+
+  # SV-P4·S2·T7 — the kind install gate. Proves the umbrella actually INSTALLS and a
+  # light subset reaches Ready (not just templates). Heavy, so it does NOT run on every
+  # PR — only on a `chart-install` label, manual dispatch, or the nightly schedule.
+  # Subset + rationale: helm/tatrman-server/deploy/values-kind-ci.yaml. (If the
+  # ghcr.io/collite/* images are ever made private, add a docker-registry pull secret
+  # + imagePullSecrets here.)
+  helm-install:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      contains(github.event.pull_request.labels.*.name, 'chart-install')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.2.1
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: ttr-umbrella-ci
+      - name: install the umbrella + wait for the subset to be Ready
+        run: |
+          scripts/helm-deps.sh
+          helm install ttr helm/tatrman-server -n ttr-umbrella --create-namespace \
+            -f helm/tatrman-server/deploy/values-kind-ci.yaml --wait --timeout 8m
+      - name: show state
+        if: always()
+        run: |
+          kubectl -n ttr-umbrella get pods
+          kubectl -n ttr-umbrella get deploy

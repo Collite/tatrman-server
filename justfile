@@ -254,6 +254,34 @@ charts:
 charts-golden:
     scripts/helm-golden.sh
 
+# Publish the umbrella chart to GHCR OCI [GATE — IRREVERSIBLE]. Runs the full gate
+# (lint + golden), vendors deps, packages, and pushes to oci://ghcr.io/collite/charts.
+# Auth: user `Collite` + $COLLITE_PAT (a PAT with write:packages). Per RO-24 / rule 8,
+# a chart version is immutable once pushed and is cut from MASTER after the fold — the
+# recipe refuses a non-master branch unless ALLOW_NONMASTER=1.
+charts-publish:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${COLLITE_PAT:?COLLITE_PAT (a PAT with write:packages) must be set}"
+    # Gate preconditions — never publish un-gated.
+    helm lint helm/tatrman-server
+    scripts/helm-golden.sh --check
+    scripts/helm-deps.sh
+    ver=$(grep -E '^version:' helm/tatrman-server/Chart.yaml | awk '{print $2}')
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$branch" != "master" ] && [ "${ALLOW_NONMASTER:-}" != "1" ]; then
+        echo "⚑ On '$branch', not master — chart publishes are cut from master after the fold (RO-24/rule 8)." >&2
+        echo "  Re-run on master, or set ALLOW_NONMASTER=1 to override." >&2
+        exit 1
+    fi
+    echo "→ packaging tatrman-server-${ver}.tgz"
+    helm package helm/tatrman-server --destination /tmp
+    echo "→ ghcr.io login as Collite"
+    echo "$COLLITE_PAT" | helm registry login ghcr.io -u Collite --password-stdin
+    echo "→ pushing oci://ghcr.io/collite/charts/tatrman-server:${ver}  [IRREVERSIBLE]"
+    helm push "/tmp/tatrman-server-${ver}.tgz" oci://ghcr.io/collite/charts
+    echo "✓ pushed. Verify: helm pull oci://ghcr.io/collite/charts/tatrman-server --version ${ver}"
+
 # ── publish — unified release entry point ───────────────────────────────────────
 #
 # Tags the repo; the matching GitHub Actions workflow does the actual
