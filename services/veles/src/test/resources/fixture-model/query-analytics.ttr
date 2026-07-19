@@ -1,0 +1,26 @@
+model query
+
+// Regression cover for the Hartland pattern-answering path: a query carrying
+// `search { patterns }` MUST be served in ModelBundle.pattern_queries; one
+// without must fall to named_queries. MetadataServiceImpl classifies on
+// `search.patterns.isNotEmpty()`, so this locks the parser→metadata→bundle chain.
+def query revenue_by_channel {
+    description: "Revenue by channel — pattern query"
+    language: SQL
+    sourceText: "select 1"
+    search {
+        patterns: [
+            "revenue (per|by) channel",
+            "sales by channel"
+        ],
+        examples: [
+            "Revenue by channel"
+        ]
+    }
+}
+
+def query all_customers {
+    description: "All customers — named (non-pattern) query"
+    language: SQL
+    sourceText: "select 1"
+}

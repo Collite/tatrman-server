@@ -17,8 +17,10 @@ import org.tatrman.ttr.metadata.registry.MetadataRegistry
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldHaveAtLeastSize
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -64,6 +66,31 @@ class MetadataServiceFixtureSpec :
             r.model.packageVersionsList[0]
                 .contentHash
                 .all { it in "0123456789abcdef" } shouldBe true
+        }
+
+        "GetModel classifies query with search.patterns into pattern_queries, one without into named_queries" {
+            // The Hartland demo path: a query's `search { patterns }` must reach the
+            // ModelBundle so Golem/Themis see it as a pattern (not free-SQL) query.
+            val r =
+                service().getModel(
+                    GetModelRequest
+                        .newBuilder()
+                        .addPackages("fixture-model")
+                        .setIncludeSearchHints(true)
+                        .build(),
+                )
+            val patternNames = r.model.patternQueriesList.map { it.objectDescriptor.localName }
+            val namedNames = r.model.namedQueriesList.map { it.objectDescriptor.localName }
+
+            patternNames shouldContain "revenue_by_channel"
+            patternNames shouldNotContain "all_customers"
+            namedNames shouldContain "all_customers"
+            namedNames shouldNotContain "revenue_by_channel"
+
+            // The patterns themselves must survive into the served bundle query.
+            val served = r.model.patternQueriesList.first { it.objectDescriptor.localName == "revenue_by_channel" }
+            served.queryDescriptor.search.patternsList shouldContainAll
+                listOf("revenue (per|by) channel", "sales by channel")
         }
 
         "GetModel rejects empty packages list with EMPTY_PACKAGES error" {
