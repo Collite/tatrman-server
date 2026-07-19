@@ -6,9 +6,11 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO as ClientCIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
@@ -22,6 +24,9 @@ data class LlmGatewayEndpoint(
     val host: String,
     val port: Int,
     val timeoutMs: Long,
+    // Gateway 2.0 requires a per-consumer `Bearer ttrk-…` key on every route (KeyValidator.requireKey).
+    // Optional + null-default so existing callers are unaffected; when set, `complete` sends it.
+    val apiKey: String? = null,
 )
 
 /**
@@ -81,6 +86,9 @@ class LlmGatewayClient(
                 httpClient
                     .post("http://${endpoint.host}:${endpoint.port}/v1/chat/completions") {
                         contentType(ContentType.Application.Json)
+                        endpoint.apiKey?.takeIf { it.isNotBlank() }?.let {
+                            header(HttpHeaders.Authorization, "Bearer $it")
+                        }
                         setBody(request)
                     }.body()
 

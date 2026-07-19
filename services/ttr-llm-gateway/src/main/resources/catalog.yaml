@@ -19,7 +19,7 @@ models:
 
   - id: azure-gpt-4o-mini
     name: gpt-4o-mini
-    aliases: ["fast"]            # rules.conf: "fast" -> gpt-4o-mini
+    # (was alias "fast" — the generic "fast" tier now routes to azure-gpt-41; still reachable by name)
     provider: azure
     upstream: gpt-4o-mini
     type: chat
@@ -40,8 +40,11 @@ models:
 
   - id: azure-gpt-41
     name: gpt-4.1
+    # Generic tier keys (LlmGatewayPromptExecutor emits these) — baseline routes ALL of Golem's/Themis's
+    # mini/fast/deep asks to this one Azure model; retune per deployment later ("play with configs").
+    aliases: ["mini", "fast", "deep"]
     provider: azure
-    upstream: tatrman-gpt-4.1
+    upstream: "${AZURE_OPENAI_CHAT_DEPLOYMENT:-tatrman-gpt-4.1}"   # per-deployment (olymp env); baked default off-Azure
     type: chat
     tags: ["tatrman"]
     pricing: { input: 10.0, output: 10.0 }   # interim (1.x cost=10)

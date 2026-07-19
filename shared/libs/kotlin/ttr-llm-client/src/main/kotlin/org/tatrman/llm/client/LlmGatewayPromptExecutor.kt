@@ -83,16 +83,18 @@ class LlmGatewayPromptExecutor(
 
     companion object {
         /**
-         * Map a Koog [LLModel] to one of the gateway's tier keys. The gateway's
-         * `complete` accepts a flat `model` string — `"haiku"` (CHEAP), `"sonnet"`
-         * (FAST), `"opus"`. Unknown ids fall through to `"haiku"` (cheapest).
+         * Map a Koog [LLModel] to one of the gateway's GENERIC tier keys — `"deep"` (smart),
+         * `"fast"` (mid), `"mini"` (cheap). These are provider-agnostic: the gateway catalog
+         * maps them to concrete models per deployment (baseline: all → one Azure gpt-4.1). Unknown
+         * ids fall through to `"mini"` (cheapest). Consumers (Golem PlanComposer, Themis nodes)
+         * therefore request tiers, not vendor names — decoupling the caller from the routed model.
          */
         fun mapModelToGatewayKey(model: LLModel): String =
             when {
-                model.id.contains("opus", ignoreCase = true) -> "opus"
-                model.id.contains("sonnet", ignoreCase = true) -> "sonnet"
-                model.id.contains("haiku", ignoreCase = true) -> "haiku"
-                else -> "haiku"
+                model.id.contains("opus", ignoreCase = true) -> "deep"
+                model.id.contains("sonnet", ignoreCase = true) -> "fast"
+                model.id.contains("haiku", ignoreCase = true) -> "mini"
+                else -> "mini"
             }
 
         private inline fun <reified T : Message> Prompt.textOf(): String =
