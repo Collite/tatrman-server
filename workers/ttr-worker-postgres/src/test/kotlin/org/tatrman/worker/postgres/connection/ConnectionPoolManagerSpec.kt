@@ -44,6 +44,25 @@ class ConnectionPoolManagerSpec :
             mgr.supportedConnections shouldBe emptySet()
         }
 
+        // Pure-env connections (`host = ${?POSTGRES_PG_<NAME>_HOST}` with no default) are declared in
+        // the base conf but activated per deployment — an entry whose host is absent (env unset) or
+        // blank is skipped rather than crashing boot in ConnectionConfig.fromConfig's getString("host").
+        "fromConfig skips a connection whose host is absent or blank" {
+            val config =
+                ConfigFactory.parseString(
+                    """
+                    connections {
+                      active { host = "real.example", database = "A", username = "u", password = "p" }
+                      unset  { database = "B", username = "u", password = "p" }
+                      blank  { host = "", database = "C", username = "u", password = "p" }
+                    }
+                    """.trimIndent(),
+                )
+            val mgr = ConnectionPoolManager.fromConfig(config)
+            mgr.supportedConnections shouldHaveSize 1
+            mgr.supportedConnections shouldContain "active"
+        }
+
         "acquire on unknown connection_id throws UnknownConnectionException" {
             val mgr = ConnectionPoolManager(emptyMap())
             shouldThrow<ConnectionPoolManager.UnknownConnectionException> {

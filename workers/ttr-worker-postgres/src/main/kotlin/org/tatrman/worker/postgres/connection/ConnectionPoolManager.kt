@@ -178,9 +178,20 @@ class ConnectionPoolManager(
             if (!config.hasPath("connections")) return ConnectionPoolManager(emptyMap())
             val root = config.getConfig("connections")
             val map =
-                root.root().keys.associateWith { id ->
-                    ConnectionConfig.fromConfig(id, root.getConfig(id))
-                }
+                root.root().keys
+                    // Pure-env connections (`host = ${?POSTGRES_PG_<NAME>_HOST}` with no default) are
+                    // declared in the base conf but ACTIVATED per deployment: an entry whose `host`
+                    // resolves to absent/blank (the deployment didn't set that env var) is skipped, so
+                    // the base conf can register optional named connections without failing boot in
+                    // ConnectionConfig.fromConfig's getString("host"). Connections that carry a default
+                    // host (e.g. pg-tpcds) are always present, unchanged.
+                    .filter { id ->
+                        val entry = root.getConfig(id)
+                        entry.hasPath("host") && entry.getString("host").isNotBlank()
+                    }
+                    .associateWith { id ->
+                        ConnectionConfig.fromConfig(id, root.getConfig(id))
+                    }
             return ConnectionPoolManager(map)
         }
     }
