@@ -2,6 +2,8 @@
 package org.tatrman.query.mcp.tools
 
 import org.tatrman.plan.v1.PipelineContext
+import org.tatrman.plan.v1.SchemaCode
+import org.tatrman.plan.v1.parseSchemaCode
 import org.tatrman.query.v1.RunRequest
 import org.tatrman.translate.v1.Language
 import org.tatrman.worker.v1.ExecutionOptions
@@ -179,6 +181,16 @@ class QueryTool(
                     "unknown_source_language",
                     "Unknown source_language '$sourceLanguageStr'. Use sql | transdsl | dfdsl | rel_node.",
                 )
+        // Physical SQL references db-layer objects (dbo columns), which don't exist in the
+        // ER model — parsing raw SQL against ER fails ("<col> is a db object; parsed against
+        // er"). Default source_language=SQL to the DB schema so physical patterns resolve;
+        // callers targeting the entity model can override with an explicit source_schema.
+        val sourceSchema =
+            args
+                .stringFieldOrNull("source_schema")
+                ?.let { parseSchemaCode(it) }
+                ?: if (sourceLanguage == Language.SQL) SchemaCode.DB else SchemaCode.SCHEMA_CODE_UNSPECIFIED
+
         val format = parseOutputFormat(args.stringFieldOrNull("format"))
         val rowLimitArg = args.intFieldOr("row_limit", cfg.limits.rowLimitDefault)
         if (rowLimitArg !in 1..cfg.limits.rowLimitMax) {
@@ -228,6 +240,7 @@ class QueryTool(
                 .newBuilder()
                 .setSource(source)
                 .setSourceLanguage(sourceLanguage)
+                .setSourceSchema(sourceSchema)
                 .setContext(context)
                 .setExecutionOptions(
                     ExecutionOptions

@@ -2,6 +2,7 @@
 package org.tatrman.query.mcp.tools
 
 import org.tatrman.plan.v1.PipelineContext
+import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.query.v1.CompileResponse
 import org.tatrman.query.v1.RunRequest
 import org.tatrman.worker.v1.ResultBatch
@@ -137,6 +138,61 @@ class QueryToolSpec :
             res.isError shouldBe true
             val msgs = (res.structuredContent!!["messages"] as JsonArray)
             ((msgs[0] as JsonObject)["code"] as JsonPrimitive).content shouldBe "row_limit_out_of_range"
+        }
+
+        "source_language=sql defaults source_schema to DB on the RunRequest" {
+            var captured: RunRequest? = null
+            val runner =
+                object : QueryRunnerClient {
+                    override fun run(request: RunRequest): Flow<ResultBatch> {
+                        captured = request
+                        return flowOf()
+                    }
+
+                    override suspend fun compile(request: RunRequest): CompileResponse =
+                        CompileResponse.getDefaultInstance()
+                }
+            val tool = QueryTool(cfg, runner, fakeMetadata)
+            val args =
+                buildJsonObject {
+                    put("source", JsonPrimitive("SELECT 1"))
+                    put("source_language", JsonPrimitive("sql"))
+                }
+            runBlocking {
+                tool.execute(
+                    CallToolRequest(params = CallToolRequestParams(name = "query", arguments = args)),
+                    identity = null,
+                )
+            }
+            captured!!.sourceSchema shouldBe SchemaCode.DB
+        }
+
+        "an explicit source_schema arg overrides the SQL->DB default" {
+            var captured: RunRequest? = null
+            val runner =
+                object : QueryRunnerClient {
+                    override fun run(request: RunRequest): Flow<ResultBatch> {
+                        captured = request
+                        return flowOf()
+                    }
+
+                    override suspend fun compile(request: RunRequest): CompileResponse =
+                        CompileResponse.getDefaultInstance()
+                }
+            val tool = QueryTool(cfg, runner, fakeMetadata)
+            val args =
+                buildJsonObject {
+                    put("source", JsonPrimitive("SELECT 1"))
+                    put("source_language", JsonPrimitive("sql"))
+                    put("source_schema", JsonPrimitive("er"))
+                }
+            runBlocking {
+                tool.execute(
+                    CallToolRequest(params = CallToolRequestParams(name = "query", arguments = args)),
+                    identity = null,
+                )
+            }
+            captured!!.sourceSchema shouldBe SchemaCode.ER
         }
 
         "invalid hide_columns_matching regex returns invalid_regex" {
