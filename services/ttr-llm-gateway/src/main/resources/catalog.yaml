@@ -45,6 +45,9 @@ models:
     aliases: ["mini", "fast", "deep"]
     provider: azure
     upstream: "${AZURE_OPENAI_CHAT_DEPLOYMENT:-tatrman-gpt-4.1}"   # per-deployment (olymp env); baked default off-Azure
+    reasoning: ${AZURE_OPENAI_REASONING:-false}   # true when the deployment is a reasoning model (gpt-5/o-series):
+    # the OpenAI-wire handler then strips temperature + top_p and maps max_tokens -> max_completion_tokens. Set
+    # alongside AZURE_OPENAI_CHAT_DEPLOYMENT in olymp so it tracks the deployment per cluster.
     type: chat
     tags: ["tatrman"]
     pricing: { input: 10.0, output: 10.0 }   # interim (1.x cost=10)

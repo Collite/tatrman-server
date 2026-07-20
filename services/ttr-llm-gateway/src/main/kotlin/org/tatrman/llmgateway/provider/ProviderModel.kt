@@ -31,6 +31,7 @@ data class UpstreamTarget(
     val authScheme: String?, // "Bearer" | null
     val providerVersion: String? = null, // anthropic → the `anthropic-version` header value
     val defaultMaxTokens: Int? = null, // anthropic → max_tokens fallback when the request omits it (REQUIRED upstream)
+    val reasoning: Boolean = false, // gpt-5 / o-series: strip temperature + map max_tokens → max_completion_tokens
 )
 
 /** Parse-lite extraction from a (non-stream) upstream body — enough for settlement, no full parse. */

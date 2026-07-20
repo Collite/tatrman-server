@@ -44,7 +44,7 @@ class PassthroughHandler(
         key: Key,
     ): ProviderResult {
         // model → upstream, model_tags stripped, everything else byte-faithful (B-T2 + LG-D1)
-        val upstreamBody = req.withModel(target.upstream).toUpstreamJson()
+        val upstreamBody = reasoningAware(req.withModel(target.upstream).toUpstreamJson(), target)
         return call(target, key, path = "chat/completions", body = upstreamBody)
     }
 
@@ -55,7 +55,7 @@ class PassthroughHandler(
     ): Flow<SseFrame> =
         channelFlow {
             // stream:true stays in the body; model → upstream, model_tags stripped (B-T2 + LG-D1).
-            val upstreamBody = req.withModel(target.upstream).toUpstreamJson()
+            val upstreamBody = reasoningAware(req.withModel(target.upstream).toUpstreamJson(), target)
             client
                 .preparePost(target.baseUrl + UrlBuilder.path(target, "chat/completions")) {
                     header(target.authHeader, target.authScheme?.let { "$it ${key.value}" } ?: key.value)
@@ -98,6 +98,26 @@ class PassthroughHandler(
     ): ProviderResult {
         val upstreamBody = JsonObject(rawBody.toMutableMap().apply { put("model", JsonPrimitive(target.upstream)) })
         return call(target, key, path = "embeddings", body = upstreamBody)
+    }
+
+    /**
+     * Reasoning models (gpt-5 / o-series, `catalog.reasoning: true`) reject the sampling + legacy-token
+     * params deterministic callers send: `temperature` (only the default 1 is allowed — a `0.0` 400s),
+     * `top_p`, and `max_tokens` (must be `max_completion_tokens` — a `max_tokens` 400s). Normalize the
+     * outbound body for those models so every caller (golem/themis/pythia) works unchanged; no-op
+     * otherwise (byte-faithful passthrough preserved for normal models).
+     */
+    private fun reasoningAware(
+        body: JsonObject,
+        target: UpstreamTarget,
+    ): JsonObject {
+        if (!target.reasoning) return body
+        val m = body.toMutableMap()
+        m.remove("temperature")
+        m.remove("top_p")
+        val maxTokens = m.remove("max_tokens")
+        if (maxTokens != null && "max_completion_tokens" !in m) m["max_completion_tokens"] = maxTokens
+        return JsonObject(m)
     }
 
     private suspend fun call(

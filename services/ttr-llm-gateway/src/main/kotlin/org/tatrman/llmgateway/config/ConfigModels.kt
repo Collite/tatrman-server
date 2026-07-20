@@ -30,6 +30,9 @@ data class CatalogModel(
     val cacheTtlSeconds: Long = 0, // 0 = uncacheable
     val fallback: List<String> = emptyList(), // ordered chain of catalog ids (C-4)
     val dimensions: Map<String, String> = emptyMap(), // reserved: tier / task_kind (GI-3)
+    val reasoning: Boolean = false, // reasoning model (gpt-5 / o-series): the OpenAI-wire handler strips
+    // `temperature` (only the default 1 is supported) and maps `max_tokens` -> `max_completion_tokens`.
+    // Env-driven via catalog `${AZURE_OPENAI_REASONING:-false}` so it tracks the deployment per cluster.
 ) {
     val isChat: Boolean get() = type == "chat"
     val isEmbedding: Boolean get() = type == "embedding"

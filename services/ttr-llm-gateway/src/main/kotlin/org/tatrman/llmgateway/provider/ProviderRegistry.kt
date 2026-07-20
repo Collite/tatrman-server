@@ -93,6 +93,7 @@ class ProviderRegistry private constructor(
                             authScheme = p.auth.scheme,
                             providerVersion = p.version,
                             defaultMaxTokens = p.defaultMaxTokens,
+                            reasoning = m.reasoning,
                         )
                     val handler = if (p.kind == "anthropic") anthropic else passthrough
                     val errorConverter =
