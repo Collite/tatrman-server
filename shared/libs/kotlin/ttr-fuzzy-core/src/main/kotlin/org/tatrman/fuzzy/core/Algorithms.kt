@@ -116,12 +116,19 @@ class JaroWinklerAlgorithm : MatchingAlgorithm {
 // }
 
 object AlgorithmFactory {
+    // FZ-P1 T5 — the stateless char-distance algorithms are singletons (each wraps a stateless
+    // debatty impl), so the standard-algorithm path no longer allocates one per request.
+    // TATRMAN stays per-call: TokenBasedAlgorithm is stateful (setCandidates/updateConfig).
+    private val levenshtein = LevenshteinAlgorithm()
+    private val damerau = DamerauLevenshteinAlgorithm()
+    private val jaroWinkler = JaroWinklerAlgorithm()
+
     fun get(type: AlgorithmType): MatchingAlgorithm =
         when (type) {
-            AlgorithmType.LEVENSHTEIN -> LevenshteinAlgorithm()
-            AlgorithmType.DAMERAU_LEVENSHTEIN -> DamerauLevenshteinAlgorithm()
-            AlgorithmType.JARO_WINKLER -> JaroWinklerAlgorithm()
-            AlgorithmType.HAMMING -> JaroWinklerAlgorithm()
+            AlgorithmType.LEVENSHTEIN -> levenshtein
+            AlgorithmType.DAMERAU_LEVENSHTEIN -> damerau
+            AlgorithmType.JARO_WINKLER -> jaroWinkler
+            AlgorithmType.HAMMING -> jaroWinkler
             AlgorithmType.TATRMAN -> TokenBasedAlgorithm()
         }
 }

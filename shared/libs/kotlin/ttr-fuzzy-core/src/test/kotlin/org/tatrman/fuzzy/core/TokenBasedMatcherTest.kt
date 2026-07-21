@@ -193,15 +193,33 @@ class DistanceCacheTest :
             cache.size() shouldBe 2
         }
 
-        "should be case insensitive" {
+        // FZ-P1 T3 — the cache no longer folds case; callers MUST pass already-folded tokens
+        // (which every production caller does). Distinct-case inputs are therefore distinct keys.
+        "keys tokens verbatim (callers fold; no case-folding in the cache)" {
             val cache = DistanceCache()
 
             val distance1 = cache.getOrCompute("Hello", "hello") { 0.0 }
-            val distance2 = cache.getOrCompute("HELLO", "hello") { 0.0 }
+            val distance2 = cache.getOrCompute("HELLO", "hello") { 3.0 }
 
             distance1 shouldBe 0.0
-            distance2 shouldBe 0.0
-            cache.size() shouldBe 1
+            distance2 shouldBe 3.0
+            cache.size() shouldBe 2
+        }
+
+        // FZ-P1 T3 — a full cache stops storing (compute-without-store) instead of wiping wholesale,
+        // so entries already cached are never lost on the hot path.
+        "when full, keeps computing without evicting existing entries" {
+            val cache = DistanceCache(maxSize = 2)
+
+            cache.getOrCompute("a", "b") { 1.0 }
+            cache.getOrCompute("c", "d") { 2.0 }
+            // Cache is full (2); a new pair is computed but not stored, and existing entries survive.
+            val fresh = cache.getOrCompute("e", "f") { 9.0 }
+
+            fresh shouldBe 9.0
+            cache.size() shouldBe 2
+            // The first pair is still memoised (no wholesale clear).
+            cache.getOrCompute("a", "b") { 99.0 } shouldBe 1.0
         }
     })
 

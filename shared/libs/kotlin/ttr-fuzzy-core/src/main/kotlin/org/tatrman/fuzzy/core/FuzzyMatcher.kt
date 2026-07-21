@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.fuzzy.core
 
-import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -55,12 +54,16 @@ fun cascadeFrom(
     }
 
 class FuzzyMatcher(
-    private val repository: StringRepository,
-    private val telemetry: FuzzyTelemetry? = null,
+    private val repository: MatchRepository,
     private val lemmatizer: Lemmatizer = NoopLemmatizer,
     // GH #69 — IDF token weighting for the TATRMAN (token-based) path. Defaulted
     // so existing call sites / tests are unaffected; wired from config in Application.
     private val idfEnabled: Boolean = true,
+    // FZ-P2 — retrieval path. Defaulted LEGACY so existing call sites / tests / goldens are
+    // byte-identical; Application wires it from `fuzzy.token-based.retrieval`. The retriever is the
+    // seam FZO plugs OpenSearch into; the in-memory default resolves against the interned vocabulary.
+    private val retrievalMode: RetrievalMode = RetrievalMode.LEGACY,
+    private val retriever: CandidateRetriever = IndexFirstRetriever(repository::getVocabulary),
 ) {
     suspend fun match(
         query: String,
@@ -180,17 +183,46 @@ class FuzzyMatcher(
         val lemmaMap = lemmatizer.lemmatize(rawQueryTokens)
         val queryLemmaTokens = rawQueryTokens.map { lemmaMap[it] ?: TextNormalizer.fold(it) }
 
-        val matcher =
-            TokenBasedMatcher(
-                candidates = candidates,
-                // Repository normalises the category key (case-insensitive lookup).
-                tokenIndex = repository.getTokenIndex(category),
-                distanceCache = repository.getDistanceCache(category),
-                idfEnabled = idfEnabled,
-            )
+        // Repository normalises the category key (case-insensitive lookup).
+        val tokenIndex = repository.getTokenIndex(category)
         val results =
             withContext(Dispatchers.Default) {
-                matcher.match(querySurfaceTokens, queryLemmaTokens, limit)
+                when (retrievalMode) {
+                    RetrievalMode.LEGACY -> {
+                        val matcher =
+                            TokenBasedMatcher(
+                                candidates = candidates,
+                                tokenIndex = tokenIndex,
+                                distanceCache = repository.getDistanceCache(category),
+                                idfEnabled = idfEnabled,
+                            )
+                        matcher.match(querySurfaceTokens, queryLemmaTokens, limit)
+                    }
+                    RetrievalMode.INDEX_FIRST -> {
+                        // Retrieve the topN candidates worth scoring against the interned vocabulary,
+                        // then exact-rescore them with the unchanged scorer. The retriever resolves
+                        // each query token once against the vocabulary and returns the best-first
+                        // candidates from a single snapshot (no ordinal escapes the retriever, so a
+                        // concurrent refresh cannot mis-map one). The rescore uses a throwaway
+                        // DistanceCache, so the shared category cache stays off this path.
+                        //
+                        // topN headroom: index-first legitimately reaches candidates legacy never
+                        // seeds (a fuzzy-resolved token pulls in rows with no exact overlap), so the
+                        // rescore set must be wide enough that legacy's true top-k are not crowded
+                        // out before the exact re-rank. 500 keeps the rescore cheap (µs-per-candidate)
+                        // while giving the parity-or-better gate ample margin.
+                        val topN = maxOf(500, limit * 4)
+                        val retrieved = retriever.retrieve(querySurfaceTokens, queryLemmaTokens, category, topN)
+                        val matcher =
+                            TokenBasedMatcher(
+                                candidates = retrieved,
+                                tokenIndex = tokenIndex,
+                                distanceCache = DistanceCache(),
+                                idfEnabled = idfEnabled,
+                            )
+                        matcher.rescore(querySurfaceTokens, queryLemmaTokens, retrieved, limit)
+                    }
+                }
             }
 
         return results.map { (candidate, score) ->
@@ -211,8 +243,9 @@ class FuzzyMatcher(
         return candidates
             .map { candidate ->
                 // Match on folded text so diacritic-only differences don't penalise the score,
-                // but return the candidate's original value to the caller.
-                val score = algorithm.similarity(foldedQuery, TextNormalizer.fold(candidate.value))
+                // but return the candidate's original value to the caller. FZ-P1 T5 — use the
+                // candidate's precomputed fold instead of folding per request.
+                val score = algorithm.similarity(foldedQuery, candidate.foldedValue)
                 candidate.toResult(score, category, method = (algorithmType ?: AlgorithmType.LEVENSHTEIN).name)
             }.sortedByDescending { it.score }
             .take(limit)

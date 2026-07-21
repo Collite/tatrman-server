@@ -63,6 +63,8 @@ include(":shared:libs:kotlin:ttr-text")
 include(":shared:libs:kotlin:ttr-diagnostics")
 // RG-P3 grounding kernel (workstream D) — consolidated PlanExpr/SqlRenderer/RecipeBuilder scaffolding.
 include(":shared:libs:kotlin:ttr-grounding-core")
+// FZ-P3 — the pure fuzzy engine, extracted so ai-platform consumes it instead of a copy.
+include(":shared:libs:kotlin:ttr-fuzzy-core")
 include(":shared:libs:kotlin:fuzzy-common")
 include(":shared:libs:kotlin:whois-common")
 include(":shared:libs:kotlin:keycloak-auth")

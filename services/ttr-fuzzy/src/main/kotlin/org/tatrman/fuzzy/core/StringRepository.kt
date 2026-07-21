@@ -11,104 +11,6 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * A matchable string. [tokens] are the folded-surface tokens (always present). [lemmaTokens] are
- * the folded *lemmas* of those tokens — populated by [StringRepository] when `infra/nlp`
- * lemmatisation is enabled, otherwise equal to [tokens] (so the lemma axis is a harmless no-op).
- * The matcher scores a query against both axes and keeps the better, so lemmatisation never
- * regresses a surface match (e.g. a diacritic-stripped exact phrase) while still letting inflected
- * queries land an exact lemma match.
- */
-data class Candidate(
-    val id: String,
-    val value: String,
-    val tokens: List<String> = emptyList(),
-    val tokenSet: Set<String> = emptySet(),
-    val lemmaTokens: List<String> = tokens,
-    val lemmaTokenSet: Set<String> = tokenSet,
-    // RG-P2 (contracts §2, RS-15): how the owning category was sourced. MEMBER
-    // (default) → `id` is a data PK; VOCABULARY → `targetRef` is the lexicon target.
-    val source: SourceTag = SourceTag.MEMBER,
-    val targetRef: String? = null,
-) {
-    /** Surface tokens ∪ lemma tokens — used to seed the candidate set for a query. */
-    val allTokenSet: Set<String> get() = tokenSet + lemmaTokenSet
-
-    companion object {
-        val WHITESPACE_REGEX = Regex("\\s+")
-
-        fun fromValues(
-            id: String,
-            value: String,
-        ): Candidate {
-            val tokens = tokenize(value)
-            val set = tokens.toSet()
-            return Candidate(
-                id = id,
-                value = value,
-                tokens = tokens,
-                tokenSet = set,
-                lemmaTokens = tokens,
-                lemmaTokenSet = set,
-            )
-        }
-
-        /** A declared-vocabulary candidate (contracts §2): carries the lexicon [targetRef]. */
-        fun vocabulary(
-            id: String,
-            value: String,
-            targetRef: String,
-        ): Candidate {
-            val tokens = tokenize(value)
-            val set = tokens.toSet()
-            return Candidate(
-                id = id,
-                value = value,
-                tokens = tokens,
-                tokenSet = set,
-                lemmaTokens = tokens,
-                lemmaTokenSet = set,
-                source = SourceTag.VOCABULARY,
-                targetRef = targetRef,
-            )
-        }
-
-        /** Builds a candidate with explicit (folded) lemma tokens — used by [StringRepository.lemmatiseCandidates].
-         *  Preserves the source dimension (MEMBER/VOCABULARY + targetRef) of the original. */
-        fun withLemmas(
-            id: String,
-            value: String,
-            surfaceTokens: List<String>,
-            lemmaTokens: List<String>,
-            source: SourceTag = SourceTag.MEMBER,
-            targetRef: String? = null,
-        ): Candidate =
-            Candidate(
-                id = id,
-                value = value,
-                tokens = surfaceTokens,
-                tokenSet = surfaceTokens.toSet(),
-                lemmaTokens = lemmaTokens,
-                lemmaTokenSet = lemmaTokens.toSet(),
-                source = source,
-                targetRef = targetRef,
-            )
-
-        /** Tokens used for matching: lower-cased, NFD-folded, whitespace-split. */
-        fun tokenize(input: String): List<String> = tokenizeRaw(input).map { TextNormalizer.fold(it) }
-
-        /** Lower-cased, whitespace-split — but **not** NFD-folded. Used as the input to lemmatisation
-         *  so the lemmatiser (MorphoDiTa via `infra/nlp`) sees properly-accented Czech; the lemmas it
-         *  returns are folded afterwards. With no lemmatiser this collapses back to [tokenize]. */
-        fun tokenizeRaw(input: String): List<String> =
-            input
-                .lowercase()
-                .split(WHITESPACE_REGEX)
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-    }
-}
-
 /** Per-category discovery + staleness for `GetStatus` (contracts §2). */
 data class CategoryStatusInfo(
     val category: String,
@@ -132,16 +34,20 @@ class StringRepository(
     // RG-P2.S2: declared vocabulary (lexicon terms + valueLabels) — VOCABULARY
     // categories merged alongside the member data. Null = member data only.
     private val snapshotSource: SnapshotVocabularySource? = null,
-) {
+) : MatchRepository {
     private val logger = LoggerFactory.getLogger(StringRepository::class.java)
 
     private companion object {
         /** Returned for an explicit category that has no index, so the matcher yields no candidates. */
         val EMPTY_TOKEN_INDEX = TokenIndex(emptyList())
+
+        /** FZ-P2 — vocabulary counterpart of [EMPTY_TOKEN_INDEX] for the explicit-unknown case. */
+        val EMPTY_VOCABULARY = TokenVocabulary(emptyList())
     }
 
     private val cache = ConcurrentHashMap<String, List<Candidate>>()
     private val categoryTokenIndices = ConcurrentHashMap<String, TokenIndex>()
+    private val categoryVocabularies = ConcurrentHashMap<String, TokenVocabulary>()
     private val categoryDistanceCaches = ConcurrentHashMap<String, DistanceCache>()
     private val isRunning = AtomicBoolean(false)
     private val isCatalogReady = AtomicBoolean(false)
@@ -151,7 +57,16 @@ class StringRepository(
     private var globalTokenIndex: TokenIndex = TokenIndex(emptyList())
 
     @Volatile
+    private var globalVocabulary: TokenVocabulary = TokenVocabulary(emptyList())
+
+    @Volatile
     private var globalDistanceCache: DistanceCache = DistanceCache()
+
+    // FZ-P1 T4 — the flattened cross-category candidate list, precomputed at refresh instead of
+    // re-flattening `cache.values` on every `getCandidates(null)` call. Same contents/order as the
+    // per-request flatten (both iterate `cache.values`), so cross-category results are unchanged.
+    @Volatile
+    private var allCandidates: List<Candidate> = emptyList()
 
     // RG-P2.S2: the vocabulary version echoed on every response + in GetStatus
     // (S-1). Content hash of {category → size} + the member load stamp; the
@@ -240,7 +155,7 @@ class StringRepository(
     }
 
     /** The vocabulary version (S-1): content signature + load stamp. */
-    fun vocabularyVersion(): String = version
+    override fun vocabularyVersion(): String = version
 
     /** Per-category discovery + staleness for `GetStatus` (contracts §2). */
     fun categoryStatuses(): List<CategoryStatusInfo> =
@@ -314,6 +229,8 @@ class StringRepository(
         cache.forEach { (category, candidates) ->
             logger.debug("Building token index for category '$category' with ${candidates.size} candidates...")
             categoryTokenIndices[category] = TokenIndex(candidates)
+            // FZ-P2 — interned vocabulary alongside the legacy index (index-first retrieval path).
+            categoryVocabularies[category] = TokenVocabulary(candidates)
             // We can optionally reuse distance cache if we want to keep it across refreshes,
             // but the original behavior was to reset it.
             categoryDistanceCaches[category] = DistanceCache()
@@ -321,11 +238,14 @@ class StringRepository(
 
         // Cleanup categories no longer in cache
         categoryTokenIndices.keys.removeIf { !cache.containsKey(it) }
+        categoryVocabularies.keys.removeIf { !cache.containsKey(it) }
         categoryDistanceCaches.keys.removeIf { !cache.containsKey(it) }
 
-        val allCandidates = cache.values.flatten()
-        logger.info("Rebuilding global token index for ${allCandidates.size} candidates...")
-        globalTokenIndex = TokenIndex(allCandidates)
+        val flattened = cache.values.flatten()
+        allCandidates = flattened
+        logger.info("Rebuilding global token index for ${flattened.size} candidates...")
+        globalTokenIndex = TokenIndex(flattened)
+        globalVocabulary = TokenVocabulary(flattened)
         globalDistanceCache = DistanceCache()
         logger.info(
             "Indices rebuilt for ${cache.size} categories and global index with ${globalTokenIndex.getAllCandidateIds().size} candidates",
@@ -338,14 +258,15 @@ class StringRepository(
     // and read (here) so lookups are case-insensitive. DB-identifier categories
     // arrive upper-cased (e.g. "db.dbo.QSTRED_DF.KOD_STR"); without this the
     // per-column index was missed and lookups leaked other columns' values.
-    fun getCandidates(category: String?): List<Candidate> =
+    override fun getCandidates(category: String?): List<Candidate> =
         if (category != null) {
             cache[category.lowercase()] ?: emptyList()
         } else {
-            cache.values.flatten()
+            // FZ-P1 T4 — precomputed at refresh (see [allCandidates]); no per-request flatten.
+            allCandidates
         }
 
-    fun getTokenIndex(category: String? = null): TokenIndex =
+    override fun getTokenIndex(category: String?): TokenIndex =
         if (category != null) {
             // An explicit-but-unknown category must NOT silently fall back to
             // the global index — that returns every other column's candidates
@@ -357,7 +278,20 @@ class StringRepository(
             globalTokenIndex
         }
 
-    fun getDistanceCache(category: String? = null): DistanceCache =
+    override fun getVocabulary(category: String?): TokenVocabulary =
+        if (category != null) {
+            // Same discipline as getTokenIndex: an explicit-but-unknown category must NOT fall back
+            // to the global vocabulary — that would score every other column's candidates and is
+            // exactly how a case-mismatched key served the wrong column. Empty-on-miss; the global
+            // vocabulary is only for the deliberate null (cross-category) lookup.
+            categoryVocabularies[category.lowercase()] ?: EMPTY_VOCABULARY
+        } else {
+            globalVocabulary
+        }
+
+    // FZ-P2 — consumed only by the `legacy` retrieval path (index-first rescores with a throwaway
+    // cache). See [DistanceCache].
+    override fun getDistanceCache(category: String?): DistanceCache =
         if (category != null) {
             categoryDistanceCaches[category.lowercase()] ?: globalDistanceCache
         } else {

@@ -13,6 +13,12 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+    // Forward the FZ perf-harness switches to the forked test JVM (Gradle does not propagate
+    // -D system properties across the fork by default): -DregenGoldens=true rewrites the parity
+    // goldens (GoldenCaptureTest), -DincludePerf=true enables the opt-in BenchmarkSpec.
+    listOf("regenGoldens", "includePerf").forEach { key ->
+        System.getProperty(key)?.let { systemProperty(key, it) }
+    }
 }
 
 val osArch = System.getProperty("os.arch").lowercase()
@@ -73,6 +79,9 @@ dependencies {
     implementation(libs.typesafe.config)
 
     implementation(libs.java.string.similarity)
+    // FZ-P3 — the extracted pure fuzzy engine (org.tatrman.fuzzy.core.*). The service keeps
+    // StringRepository/loaders/api/telemetry and composes the engine over them.
+    implementation(project(":shared:libs:kotlin:ttr-fuzzy-core"))
     implementation(project(":shared:libs:kotlin:fuzzy-common"))
     // RG-P0.S3 — fold() now comes from the shared S-2 lib (was inline here).
     implementation(project(":shared:libs:kotlin:ttr-text"))

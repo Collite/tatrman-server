@@ -5,11 +5,13 @@ name: Publish server libraries (GH Packages)
 # staging registry). Tag-driven, mirroring tatrman's publish.yml.
 #
 # Tag → set:
-#   server-libs/v<x.y.z>   the 11-module library set (SV-P1 S2 T1 audit):
+#   server-libs/v<x.y.z>   the 13-module library set (SV-P1 S2 T1 audit; +2 at FZ-P3):
 #     ttr-server-proto · otel-config · logging-config · ktor-configurator ·
-#     db-common · data-formatter · fuzzy-common · whois-common · keycloak-auth ·
-#     ttr-meta-client · ttr-llm-client
+#     db-common · data-formatter · ttr-fuzzy-core · ttr-text · fuzzy-common ·
+#     whois-common · keycloak-auth · ttr-meta-client · ttr-llm-client
 #   (capabilities-client trimmed — no external consumer; see build.gradle.kts.)
+#   FZ-P3 added ttr-fuzzy-core (the extracted fuzzy engine, consumed by ai-platform)
+#   and ttr-text (its S-2 fold dependency — the RG-P0.S3 cross-repo consumer landed).
 #
 # Version comes from the tag via -Ptatrman-server.version (the build reads that
 # gradle property, NOT -Pversion). RO-24: never re-cut an existing version.
