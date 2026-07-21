@@ -34,6 +34,13 @@ data class Candidate(
     /** Surface tokens ∪ lemma tokens — used to seed the candidate set for a query. */
     val allTokenSet: Set<String> get() = tokenSet + lemmaTokenSet
 
+    /**
+     * FZ-P1 T5 — the folded value, computed once at construction (the standard-algorithm cascade
+     * folded [value] on every request before this). A body `val` ⇒ it is NOT part of the data
+     * class's generated equals/hashCode/copy/componentN, so equality is unchanged.
+     */
+    val foldedValue: String = TextNormalizer.fold(value)
+
     companion object {
         val WHITESPACE_REGEX = Regex("\\s+")
 
@@ -152,6 +159,12 @@ class StringRepository(
 
     @Volatile
     private var globalDistanceCache: DistanceCache = DistanceCache()
+
+    // FZ-P1 T4 — the flattened cross-category candidate list, precomputed at refresh instead of
+    // re-flattening `cache.values` on every `getCandidates(null)` call. Same contents/order as the
+    // per-request flatten (both iterate `cache.values`), so cross-category results are unchanged.
+    @Volatile
+    private var allCandidates: List<Candidate> = emptyList()
 
     // RG-P2.S2: the vocabulary version echoed on every response + in GetStatus
     // (S-1). Content hash of {category → size} + the member load stamp; the
@@ -323,9 +336,10 @@ class StringRepository(
         categoryTokenIndices.keys.removeIf { !cache.containsKey(it) }
         categoryDistanceCaches.keys.removeIf { !cache.containsKey(it) }
 
-        val allCandidates = cache.values.flatten()
-        logger.info("Rebuilding global token index for ${allCandidates.size} candidates...")
-        globalTokenIndex = TokenIndex(allCandidates)
+        val flattened = cache.values.flatten()
+        allCandidates = flattened
+        logger.info("Rebuilding global token index for ${flattened.size} candidates...")
+        globalTokenIndex = TokenIndex(flattened)
         globalDistanceCache = DistanceCache()
         logger.info(
             "Indices rebuilt for ${cache.size} categories and global index with ${globalTokenIndex.getAllCandidateIds().size} candidates",
@@ -342,7 +356,8 @@ class StringRepository(
         if (category != null) {
             cache[category.lowercase()] ?: emptyList()
         } else {
-            cache.values.flatten()
+            // FZ-P1 T4 — precomputed at refresh (see [allCandidates]); no per-request flatten.
+            allCandidates
         }
 
     fun getTokenIndex(category: String? = null): TokenIndex =

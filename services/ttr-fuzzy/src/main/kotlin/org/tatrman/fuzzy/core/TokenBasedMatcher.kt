@@ -20,6 +20,16 @@ class TokenBasedMatcher(
     private val logger = LoggerFactory.getLogger(TokenBasedMatcher::class.java)
     private val levenshtein = Levenshtein()
 
+    /**
+     * FZ-P1 T6 — Levenshtein with an early-exit cutoff at `max(len)`. The true distance never
+     * exceeds `max(len1, len2)`, so this cutoff never truncates a result — it is score-invariant —
+     * while letting debatty's bounded implementation abandon rows that already exceed the cap.
+     */
+    private fun boundedDistance(
+        a: String,
+        b: String,
+    ): Double = levenshtein.distance(a, b, maxOf(a.length, b.length))
+
     fun match(
         query: String,
         limit: Int,
@@ -61,12 +71,30 @@ class TokenBasedMatcher(
         }
 
         val seedCandidates = seedIds.mapNotNull { index?.getCandidateById(it) }
-        val seedResults = scoreAndSort(querySurfaceTokens, queryLemmaTokens, seedCandidates)
         // Defensively also fuzzy-score a few candidates with no token overlap, in case one is a closer fuzzy match.
-        val extraResults =
-            scoreAndSort(querySurfaceTokens, queryLemmaTokens, candidates.filter { it.id !in seedIds }.take(limit))
+        // FZ-P1 T4 — lazy: take only `limit` non-seed candidates instead of eagerly allocating a
+        // near-full copy of the candidate list per request (byte-identical: same first `limit`
+        // non-seed candidates in list order).
+        val extras =
+            candidates
+                .asSequence()
+                .filter { it.id !in seedIds }
+                .take(limit)
+                .toList()
 
-        return (seedResults + extraResults).sortedByDescending { it.second }.take(limit)
+        // FZ-P1 T7 — select the top-`limit` with a SINGLE stable sort over seeds ++ extras. The
+        // legacy path stable-sorted the seeds, concatenated the extras, then stable-sorted again;
+        // for a stable sort keyed on score, sort(sort(seeds) ++ extras) == sort(seeds ++ extras),
+        // so dropping the redundant seed pre-sort is byte-identical (ties keep seed-iteration order)
+        // while removing one ~seed-sized sort per request.
+        val scored = ArrayList<Pair<Candidate, Double>>(seedCandidates.size + extras.size)
+        for (candidate in seedCandidates) {
+            scored.add(candidate to scoreCandidate(querySurfaceTokens, queryLemmaTokens, candidate))
+        }
+        for (candidate in extras) {
+            scored.add(candidate to scoreCandidate(querySurfaceTokens, queryLemmaTokens, candidate))
+        }
+        return scored.sortedByDescending { it.second }.take(limit)
     }
 
     /** Score a candidate on both axes (surface and lemma) and keep the better. */
@@ -75,28 +103,34 @@ class TokenBasedMatcher(
         queryLemmaTokens: List<String>,
         candidate: Candidate,
     ): Double {
-        val surfaceScore = axisScore(querySurfaceTokens, candidate.tokens)
+        val surfaceScore = axisScore(querySurfaceTokens, candidate.tokens, candidate.tokenSet)
         // Skip the lemma axis when it's identical to the surface axis (no lemmatiser) — cheap shortcut.
         val lemmaIdentical = queryLemmaTokens == querySurfaceTokens && candidate.lemmaTokens == candidate.tokens
         val lemmaScore =
-            if (lemmaIdentical) 0.0 else axisScore(queryLemmaTokens, candidate.lemmaTokens)
+            if (lemmaIdentical) 0.0 else axisScore(queryLemmaTokens, candidate.lemmaTokens, candidate.lemmaTokenSet)
         return maxOf(surfaceScore, lemmaScore)
     }
 
     /**
      * Score one axis (surface OR lemma) of a query against a candidate. Uses the
      * IDF-weighted aggregation when enabled and a corpus is available; otherwise
-     * the legacy char-overlap score. Empty token lists score 0.
+     * the legacy char-overlap score. Empty token lists score 0. [candidateTokenSet]
+     * is the axis's token set, used for the O(1) exact-hit short-circuit (FZ-P1 T2).
      */
     private fun axisScore(
         queryTokens: List<String>,
         candidateTokens: List<String>,
+        candidateTokenSet: Set<String>,
     ): Double {
         if (queryTokens.isEmpty() || candidateTokens.isEmpty()) return 0.0
         return if (idfEnabled && tokenIndex != null) {
-            idfWeightedScore(queryTokens, candidateTokens)
+            idfWeightedScore(queryTokens, candidateTokens, candidateTokenSet)
         } else {
-            calculateScore(queryTokens, candidateTokens, calculateSetDistance(queryTokens, candidateTokens))
+            calculateScore(
+                queryTokens,
+                candidateTokens,
+                calculateSetDistance(queryTokens, candidateTokens, candidateTokenSet),
+            )
         }
     }
 
@@ -111,22 +145,34 @@ class TokenBasedMatcher(
     private fun idfWeightedScore(
         queryTokens: List<String>,
         candidateTokens: List<String>,
+        candidateTokenSet: Set<String>,
     ): Double {
         var weightedSum = 0.0
         var weightTotal = 0.0
         for (queryToken in queryTokens) {
-            var bestDistance = Double.MAX_VALUE
-            var bestToken: String? = null
-            for (candidateToken in candidateTokens) {
-                val distance =
-                    distanceCache.getOrCompute(queryToken, candidateToken) {
-                        levenshtein.distance(queryToken, candidateToken)
+            var bestDistance: Double
+            var bestToken: String?
+            // FZ-P1 T2 — exact-token short-circuit. When the query token is present in the
+            // candidate's token set the nearest token is itself (distance 0, quality 1.0) and its IDF
+            // weight is idf(queryToken); the legacy loop reaches the identical (bestToken=queryToken,
+            // bestDistance=0) state, so this is byte-identical while skipping the Levenshtein scan.
+            if (queryToken in candidateTokenSet) {
+                bestDistance = 0.0
+                bestToken = queryToken
+            } else {
+                bestDistance = Double.MAX_VALUE
+                bestToken = null
+                for (candidateToken in candidateTokens) {
+                    val distance =
+                        distanceCache.getOrCompute(queryToken, candidateToken) {
+                            boundedDistance(queryToken, candidateToken)
+                        }
+                    if (distance < bestDistance) {
+                        bestDistance = distance
+                        bestToken = candidateToken
                     }
-                if (distance < bestDistance) {
-                    bestDistance = distance
-                    bestToken = candidateToken
+                    if (distance == 0.0) break
                 }
-                if (distance == 0.0) break
             }
             val matched = bestToken ?: continue
             val maxLen = maxOf(queryToken.length, matched.length).coerceAtLeast(1).toDouble()
@@ -168,23 +214,31 @@ class TokenBasedMatcher(
         val tokens2 = Candidate.tokenize(s2)
         if (tokens1.isEmpty() || tokens2.isEmpty()) return 0.0
 
-        val distance = calculateSetDistance(tokens1, tokens2)
+        val distance = calculateSetDistance(tokens1, tokens2, tokens2.toSet())
         return calculateScore(tokens1, tokens2, distance)
     }
 
     private fun calculateSetDistance(
         queryTokens: List<String>,
         candidateTokens: List<String>,
+        candidateTokenSet: Set<String>,
     ): Double {
         var totalDistance = 0.0
 
         for (queryToken in queryTokens) {
             var bestDistance = Double.MAX_VALUE
 
+            // FZ-P1 T2 — exact-token short-circuit (byte-identical: the loop would find distance 0
+            // and break with bestDistance 0.0 anyway).
+            if (queryToken in candidateTokenSet) {
+                totalDistance += 0.0
+                continue
+            }
+
             for (candidateToken in candidateTokens) {
                 val distance =
                     distanceCache.getOrCompute(queryToken, candidateToken) {
-                        levenshtein.distance(queryToken, candidateToken)
+                        boundedDistance(queryToken, candidateToken)
                     }
 
                 if (distance == 0.0) {
@@ -229,27 +283,18 @@ class TokenBasedMatcher(
     ): Double {
         var correctPairs = 0
 
-        val queryLower = queryTokens.map { it.lowercase() }
-        val candidateLower = candidateTokens.map { it.lowercase() }
-
-        // Optimization: Map tokens to their FIRST position in candidate
-        val candidatePositions = mutableMapOf<String, Int>()
-        candidateLower.forEachIndexed { index, token ->
-            candidatePositions.putIfAbsent(token, index)
-        }
-
-        for (i in queryLower.indices) {
-            for (j in queryLower.indices) {
-                if (i < j) {
-                    val qi = queryLower[i]
-                    val qj = queryLower[j]
-
-                    val ci = candidatePositions[qi]
-                    val cj = candidatePositions[qj]
-
-                    if (ci != null && cj != null && ci < cj) {
-                        correctPairs++
-                    }
+        // FZ-P1 — count in-order query-token pairs allocation-free. The legacy path built a
+        // HashMap<token,firstPos> per candidate (a HashMap + entry nodes for EVERY scored candidate);
+        // `List.indexOf` returns the SAME first position, so this is byte-identical while removing
+        // the dominant per-seed allocation. Tokens are already folded by `tokenize`, so the old
+        // per-call `.lowercase()` copies were pure waste too.
+        for (i in queryTokens.indices) {
+            val ci = candidateTokens.indexOf(queryTokens[i])
+            if (ci < 0) continue
+            for (j in i + 1 until queryTokens.size) {
+                val cj = candidateTokens.indexOf(queryTokens[j])
+                if (cj > ci) {
+                    correctPairs++
                 }
             }
         }

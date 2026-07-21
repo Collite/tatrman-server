@@ -29,8 +29,12 @@ class TokenIndex(
     // defensive default.)
     private val idfForAbsent: Double = ln(documentCount + 1.0) + 1.0
 
-    /** IDF weight for [token] in this category — see [idfByToken]. */
-    fun idf(token: String): Double = idfByToken[token.lowercase()] ?: idfForAbsent
+    /**
+     * IDF weight for [token] in this category — see [idfByToken]. FZ-P1: [token] MUST be already
+     * folded (as every matcher call site passes it); the index keys are folded, so the former
+     * per-lookup `.lowercase()` was a redundant allocation on the hot scoring path.
+     */
+    fun idf(token: String): Double = idfByToken[token] ?: idfForAbsent
 
     private fun buildExactIndex(): Map<String, List<String>> {
         val index = mutableMapOf<String, MutableList<String>>()

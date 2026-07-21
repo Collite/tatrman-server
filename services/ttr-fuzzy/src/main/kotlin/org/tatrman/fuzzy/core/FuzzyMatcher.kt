@@ -211,8 +211,9 @@ class FuzzyMatcher(
         return candidates
             .map { candidate ->
                 // Match on folded text so diacritic-only differences don't penalise the score,
-                // but return the candidate's original value to the caller.
-                val score = algorithm.similarity(foldedQuery, TextNormalizer.fold(candidate.value))
+                // but return the candidate's original value to the caller. FZ-P1 T5 — use the
+                // candidate's precomputed fold instead of folding per request.
+                val score = algorithm.similarity(foldedQuery, candidate.foldedValue)
                 candidate.toResult(score, category, method = (algorithmType ?: AlgorithmType.LEVENSHTEIN).name)
             }.sortedByDescending { it.score }
             .take(limit)
