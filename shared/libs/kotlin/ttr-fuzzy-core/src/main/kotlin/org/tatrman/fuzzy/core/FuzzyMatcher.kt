@@ -199,19 +199,20 @@ class FuzzyMatcher(
                         matcher.match(querySurfaceTokens, queryLemmaTokens, limit)
                     }
                     RetrievalMode.INDEX_FIRST -> {
-                        // Retrieve topN candidate ordinals against the interned vocabulary, then
-                        // exact-rescore them with the unchanged scorer. topN = max(200, limit*4)
-                        // keeps the true top-k comfortably inside the rescored set. The rescore uses
-                        // a throwaway DistanceCache, so the shared category cache stays off this path.
-                        val vocab = repository.getVocabulary(category)
+                        // Retrieve the topN candidates worth scoring against the interned vocabulary,
+                        // then exact-rescore them with the unchanged scorer. The retriever resolves
+                        // each query token once against the vocabulary and returns the best-first
+                        // candidates from a single snapshot (no ordinal escapes the retriever, so a
+                        // concurrent refresh cannot mis-map one). The rescore uses a throwaway
+                        // DistanceCache, so the shared category cache stays off this path.
+                        //
                         // topN headroom: index-first legitimately reaches candidates legacy never
                         // seeds (a fuzzy-resolved token pulls in rows with no exact overlap), so the
                         // rescore set must be wide enough that legacy's true top-k are not crowded
                         // out before the exact re-rank. 500 keeps the rescore cheap (µs-per-candidate)
                         // while giving the parity-or-better gate ample margin.
                         val topN = maxOf(500, limit * 4)
-                        val ordinals = retriever.retrieve(querySurfaceTokens, queryLemmaTokens, category, topN)
-                        val retrieved = ordinals.map { vocab.candidates[it] }
+                        val retrieved = retriever.retrieve(querySurfaceTokens, queryLemmaTokens, category, topN)
                         val matcher =
                             TokenBasedMatcher(
                                 candidates = retrieved,

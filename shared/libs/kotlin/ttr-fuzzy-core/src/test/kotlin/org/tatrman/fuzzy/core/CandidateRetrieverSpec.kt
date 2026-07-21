@@ -22,13 +22,15 @@ class CandidateRetrieverSpec :
         val retriever =
             IndexFirstRetriever { cat -> if (cat == "db.nope.missing") TokenVocabulary(emptyList()) else vocab }
 
+        // The seam returns Candidates best-first; these fixtures give each candidate an id equal to
+        // its ordinal, so mapping back to the ordinal keeps the ranking assertions readable.
         fun ret(
             q: String,
             topN: Int = 10,
             cat: String? = null,
         ): List<Int> {
             val tokens = Candidate.tokenize(q)
-            return retriever.retrieve(tokens, tokens, cat, topN).toList()
+            return retriever.retrieve(tokens, tokens, cat, topN).map { it.id.toInt() }
         }
 
         "(a) exact-subset query ranks the both-token candidate first" {

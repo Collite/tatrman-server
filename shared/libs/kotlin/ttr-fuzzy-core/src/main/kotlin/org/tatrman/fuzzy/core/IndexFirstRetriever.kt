@@ -27,9 +27,13 @@ class IndexFirstRetriever(
         queryLemmaTokens: List<String>,
         category: String?,
         topN: Int,
-    ): IntArray {
+    ): List<Candidate> {
+        // Fetch the vocabulary snapshot ONCE. All ordinals below index into `vocab.candidates`, and
+        // they are dereferenced against this same instance before returning — never a re-fetched one
+        // — so a concurrent refresh (which swaps the vocabulary + its candidate list atomically)
+        // cannot make an ordinal point at the wrong candidate or run off the end of the list.
         val vocab = vocabularyFor(category)
-        if (vocab.size == 0 || topN <= 0) return IntArray(0)
+        if (vocab.size == 0 || topN <= 0) return emptyList()
         val resolver = VocabularyResolver(vocab)
 
         val surfaceScores = accumulate(querySurfaceTokens, vocab, resolver)
@@ -41,9 +45,9 @@ class IndexFirstRetriever(
                 val lemmaScores = accumulate(queryLemmaTokens, vocab, resolver)
                 maxMerge(surfaceScores, lemmaScores)
             }
-        if (combined.isEmpty()) return IntArray(0)
+        if (combined.isEmpty()) return emptyList()
 
-        return topOrdinals(combined, topN)
+        return topOrdinals(combined, topN).map { vocab.candidates[it] }
     }
 
     /**
