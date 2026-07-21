@@ -13,6 +13,12 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+    // Forward the FZ perf-harness switches to the forked test JVM (Gradle does not propagate
+    // -D system properties across the fork by default): -DregenGoldens=true rewrites the parity
+    // goldens (GoldenCaptureTest), -DincludePerf=true enables the opt-in BenchmarkSpec.
+    listOf("regenGoldens", "includePerf").forEach { key ->
+        System.getProperty(key)?.let { systemProperty(key, it) }
+    }
 }
 
 val osArch = System.getProperty("os.arch").lowercase()
