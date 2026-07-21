@@ -153,7 +153,14 @@ fun Application.module(serverConfig: KtorServerConfig) {
 
     val repository = StringRepository(config, loaderSource, telemetry, lemmatizer)
     val fuzzyMatcher =
-        FuzzyMatcher(repository, telemetry, lemmatizer, idfEnabled = config.tokenBasedConfig.idfEnabled)
+        FuzzyMatcher(
+            repository,
+            telemetry,
+            lemmatizer,
+            idfEnabled = config.tokenBasedConfig.idfEnabled,
+            retrievalMode = config.tokenBasedConfig.retrieval,
+        )
+    log.info("Fuzzy retrieval mode: ${config.tokenBasedConfig.retrieval}")
     val grpcService = GrpcService(fuzzyMatcher, repository, telemetry)
 
     // Tolerate clients' keepalive (30s pings, incl. idle) instead of GOAWAY too_many_pings.

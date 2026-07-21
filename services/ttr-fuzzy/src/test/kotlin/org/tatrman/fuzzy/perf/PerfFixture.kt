@@ -6,6 +6,7 @@ import org.tatrman.fuzzy.core.AlgorithmType
 import org.tatrman.fuzzy.core.Candidate
 import org.tatrman.fuzzy.core.FuzzyMatchResult
 import org.tatrman.fuzzy.core.FuzzyMatcher
+import org.tatrman.fuzzy.core.RetrievalMode
 import org.tatrman.fuzzy.core.StringRepository
 import org.tatrman.fuzzy.loader.StaticLoaderSource
 
@@ -91,7 +92,10 @@ class PerfFixture private constructor(
          * Builds a fixture over an explicit [corpus] using the real repository + matcher. Manual
          * refresh mode ⇒ [StringRepository.forceRefresh] is called once here; the caller [close]s it.
          */
-        suspend fun of(corpus: Map<String, List<Candidate>>): PerfFixture {
+        suspend fun of(
+            corpus: Map<String, List<Candidate>>,
+            retrievalMode: RetrievalMode = RetrievalMode.LEGACY,
+        ): PerfFixture {
             val cfg =
                 AppConfig(
                     serverPort = 0,
@@ -102,10 +106,11 @@ class PerfFixture private constructor(
                 )
             val repo = StringRepository(cfg, StaticLoaderSource(corpus), telemetry = null)
             repo.forceRefresh()
-            return PerfFixture(repo, FuzzyMatcher(repo))
+            return PerfFixture(repo, FuzzyMatcher(repo, retrievalMode = retrievalMode))
         }
 
-        /** Convenience: a fixture over the parity corpus. */
-        suspend fun parity(): PerfFixture = of(parityCorpus())
+        /** Convenience: a fixture over the parity corpus (LEGACY by default; pass INDEX_FIRST for the gate). */
+        suspend fun parity(retrievalMode: RetrievalMode = RetrievalMode.LEGACY): PerfFixture =
+            of(parityCorpus(), retrievalMode)
     }
 }

@@ -74,6 +74,9 @@ data class TokenBasedConfig(
     val orderBonusMultiplier: Double = 1.05,
     val maxOrderBonus: Double = 1.5,
     val idfEnabled: Boolean = true,
+    // FZ-P2 — retrieval path selector (`fuzzy.token-based.retrieval`). Defaults LEGACY; flipped to
+    // INDEX_FIRST in application.conf at the FZ-P2 DoD.
+    val retrieval: org.tatrman.fuzzy.core.RetrievalMode = org.tatrman.fuzzy.core.RetrievalMode.LEGACY,
 )
 
 /**
@@ -172,6 +175,10 @@ object ConfigLoader {
                     } else {
                         true
                     },
+                retrieval =
+                    org.tatrman.fuzzy.core.RetrievalMode.fromString(
+                        if (tokenBasedConfig.hasPath("retrieval")) tokenBasedConfig.getString("retrieval") else null,
+                    ),
             )
         } catch (e: com.typesafe.config.ConfigException) {
             TokenBasedConfig()

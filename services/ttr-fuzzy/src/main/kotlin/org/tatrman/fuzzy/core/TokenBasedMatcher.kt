@@ -190,6 +190,20 @@ class TokenBasedMatcher(
         return baseScore * orderBonus
     }
 
+    /**
+     * FZ-P2 — exact-rescore an explicit candidate list (the index-first rescore step) with the
+     * UNCHANGED per-candidate scorer (surface+lemma axes, IDF aggregation, order bonus), returning
+     * the top [limit] by score (stable descending sort, ties keep input order). For the candidates a
+     * given query would also reach on the legacy path, this yields byte-identical scores — which is
+     * what makes `index-first` parity-or-better rather than different.
+     */
+    fun rescore(
+        querySurfaceTokens: List<String>,
+        queryLemmaTokens: List<String>,
+        candidates: List<Candidate>,
+        limit: Int,
+    ): List<Pair<Candidate, Double>> = scoreAndSort(querySurfaceTokens, queryLemmaTokens, candidates).take(limit)
+
     private fun scoreAndSort(
         querySurfaceTokens: List<String>,
         queryLemmaTokens: List<String>,

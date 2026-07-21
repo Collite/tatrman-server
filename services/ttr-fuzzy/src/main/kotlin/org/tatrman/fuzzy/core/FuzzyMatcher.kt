@@ -61,6 +61,11 @@ class FuzzyMatcher(
     // GH #69 — IDF token weighting for the TATRMAN (token-based) path. Defaulted
     // so existing call sites / tests are unaffected; wired from config in Application.
     private val idfEnabled: Boolean = true,
+    // FZ-P2 — retrieval path. Defaulted LEGACY so existing call sites / tests / goldens are
+    // byte-identical; Application wires it from `fuzzy.token-based.retrieval`. The retriever is the
+    // seam FZO plugs OpenSearch into; the in-memory default resolves against the interned vocabulary.
+    private val retrievalMode: RetrievalMode = RetrievalMode.LEGACY,
+    private val retriever: CandidateRetriever = IndexFirstRetriever(repository::getVocabulary),
 ) {
     suspend fun match(
         query: String,
@@ -180,17 +185,45 @@ class FuzzyMatcher(
         val lemmaMap = lemmatizer.lemmatize(rawQueryTokens)
         val queryLemmaTokens = rawQueryTokens.map { lemmaMap[it] ?: TextNormalizer.fold(it) }
 
-        val matcher =
-            TokenBasedMatcher(
-                candidates = candidates,
-                // Repository normalises the category key (case-insensitive lookup).
-                tokenIndex = repository.getTokenIndex(category),
-                distanceCache = repository.getDistanceCache(category),
-                idfEnabled = idfEnabled,
-            )
+        // Repository normalises the category key (case-insensitive lookup).
+        val tokenIndex = repository.getTokenIndex(category)
         val results =
             withContext(Dispatchers.Default) {
-                matcher.match(querySurfaceTokens, queryLemmaTokens, limit)
+                when (retrievalMode) {
+                    RetrievalMode.LEGACY -> {
+                        val matcher =
+                            TokenBasedMatcher(
+                                candidates = candidates,
+                                tokenIndex = tokenIndex,
+                                distanceCache = repository.getDistanceCache(category),
+                                idfEnabled = idfEnabled,
+                            )
+                        matcher.match(querySurfaceTokens, queryLemmaTokens, limit)
+                    }
+                    RetrievalMode.INDEX_FIRST -> {
+                        // Retrieve topN candidate ordinals against the interned vocabulary, then
+                        // exact-rescore them with the unchanged scorer. topN = max(200, limit*4)
+                        // keeps the true top-k comfortably inside the rescored set. The rescore uses
+                        // a throwaway DistanceCache, so the shared category cache stays off this path.
+                        val vocab = repository.getVocabulary(category)
+                        // topN headroom: index-first legitimately reaches candidates legacy never
+                        // seeds (a fuzzy-resolved token pulls in rows with no exact overlap), so the
+                        // rescore set must be wide enough that legacy's true top-k are not crowded
+                        // out before the exact re-rank. 500 keeps the rescore cheap (µs-per-candidate)
+                        // while giving the parity-or-better gate ample margin.
+                        val topN = maxOf(500, limit * 4)
+                        val ordinals = retriever.retrieve(querySurfaceTokens, queryLemmaTokens, category, topN)
+                        val retrieved = ordinals.map { vocab.candidates[it] }
+                        val matcher =
+                            TokenBasedMatcher(
+                                candidates = retrieved,
+                                tokenIndex = tokenIndex,
+                                distanceCache = DistanceCache(),
+                                idfEnabled = idfEnabled,
+                            )
+                        matcher.rescore(querySurfaceTokens, queryLemmaTokens, retrieved, limit)
+                    }
+                }
             }
 
         return results.map { (candidate, score) ->

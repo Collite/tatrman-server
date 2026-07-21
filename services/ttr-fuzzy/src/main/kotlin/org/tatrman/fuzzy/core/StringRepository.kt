@@ -145,10 +145,14 @@ class StringRepository(
     private companion object {
         /** Returned for an explicit category that has no index, so the matcher yields no candidates. */
         val EMPTY_TOKEN_INDEX = TokenIndex(emptyList())
+
+        /** FZ-P2 — vocabulary counterpart of [EMPTY_TOKEN_INDEX] for the explicit-unknown case. */
+        val EMPTY_VOCABULARY = TokenVocabulary(emptyList())
     }
 
     private val cache = ConcurrentHashMap<String, List<Candidate>>()
     private val categoryTokenIndices = ConcurrentHashMap<String, TokenIndex>()
+    private val categoryVocabularies = ConcurrentHashMap<String, TokenVocabulary>()
     private val categoryDistanceCaches = ConcurrentHashMap<String, DistanceCache>()
     private val isRunning = AtomicBoolean(false)
     private val isCatalogReady = AtomicBoolean(false)
@@ -156,6 +160,9 @@ class StringRepository(
 
     @Volatile
     private var globalTokenIndex: TokenIndex = TokenIndex(emptyList())
+
+    @Volatile
+    private var globalVocabulary: TokenVocabulary = TokenVocabulary(emptyList())
 
     @Volatile
     private var globalDistanceCache: DistanceCache = DistanceCache()
@@ -327,6 +334,8 @@ class StringRepository(
         cache.forEach { (category, candidates) ->
             logger.debug("Building token index for category '$category' with ${candidates.size} candidates...")
             categoryTokenIndices[category] = TokenIndex(candidates)
+            // FZ-P2 — interned vocabulary alongside the legacy index (index-first retrieval path).
+            categoryVocabularies[category] = TokenVocabulary(candidates)
             // We can optionally reuse distance cache if we want to keep it across refreshes,
             // but the original behavior was to reset it.
             categoryDistanceCaches[category] = DistanceCache()
@@ -334,12 +343,14 @@ class StringRepository(
 
         // Cleanup categories no longer in cache
         categoryTokenIndices.keys.removeIf { !cache.containsKey(it) }
+        categoryVocabularies.keys.removeIf { !cache.containsKey(it) }
         categoryDistanceCaches.keys.removeIf { !cache.containsKey(it) }
 
         val flattened = cache.values.flatten()
         allCandidates = flattened
         logger.info("Rebuilding global token index for ${flattened.size} candidates...")
         globalTokenIndex = TokenIndex(flattened)
+        globalVocabulary = TokenVocabulary(flattened)
         globalDistanceCache = DistanceCache()
         logger.info(
             "Indices rebuilt for ${cache.size} categories and global index with ${globalTokenIndex.getAllCandidateIds().size} candidates",
@@ -372,6 +383,19 @@ class StringRepository(
             globalTokenIndex
         }
 
+    fun getVocabulary(category: String? = null): TokenVocabulary =
+        if (category != null) {
+            // Same discipline as getTokenIndex: an explicit-but-unknown category must NOT fall back
+            // to the global vocabulary — that would score every other column's candidates and is
+            // exactly how a case-mismatched key served the wrong column. Empty-on-miss; the global
+            // vocabulary is only for the deliberate null (cross-category) lookup.
+            categoryVocabularies[category.lowercase()] ?: EMPTY_VOCABULARY
+        } else {
+            globalVocabulary
+        }
+
+    // FZ-P2 — consumed only by the `legacy` retrieval path (index-first rescores with a throwaway
+    // cache). See [DistanceCache].
     fun getDistanceCache(category: String? = null): DistanceCache =
         if (category != null) {
             categoryDistanceCaches[category.lowercase()] ?: globalDistanceCache

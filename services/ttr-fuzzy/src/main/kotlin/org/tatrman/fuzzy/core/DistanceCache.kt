@@ -3,6 +3,16 @@ package org.tatrman.fuzzy.core
 
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * Cross-request memoisation of token-pair edit distances.
+ *
+ * FZ-P2 — **legacy-path only.** With `fuzzy.token-based.retrieval = index-first` (the default) the
+ * shared per-category cache ([StringRepository.getDistanceCache]) is no longer on the hot path:
+ * index-first resolves distances once against the vocabulary ([VocabularyResolver]) and exact-rescores
+ * a small candidate set with a *throwaway* [DistanceCache] (see [FuzzyMatcher]). The shared cache now
+ * serves only the `legacy` retrieval mode and the corpus-less [TokenBasedAlgorithm.calculateSimilarity]
+ * path. Kept (not deleted) so the `legacy` escape hatch keeps working.
+ */
 class DistanceCache(
     // FZ-P1 T3 — sized to the real distinct-pair population (tens of thousands even for a large
     // corpus) so the hot path never evicts. The legacy 10k default + wholesale clear() past 15k made
