@@ -106,11 +106,12 @@ val publishableLibs =
         ":shared:libs:kotlin:ktor-configurator",
         ":shared:libs:kotlin:db-common",
         ":shared:libs:kotlin:data-formatter",
-        // ttr-text / ttr-diagnostics (RG-P0.S3) are NOT published yet: they have no
-        // external consumer today (in-repo project deps only), and per the
-        // capabilities-client precedent below we don't make a Central maintenance
-        // promise without a taker. Add them here when a cross-repo consumer lands
-        // (e.g. ai-platform vendoring the S-2 fold for byte-identical parity).
+        // FZ-P3 — the extracted fuzzy engine, consumed by ai-platform (NX-B pattern).
+        ":shared:libs:kotlin:ttr-fuzzy-core",
+        // ttr-text (RG-P0.S3 — the one S-2 fold) is now published: ttr-fuzzy-core depends on it, so
+        // ai-platform (consuming ttr-fuzzy-core) needs the fold resolvable — exactly the cross-repo
+        // consumer the RG-P0.S3 note anticipated. ttr-diagnostics still has no external consumer.
+        ":shared:libs:kotlin:ttr-text",
         ":shared:libs:kotlin:fuzzy-common",
         ":shared:libs:kotlin:whois-common",
         ":shared:libs:kotlin:keycloak-auth",
@@ -132,6 +133,8 @@ val pomMeta: Map<String, Triple<String, String, String>> =
         ":shared:libs:kotlin:ktor-configurator" to Triple("ktor-configurator", "TTR Server Ktor Configurator", "Shared Ktor server bootstrap (routing, health, OTel, error handling) for the TTR read-spine services."),
         ":shared:libs:kotlin:db-common" to Triple("db-common", "TTR Server DB Common", "Shared JDBC/connection-pool helpers for the TTR worker services."),
         ":shared:libs:kotlin:data-formatter" to Triple("data-formatter", "TTR Server Data Formatter", "Shared result/value formatting for the TTR read-spine services."),
+        ":shared:libs:kotlin:ttr-fuzzy-core" to Triple("ttr-fuzzy-core", "TTR Fuzzy Core", "The embedded fuzzy-matching engine (token index + vocabulary, index-first retrieval, cascade) for the TTR services."),
+        ":shared:libs:kotlin:ttr-text" to Triple("ttr-text", "TTR Text", "The one S-2 text fold (lowercase → NFD → strip marks) every TTR matcher shares."),
         ":shared:libs:kotlin:fuzzy-common" to Triple("fuzzy-common", "TTR Server Fuzzy Common", "Shared fuzzy-matching types for the TTR services."),
         ":shared:libs:kotlin:whois-common" to Triple("whois-common", "TTR Server Whois Common", "Shared identity/role-source (roleSource: bearer|whois) types for the TTR services."),
         ":shared:libs:kotlin:keycloak-auth" to Triple("keycloak-auth", "TTR Server Keycloak Auth", "Shared Keycloak/OBO bearer-auth helpers for the TTR services."),

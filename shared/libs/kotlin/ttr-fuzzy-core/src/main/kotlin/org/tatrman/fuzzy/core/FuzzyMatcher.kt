@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.fuzzy.core
 
-import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -55,8 +54,7 @@ fun cascadeFrom(
     }
 
 class FuzzyMatcher(
-    private val repository: StringRepository,
-    private val telemetry: FuzzyTelemetry? = null,
+    private val repository: MatchRepository,
     private val lemmatizer: Lemmatizer = NoopLemmatizer,
     // GH #69 — IDF token weighting for the TATRMAN (token-based) path. Defaulted
     // so existing call sites / tests are unaffected; wired from config in Application.

@@ -79,6 +79,9 @@ dependencies {
     implementation(libs.typesafe.config)
 
     implementation(libs.java.string.similarity)
+    // FZ-P3 — the extracted pure fuzzy engine (org.tatrman.fuzzy.core.*). The service keeps
+    // StringRepository/loaders/api/telemetry and composes the engine over them.
+    implementation(project(":shared:libs:kotlin:ttr-fuzzy-core"))
     implementation(project(":shared:libs:kotlin:fuzzy-common"))
     // RG-P0.S3 — fold() now comes from the shared S-2 lib (was inline here).
     implementation(project(":shared:libs:kotlin:ttr-text"))

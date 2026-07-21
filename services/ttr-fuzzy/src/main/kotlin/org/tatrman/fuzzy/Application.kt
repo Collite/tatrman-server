@@ -155,7 +155,6 @@ fun Application.module(serverConfig: KtorServerConfig) {
     val fuzzyMatcher =
         FuzzyMatcher(
             repository,
-            telemetry,
             lemmatizer,
             idfEnabled = config.tokenBasedConfig.idfEnabled,
             retrievalMode = config.tokenBasedConfig.retrieval,
