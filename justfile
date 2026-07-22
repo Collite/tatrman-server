@@ -221,10 +221,14 @@ conformance-service-level:
     #!/usr/bin/env bash
     set -euo pipefail
     just conformance-verify-hashes
-    ./gradlew \
-      :services:ttr-resolver:test --tests '*Q20ParityTest*' \
-        --tests '*CallsSeedConformanceTest*' --tests '*RefusalOverGuessConformanceTest*' \
-      :services:ttr-fuzzy:test --tests '*MatchQualityCorpusTest*'
+    # One --tests filter per gradle invocation, deliberately NOT collapsed into a single call.
+    # Kotest 6.x's JUnit-Platform engine does not OR multiple Gradle `--tests` filters on one
+    # test task — passing more than one makes Gradle report "No tests found for given includes"
+    # and the whole task fails. A single filter per task works, so each spec runs on its own.
+    ./gradlew :services:ttr-resolver:test --tests '*Q20ParityTest*'
+    ./gradlew :services:ttr-resolver:test --tests '*CallsSeedConformanceTest*'
+    ./gradlew :services:ttr-resolver:test --tests '*RefusalOverGuessConformanceTest*'
+    ./gradlew :services:ttr-fuzzy:test --tests '*MatchQualityCorpusTest*'
     just eval-grounding-test
 
 # Pin the three-tier corpora by content hash (RG-P6 review I): the recorded provenance
