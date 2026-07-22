@@ -49,6 +49,9 @@ dependencies {
     // The ④ hall proto: transfer.v1 (CharonService) + metis.v1 (carved) + cz.tatrman.common.v1,
     // and — transitively via hall-proto's `api` — the published worker.v1/plan.v1 classes.
     implementation(project(":proto:hall-proto"))
+    // Secret-store SPI (contracts §17, H-5): per-transfer source×target connection resolution — the
+    // TransferSecretInjector's SPI (never a dep on the hall service; same SPI, own injector).
+    implementation(project(":shared:secrets-spi"))
 
     implementation(libs.kotlinx.coroutines.core)
 
