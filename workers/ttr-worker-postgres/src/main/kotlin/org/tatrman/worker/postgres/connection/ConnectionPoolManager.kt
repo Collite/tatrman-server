@@ -178,7 +178,9 @@ class ConnectionPoolManager(
             if (!config.hasPath("connections")) return ConnectionPoolManager(emptyMap())
             val root = config.getConfig("connections")
             val map =
-                root.root().keys
+                root
+                    .root()
+                    .keys
                     // Pure-env connections (`host = ${?POSTGRES_PG_<NAME>_HOST}` with no default) are
                     // declared in the base conf but ACTIVATED per deployment: an entry whose `host`
                     // resolves to absent/blank (the deployment didn't set that env var) is skipped, so
@@ -188,8 +190,7 @@ class ConnectionPoolManager(
                     .filter { id ->
                         val entry = root.getConfig(id)
                         entry.hasPath("host") && entry.getString("host").isNotBlank()
-                    }
-                    .associateWith { id ->
+                    }.associateWith { id ->
                         ConnectionConfig.fromConfig(id, root.getConfig(id))
                     }
             return ConnectionPoolManager(map)
