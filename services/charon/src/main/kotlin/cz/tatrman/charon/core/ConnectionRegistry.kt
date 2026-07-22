@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import cz.tatrman.secrets.spi.SecretRef
+import cz.tatrman.secrets.spi.SecretStoreRegistry
 import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicReference
 
@@ -90,6 +92,22 @@ class ConnectionRegistry private constructor(
             yaml: String,
             env: Map<String, String> = System.getenv(),
         ): ConnectionRegistry = ConnectionRegistry(parse(yaml, env))
+
+        /**
+         * Build with credentials resolved from the **secret-store SPI** (contracts §17, H-5) instead of
+         * `${ENV}` plaintext (PL-P3.S1.T5). [connectionRefs] maps each `TTR_CONN_*` name to its secret ref;
+         * the [TransferSecretInjector] resolves ONLY those (source×target least-exposure) into a
+         * `TTR_CONN_*` env, which the connections YAML references via `${TTR_CONN_*}` tokens. The resolved
+         * material lands only in the in-memory handles (the Hikari pool) — never in a config file, run-store,
+         * log, or on the wire. The `TTR_CONN_*` env contract is verbatim the hall's, so a connection secret
+         * resolves the same way whether a worker or Charon consumes it. A store unreachable at resolution is
+         * a [SecretPreflightException] (`PLT-SEC-001`).
+         */
+        fun fromSecrets(
+            yaml: String,
+            connectionRefs: Map<String, SecretRef>,
+            secrets: SecretStoreRegistry,
+        ): ConnectionRegistry = fromYaml(yaml, env = TransferSecretInjector(secrets).inject(connectionRefs))
 
         /** Build from already-resolved handles (programmatic; used by tests and
          *  any caller that builds connections without a YAML file). */

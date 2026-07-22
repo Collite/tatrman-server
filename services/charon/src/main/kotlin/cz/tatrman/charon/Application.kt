@@ -9,6 +9,9 @@ import cz.tatrman.charon.core.MovePlanner
 import cz.tatrman.charon.endpoints.GrpcWorkerGatewayFactory
 import cz.tatrman.charon.endpoints.RedisEndpoint
 import cz.tatrman.charon.grpc.CharonServiceImpl
+import cz.tatrman.secrets.spi.FileSecretStore
+import cz.tatrman.secrets.spi.SecretRef
+import cz.tatrman.secrets.spi.SecretStoreRegistry
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
 import io.ktor.http.ContentType
 import io.ktor.serialization.kotlinx.json.json
@@ -40,6 +43,7 @@ import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.S3Configuration
 import java.io.File
 import java.net.URI
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 private val log = LoggerFactory.getLogger("cz.tatrman.charon.Application")
@@ -82,7 +86,19 @@ fun main() {
     // loaded lazily-validated (a broken DB connection does NOT gate the pod —
     // architecture §7 + plan §4 Stage 2.3); a missing file ⇒ blob-only pod.
     val connectionsFile = File(config.getString("charon.connections.path"))
-    val connectionRegistry = ConnectionRegistry.fromFile(connectionsFile)
+    // PL-P3.S1.T5: the platform path resolves credentials from the secret-store SPI (§17, H-5). When
+    // `charon.connections.refs` maps TTR_CONN_* names to secret refs, build a k8s FileSecretStore at the
+    // mount root and resolve the DSN/creds via the SPI (the connections YAML references `${TTR_CONN_*}`).
+    // With no refs configured, fall back to the legacy `${ENV}` plaintext path (dev/local convenience).
+    val connectionRefs = readConnectionRefs(config)
+    val connectionRegistry =
+        if (connectionRefs.isNotEmpty()) {
+            val secrets =
+                SecretStoreRegistry(listOf(FileSecretStore(root = Path.of(config.getString("charon.secrets.mount-root")))))
+            ConnectionRegistry.fromSecrets(connectionsFile.readText(), connectionRefs, secrets)
+        } else {
+            ConnectionRegistry.fromFile(connectionsFile)
+        }
     val dbProvider = HikariConnectionProvider()
     Runtime.getRuntime().addShutdownHook(Thread { dbProvider.close() })
     log.info("Charon connection registry: {} connection(s) {}", connectionRegistry.ids().size, connectionRegistry.ids())
@@ -189,6 +205,18 @@ private fun buildRedisConnection(config: Config): StatefulRedisConnection<ByteAr
     Runtime.getRuntime().addShutdownHook(Thread { client.shutdown() })
     return connection
 }
+
+/**
+ * Read `charon.connections.refs` (TTR_CONN_* name → `secret://…` ref) — the transfer source×target
+ * connection secrets resolved via the SPI (§17). Absent/empty ⇒ the legacy `${ENV}` plaintext path.
+ */
+private fun readConnectionRefs(config: Config): Map<String, SecretRef> =
+    if (config.hasPath("charon.connections.refs")) {
+        val refs = config.getConfig("charon.connections.refs")
+        refs.root().keys.associateWith { SecretRef.parse(refs.getString(it)) }
+    } else {
+        emptyMap()
+    }
 
 fun Application.module(
     meterRegistry: PrometheusMeterRegistry,
