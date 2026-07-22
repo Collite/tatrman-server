@@ -13,6 +13,13 @@ plugins {
 
 application {
     mainClass.set("cz.tatrman.charon.ApplicationKt")
+    // Arrow's netty allocator uses NIO internals the JVM 9+ module system blocks — the installDist
+    // launcher (the deployed image entrypoint) needs these opens or the first move crashes at runtime.
+    applicationDefaultJvmArgs =
+        listOf(
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+        )
 }
 
 kotlin {
