@@ -97,6 +97,10 @@ dependencies {
     // In-process gRPC server for the component suite (the five RPCs over an in-process channel).
     testImplementation(libs.grpc.inprocess)
     // H2 in-memory DB — the unit-test stand-in JDBC driver for the DB-edge round-trips (real PG/MSSQL
-    // dialect fidelity is the separate integration suite; T3 adds the Testcontainers PG contract test).
+    // dialect fidelity is the separate integration suite).
     testImplementation(libs.h2)
+    // Testcontainers PG — the real query source for the T3 frozen contract tests (postgres:16-alpine,
+    // the platform's veles/radegast image).
+    testImplementation(libs.testcontainers)
+    testImplementation(libs.testcontainers.postgresql)
 }
