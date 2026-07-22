@@ -36,7 +36,12 @@ class BatchMatchTest :
                 serverPort = 7103,
                 grpcPort = 7203,
                 grpcReflectionEnabled = false,
-                refreshIntervalSeconds = 3600,
+                // Manual-refresh mode (<=0): no background refresh loop. With a positive interval the
+                // loop fires an immediate refresh on construction that races this test's forceRefresh,
+                // re-stamping `vocabularyVersion` (loadedAtMs) between batchMatch's read and the
+                // assertion below — a flake that surfaced on slower CI runners. The test drives refresh
+                // explicitly via forceRefresh(), so it needs no background loop.
+                refreshIntervalSeconds = 0,
                 tokenBasedConfig = TokenBasedConfig(),
                 nlp = NlpConfig(),
                 loaderSource = LoaderSourceConfig(source = "static"),
