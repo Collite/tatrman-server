@@ -34,20 +34,25 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectResponse
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectResponse
 import software.amazon.awssdk.services.s3.model.PutObjectTaggingRequest
 import software.amazon.awssdk.services.s3.model.PutObjectTaggingResponse
+import software.amazon.awssdk.services.s3.model.S3Object
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * PL-P3.S1.T3 — the four FROZEN contract tests. These pin the transplanted Charon API's behaviour as
- * the platform's ④ contract: once green, treat them as the movement spec (do not loosen without a
- * conformance decision — PL-P3's thesis is "movement becomes Charon's without changing a result byte").
+ * PL-P3.S1.T3 — the FROZEN contract tests. These pin the transplanted Charon API's behaviour as the
+ * platform's ④ contract: once green, treat them as the movement spec (do not loosen without a conformance
+ * decision — PL-P3's thesis is "movement becomes Charon's without changing a result byte"). The four S1
+ * tests (Materialize / byte-faithful Stage-Copy / Evict-idempotent / named-conn-fail) are joined by the
+ * S2 run-scoped prefix Evict (3b, FQ-6) — the run-staging reclaim the lifecycle depends on.
  *
  * Component tier: a **Testcontainers Postgres** (postgres:16-alpine, the platform's veles/radegast image)
  * is the real query source; a **stateful in-memory S3** ([InMemoryS3]) is the object-store staging tier —
@@ -182,6 +187,33 @@ class CharonContractTest :
             val second = executor.evict(loc)
             second.shouldBeInstanceOf<Either.Right<*>>()
             withClue("re-evicting a gone target is idempotent: existed=false, not an error") {
+                (second as Either.Right).value.existed shouldBe false
+            }
+        }
+
+        // --- 3b. Evict (run-scoped): a '<prefix>/' key reclaims every staged object under it (FQ-6) ----
+
+        "Evict (run-scoped): a '<prefix>/' key removes every object under the prefix, idempotent" {
+            val s3 = InMemoryS3()
+            val executor = CharonMoveExecutor(s3.client, mockk<cz.tatrman.charon.endpoints.RedisOps>(relaxed = true))
+            // Two staged objects for run-1, one for a DIFFERENT run that must survive the run-1 reclaim.
+            s3.store["run-staging/run-1/extract.arrow"] = InMemoryS3.Stored(byteArrayOf(1), emptyMap())
+            s3.store["run-staging/run-1/enrich.arrow"] = InMemoryS3.Stored(byteArrayOf(2), emptyMap())
+            s3.store["run-staging/run-2/other.arrow"] = InMemoryS3.Stored(byteArrayOf(3), emptyMap())
+            val loc = Plan(MoveRpc.EVICT, seaweedLoc("run-staging", "run-1/"), null, MoveOptions.getDefaultInstance())
+
+            val first = executor.evict(loc)
+            first.shouldBeInstanceOf<Either.Right<*>>()
+            withClue("the run's whole staging prefix is reclaimed and it reports it existed") {
+                (first as Either.Right).value.existed shouldBe true
+                s3.store.keys.none { it.startsWith("run-staging/run-1/") } shouldBe true
+            }
+            withClue("a different run's staging is untouched (the prefix scopes the delete)") {
+                s3.store.containsKey("run-staging/run-2/other.arrow") shouldBe true
+            }
+
+            val second = executor.evict(loc)
+            withClue("re-evicting a gone prefix is idempotent: existed=false, not an error") {
                 (second as Either.Right).value.existed shouldBe false
             }
         }
@@ -363,6 +395,21 @@ private class InMemoryS3 {
             val req = firstArg<DeleteObjectRequest>()
             store.remove(key(req.bucket(), req.key()))
             DeleteObjectResponse.builder().build()
+        }
+        every { client.listObjectsV2(any<ListObjectsV2Request>()) } answers {
+            val req = firstArg<ListObjectsV2Request>()
+            val bucketRoot = "${req.bucket()}/"
+            // Return the object keys (bucket-relative) under `bucket/prefix`. Single page (isTruncated=false)
+            // — the staging prefixes the FQ-6 sweep evicts are far below the 1000-key page size.
+            val matched =
+                store.keys
+                    .filter { it.startsWith(bucketRoot + req.prefix()) }
+                    .map { S3Object.builder().key(it.removePrefix(bucketRoot)).build() }
+            ListObjectsV2Response
+                .builder()
+                .contents(matched)
+                .isTruncated(false)
+                .build()
         }
         every { client.putObjectTagging(any<PutObjectTaggingRequest>()) } returns PutObjectTaggingResponse.builder().build()
     }

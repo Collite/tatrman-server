@@ -20,6 +20,7 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectTaggingRequest
@@ -280,13 +281,27 @@ class SeaweedEndpoint(
 
     fun evict(blob: SeaweedBlob): EvictResult {
         currentLocation = blob
+        // A key ending in '/' is a run-scoped staging PREFIX (FQ-6) — evict every object under it. S3 has
+        // no directories, so an exact-key delete of a '<prefix>/' would be a silent no-op; the run-scoped
+        // reclaim MUST enumerate the prefix and delete each object. A plain key evicts the single object.
+        return if (blob.key.endsWith("/")) {
+            evictPrefix(blob.bucket, blob.key)
+        } else {
+            evictObject(blob.bucket, blob.key)
+        }
+    }
+
+    private fun evictObject(
+        bucket: String,
+        key: String,
+    ): EvictResult {
         val existed =
             try {
                 client.headObject(
                     HeadObjectRequest
                         .builder()
-                        .bucket(blob.bucket)
-                        .key(blob.key)
+                        .bucket(bucket)
+                        .key(key)
                         .build(),
                 )
                 true
@@ -299,13 +314,53 @@ class SeaweedEndpoint(
             client.deleteObject(
                 DeleteObjectRequest
                     .builder()
-                    .bucket(blob.bucket)
-                    .key(blob.key)
+                    .bucket(bucket)
+                    .key(key)
                     .build(),
             )
         } catch (e: S3Exception) {
             // Even on delete error, surface the prior-existence state.
         }
+        return EvictResult.newBuilder().setExisted(existed).build()
+    }
+
+    /**
+     * Evict every object under a run-scoped staging prefix (FQ-6). Lists the prefix (paginated) and deletes
+     * each object; `existed` is true iff at least one object was found. Idempotent — re-evicting an
+     * already-reclaimed prefix lists nothing and reports `existed=false`. Best-effort like the single-object
+     * path: a list/delete error is swallowed (the S3 `shallow` retention rule or a later sweep reclaims).
+     */
+    private fun evictPrefix(
+        bucket: String,
+        prefix: String,
+    ): EvictResult {
+        var existed = false
+        var continuationToken: String? = null
+        do {
+            val builder = ListObjectsV2Request.builder().bucket(bucket).prefix(prefix)
+            if (continuationToken != null) builder.continuationToken(continuationToken)
+            val resp =
+                try {
+                    client.listObjectsV2(builder.build())
+                } catch (e: S3Exception) {
+                    return EvictResult.newBuilder().setExisted(existed).build()
+                }
+            for (obj in resp.contents()) {
+                existed = true
+                try {
+                    client.deleteObject(
+                        DeleteObjectRequest
+                            .builder()
+                            .bucket(bucket)
+                            .key(obj.key())
+                            .build(),
+                    )
+                } catch (e: S3Exception) {
+                    // best-effort per object — a missed delete is reclaimed by the retention rule.
+                }
+            }
+            continuationToken = if (resp.isTruncated == true) resp.nextContinuationToken() else null
+        } while (continuationToken != null)
         return EvictResult.newBuilder().setExisted(existed).build()
     }
 
