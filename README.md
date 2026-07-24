@@ -41,6 +41,14 @@ Status labels used across the docs: **live** (running at a production pilot) ·
 **extracted** (implemented in the open lineage) · **planned** (designed, not
 built) · **parked** (deliberately deferred).
 
+## Operating & consuming
+
+- **[docs/operations.md](docs/operations.md)** — operating the open Server: the read-only
+  health & status page (version, model fingerprint, per-service health), the config
+  reference, and the "no admin app" stance (FO-28).
+- **[docs/superset.md](docs/superset.md)** — BI via the semantic layer: self-serve Superset
+  pairing/embedding on the open tier, and the operated Superset add-on (operate tier).
+
 ## Quickstart
 
 A one-command bring-up (single umbrella chart → sample estate → a governed answer

@@ -18,6 +18,17 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// FO-P5.S2 (FO-28): filter the single release-train version into build.properties so the open-tier
+// status page can report the running Server version. Scoped to build.properties only — application.conf
+// / logback.xml carry HOCON ${?ENV} placeholders that must NOT be expanded.
+tasks.processResources {
+    val serverVersion = project.version.toString()
+    inputs.property("serverVersion", serverVersion)
+    filesMatching("build.properties") {
+        expand("version" to serverVersion)
+    }
+}
+
 val osArch = System.getProperty("os.arch").lowercase()
 val isArm64 = osArch.contains("aarch64") || osArch.contains("arm64")
 val isCi = System.getenv("CI") != null
