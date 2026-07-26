@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.charon.core
 
+import org.slf4j.LoggerFactory
 import java.util.ServiceLoader
 
 /**
@@ -30,13 +31,48 @@ fun interface ConnectionSecretResolver {
     fun resolve(name: String): String?
 
     companion object {
+        private val log = LoggerFactory.getLogger(ConnectionSecretResolver::class.java)
+
         /**
          * The provider registered via `ServiceLoader`, or the env-var default
          * ([EnvSecretResolver]) when none is registered. Discovered once at
          * registry construction — a resolver is not hot-swapped mid-pod.
+         *
+         * **Always logs which resolver won**, because the fallback is silent by
+         * design and its failure mode is confusing: a deployment that *ships* the
+         * CH-P2 platform adapter but mis-packages it (no
+         * `META-INF/services/…ConnectionSecretResolver` entry) falls back to env
+         * binding, finds no `TTR_CONN_*`, and surfaces as "connections degraded"
+         * rather than "adapter missing". The boot line is how an operator tells
+         * those two apart. If more than one provider is registered the winner is
+         * `ServiceLoader` order — arbitrary — so that case is logged as a warning
+         * naming every candidate.
          */
-        fun discover(): ConnectionSecretResolver =
-            ServiceLoader.load(ConnectionSecretResolver::class.java).firstOrNull() ?: EnvSecretResolver
+        fun discover(): ConnectionSecretResolver {
+            val providers = ServiceLoader.load(ConnectionSecretResolver::class.java).toList()
+            return when {
+                providers.isEmpty() -> {
+                    log.info(
+                        "connection secrets: no ServiceLoader provider registered — using the env-var default ({})",
+                        EnvSecretResolver::class.java.name,
+                    )
+                    EnvSecretResolver
+                }
+                providers.size == 1 -> {
+                    log.info("connection secrets: resolver = {} (ServiceLoader)", providers[0]::class.java.name)
+                    providers[0]
+                }
+                else -> {
+                    log.warn(
+                        "connection secrets: {} providers registered {} — ServiceLoader order decides; using {}",
+                        providers.size,
+                        providers.map { it::class.java.name },
+                        providers[0]::class.java.name,
+                    )
+                    providers[0]
+                }
+            }
+        }
     }
 }
 

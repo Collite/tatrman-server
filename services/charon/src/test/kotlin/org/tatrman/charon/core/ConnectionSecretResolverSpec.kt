@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.charon.core
 
 import io.kotest.core.spec.style.StringSpec

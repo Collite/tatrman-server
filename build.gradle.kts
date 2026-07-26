@@ -127,7 +127,7 @@ val publishableLibs =
 val pomMeta: Map<String, Triple<String, String, String>> =
     mapOf(
         // path to Triple(artifactId, POM name, POM description)
-        ":shared:proto" to Triple("ttr-server-proto", "TTR Server Proto", "gRPC/protobuf wire contracts for the TTR read-spine services (meta.v1, query.v1, translate.v1, validate.v1, dispatch.v1, worker.v1, …)."),
+        ":shared:proto" to Triple("ttr-server-proto", "TTR Server Proto", "gRPC/protobuf wire contracts for the TTR read-spine services (meta.v1, query.v1, translate.v1, validate.v1, dispatch.v1, worker.v1, transfer.v1, metis.v1, …)."),
         ":shared:libs:kotlin:otel-config" to Triple("otel-config", "TTR Server OTel Config", "OpenTelemetry bootstrap shared by the TTR read-spine services."),
         ":shared:libs:kotlin:logging-config" to Triple("logging-config", "TTR Server Logging Config", "Logback/structured-logging bootstrap shared by the TTR read-spine services."),
         ":shared:libs:kotlin:ktor-configurator" to Triple("ktor-configurator", "TTR Server Ktor Configurator", "Shared Ktor server bootstrap (routing, health, OTel, error handling) for the TTR read-spine services."),

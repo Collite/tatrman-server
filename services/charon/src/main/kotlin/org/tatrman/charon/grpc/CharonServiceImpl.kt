@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package org.tatrman.charon.grpc
 
 import org.tatrman.charon.core.CharonError
