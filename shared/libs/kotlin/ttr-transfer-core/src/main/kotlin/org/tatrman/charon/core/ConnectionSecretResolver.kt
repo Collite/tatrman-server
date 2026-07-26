@@ -48,10 +48,21 @@ fun interface ConnectionSecretResolver {
          * `ServiceLoader` order — arbitrary — so that case is logged as a warning
          * naming every candidate.
          */
-        fun discover(): ConnectionSecretResolver {
+        fun discover(requireProvider: Boolean = false): ConnectionSecretResolver {
             val providers = ServiceLoader.load(ConnectionSecretResolver::class.java).toList()
             return when {
                 providers.isEmpty() -> {
+                    // F5 (review-074) other half — CH-P2. A deployment that MUST resolve credentials from a
+                    // real secret store (the platform's cz.tatrman:secrets-spi adapter) sets `requireProvider`
+                    // so a mis-packaged adapter (no META-INF/services entry) fails the pod CLOSED at boot,
+                    // instead of silently falling back to env binding, finding no TTR_CONN_*, and surfacing
+                    // as the ambiguous "connections degraded".
+                    check(!requireProvider) {
+                        "connection secrets: require-secret-resolver is set but no ServiceLoader " +
+                            "ConnectionSecretResolver provider is registered — refusing to fall back to the " +
+                            "env-var default (${EnvSecretResolver::class.java.name}). Package the platform " +
+                            "secrets adapter's META-INF/services/${ConnectionSecretResolver::class.java.name} entry."
+                    }
                     log.info(
                         "connection secrets: no ServiceLoader provider registered — using the env-var default ({})",
                         EnvSecretResolver::class.java.name,

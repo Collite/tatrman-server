@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.charon.core
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 
 /**
  * The open connection-secret resolution port (CH-D3). Charon resolves `${VAR}`
@@ -32,6 +34,13 @@ class ConnectionSecretResolverSpec :
             // No META-INF/services provider is on the test classpath, so discovery
             // returns the env default — open Charon's dependency-free `${ENV}` mode.
             ConnectionSecretResolver.discover() shouldBe EnvSecretResolver
+        }
+
+        "discover(requireProvider = true) with no provider fails closed (F5 require-half)" {
+            // A deployment that MUST resolve from a real store (require-secret-resolver=true) refuses to
+            // fall back to env binding — a mis-packaged adapter kills the pod at boot, not silently degrades.
+            val ex = shouldThrow<IllegalStateException> { ConnectionSecretResolver.discover(requireProvider = true) }
+            ex.message shouldContain "require-secret-resolver"
         }
 
         "EnvSecretResolver reads the process environment; an absent name → null" {

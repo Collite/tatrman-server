@@ -5,6 +5,7 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import org.tatrman.charon.core.CharonMoveExecutor
 import org.tatrman.charon.core.ConnectionRegistry
+import org.tatrman.charon.core.ConnectionSecretResolver
 import org.tatrman.charon.core.HikariConnectionProvider
 import org.tatrman.charon.core.MovePlanner
 import org.tatrman.charon.endpoints.GrpcWorkerGatewayFactory
@@ -87,7 +88,15 @@ fun main() {
     // ConnectionSecretResolver port — env-var binding by default; a deployment registers
     // a ServiceLoader provider (the platform's cz.tatrman:secrets-spi adapter at CH-P2)
     // for real secret-store resolution. A missing/empty file ⇒ a blob-only pod.
-    val connectionRegistry = ConnectionRegistry.fromFile(connectionsFile)
+    // F5 (review-074) require-half: a deployment that MUST use a real store sets
+    // require-secret-resolver so a mis-packaged adapter fails the pod closed instead of
+    // silently falling back to env binding.
+    val requireResolver = config.getBoolean("charon.connections.require-secret-resolver")
+    val connectionRegistry =
+        ConnectionRegistry.fromFile(
+            connectionsFile,
+            ConnectionSecretResolver.discover(requireProvider = requireResolver),
+        )
     val dbProvider = HikariConnectionProvider()
     Runtime.getRuntime().addShutdownHook(Thread { dbProvider.close() })
     log.info("Charon connection registry: {} connection(s) {}", connectionRegistry.ids().size, connectionRegistry.ids())
