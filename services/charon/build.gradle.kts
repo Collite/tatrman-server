@@ -83,6 +83,12 @@ dependencies {
     // ttr-server-proto) beside worker.v1/plan.v1/etc.; the platform-only :proto:hall-proto is
     // left behind (charon carries only transfer.v1 + metis.v1, its own two protos).
     implementation(project(":shared:proto"))
+    // CH-D5 — the published transfer seam (MoveExecutor + Plan + Either + CharonError +
+    // MoveRpc + LocationKind), extracted from core/ so radegast embeds it in-process at
+    // CH-P2 without depending on this whole service. `api` because the service's own core
+    // (CharonMoveExecutor, MovePlanner, the legality matrix) references these types in
+    // public signatures. Same package `org.tatrman.charon.core` — a deliberate split.
+    api(project(":shared:libs:kotlin:ttr-transfer-core"))
     // CH-D4 house bootstrap: the shared ktor base (ContentNegotiation/CORS/CallLogging/
     // ForwardedHeaders) via installKtorServerBase — charon was the last service hand-rolling
     // its Ktor module; this aligns it with the 9 siblings. (logging-config/otel-config +

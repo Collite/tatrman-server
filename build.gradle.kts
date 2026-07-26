@@ -117,6 +117,9 @@ val publishableLibs =
         ":shared:libs:kotlin:keycloak-auth",
         ":shared:libs:kotlin:ttr-meta-client",
         ":shared:libs:kotlin:ttr-llm-client",
+        // CH-D5 — the Charon transfer seam, consumed by tatrman-platform's radegast
+        // (CH-P2 cutover) behind the unchanged TransferMover in-process seam.
+        ":shared:libs:kotlin:ttr-transfer-core",
         // capabilities-client TRIMMED at SV-P1 S2 (2026-07-11): no external consumer
         // (kantheon keeps its own copy; nothing published depends on it). Publishing it
         // would be a maintenance promise with no taker — re-add here if a consumer appears.
@@ -140,6 +143,7 @@ val pomMeta: Map<String, Triple<String, String, String>> =
         ":shared:libs:kotlin:keycloak-auth" to Triple("keycloak-auth", "TTR Server Keycloak Auth", "Shared Keycloak/OBO bearer-auth helpers for the TTR services."),
         ":shared:libs:kotlin:ttr-meta-client" to Triple("ttr-meta-client", "TTR Meta Client", "gRPC client for the Veles metadata service (meta.v1)."),
         ":shared:libs:kotlin:ttr-llm-client" to Triple("ttr-llm-client", "TTR LLM Client", "Client for the ttr-llm-gateway service (llm.v1)."),
+        ":shared:libs:kotlin:ttr-transfer-core" to Triple("ttr-transfer-core", "TTR Transfer Core", "The Charon transfer seam (MoveExecutor + Plan + CharonError over transfer.v1) for in-process embedding behind a TransferMover."),
     )
 
 subprojects {

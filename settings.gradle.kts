@@ -70,6 +70,9 @@ include(":shared:libs:kotlin:whois-common")
 include(":shared:libs:kotlin:keycloak-auth")
 include(":shared:libs:kotlin:ttr-meta-client")
 include(":shared:libs:kotlin:ttr-llm-client")
+// CH-D5 — the published Charon transfer seam (MoveExecutor + Plan + Either +
+// CharonError + MoveRpc), embedded in-process by radegast behind TransferMover.
+include(":shared:libs:kotlin:ttr-transfer-core")
 // Grafted from kantheon per Bora's decision (S4) — capability-registration client
 // (4 MCP tools) + the component/integration test-tier harness libs.
 include(":shared:libs:kotlin:capabilities-client")

@@ -10,21 +10,9 @@ import org.tatrman.transfer.v1.MaterializeRequest
 import org.tatrman.transfer.v1.MoveOptions
 import org.tatrman.transfer.v1.StageRequest
 
-/**
- * A [Plan] is what the planner hands to the [MoveExecutor] when the legality
- * check passes. The executor still has to *do* the move — the plan is the
- * validated spec, not the result.
- *
- * Kept as a small data class (one public class per file, `AGENTS.md` §9) —
- * additional fields land in later stages (the connection registry handle, the
- * resolved worker endpoint address, the per-RPC deadline, etc.).
- */
-data class Plan(
-    val rpc: MoveRpc,
-    val source: Location,
-    val target: Location?,
-    val options: MoveOptions,
-)
+// `Plan`, `MoveRpc`, `LocationKind` now live in the published `ttr-transfer-core`
+// seam lib (CH-D5) — same package `org.tatrman.charon.core`, so referenced here
+// without an import. The planner that *produces* validated `Plan`s stays here.
 
 /**
  * The pure planning layer. No I/O, no coroutines, no service deps.
