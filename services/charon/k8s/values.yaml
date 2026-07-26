@@ -5,7 +5,11 @@
 replicaCount: 1
 
 image:
-  repository: charon
+  # The published coordinate (CH-P2·T5a / review-074·F9b). CH-D7 ratified the image *name* `charon`;
+  # this is the *registry-qualified* coordinate every sibling subchart carries (ghcr.io/collite/ttr-query,
+  # veles, …). A bare `charon` would render `docker.io/library/charon` — the Jib local name leaking into
+  # the chart. Publishes to GHCR beside the siblings.
+  repository: ghcr.io/collite/charon
   # Defaults to .Chart.appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent
@@ -56,10 +60,14 @@ envFrom:
 # The named-connection registry, mounted read-only at `mountPath`. Set `configMapName` to a
 # ConfigMap holding connections.yaml (with ${ENV} credential tokens fed from the envFrom
 # secret). The ConfigMap itself is created by the deploying context (olymp), NOT templated
-# here — its content is Bora-owned / environment-specific. Empty configMapName = no mount
-# (blob-only boot). Defaults to the base convention name `charon-connections`.
+# here — its content is Bora-owned / environment-specific.
+#
+# CH-P2·T5a / review-074·F9b: default to EMPTY (blob-only boot). The ConfigMap is not templated
+# here and the volume mounts non-optionally, so a default install with `configMapName` set would sit
+# in FailedMount forever. Empty = no mount, so the out-of-box install boots blob-only and olymp opts
+# in by setting the name — mirroring how the credentials secret above is already `optional: true`.
 connections:
-  configMapName: "charon-connections"
+  configMapName: ""
   mountPath: /etc/charon
 
 # Probes (HTTP on the http port).

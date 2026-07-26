@@ -814,7 +814,7 @@ spec:
     spec:
       containers:
         - name: charon
-          image: "charon:0.9.0"
+          image: "ghcr.io/collite/charon:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -860,14 +860,6 @@ spec:
             requests:
               cpu: 250m
               memory: 512Mi
-          volumeMounts:
-            - name: connections
-              mountPath: /etc/charon
-              readOnly: true
-      volumes:
-        - name: connections
-          configMap:
-            name: charon-connections
 
 ---
 # Source: tatrman-server/charts/chrono/templates/deployment.yaml

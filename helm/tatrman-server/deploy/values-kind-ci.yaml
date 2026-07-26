@@ -23,13 +23,13 @@ whois:     { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } }
 health:    { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
 
 dispatch: { enabled: false }
-# charon needs backing this overlay does not stand up (S3 + Redis — its extraEnv points at
-# `data-seaweedfs` / `data-redis`, which the umbrella does not ship at all) AND a
-# `charon-connections` ConfigMap, which the chart deliberately does not template (the
-# deploying context owns it, see services/charon/k8s/values.yaml). Left enabled it mounts a
-# ConfigMap volume that never appears → FailedMount → never Ready → `helm install --wait`
-# times out. Same rationale as the workers. (CH-P1, review-074·F9.)
-charon: { enabled: false }
+# charon rejoins kind-CI at CH-P2·T5a. The `helm install --wait` blocker at F9a was the
+# non-optional `charon-connections` ConfigMap mount (FailedMount → never Ready → timeout); T5a
+# defaulted `connections.configMapName` to "" (blob-only boot, no mount), so a bare install now
+# boots and reports Ready via the static `/ready` (which does NOT probe S3/Redis — connections are
+# lazily-validated, "one broken DB ≠ unready pod"). The data-seaweedfs/data-redis backing the overlay
+# omits only bounds *functional* moves, not readiness — so this is a genuine coverage win. (review-074·F9b.)
+charon: { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
 llm-gateway: { enabled: false }
 mssql: { enabled: false }
 postgres: { enabled: false }
