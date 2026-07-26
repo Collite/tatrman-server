@@ -9,6 +9,30 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.jib)
+}
+
+// CH-P1.T7 (CH-D4/D7): the server builds Kotlin service images with Jib (release-image.yml
+// `./gradlew :path:jib`), the veles precedent — the platform's installDist + Dockerfile is
+// dropped. Image named `charon` (CH-D7 ratified). Arrow's netty allocator needs the NIO
+// opens at runtime, carried here as container jvmFlags (the installDist launcher's
+// applicationDefaultJvmArgs above stays for `just`/local dist runs).
+jib {
+    from {
+        image = "eclipse-temurin:21-jre"
+    }
+    to {
+        image = "charon:dev"
+    }
+    container {
+        mainClass = "org.tatrman.charon.ApplicationKt"
+        ports = listOf("7250", "7251")
+        jvmFlags =
+            listOf(
+                "--add-opens=java.base/java.nio=ALL-UNNAMED",
+                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+            )
+    }
 }
 
 application {

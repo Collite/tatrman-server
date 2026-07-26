@@ -1,5 +1,17 @@
 # Charon — Arrow data mover
 
+> **Arrival note — CH-P1 (2026-07-26).** This is the **one open Charon** (arc CH,
+> Apache-2.0). History-preserving `git filter-repo` from `tatrman-platform` master
+> `395ec99` (`kotlin/services/charon` → `services/charon`), carrying the full
+> kantheon→platform→server chain. Re-homed onto the server: Kotlin root
+> `org.tatrman.charon.*`; `transfer.v1` + `metis.v1` → `:shared:proto` (published in
+> `ttr-server-proto`), `common.v1` reuses the server's `org.tatrman.common.v1`;
+> secrets via the open `ConnectionSecretResolver` port (the `cz.tatrman:secrets-spi`
+> wiring is the platform's CH-P2 adapter, not here); `installKtorServerBase` bootstrap;
+> image via Jib (`charon`, CH-D7). Platform + kantheon become consumers by published
+> version (CH-P2/CH-P3). Suite: 21 specs / 248 tests. **Consumed core (`ttr-transfer-core`,
+> CH-D5) publishes when radegast switches to it at CH-P2.**
+
 > **Status:** **Arc complete (`charon/v0.3.0`).** Seaweed + Redis object-store movers (P1) + DB edges (P2: connection registry, JDBC extract/ingest for PG + MSSQL, allow-lists, `Describe(db_table)`) + **worker edges (P3)**: a `WorkerEndpoint` over a `WorkerGateway` SPI — **both METIS and POLARS** have the full stage-in / scan-out / describe / evict surface; the `tools/charon-mcp` wrapper + `move.*` capability registration + the throughput bench. Pythia Phase 4 unblocked.
 >
 > **Worker stage-in (both engines, 2026-06-26).** METIS uses `metis.v1` `ImportDataFrame`/`ExportDataFrame`/`DropWorkspaceEntry`. **POLARS uses the `worker.v1` `ImportDataFrame`/`DropWorkspaceEntry` RPCs added to Steropes at the Stage 3.1 closeout** (mirroring Metis §1.3) — `Stage(X → worker_df{POLARS})` and `Evict(worker_df{POLARS})` are live, closing the earlier upstream gap. POLARS read-out is `Execute` over a `WorkspaceRef`.

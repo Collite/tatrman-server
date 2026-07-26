@@ -1,1 +1,1 @@
-{{ include "kantheon-service.deployment" . }}
+{{ include "ttr-service.deployment" . }}

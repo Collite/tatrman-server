@@ -44,6 +44,11 @@ dependencies:
     version: "0.1.0"
     repository: "file://../../services/ttr-dispatch/k8s"
     condition: dispatch.enabled
+  # ④ Charon — the Arrow data mover (arc CH; unified open Charon).
+  - name: charon
+    version: "0.1.0"
+    repository: "file://../../services/charon/k8s"
+    condition: charon.enabled
   - name: llm-gateway
     version: "0.1.0"
     repository: "file://../../services/ttr-llm-gateway/k8s"

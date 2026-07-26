@@ -78,6 +78,7 @@ jobs:
             [ttr-translate]=services/ttr-translate
             [ttr-validate]=services/ttr-validate
             [ttr-dispatch]=services/ttr-dispatch
+            [charon]=services/charon
             [ttr-fuzzy]=services/ttr-fuzzy
             [ttr-llm-gateway]=services/ttr-llm-gateway
             [ttr-nlp]=services/ttr-nlp
@@ -96,7 +97,7 @@ jobs:
             [ttr-identity]=infra/ttr-identity
             [health]=infra/health
           )
-          ALL="veles ttr-query ttr-translate ttr-validate ttr-dispatch ttr-fuzzy ttr-llm-gateway ttr-nlp chrono geo money ttr-grounding-mcp ttr-resolver ttr-meta-mcp ttr-query-mcp ttr-fuzzy-mcp ttr-nlp-mcp ttr-worker-postgres ttr-worker-mssql ttr-worker-polars ttr-identity health"
+          ALL="veles ttr-query ttr-translate ttr-validate ttr-dispatch charon ttr-fuzzy ttr-llm-gateway ttr-nlp chrono geo money ttr-grounding-mcp ttr-resolver ttr-meta-mcp ttr-query-mcp ttr-fuzzy-mcp ttr-nlp-mcp ttr-worker-postgres ttr-worker-mssql ttr-worker-polars ttr-identity health"
 
           declare -a NAMES
           if [ "${{ github.event_name }}" = "push" ]; then
