@@ -10,3 +10,10 @@ geo: { enabled: false }
 money: { enabled: false }
 ttr-grounding-mcp: { enabled: false }
 ttr-resolver: { enabled: false }
+
+# charon OFF (CH-P1, review-074·F9). Charon is spine muscle by the CH union ruling —
+# but it is not on the QUERY PATH, which is the one claim this fixture makes. It moves
+# bytes between engines; query → translate → validate → dispatch → worker never calls
+# it. Same "not the query path" test that disables everything above. `full` and
+# `dark-geo` carry charon's render coverage.
+charon: { enabled: false }

@@ -23,6 +23,13 @@ whois:     { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } }
 health:    { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
 
 dispatch: { enabled: false }
+# charon needs backing this overlay does not stand up (S3 + Redis — its extraEnv points at
+# `data-seaweedfs` / `data-redis`, which the umbrella does not ship at all) AND a
+# `charon-connections` ConfigMap, which the chart deliberately does not template (the
+# deploying context owns it, see services/charon/k8s/values.yaml). Left enabled it mounts a
+# ConfigMap volume that never appears → FailedMount → never Ready → `helm install --wait`
+# times out. Same rationale as the workers. (CH-P1, review-074·F9.)
+charon: { enabled: false }
 llm-gateway: { enabled: false }
 mssql: { enabled: false }
 postgres: { enabled: false }
