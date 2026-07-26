@@ -1,0 +1,79 @@
+# Default values for charon. Env-agnostic: sane defaults, NO cluster knowledge. Deploying
+# environments (Olymp cluster values, or test-context values) override image, telemetry,
+# the downstream wiring in extraEnv, the connections ConfigMap and the DB-credentials secret.
+
+replicaCount: 1
+
+image:
+  repository: charon
+  # Defaults to .Chart.appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# HTTP (data + control) port and gRPC port (constellation services call charon over gRPC).
+# These are the container ports AND the service ports AND the probe target (http).
+ports:
+  http: 7250
+  grpc: 7251
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: 1000m
+
+# OpenTelemetry. charon reads a single OTLP endpoint URL (OTEL_EXPORTER_OTLP_ENDPOINT) plus
+# the OTEL_ENABLED_CHARON flag. Point `endpoint` at a collector (e.g. the cluster's Alloy)
+# and set enabled; leave disabled where no collector exists (e.g. test runs).
+telemetry:
+  enabled: false
+  # e.g. http://alloy.observability.svc.cluster.local:4317
+  endpoint: ""
+  serviceName: charon
+
+# Downstream / storage wiring. Defaults match the platform's stable in-cluster names
+# (Seaweed S3 gateway + Redis) — env-agnostic. A deploying env REPLACES this list to retarget.
+# CHARON_CONNECTIONS_PATH points at the mounted connection registry (see `connections` below).
+extraEnv:
+  - { name: CHARON_S3_ENDPOINT, value: "http://data-seaweedfs:8333" }
+  - { name: CHARON_REDIS_URL, value: "redis://data-redis:6379" }
+  - { name: CHARON_CONNECTIONS_PATH, value: "/etc/charon/connections.yaml" }
+
+# DB credentials for the named connections ride in via an OPTIONAL secretRef (a blob-only pod
+# still starts without it — plan §4 Stage 2.3). The secret is created by the deploying env.
+envFrom:
+  - secretRef:
+      name: charon-db-credentials
+      optional: true
+
+# The named-connection registry, mounted read-only at `mountPath`. Set `configMapName` to a
+# ConfigMap holding connections.yaml (with ${ENV} credential tokens fed from the envFrom
+# secret). The ConfigMap itself is created by the deploying context (olymp), NOT templated
+# here — its content is Bora-owned / environment-specific. Empty configMapName = no mount
+# (blob-only boot). Defaults to the base convention name `charon-connections`.
+connections:
+  configMapName: "charon-connections"
+  mountPath: /etc/charon
+
+# Probes (HTTP on the http port).
+readinessProbe:
+  path: /ready
+  initialDelaySeconds: 2
+  periodSeconds: 3
+  failureThreshold: 20
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
