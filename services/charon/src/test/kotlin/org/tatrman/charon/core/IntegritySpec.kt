@@ -189,7 +189,8 @@ private fun utf8(name: String): Field = Field(name, FieldType.notNullable(ArrowT
 
 private fun bigint(name: String): Field = Field(name, FieldType.notNullable(ArrowType.Int(64, true)), null)
 
-private fun float64(name: String): Field = Field(name, FieldType.notNullable(ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)), null)
+private fun float64(name: String): Field =
+    Field(name, FieldType.notNullable(ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)), null)
 
 private fun schemaOf(vararg fields: Field): Schema = Schema(listOf(*fields))
 

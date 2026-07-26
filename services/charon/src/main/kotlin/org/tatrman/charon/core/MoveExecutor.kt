@@ -41,13 +41,18 @@ sealed class Either<out L, out R> {
 
 /** The Stage 1.1 skeleton executor — every method returns `UNIMPLEMENTED`. */
 class SkeletonMoveExecutor : MoveExecutor {
-    override fun materialize(plan: Plan): Either<CharonError, MoveResult> = Either.Left(CharonError.NotYetImplemented(MoveRpc.MATERIALIZE))
+    override fun materialize(plan: Plan): Either<CharonError, MoveResult> =
+        Either.Left(CharonError.NotYetImplemented(MoveRpc.MATERIALIZE))
 
-    override fun stage(plan: Plan): Either<CharonError, MoveResult> = Either.Left(CharonError.NotYetImplemented(MoveRpc.STAGE))
+    override fun stage(plan: Plan): Either<CharonError, MoveResult> =
+        Either.Left(CharonError.NotYetImplemented(MoveRpc.STAGE))
 
-    override fun copy(plan: Plan): Either<CharonError, MoveResult> = Either.Left(CharonError.NotYetImplemented(MoveRpc.COPY))
+    override fun copy(plan: Plan): Either<CharonError, MoveResult> =
+        Either.Left(CharonError.NotYetImplemented(MoveRpc.COPY))
 
-    override fun evict(plan: Plan): Either<CharonError, EvictResult> = Either.Left(CharonError.NotYetImplemented(MoveRpc.EVICT))
+    override fun evict(plan: Plan): Either<CharonError, EvictResult> =
+        Either.Left(CharonError.NotYetImplemented(MoveRpc.EVICT))
 
-    override fun describe(plan: Plan): Either<CharonError, DescribeResult> = Either.Left(CharonError.NotYetImplemented(MoveRpc.DESCRIBE))
+    override fun describe(plan: Plan): Either<CharonError, DescribeResult> =
+        Either.Left(CharonError.NotYetImplemented(MoveRpc.DESCRIBE))
 }

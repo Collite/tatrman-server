@@ -365,7 +365,8 @@ private class InMemoryS3 {
         }
         every { client.getObject(any<GetObjectRequest>()) } answers {
             val req = firstArg<GetObjectRequest>()
-            val s = store[key(req.bucket(), req.key())] ?: throw NoSuchKeyException.builder().message("no such key").build()
+            val s =
+                store[key(req.bucket(), req.key())] ?: throw NoSuchKeyException.builder().message("no such key").build()
             val resp =
                 GetObjectResponse
                     .builder()
@@ -376,7 +377,8 @@ private class InMemoryS3 {
         }
         every { client.headObject(any<HeadObjectRequest>()) } answers {
             val req = firstArg<HeadObjectRequest>()
-            val s = store[key(req.bucket(), req.key())] ?: throw NoSuchKeyException.builder().message("no such key").build()
+            val s =
+                store[key(req.bucket(), req.key())] ?: throw NoSuchKeyException.builder().message("no such key").build()
             HeadObjectResponse
                 .builder()
                 .metadata(s.metadata)
@@ -411,6 +413,7 @@ private class InMemoryS3 {
                 .isTruncated(false)
                 .build()
         }
-        every { client.putObjectTagging(any<PutObjectTaggingRequest>()) } returns PutObjectTaggingResponse.builder().build()
+        every { client.putObjectTagging(any<PutObjectTaggingRequest>()) } returns
+            PutObjectTaggingResponse.builder().build()
     }
 }

@@ -14,11 +14,13 @@ import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
  * Regression guard for the ContentNegotiation-or-406 trap (EXAMPLES.md §2a).
  *
  * The Ktor `module()` responds to `/health` and `/ready` with
- * `call.respond(buildJsonObject { … })`. Without `install(ContentNegotiation)`
- * those responses have no negotiated representation and Ktor answers **HTTP 406**,
- * which the kubelet liveness probe reads as a failure → CrashLoopBackOff. Charon
- * wires its Ktor module by hand (no `installKtorServerBase`), so the plugin must be
- * installed explicitly; this spec fails with 406 if that install is ever dropped.
+ * `call.respond(buildJsonObject { … })`. Without ContentNegotiation those
+ * responses have no negotiated representation and Ktor answers **HTTP 406**,
+ * which the kubelet liveness probe reads as a failure → CrashLoopBackOff.
+ * CH-D4 aligned charon onto the shared `installKtorServerBase` (the 9-sibling
+ * pattern), which installs ContentNegotiation(json); this spec fails with 406 if
+ * that base install is ever dropped. Bodies are whitespace-insensitive here — the
+ * house base pretty-prints JSON, so asserts strip whitespace before matching.
  */
 class HealthRoutesSpec :
     StringSpec({
@@ -30,7 +32,7 @@ class HealthRoutesSpec :
                 application { module(meter()) }
                 val res = client.get("/health")
                 res.status shouldBe HttpStatusCode.OK
-                res.bodyAsText() shouldContain "\"status\":\"UP\""
+                res.bodyAsText().replace(Regex("\\s"), "") shouldContain "\"status\":\"UP\""
             }
         }
 
@@ -39,7 +41,7 @@ class HealthRoutesSpec :
                 application { module(meter()) }
                 val res = client.get("/ready")
                 res.status shouldBe HttpStatusCode.OK
-                res.bodyAsText() shouldContain "\"status\":\"UP\""
+                res.bodyAsText().replace(Regex("\\s"), "") shouldContain "\"status\":\"UP\""
             }
         }
 
@@ -48,7 +50,7 @@ class HealthRoutesSpec :
                 application { module(meter()) }
                 val res = client.get("/status")
                 res.status shouldBe HttpStatusCode.OK
-                res.bodyAsText() shouldContain "\"service\":\"charon\""
+                res.bodyAsText().replace(Regex("\\s"), "") shouldContain "\"service\":\"charon\""
             }
         }
     })

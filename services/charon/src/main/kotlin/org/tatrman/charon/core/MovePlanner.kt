@@ -203,4 +203,5 @@ fun Location.kind(): LocationKind =
 /** Promote a proto `WorkerSessionDf` to a `Location` (used by `Stage`'s typed
  *  request — the worker target is a `WorkerSessionDf`, not a `Location` on the
  *  wire). */
-private fun org.tatrman.transfer.v1.WorkerSessionDf.toLocation(): Location = Location.newBuilder().setWorkerDf(this).build()
+private fun org.tatrman.transfer.v1.WorkerSessionDf.toLocation(): Location =
+    Location.newBuilder().setWorkerDf(this).build()

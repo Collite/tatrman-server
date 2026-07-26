@@ -59,6 +59,12 @@ dependencies {
     // ttr-server-proto) beside worker.v1/plan.v1/etc.; the platform-only :proto:hall-proto is
     // left behind (charon carries only transfer.v1 + metis.v1, its own two protos).
     implementation(project(":shared:proto"))
+    // CH-D4 house bootstrap: the shared ktor base (ContentNegotiation/CORS/CallLogging/
+    // ForwardedHeaders) via installKtorServerBase — charon was the last service hand-rolling
+    // its Ktor module; this aligns it with the 9 siblings. (logging-config/otel-config +
+    // KtorServerBootstrap engine adoption deferred — see Application.kt: charon keeps its
+    // Netty probe server + prometheus /metrics; no unwired otel spans, no logback conflict.)
+    implementation(project(":shared:libs:kotlin:ktor-configurator"))
 
     implementation(libs.kotlinx.coroutines.core)
 

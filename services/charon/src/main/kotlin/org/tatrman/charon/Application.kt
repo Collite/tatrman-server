@@ -11,14 +11,11 @@ import org.tatrman.charon.endpoints.RedisEndpoint
 import org.tatrman.charon.grpc.CharonServiceImpl
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
 import io.ktor.http.ContentType
-import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.application.call
-import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
@@ -28,6 +25,9 @@ import io.lettuce.core.RedisClient
 import io.lettuce.core.api.StatefulRedisConnection
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
+import shared.ktor.KtorConfigFactory
+import shared.ktor.KtorServerConfig
+import shared.ktor.installKtorServerBase
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -147,11 +147,12 @@ fun main() {
         grpcPort,
     )
 
+    val serverConfig = KtorConfigFactory.fromConfig(config, "charon", httpPort)
     embeddedServer(
         Netty,
         port = httpPort,
         host = "0.0.0.0",
-        module = { module(meterRegistry, connectionRegistry, connectionsFile) },
+        module = { module(meterRegistry, connectionRegistry, connectionsFile, serverConfig) },
     ).start(wait = true)
 }
 
@@ -198,14 +199,14 @@ fun Application.module(
     meterRegistry: PrometheusMeterRegistry,
     connectionRegistry: ConnectionRegistry = ConnectionRegistry.of(emptyList()),
     connectionsFile: File? = null,
+    serverConfig: KtorServerConfig = KtorConfigFactory.fromConfig(ConfigFactory.load(), "charon", 7250),
 ) {
-    // JSON serialization for the probe/status routes below. Without this the
-    // `call.respond(buildJsonObject { … })` responses have no negotiated
-    // representation and Ktor returns HTTP 406 — a silently-failing
-    // `/health`/`/ready` probe → CrashLoopBackOff on the cluster. Every sibling
-    // service installs this via `installKtorServerBase`; charon wires the Ktor
-    // module by hand, so it must install it explicitly. See EXAMPLES.md §2a.
-    install(ContentNegotiation) { json() }
+    // CH-D4: the shared ktor base installs ContentNegotiation(json) + CORS + CallLogging +
+    // ForwardedHeaders — the 9-sibling pattern, replacing charon's hand-rolled install.
+    // ContentNegotiation is still the load-bearing piece: without it the JSON probe routes
+    // answer HTTP 406 and the kubelet reads a liveness failure → CrashLoopBackOff
+    // (HealthRoutesSpec is the regression guard). See EXAMPLES.md §2a.
+    installKtorServerBase(serverConfig)
     routing {
         get("/health") { call.respond(buildJsonObject { put("status", "UP") }) }
         get("/ready") {

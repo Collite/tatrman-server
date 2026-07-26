@@ -86,7 +86,9 @@ class FixturePolarsWorker : WorkerServiceGrpcKt.WorkerServiceCoroutineImplBase()
         store["$session/$df"] = payloads
     }
 
-    override suspend fun importDataFrame(requests: Flow<org.tatrman.worker.v1.ImportChunk>): org.tatrman.worker.v1.ImportDataFrameResult {
+    override suspend fun importDataFrame(
+        requests: Flow<org.tatrman.worker.v1.ImportChunk>,
+    ): org.tatrman.worker.v1.ImportDataFrameResult {
         val chunks = requests.toList()
         val header = chunks.first().header
         if (header.dfName == "__cap__") {
