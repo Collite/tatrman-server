@@ -20,7 +20,7 @@ syntax = "proto3";
 
 package org.tatrman.transfer.v1;
 
-import "cz/tatrman/common/v1/response_message.proto";
+import "org/tatrman/common/v1/response_message.proto";
 
 option java_package = "org.tatrman.transfer.v1";
 option java_multiple_files = true;
@@ -177,14 +177,14 @@ message MoveResult {
   int64 size_bytes = 5;
   int64 duration_ms = 6;
   // Rule 6 — application-layer outcomes.
-  repeated cz.tatrman.common.v1.ResponseMessage messages = 99;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
 }
 
 message EvictResult {
   // True if something was there. False is *not* an error — eviction is
   // idempotent (the caller may have re-evicted, or the TTL may have hit first).
   bool existed = 1;
-  repeated cz.tatrman.common.v1.ResponseMessage messages = 99;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
 }
 
 message DescribeResult {
@@ -198,5 +198,5 @@ message DescribeResult {
   // RFC3339; populated for Redis TTL / worker session TTL / S3 lifecycle rule
   // when the underlying store exposes one. Empty otherwise.
   optional string expires_at = 7;
-  repeated cz.tatrman.common.v1.ResponseMessage messages = 99;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;
 }

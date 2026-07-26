@@ -12,7 +12,7 @@ plugins {
 }
 
 application {
-    mainClass.set("cz.tatrman.charon.ApplicationKt")
+    mainClass.set("org.tatrman.charon.ApplicationKt")
     // Arrow's netty allocator uses NIO internals the JVM 9+ module system blocks — the installDist
     // launcher (the deployed image entrypoint) needs these opens or the first move crashes at runtime.
     applicationDefaultJvmArgs =
@@ -44,7 +44,7 @@ tasks.test {
 tasks.register<JavaExec>("bench") {
     group = "verification"
     description = "Run the Charon move-core micro-bench (rows/s + MB/s; network-free)."
-    mainClass.set("cz.tatrman.charon.bench.MovePipeBenchKt")
+    mainClass.set("org.tatrman.charon.bench.MovePipeBenchKt")
     classpath = sourceSets.test.get().runtimeClasspath
     jvmArgs(
         "--add-opens=java.base/java.nio=ALL-UNNAMED",
@@ -53,12 +53,12 @@ tasks.register<JavaExec>("bench") {
 }
 
 dependencies {
-    // The ④ hall proto: transfer.v1 (CharonService) + metis.v1 (carved) + cz.tatrman.common.v1,
-    // and — transitively via hall-proto's `api` — the published worker.v1/plan.v1 classes.
-    implementation(project(":proto:hall-proto"))
-    // Secret-store SPI (contracts §17, H-5): per-transfer source×target connection resolution — the
-    // TransferSecretInjector's SPI (never a dep on the hall service; same SPI, own injector).
-    implementation(project(":shared:secrets-spi"))
+    // The ④ transfer proto: transfer.v1 (CharonService) + metis.v1 (the worker-session
+    // endpoint's wire — CharonMetisInteropSpec / MetisWorkerGateway) + org.tatrman.common.v1.
+    // CH-P1/CH-D2: both now ride the server's :shared:proto umbrella (published as
+    // ttr-server-proto) beside worker.v1/plan.v1/etc.; the platform-only :proto:hall-proto is
+    // left behind (charon carries only transfer.v1 + metis.v1, its own two protos).
+    implementation(project(":shared:proto"))
 
     implementation(libs.kotlinx.coroutines.core)
 

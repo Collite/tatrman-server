@@ -90,6 +90,9 @@ include(":services:ttr-resolver")
 include(":services:chrono")
 include(":services:money")
 include(":services:geo")
+// CH — Charon (Arrow data mover, strangler ④): the one open Charon, unified from the
+// kantheon/platform siblings (arc CH; base = platform PL-P3 copy). transfer.v1 → :shared:proto.
+include(":services:charon")
 include(":services:ttr-grounding-mcp")
 
 // Engine workers (JVM; the Polars worker is Python — out of the Gradle build)
