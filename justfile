@@ -351,7 +351,10 @@ publish *args:
     # Resolve WHAT -> tag PREFIX + human description.
     if [ "$WHAT" = "bundle server-libs" ]; then
         PREFIX=server-libs
-        DESC="the 11 org.tatrman:* Maven libs"
+        # The set is Gradle-derived (build.gradle.kts `publishableLibs`) — this count is the
+        # human echo in the confirm prompt, keep it in sync when publishableLibs changes.
+        # 14 since CH-P2 (+ttr-transfer-core; ttr-server-proto now also carries transfer.v1+metis.v1).
+        DESC="the 14 org.tatrman:* Maven libs (publishableLibs — incl. ttr-server-proto + ttr-transfer-core)"
     else
         MOD_PATH=$(just _resolve "$WHAT")
         MOD_NAME=$(basename "$MOD_PATH")
