@@ -41,6 +41,7 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.S3Configuration
 import java.io.File
+import java.nio.file.Path
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
@@ -85,17 +86,20 @@ fun main() {
     // architecture §7 + plan §4 Stage 2.3); a missing file ⇒ blob-only pod.
     val connectionsFile = File(config.getString("charon.connections.path"))
     // CH-D3: connections resolve their `${VAR}` credential tokens through the open
-    // ConnectionSecretResolver port — env-var binding by default; a deployment registers
-    // a ServiceLoader provider (the platform's cz.tatrman:secrets-spi adapter at CH-P2)
-    // for real secret-store resolution. A missing/empty file ⇒ a blob-only pod.
+    // ConnectionSecretResolver port — env-var binding by default; a deployment binds a real
+    // secret-store adapter (the platform's cz.tatrman:secrets-spi adapter). CH-D8: the adapter
+    // is MOUNTED as a jar into charon.connections.plugin-dir (env CHARON_PLUGIN_DIR), loaded via
+    // an isolated child classloader — the open image carries no commercial bytes. Empty ⇒ the
+    // app classloader only (today's behaviour). A missing/empty connections file ⇒ a blob-only pod.
     // F5 (review-074) require-half: a deployment that MUST use a real store sets
-    // require-secret-resolver so a mis-packaged adapter fails the pod closed instead of
+    // require-secret-resolver so a missing/mis-mounted adapter fails the pod closed instead of
     // silently falling back to env binding.
+    val pluginDir = config.getString("charon.connections.plugin-dir").takeIf { it.isNotBlank() }?.let { Path.of(it) }
     val requireResolver = config.getBoolean("charon.connections.require-secret-resolver")
     val connectionRegistry =
         ConnectionRegistry.fromFile(
             connectionsFile,
-            ConnectionSecretResolver.discover(requireProvider = requireResolver),
+            ConnectionSecretResolver.discover(pluginDir = pluginDir, requireProvider = requireResolver),
         )
     val dbProvider = HikariConnectionProvider()
     Runtime.getRuntime().addShutdownHook(Thread { dbProvider.close() })
