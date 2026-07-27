@@ -15,4 +15,21 @@
 {{- with .Values.extraEnv }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
+{{- /* Secret-resolver plugin (CH-D8 / CH-P3 T2b) — only when an adapter image is mounted. */ -}}
+{{- with .Values.pluginDir }}
+{{- if .image }}
+- name: CHARON_PLUGIN_DIR
+  value: {{ .mountPath | quote }}
+- name: CHARON_REQUIRE_SECRET_RESOLVER
+  value: {{ .requireResolver | quote }}
+{{- if .secrets.secretName }}
+- name: CHARON_SECRETS_MOUNT_ROOT
+  value: {{ .secrets.mountPath | quote }}
+{{- end }}
+{{- if .refs.configMapName }}
+- name: CHARON_CONN_REFS_FILE
+  value: {{ printf "%s/%s" .refs.mountPath .refs.fileName | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end -}}

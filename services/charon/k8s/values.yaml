@@ -70,6 +70,32 @@ connections:
   configMapName: ""
   mountPath: /etc/charon
 
+# Secret-resolver plugin (CH-D8 / CH-P3 T2b). OFF by default — an empty pluginDir.image ⇒ no
+# initContainer, no plugin mount, and discover() sees no dir ⇒ the env-var default resolver
+# (today's behaviour). A deploying env (olymp) sets `image` to a platform-published shadow of the
+# transfer-secrets-adapter (Jib packaged image; its jars land in the emptyDir at mountPath) to bind
+# the CH-D3 ConnectionSecretResolver port onto the platform secrets-spi. The estate runs the EXACT
+# published open image; zero cz.tatrman bytes are baked in. See t2b-d3-mount-design.md.
+pluginDir:
+  # OCI image (platform-published, Jib) whose /app/*.jar the initContainer copies into the mount.
+  image: ""
+  pullPolicy: IfNotPresent
+  # emptyDir mount → CHARON_PLUGIN_DIR (the dir the open loader globs for *.jar).
+  mountPath: /opt/charon/plugins
+  # Secret material for the mounted FileSecretStore (CHARON_SECRETS_MOUNT_ROOT). Only needed once
+  # named connections resolve `secret://` refs; empty secretName ⇒ not mounted.
+  secrets:
+    secretName: ""
+    mountPath: /etc/charon/secrets
+  # Refs file (CHARON_CONN_REFS_FILE): NAME = secret://store/path, from a ConfigMap. Empty ⇒ off.
+  refs:
+    configMapName: ""
+    mountPath: /etc/charon/conn-refs
+    fileName: refs.conf
+  # Fail the pod closed if no resolver provider registers (CHARON_REQUIRE_SECRET_RESOLVER). Set
+  # true only AFTER the image is confirmed mounted (the ordering trap — see design §5).
+  requireResolver: false
+
 # Probes (HTTP on the http port).
 readinessProbe:
   path: /ready
