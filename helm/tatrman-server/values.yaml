@@ -67,7 +67,7 @@ query: { enabled: true }
 translate: { enabled: true }
 validate: { enabled: true }
 dispatch: { enabled: true }
-charon: { enabled: true }
+charon: { enabled: true, image: { tag: "0.10.0"} }
 llm-gateway: { enabled: true }
 mssql: { enabled: true }
 postgres: { enabled: true }
