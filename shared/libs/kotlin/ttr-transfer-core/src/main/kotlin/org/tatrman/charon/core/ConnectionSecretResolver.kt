@@ -56,6 +56,16 @@ fun interface ConnectionSecretResolver {
          * open interface, closed plugin). A jar whose provider fails to
          * instantiate is **skipped with a warning** — never a silent env fallback.
          *
+         * **⚑ Signature verification is DEFERRED, not overlooked** (CH-P3.T2b, recorded
+         * at review-076 F5). `svarog/PluginHost` gained a PGP **verify-if-signed** pass
+         * plus a `require-signed` knob at PL-P5.S2; this host has **neither** — it loads
+         * whatever `*.jar` is in the mounted directory, into the **credential-resolution**
+         * path, which is exactly the case that knob was built for. Today the only
+         * writer of that directory is the deployment itself (a k8s volume), so the
+         * trust boundary is the estate's, not this code's. Adopting the svarog policy
+         * here is **recommended** and is an open call for the operate lane — do not
+         * read its absence as a decision that verification is unnecessary.
+         *
          * **Always logs which resolver won**, because the fallback is silent by
          * design and its failure mode is confusing: a deployment that *ships* the
          * CH-P2 platform adapter but mis-mounts it (empty/absent plugin dir, or no
