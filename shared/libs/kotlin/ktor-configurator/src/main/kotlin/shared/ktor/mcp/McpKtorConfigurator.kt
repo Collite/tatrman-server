@@ -21,6 +21,7 @@ import io.opentelemetry.instrumentation.ktor.v3_0.KtorServerTelemetry
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
+import shared.ktor.ProbePaths
 
 private fun jsonRpcErrorBody(cause: Throwable) =
     buildJsonObject {
@@ -71,6 +72,9 @@ fun Application.installMcpKtorBase(
     config.callLoggingConfig?.let { callLoggingConfig ->
         install(CallLogging) {
             level = callLoggingConfig.level
+            // Drop k8s liveness/readiness probes — see ProbePaths. Without this every pod logs a
+            // line every few seconds forever, which buries real traffic.
+            filter { !ProbePaths.isProbe(it.request.path()) }
             format { call ->
                 callLoggingConfig.customFormat?.invoke(call.request)
                     ?: "-> ${call.request.httpMethod.value} ${call.request.path()}"
