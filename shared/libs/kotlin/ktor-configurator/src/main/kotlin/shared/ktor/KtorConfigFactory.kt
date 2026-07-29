@@ -35,6 +35,13 @@ object KtorConfigFactory {
     private const val DEFAULT_CORS_ENV_VAR = "KTOR_CORS_ALLOWED_HOSTS"
     private val DEFAULT_CORS_HOSTS = listOf("localhost:5173", "localhost:7010")
 
+    // Netty's write timeout, in seconds. Deliberately NOT Ktor's 10s default — see
+    // KtorServerConfig.responseWriteTimeoutSeconds and
+    // project/server/features/stream-timeouts/contracts.md §3.
+    private const val DEFAULT_RESPONSE_WRITE_TIMEOUT_S = 180L
+    private const val RESPONSE_WRITE_TIMEOUT_PATH = "server.response-write-timeout-s"
+    private const val RESPONSE_WRITE_TIMEOUT_LEGACY_PATH = "ktor.deployment.response-write-timeout-s"
+
     fun fromConfig(
         config: Config,
         defaultServiceName: String,
@@ -69,6 +76,19 @@ object KtorConfigFactory {
                     null
                 },
             forwardedHeaderEnabled = config.hasPath("forwardedHeader"),
+            // Resolved from the config root rather than from `serverSection` above: that
+            // variable falls back to `ktor.deployment` only when `server.port` is missing, so a
+            // config with a `server` section but no port would look in the wrong place. The two
+            // explicit paths express the documented precedence directly.
+            responseWriteTimeoutSeconds =
+                config
+                    .getLongOrElse(
+                        RESPONSE_WRITE_TIMEOUT_PATH,
+                        config.getLongOrElse(
+                            RESPONSE_WRITE_TIMEOUT_LEGACY_PATH,
+                            DEFAULT_RESPONSE_WRITE_TIMEOUT_S,
+                        ),
+                    ).toInt(),
         )
     }
 

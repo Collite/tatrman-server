@@ -37,4 +37,11 @@ dependencies {
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
+
+    // A real HTTP client, so the Netty engine tests can prove `responseWriteTimeoutSeconds`
+    // actually reaches the engine (ST-P2·S1·T5). Asserting on the data class alone would pass
+    // even if the `configure` block were deleted. The server side needs nothing extra —
+    // `ktor-server-netty` is already an `implementation` dep above, which `testImplementation`
+    // extends.
+    testImplementation(libs.ktor.client.cio)
 }
