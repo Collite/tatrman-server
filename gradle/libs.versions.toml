@@ -3,8 +3,8 @@
 # https://docs.gradle.org/current/userguide/version_catalogs.html
 
 [versions]
-tatrman-modeler           = "0.8.6"
-tatrman-ttr-metadata      = "0.10.2"
+tatrman-grammar           = "0.11.0"
+tatrman-ttr-metadata      = "0.10.4"
 tatrman-ttr-translator    = "0.10.1"
 tatrman-ttr-plan-proto    = "0.10.1"
 # SV-P1 S4 — Maven Central publishing via the Central Portal.
@@ -166,126 +166,126 @@ pgvector                  = "0.1.6"
 
 [libraries]
 # Kotlin
-kotlin-stdlib                       = { module = "org.jetbrains.kotlin:kotlin-stdlib",                    version.ref = "kotlin" }
-kotlin-reflect                      = { module = "org.jetbrains.kotlin:kotlin-reflect",                   version.ref = "kotlin" }
-kotlinx-coroutines-core             = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",         version.ref = "kotlinx-coroutines" }
-kotlinx-coroutines-test             = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test",         version.ref = "kotlinx-coroutines" }
-kotlinx-serialization-json          = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json",      version.ref = "kotlinx-serialization" }
+kotlin-stdlib                       = { module = "org.jetbrains.kotlin:kotlin-stdlib",                      version.ref = "kotlin" }
+kotlin-reflect                      = { module = "org.jetbrains.kotlin:kotlin-reflect",                     version.ref = "kotlin" }
+kotlinx-coroutines-core             = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",           version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test             = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test",           version.ref = "kotlinx-coroutines" }
+kotlinx-serialization-json          = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json",        version.ref = "kotlinx-serialization" }
 
 # Ktor server
-ktor-server-core                    = { module = "io.ktor:ktor-server-core-jvm",                          version.ref = "ktor" }
-ktor-server-cio                     = { module = "io.ktor:ktor-server-cio-jvm",                           version.ref = "ktor" }
-ktor-server-netty                   = { module = "io.ktor:ktor-server-netty-jvm",                         version.ref = "ktor" }
-ktor-server-content-negotiation     = { module = "io.ktor:ktor-server-content-negotiation-jvm",           version.ref = "ktor" }
-ktor-serialization-kotlinx-json     = { module = "io.ktor:ktor-serialization-kotlinx-json-jvm",           version.ref = "ktor" }
-ktor-server-status-pages            = { module = "io.ktor:ktor-server-status-pages-jvm",                  version.ref = "ktor" }
-ktor-server-call-logging            = { module = "io.ktor:ktor-server-call-logging-jvm",                  version.ref = "ktor" }
-ktor-server-test-host               = { module = "io.ktor:ktor-server-test-host-jvm",                     version.ref = "ktor" }
-ktor-server-cors                    = { module = "io.ktor:ktor-server-cors-jvm",                           version.ref = "ktor" }
-ktor-server-sse                     = { module = "io.ktor:ktor-server-sse-jvm",                            version.ref = "ktor" }
-ktor-server-forwarded-header        = { module = "io.ktor:ktor-server-forwarded-header-jvm",               version.ref = "ktor" }
+ktor-server-core                    = { module = "io.ktor:ktor-server-core-jvm",                            version.ref = "ktor" }
+ktor-server-cio                     = { module = "io.ktor:ktor-server-cio-jvm",                             version.ref = "ktor" }
+ktor-server-netty                   = { module = "io.ktor:ktor-server-netty-jvm",                           version.ref = "ktor" }
+ktor-server-content-negotiation     = { module = "io.ktor:ktor-server-content-negotiation-jvm",             version.ref = "ktor" }
+ktor-serialization-kotlinx-json     = { module = "io.ktor:ktor-serialization-kotlinx-json-jvm",             version.ref = "ktor" }
+ktor-server-status-pages            = { module = "io.ktor:ktor-server-status-pages-jvm",                    version.ref = "ktor" }
+ktor-server-call-logging            = { module = "io.ktor:ktor-server-call-logging-jvm",                    version.ref = "ktor" }
+ktor-server-test-host               = { module = "io.ktor:ktor-server-test-host-jvm",                       version.ref = "ktor" }
+ktor-server-cors                    = { module = "io.ktor:ktor-server-cors-jvm",                            version.ref = "ktor" }
+ktor-server-sse                     = { module = "io.ktor:ktor-server-sse-jvm",                             version.ref = "ktor" }
+ktor-server-forwarded-header        = { module = "io.ktor:ktor-server-forwarded-header-jvm",                version.ref = "ktor" }
 ktor-opentelemetry                  = { module = "io.opentelemetry.instrumentation:opentelemetry-ktor-3.0", version.ref = "ktor-otel" }
 
 # Ktor client
-ktor-client-core                    = { module = "io.ktor:ktor-client-core-jvm",                          version.ref = "ktor" }
-ktor-client-apache                  = { module = "io.ktor:ktor-client-apache-jvm",                        version.ref = "ktor" }
-ktor-client-cio                     = { module = "io.ktor:ktor-client-cio-jvm",                           version.ref = "ktor" }
-ktor-client-content-negotiation     = { module = "io.ktor:ktor-client-content-negotiation",               version.ref = "ktor" }
-ktor-client-auth                    = { module = "io.ktor:ktor-client-auth-jvm",                          version.ref = "ktor" }
-ktor-client-mock                    = { module = "io.ktor:ktor-client-mock-jvm",                          version.ref = "ktor" }
+ktor-client-core                    = { module = "io.ktor:ktor-client-core-jvm",                            version.ref = "ktor" }
+ktor-client-apache                  = { module = "io.ktor:ktor-client-apache-jvm",                          version.ref = "ktor" }
+ktor-client-cio                     = { module = "io.ktor:ktor-client-cio-jvm",                             version.ref = "ktor" }
+ktor-client-content-negotiation     = { module = "io.ktor:ktor-client-content-negotiation",                 version.ref = "ktor" }
+ktor-client-auth                    = { module = "io.ktor:ktor-client-auth-jvm",                            version.ref = "ktor" }
+ktor-client-mock                    = { module = "io.ktor:ktor-client-mock-jvm",                            version.ref = "ktor" }
 
 # Config
-typesafe-config                     = { module = "com.typesafe:config",                                   version.ref = "typesafe-config" }
+typesafe-config                     = { module = "com.typesafe:config",                                     version.ref = "typesafe-config" }
 
 # Logging
-slf4j-api                           = { module = "org.slf4j:slf4j-api",                                   version.ref = "slf4j" }
-logback-classic                     = { module = "ch.qos.logback:logback-classic",                        version.ref = "logback" }
-logstash-logback-encoder            = { module = "net.logstash.logback:logstash-logback-encoder",         version.ref = "logstash" }
-kotlin-logging                      = { module = "io.github.oshai:kotlin-logging-jvm",                    version.ref = "kotlin-logging" }
+slf4j-api                           = { module = "org.slf4j:slf4j-api",                                     version.ref = "slf4j" }
+logback-classic                     = { module = "ch.qos.logback:logback-classic",                          version.ref = "logback" }
+logstash-logback-encoder            = { module = "net.logstash.logback:logstash-logback-encoder",           version.ref = "logstash" }
+kotlin-logging                      = { module = "io.github.oshai:kotlin-logging-jvm",                      version.ref = "kotlin-logging" }
 
 # Protobuf
-protobuf-java                       = { module = "com.google.protobuf:protobuf-java",                     version.ref = "protobuf" }
-protobuf-java-util                  = { module = "com.google.protobuf:protobuf-java-util",                version.ref = "protobuf" }
-protobuf-kotlin                     = { module = "com.google.protobuf:protobuf-kotlin",                   version.ref = "protobuf" }
-protobuf-protoc                     = { module = "com.google.protobuf:protoc",                            version.ref = "protobuf" }
+protobuf-java                       = { module = "com.google.protobuf:protobuf-java",                       version.ref = "protobuf" }
+protobuf-java-util                  = { module = "com.google.protobuf:protobuf-java-util",                  version.ref = "protobuf" }
+protobuf-kotlin                     = { module = "com.google.protobuf:protobuf-kotlin",                     version.ref = "protobuf" }
+protobuf-protoc                     = { module = "com.google.protobuf:protoc",                              version.ref = "protobuf" }
 
 # gRPC — kantheon v1 prefers MCP over gRPC for new services, but `logging-config`
 # carries gRPC interceptors for cross-service reuse. Only the kotlin-stub is exposed
 # in the catalog; full netty/protobuf/grpc transitives are added by the gRPC-using
 # service modules themselves.
-grpc-stub                            = { module = "io.grpc:grpc-stub",                                     version.ref = "grpc" }
-grpc-protobuf                        = { module = "io.grpc:grpc-protobuf",                                 version.ref = "grpc" }
-grpc-kotlin-stub                     = { module = "io.grpc:grpc-kotlin-stub",                              version.ref = "grpc-kotlin" }
-grpc-netty-shaded                    = { module = "io.grpc:grpc-netty-shaded",                             version.ref = "grpc" }
-grpc-services                        = { module = "io.grpc:grpc-services",                                 version.ref = "grpc" }
-grpc-inprocess                        = { module = "io.grpc:grpc-inprocess",                               version.ref = "grpc" }
+grpc-stub                            = { module = "io.grpc:grpc-stub",                                      version.ref = "grpc" }
+grpc-protobuf                        = { module = "io.grpc:grpc-protobuf",                                  version.ref = "grpc" }
+grpc-kotlin-stub                     = { module = "io.grpc:grpc-kotlin-stub",                               version.ref = "grpc-kotlin" }
+grpc-netty-shaded                    = { module = "io.grpc:grpc-netty-shaded",                              version.ref = "grpc" }
+grpc-services                        = { module = "io.grpc:grpc-services",                                  version.ref = "grpc" }
+grpc-inprocess                        = { module = "io.grpc:grpc-inprocess",                                version.ref = "grpc" }
 
 # Algorithm + graph + VCS
 jgrapht-core                         = { module = "org.jgrapht:jgrapht-core",                               version.ref = "jgrapht" }
-jgit                                 = { module = "org.eclipse.jgit:org.eclipse.jgit",                     version.ref = "jgit" }
-apache-commons-compress              = { module = "org.apache.commons:commons-compress",                   version.ref = "apache-commons-compress" }
-micrometer-registry-prometheus       = { module = "io.micrometer:micrometer-registry-prometheus",          version.ref = "micrometer" }
-java-string-similarity               = { module = "info.debatty:java-string-similarity",                   version.ref = "java-string-similarity" }
+jgit                                 = { module = "org.eclipse.jgit:org.eclipse.jgit",                      version.ref = "jgit" }
+apache-commons-compress              = { module = "org.apache.commons:commons-compress",                    version.ref = "apache-commons-compress" }
+micrometer-registry-prometheus       = { module = "io.micrometer:micrometer-registry-prometheus",           version.ref = "micrometer" }
+java-string-similarity               = { module = "info.debatty:java-string-similarity",                    version.ref = "java-string-similarity" }
 
 # Jackson YAML — used by capabilities-mcp ManifestYamlLoader
-jackson-databind                    = { module = "com.fasterxml.jackson.core:jackson-databind",           version.ref = "jackson" }
-jackson-module-kotlin               = { module = "com.fasterxml.jackson.module:jackson-module-kotlin",    version.ref = "jackson" }
+jackson-databind                    = { module = "com.fasterxml.jackson.core:jackson-databind",             version.ref = "jackson" }
+jackson-module-kotlin               = { module = "com.fasterxml.jackson.module:jackson-module-kotlin",      version.ref = "jackson" }
 jackson-dataformat-yaml             = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
 
 # Kotlin MCP SDK
-kotlin-mcp-sdk                      = { module = "io.modelcontextprotocol:kotlin-sdk",                    version.ref = "kotlin-mcp-sdk" }
+kotlin-mcp-sdk                      = { module = "io.modelcontextprotocol:kotlin-sdk",                      version.ref = "kotlin-mcp-sdk" }
 
 # Koog (declared so Phase 2 picks it up without further catalog churn).
 # Only the umbrella `koog-agents-jvm` artifact is published at 0.8.0; core + tools come transitively.
 # See agents/_koog-spike/docs/koog-spike-report.md §T1 for the discovery.
-koog-agents                         = { module = "ai.koog:koog-agents-jvm",                               version.ref = "koog" }
+koog-agents                         = { module = "ai.koog:koog-agents-jvm",                                 version.ref = "koog" }
 # Test-only — provides `getMockExecutor` (DSL for mocking PromptExecutor). Used by T3 to
 # exercise StructureFixingParser without a Wiremock HTTP layer; matches Koog's own
 # StructureFixingParserTest idiom. Not pulled by the umbrella artifact.
-koog-agents-test                    = { module = "ai.koog:agents-test-jvm",                               version.ref = "koog" }
+koog-agents-test                    = { module = "ai.koog:agents-test-jvm",                                 version.ref = "koog" }
 
 # OTel
-opentelemetry-api                   = { module = "io.opentelemetry:opentelemetry-api",                    version.ref = "otel" }
-opentelemetry-sdk                   = { module = "io.opentelemetry:opentelemetry-sdk",                    version.ref = "otel" }
+opentelemetry-api                   = { module = "io.opentelemetry:opentelemetry-api",                      version.ref = "otel" }
+opentelemetry-sdk                   = { module = "io.opentelemetry:opentelemetry-sdk",                      version.ref = "otel" }
 opentelemetry-sdk-extension-autoconfigure = { module = "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure", version.ref = "otel" }
-opentelemetry-exporter-otlp         = { module = "io.opentelemetry:opentelemetry-exporter-otlp",          version.ref = "otel" }
-opentelemetry-semconv               = { module = "io.opentelemetry.semconv:opentelemetry-semconv",        version.ref = "otel-semconv" }
+opentelemetry-exporter-otlp         = { module = "io.opentelemetry:opentelemetry-exporter-otlp",            version.ref = "otel" }
+opentelemetry-semconv               = { module = "io.opentelemetry.semconv:opentelemetry-semconv",          version.ref = "otel-semconv" }
 # Coroutine-aware OTel context propagation (Span.asContextElement) — used by the otel-config withSpan helper.
-opentelemetry-extension-kotlin      = { module = "io.opentelemetry:opentelemetry-extension-kotlin",       version.ref = "otel" }
+opentelemetry-extension-kotlin      = { module = "io.opentelemetry:opentelemetry-extension-kotlin",         version.ref = "otel" }
 # In-memory span exporter for span-emission/nesting component tests.
-opentelemetry-sdk-testing           = { module = "io.opentelemetry:opentelemetry-sdk-testing",            version.ref = "otel" }
+opentelemetry-sdk-testing           = { module = "io.opentelemetry:opentelemetry-sdk-testing",              version.ref = "otel" }
 otel-logback-appender               = { module = "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0", version.ref = "otel-instrumentation-base" }
 
 # Caches — Caffeine. Used by themis ResolverCache; central pin matches ai-platform.
-caffeine                            = { module = "com.github.ben-manes.caffeine:caffeine",                version.ref = "caffeine" }
+caffeine                            = { module = "com.github.ben-manes.caffeine:caffeine",                  version.ref = "caffeine" }
 
 # Tests
-kotest-runner-junit5                = { module = "io.kotest:kotest-runner-junit5",                        version.ref = "kotest" }
-kotest-assertions-core              = { module = "io.kotest:kotest-assertions-core",                      version.ref = "kotest" }
-kotest-property                     = { module = "io.kotest:kotest-property",                             version.ref = "kotest" }
-mockk                               = { module = "io.mockk:mockk",                                        version.ref = "mockk" }
-wiremock                            = { module = "org.wiremock:wiremock",                                 version.ref = "wiremock" }
-testcontainers                      = { module = "org.testcontainers:testcontainers",                    version.ref = "testcontainers" }
+kotest-runner-junit5                = { module = "io.kotest:kotest-runner-junit5",                          version.ref = "kotest" }
+kotest-assertions-core              = { module = "io.kotest:kotest-assertions-core",                        version.ref = "kotest" }
+kotest-property                     = { module = "io.kotest:kotest-property",                               version.ref = "kotest" }
+mockk                               = { module = "io.mockk:mockk",                                          version.ref = "mockk" }
+wiremock                            = { module = "org.wiremock:wiremock",                                   version.ref = "wiremock" }
+testcontainers                      = { module = "org.testcontainers:testcontainers",                       version.ref = "testcontainers" }
 # Testcontainers 2.x DB modules (note the `testcontainers-` artifact prefix +
 # `org.testcontainers.<db>` package, new in 2.0). Component tier — Stage 1.2.
 # Postgres is native multi-arch; the MSSQL *image* is amd64-only (CI-gated spec).
-testcontainers-mssqlserver          = { module = "org.testcontainers:testcontainers-mssqlserver",        version.ref = "testcontainers" }
-testcontainers-postgresql           = { module = "org.testcontainers:testcontainers-postgresql",         version.ref = "testcontainers" }
+testcontainers-mssqlserver          = { module = "org.testcontainers:testcontainers-mssqlserver",           version.ref = "testcontainers" }
+testcontainers-postgresql           = { module = "org.testcontainers:testcontainers-postgresql",            version.ref = "testcontainers" }
 # Read-only k8s status reads for the integration readiness gate (Stage 2.1).
-fabric8-kubernetes-client           = { module = "io.fabric8:kubernetes-client",                          version.ref = "fabric8" }
+fabric8-kubernetes-client           = { module = "io.fabric8:kubernetes-client",                            version.ref = "fabric8" }
 
 # (fork Stage 2.6) com.tatrman:shared-proto removed — Themis retargeted to
 # in-repo protos (:shared:proto). No ai-platform Maven coordinate remains.
 
 # Engine
-calcite-core                        = { module = "org.apache.calcite:calcite-core",                        version.ref = "calcite" }
+calcite-core                        = { module = "org.apache.calcite:calcite-core",                         version.ref = "calcite" }
 
 # Modeler — TTR parser/writer/semantics (third-party Maven artifacts).
-tatrman-ttr-parser                  = { module = "org.tatrman:ttr-parser",                                version.ref = "tatrman-modeler" }
-tatrman-ttr-writer                  = { module = "org.tatrman:ttr-writer",                                version.ref = "tatrman-modeler" }
-tatrman-ttr-semantics               = { module = "org.tatrman:ttr-semantics",                            version.ref = "tatrman-modeler" }
-tatrman-ttr-metadata                = { module = "org.tatrman:ttr-metadata",                              version.ref = "tatrman-ttr-metadata" }
-tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",                          version.ref = "tatrman-ttr-metadata" }
+tatrman-ttr-parser                  = { module = "org.tatrman:ttr-parser",                                  version.ref = "tatrman-grammar" }
+tatrman-ttr-writer                  = { module = "org.tatrman:ttr-writer",                                  version.ref = "tatrman-grammar" }
+tatrman-ttr-semantics               = { module = "org.tatrman:ttr-semantics",                               version.ref = "tatrman-grammar" }
+tatrman-ttr-metadata                = { module = "org.tatrman:ttr-metadata",                                version.ref = "tatrman-ttr-metadata" }
+tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",                            version.ref = "tatrman-ttr-metadata" }
 # translate.v1 public line (SV-P1 gate 2, kotlin-translator/v0.9.0): the renamed
 # ttr-plan-proto/ttr-translator now resolve from GitHub Packages — the SV-P0
 # 0.0.1-LOCAL/mavenLocal interim is retired. 0.9.0 carries org/tatrman/translate/v1/.
@@ -293,25 +293,25 @@ tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",
 # catalog functions (period_start/period_end/geo_distance_m + grounding dialects) omitted in
 # the extraction — source fix tatrman @ 9fe7b2d, released at bf739bd. Retires the
 # 0.9.5-rgp3-SNAPSHOT mavenLocal interim.
-tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                            version.ref = "tatrman-ttr-plan-proto" }
-tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                            version.ref = "tatrman-ttr-translator" }
-exposed-core                        = { module = "org.jetbrains.exposed:exposed-core",                    version.ref = "exposed" }
-exposed-jdbc                        = { module = "org.jetbrains.exposed:exposed-jdbc",                    version.ref = "exposed" }
-exposed-java-time                   = { module = "org.jetbrains.exposed:exposed-java-time",               version.ref = "exposed" }
+tatrman-ttr-plan-proto              = { module = "org.tatrman:ttr-plan-proto",                              version.ref = "tatrman-ttr-plan-proto" }
+tatrman-ttr-translator              = { module = "org.tatrman:ttr-translator",                              version.ref = "tatrman-ttr-translator" }
+exposed-core                        = { module = "org.jetbrains.exposed:exposed-core",                      version.ref = "exposed" }
+exposed-jdbc                        = { module = "org.jetbrains.exposed:exposed-jdbc",                      version.ref = "exposed" }
+exposed-java-time                   = { module = "org.jetbrains.exposed:exposed-java-time",                 version.ref = "exposed" }
 # JSON/JSONB column types — iris-bff (Stage 1.2) JSONB columns, raw-string serialize.
-exposed-json                        = { module = "org.jetbrains.exposed:exposed-json",                    version.ref = "exposed" }
-hikaricp                            = { module = "com.zaxxer:HikariCP",                                  version.ref = "hikaricp" }
-postgresql                          = { module = "org.postgresql:postgresql",                            version.ref = "pgsql" }
+exposed-json                        = { module = "org.jetbrains.exposed:exposed-json",                      version.ref = "exposed" }
+hikaricp                            = { module = "com.zaxxer:HikariCP",                                     version.ref = "hikaricp" }
+postgresql                          = { module = "org.postgresql:postgresql",                               version.ref = "pgsql" }
 # RG-P3 geo — JTS: GeoJSON polygon → WKT + bounding box for the boundary-containment recipe.
-jts-core                            = { module = "org.locationtech.jts:jts-core",                        version.ref = "jts" }
-mssql-jdbc                          = { module = "com.microsoft.sqlserver:mssql-jdbc",                   version.ref = "mssql" }
+jts-core                            = { module = "org.locationtech.jts:jts-core",                           version.ref = "jts" }
+mssql-jdbc                          = { module = "com.microsoft.sqlserver:mssql-jdbc",                      version.ref = "mssql" }
 
 # Kleio / DocWH ingestion parsers (services/kallimachos, P1 Stage 1.1 — ported
 # from doc-store). pgvector helper is the VECTOR-plane binding (P2 Stage 2.1).
-jsoup                               = { module = "org.jsoup:jsoup",                                      version.ref = "jsoup" }
-flexmark                            = { module = "com.vladsch.flexmark:flexmark",                        version.ref = "flexmark" }
-pdfbox                              = { module = "org.apache.pdfbox:pdfbox",                             version.ref = "pdfbox" }
-pgvector                            = { module = "com.pgvector:pgvector",                                version.ref = "pgvector" }
+jsoup                               = { module = "org.jsoup:jsoup",                                         version.ref = "jsoup" }
+flexmark                            = { module = "com.vladsch.flexmark:flexmark",                           version.ref = "flexmark" }
+pdfbox                              = { module = "org.apache.pdfbox:pdfbox",                                version.ref = "pdfbox" }
+pgvector                            = { module = "com.pgvector:pgvector",                                   version.ref = "pgvector" }
 
 # Apache Arrow Java — workers/MSSQL JDBC ResultSet → Arrow IPC; Charon's
 # `services/charon` `MovePlanner` → `ArrowPipe` (P1 Stage 1.2) uses
@@ -323,30 +323,30 @@ pgvector                            = { module = "com.pgvector:pgvector",       
 # stable across the move pipe and the worker (workers/polars
 # `_schema_fingerprint` reference impl — charon/contracts.md §6). P2 Stage 2.1
 # adds `arrow-jdbc` + the ADBC drivers when the spike gate runs.
-arrow-vector                        = { module = "org.apache.arrow:arrow-vector",                         version.ref = "arrow-java" }
-arrow-memory-netty                  = { module = "org.apache.arrow:arrow-memory-netty",                   version.ref = "arrow-java" }
+arrow-vector                        = { module = "org.apache.arrow:arrow-vector",                           version.ref = "arrow-java" }
+arrow-memory-netty                  = { module = "org.apache.arrow:arrow-memory-netty",                     version.ref = "arrow-java" }
 
 # AWS SDK v2 S3 client — Charon's SeaweedEndpoint (P1 Stage 1.2) talks to
 # SeaweedFS S3 gateway at `data-seaweedfs:8333` (architecture §2). SeaweedFS is
 # S3-API-compatible; no custom protocol code.
-aws-sdk-s3                          = { module = "software.amazon.awssdk:s3",                             version.ref = "aws-sdk-s3" }
+aws-sdk-s3                          = { module = "software.amazon.awssdk:s3",                               version.ref = "aws-sdk-s3" }
 
 # Lettuce — Charon's RedisEndpoint (P1 Stage 1.3) — binary-safe value access
 # for Arrow IPC bytes. Matches the platform Redis (architecture §2).
-lettuce-core                        = { module = "io.lettuce:lettuce-core",                              version.ref = "lettuce" }
+lettuce-core                        = { module = "io.lettuce:lettuce-core",                                version.ref = "lettuce" }
 
 # jtokkit — BPE tokenizer for the LG gateway's flagged last-resort budget estimate (LG-P4·S2, D-4).
-jtokkit                             = { module = "com.knuddels:jtokkit",                                 version.ref = "jtokkit" }
+jtokkit                             = { module = "com.knuddels:jtokkit",                                   version.ref = "jtokkit" }
 
 # auth0 java-jwt — RS256 verification of Keycloak admin tokens on the LG admin API (LG-P4·S3).
-auth0-java-jwt                      = { module = "com.auth0:java-jwt",                                    version.ref = "auth0-java-jwt" }
+auth0-java-jwt                      = { module = "com.auth0:java-jwt",                                     version.ref = "auth0-java-jwt" }
 
 # Apache POI / Parquet / Hadoop — data-formatter XLSX + Parquet output
-apache-poi-ooxml                    = { module = "org.apache.poi:poi-ooxml",                              version.ref = "apache-poi" }
-apache-parquet-avro                 = { module = "org.apache.parquet:parquet-avro",                       version.ref = "apache-parquet" }
-apache-parquet-hadoop               = { module = "org.apache.parquet:parquet-hadoop",                     version.ref = "apache-parquet" }
-hadoop-common                       = { module = "org.apache.hadoop:hadoop-common",                       version.ref = "hadoop" }
-hadoop-mapreduce-client-core        = { module = "org.apache.hadoop:hadoop-mapreduce-client-core",        version.ref = "hadoop" }
+apache-poi-ooxml                    = { module = "org.apache.poi:poi-ooxml",                               version.ref = "apache-poi" }
+apache-parquet-avro                 = { module = "org.apache.parquet:parquet-avro",                        version.ref = "apache-parquet" }
+apache-parquet-hadoop               = { module = "org.apache.parquet:parquet-hadoop",                      version.ref = "apache-parquet" }
+hadoop-common                       = { module = "org.apache.hadoop:hadoop-common",                        version.ref = "hadoop" }
+hadoop-mapreduce-client-core        = { module = "org.apache.hadoop:hadoop-mapreduce-client-core",         version.ref = "hadoop" }
 
 # LLM gateway (Spring Boot) — fork Stage 2.5.
 boot-starter-web                    = { module = "org.springframework.boot:spring-boot-starter-web",                       version.ref = "spring-boot" }
@@ -386,8 +386,8 @@ ktor-server-websockets              = { module = "io.ktor:ktor-server-websockets
 ktor-server-auth                    = { module = "io.ktor:ktor-server-auth-jvm",                            version.ref = "ktor" }
 ktor-client-logging                 = { module = "io.ktor:ktor-client-logging-jvm",                         version.ref = "ktor" }
 sqlite-jdbc                         = { module = "org.xerial:sqlite-jdbc",                                  version.ref = "sqliteJdbc" }
-telegrambots-longpolling            = { module = "org.telegram:telegrambots-longpolling",                  version.ref = "telegram" }
-telegrambots-client-jetty           = { module = "org.telegram:telegrambots-client-jetty-adapter",         version.ref = "telegram" }
+telegrambots-longpolling            = { module = "org.telegram:telegrambots-longpolling",                   version.ref = "telegram" }
+telegrambots-client-jetty           = { module = "org.telegram:telegrambots-client-jetty-adapter",          version.ref = "telegram" }
 bouncycastle                        = { module = "org.bouncycastle:bcprov-jdk18on",                         version.ref = "bouncycastle" }
 pf4j                                = { module = "org.pf4j:pf4j",                                           version.ref = "pf4j" }
 oras-sdk                            = { module = "land.oras:oras-java-sdk",                                 version.ref = "oras" }
@@ -404,7 +404,7 @@ kotest-assertions                   = { module = "io.kotest:kotest-assertions-co
 kotest-framework-engine             = { module = "io.kotest:kotest-framework-engine",                       version.ref = "kotest" }
 kotest-junit-platform-runner        = { module = "io.kotest:kotest-runner-junit5-jvm",                      version.ref = "kotest" }
 detekt-api                          = { module = "io.gitlab.arturbosch.detekt:detekt-api",                  version.ref = "detekt" }
-detekt-test                         = { module = "io.gitlab.arturbosch.detekt:detekt-test",                version.ref = "detekt" }
+detekt-test                         = { module = "io.gitlab.arturbosch.detekt:detekt-test",                 version.ref = "detekt" }
 
 
 [bundles]
