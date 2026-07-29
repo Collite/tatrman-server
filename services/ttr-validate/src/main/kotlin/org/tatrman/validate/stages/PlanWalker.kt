@@ -128,6 +128,17 @@ internal object PlanWalker {
             // pass-through here so wrapTableScans is a structural identity
             // for workspace_ref leaves.
             PlanNode.NodeCase.WORKSPACE_REF -> plan
+            // Store (write-plan root): recurse into the read subtree so the source
+            // rows of a write are RLS-filtered just like a read plan. The write
+            // `target` is a qname field, not a TableScan, so it is never wrapped.
+            PlanNode.NodeCase.STORE ->
+                PlanNode
+                    .newBuilder()
+                    .setStore(
+                        plan.store
+                            .toBuilder()
+                            .setInput(wrapTableScans(plan.store.input, target, predicate)),
+                    ).build()
             PlanNode.NodeCase.SCAN, PlanNode.NodeCase.VALUES, PlanNode.NodeCase.NODE_NOT_SET -> plan
         }
 
@@ -197,6 +208,7 @@ internal object WorkspaceRefDetector {
             org.tatrman.plan.v1.PlanNode.NodeCase.SORT -> hasWorkspaceRef(plan.sort.input)
             org.tatrman.plan.v1.PlanNode.NodeCase.LIMIT_OFFSET -> hasWorkspaceRef(plan.limitOffset.input)
             org.tatrman.plan.v1.PlanNode.NodeCase.SUBQUERY -> hasWorkspaceRef(plan.subquery.subquery)
+            org.tatrman.plan.v1.PlanNode.NodeCase.STORE -> hasWorkspaceRef(plan.store.input)
             org.tatrman.plan.v1.PlanNode.NodeCase.VALUES,
             org.tatrman.plan.v1.PlanNode.NodeCase.NODE_NOT_SET,
             -> false
@@ -333,6 +345,13 @@ internal object ColumnUsage {
             PlanNode.NodeCase.SORT -> collectTables(plan.sort.input, acc)
             PlanNode.NodeCase.LIMIT_OFFSET -> collectTables(plan.limitOffset.input, acc)
             PlanNode.NodeCase.SUBQUERY -> collectTables(plan.subquery.subquery, acc)
+            // Store (write-plan root): the write `target` and the tables read by
+            // its `input` are both surfaces a DENY rule may fire on. Conservative
+            // (deny-leaning) posture: count both.
+            PlanNode.NodeCase.STORE -> {
+                acc.add(plan.store.target)
+                collectTables(plan.store.input, acc)
+            }
             PlanNode.NodeCase.SCAN,
             PlanNode.NodeCase.WORKSPACE_REF,
             PlanNode.NodeCase.VALUES,
@@ -403,6 +422,9 @@ internal object ColumnUsage {
             }
             PlanNode.NodeCase.LIMIT_OFFSET -> collectColumns(plan.limitOffset.input, acc)
             PlanNode.NodeCase.SUBQUERY -> collectColumns(plan.subquery.subquery, acc)
+            // Store (write-plan root): its `input` read subtree already carries the
+            // grain-key + measure columns as a projection, so recursing covers them.
+            PlanNode.NodeCase.STORE -> collectColumns(plan.store.input, acc)
             PlanNode.NodeCase.SCAN,
             PlanNode.NodeCase.WORKSPACE_REF,
             PlanNode.NodeCase.VALUES,
@@ -535,6 +557,16 @@ internal object ExpressionRewriter {
                         plan.subquery
                             .toBuilder()
                             .setSubquery(rewriteColumnRefs(plan.subquery.subquery, transform)),
+                    ).build()
+            // Store (write-plan root): mask column refs inside the read subtree that
+            // computes the rows being written.
+            PlanNode.NodeCase.STORE ->
+                PlanNode
+                    .newBuilder()
+                    .setStore(
+                        plan.store
+                            .toBuilder()
+                            .setInput(rewriteColumnRefs(plan.store.input, transform)),
                     ).build()
         }
 

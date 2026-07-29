@@ -37,6 +37,13 @@ internal object PlanScanCollector {
             PlanNode.NodeCase.SORT -> walk(plan.sort.input, acc)
             PlanNode.NodeCase.LIMIT_OFFSET -> walk(plan.limitOffset.input, acc)
             PlanNode.NodeCase.SUBQUERY -> walk(plan.subquery.subquery, acc)
+            // A Store is a write-plan root: the write `target` needs a connection
+            // just like a scanned table, and its `input` read subtree carries the
+            // source scans. Both contribute candidate connections.
+            PlanNode.NodeCase.STORE -> {
+                acc.add(plan.store.target)
+                walk(plan.store.input, acc)
+            }
             PlanNode.NodeCase.WORKSPACE_REF -> Unit
             PlanNode.NodeCase.VALUES, PlanNode.NodeCase.NODE_NOT_SET -> Unit
         }
@@ -154,6 +161,16 @@ internal object PlanQnameRewriter {
                             rewrite(plan.subquery.subquery, defaultSchema, mismatches),
                         ),
                     ).build()
+            // Store (write-plan root): concretize the write `target` and rewrite the
+            // `input` read subtree so both target the worker's advertised schema.
+            PlanNode.NodeCase.STORE -> {
+                val storeBuilder =
+                    plan.store
+                        .toBuilder()
+                        .setInput(rewrite(plan.store.input, defaultSchema, mismatches))
+                concretize(plan.store.target, defaultSchema, mismatches)?.let { storeBuilder.setTarget(it) }
+                b.setStore(storeBuilder).build()
+            }
             PlanNode.NodeCase.WORKSPACE_REF,
             PlanNode.NodeCase.VALUES,
             PlanNode.NodeCase.NODE_NOT_SET,
@@ -202,6 +219,7 @@ internal object WorkspaceRefDetector {
             PlanNode.NodeCase.SORT -> hasWorkspaceRef(plan.sort.input)
             PlanNode.NodeCase.LIMIT_OFFSET -> hasWorkspaceRef(plan.limitOffset.input)
             PlanNode.NodeCase.SUBQUERY -> hasWorkspaceRef(plan.subquery.subquery)
+            PlanNode.NodeCase.STORE -> hasWorkspaceRef(plan.store.input)
             PlanNode.NodeCase.VALUES, PlanNode.NodeCase.NODE_NOT_SET -> false
         }
 }

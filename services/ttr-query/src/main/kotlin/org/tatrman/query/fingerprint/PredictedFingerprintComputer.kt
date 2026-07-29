@@ -73,6 +73,9 @@ object PredictedFingerprintComputer {
             // back to empty; the Worker emits its own schema fingerprint on
             // the result batch.
             PlanNode.NodeCase.WORKSPACE_REF -> emptyList()
+            // A Store node is a write-plan root; it produces no read result set,
+            // so the predicted result-schema fingerprint is best-effort empty.
+            PlanNode.NodeCase.STORE -> emptyList()
         }
 
     private fun projectColumns(node: ProjectNode): List<Pair<String, String>> =

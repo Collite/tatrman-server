@@ -151,6 +151,10 @@ class PolicyEngine(
             PlanNode.NodeCase.SORT -> collectTableScans(plan.sort.input, acc)
             PlanNode.NodeCase.LIMIT_OFFSET -> collectTableScans(plan.limitOffset.input, acc)
             PlanNode.NodeCase.SUBQUERY -> collectTableScans(plan.subquery.subquery, acc)
+            // Store (write-plan root): RLS read-predicates apply to the tables scanned
+            // by the `input` subtree that produces the rows to write; the write `target`
+            // is not a scanned source, so recurse into `input` only.
+            PlanNode.NodeCase.STORE -> collectTableScans(plan.store.input, acc)
             // workspace_ref is a session-scoped leaf with no table to evaluate against.
             PlanNode.NodeCase.WORKSPACE_REF -> Unit
             PlanNode.NodeCase.VALUES, PlanNode.NodeCase.NODE_NOT_SET -> Unit

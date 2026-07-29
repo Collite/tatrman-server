@@ -196,6 +196,9 @@ class RuleEnforcer(
             PlanNode.NodeCase.WORKSPACE_REF,
             PlanNode.NodeCase.VALUES,
             PlanNode.NodeCase.NODE_NOT_SET,
+            // A Store is a write-plan root, never a source for ORDER-BY / group-by
+            // mask resolution; no bare column ref to resolve here.
+            PlanNode.NodeCase.STORE,
             -> false
         }
 
