@@ -23,13 +23,13 @@ whois:     { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } }
 health:    { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
 
 dispatch: { enabled: false }
-# charon rejoins kind-CI at CH-P2·T5a. The `helm install --wait` blocker at F9a was the
-# non-optional `charon-connections` ConfigMap mount (FailedMount → never Ready → timeout); T5a
-# defaulted `connections.configMapName` to "" (blob-only boot, no mount), so a bare install now
-# boots and reports Ready via the static `/ready` (which does NOT probe S3/Redis — connections are
-# lazily-validated, "one broken DB ≠ unready pod"). The data-seaweedfs/data-redis backing the overlay
-# omits only bounds *functional* moves, not readiness — so this is a genuine coverage win. (review-074·F9b.)
-charon: { enabled: true, resources: { requests: { cpu: 25m, memory: 256Mi } } }
+# charon is DISABLED in kind-CI pending Collite/tatrman-server#25. It rejoined at CH-P2·T5a on the
+# assumption it boots blob-only without Redis — but charon:0.10.0's Redis connect is eager + fatal at
+# boot (review-076·F1), and the kind smoke subset has no data-redis, so the pod never reaches /ready
+# (Available: 0/1) and the nightly `helm install --wait` times out. This only ever ran on the nightly
+# (the job is skipped on pushes), which is where it was dying. Re-enable once #25 provisions Redis /
+# makes the connect lazy / drops charon from the --wait set.
+charon: { enabled: false }
 llm-gateway: { enabled: false }
 mssql: { enabled: false }
 postgres: { enabled: false }
