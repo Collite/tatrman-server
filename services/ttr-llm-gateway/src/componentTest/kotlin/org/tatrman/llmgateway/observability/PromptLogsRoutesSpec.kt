@@ -15,6 +15,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.config.MapApplicationConfig
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -194,6 +195,68 @@ class PromptLogsRoutesSpec :
                     }
                 unknown.status shouldBe HttpStatusCode.OK
                 items(unknown.bodyAsText()).size shouldBe 0
+            }
+        }
+
+        // review-079 R8. The two keys used to be ORed, so naming one turn returned
+        // every row sharing its trace — sibling turns' prompt and completion bodies
+        // included. turn_ref now wins when both are supplied.
+        "a turn_ref never widens to its whole trace, even when both keys are given" {
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application { module(cfg) }
+
+                // Two turns, ONE trace — what a session-level trace looks like.
+                seed(turnRef = "turn-mine", traceId = "trace-shared", prompt = "mine")
+                seed(turnRef = "turn-theirs", traceId = "trace-shared", prompt = "theirs")
+
+                val both =
+                    client.get("/v1/prompt-logs?turn_ref=turn-mine&trace_id=trace-shared") {
+                        header(HttpHeaders.Authorization, "Bearer $adminJwt")
+                    }
+                val rows = items(both.bodyAsText())
+                rows.size shouldBe 1
+                rows
+                    .single()
+                    .jsonObject["promptText"]!!
+                    .jsonPrimitive.content shouldBe "mine"
+
+                // The trace remains a first-class key on its own — a caller holding
+                // only a trace still gets everything under it.
+                items(
+                    client
+                        .get("/v1/prompt-logs?trace_id=trace-shared") {
+                            header(HttpHeaders.Authorization, "Bearer $adminJwt")
+                        }.bodyAsText(),
+                ).size shouldBe 2
+            }
+        }
+
+        // review-079 R12. `created_at` has a DEFAULT, not a NOT NULL; a row carrying
+        // an explicit NULL used to throw in the row mapper and 500 the whole page.
+        "a row with a null created_at serializes instead of failing the page" {
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application { module(cfg) }
+
+                seed(turnRef = "turn-null-ts", traceId = null, prompt = "no timestamp")
+                DriverManager
+                    .getConnection(pgc.jdbcUrl, pgc.username, pgc.password)
+                    .use { c ->
+                        c.prepareStatement("UPDATE prompt_logs SET created_at = NULL WHERE turn_ref = ?").use { st ->
+                            st.setString(1, "turn-null-ts")
+                            st.executeUpdate()
+                        }
+                    }
+
+                val res =
+                    client.get("/v1/prompt-logs?turn_ref=turn-null-ts") {
+                        header(HttpHeaders.Authorization, "Bearer $adminJwt")
+                    }
+                res.status shouldBe HttpStatusCode.OK
+                val row = items(res.bodyAsText()).single().jsonObject
+                row["promptText"]!!.jsonPrimitive.content shouldBe "no timestamp"
+                row["createdAt"]!!.jsonPrimitive.contentOrNull shouldBe null
             }
         }
     })

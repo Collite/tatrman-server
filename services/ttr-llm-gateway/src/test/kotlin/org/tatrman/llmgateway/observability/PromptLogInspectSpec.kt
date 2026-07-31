@@ -3,6 +3,7 @@ package org.tatrman.llmgateway.observability
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -111,5 +112,32 @@ class PromptLogInspectSpec :
                 )
 
             row.toJson()["promptText"]!!.jsonPrimitive.content shouldBe secretish
+        }
+
+        // review-079 R12. `created_at` is DEFAULT, not NOT NULL — a row carrying an
+        // explicit NULL must serialize as null rather than take the page to a 500.
+        "a null created_at serializes as null, not as the string \"null\"" {
+            val row =
+                PromptLogRow(
+                    id = 3,
+                    turnRef = "t",
+                    traceId = null,
+                    requestedModel = null,
+                    servedModel = null,
+                    servedProvider = null,
+                    fallbackFrom = null,
+                    cached = false,
+                    tokensPrompt = null,
+                    tokensCompletion = null,
+                    durationMs = null,
+                    ttfbMs = null,
+                    costUsd = null,
+                    status = null,
+                    createdAt = null,
+                    promptText = null,
+                    responseText = null,
+                )
+
+            row.toJson()["createdAt"]!!.jsonPrimitive.contentOrNull shouldBe null
         }
     })

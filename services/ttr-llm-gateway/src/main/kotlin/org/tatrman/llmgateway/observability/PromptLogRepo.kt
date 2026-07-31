@@ -5,7 +5,6 @@ import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import shared.libs.db.common.DatabaseConnection
@@ -35,7 +34,12 @@ internal object PromptLogs : Table("prompt_logs") {
     val ttfbMs = long("ttfb_ms").nullable()
     val costUsd = decimal("cost_usd", 12, 6).nullable()
     val status = text("status").nullable()
-    val createdAt = timestampWithTimeZone("created_at")
+
+    // Nullable to match the DDL: V1 gives `created_at` a DEFAULT, not a NOT NULL.
+    // The writer omits the column and lets the default fire, but a legacy 1.x row
+    // with an explicit NULL would make a non-null mapping throw and take the WHOLE
+    // page to a 500 (review-079 R12).
+    val createdAt = timestampWithTimeZone("created_at").nullable()
     val promptText = text("prompt_text").nullable()
     val responseText = text("response_text").nullable()
 
@@ -58,7 +62,7 @@ data class PromptLogRow(
     val ttfbMs: Long?,
     val costUsd: Double?,
     val status: String?,
-    val createdAt: OffsetDateTime,
+    val createdAt: OffsetDateTime?,
     val promptText: String?,
     val responseText: String?,
 )
@@ -85,10 +89,17 @@ class PromptLogRepo(
             PromptLogs
                 .selectAll()
                 .where {
+                    // **turn_ref wins when both are supplied.** ORing them looked
+                    // generous and was a leak: a trace that covers more than one turn
+                    // would return the sibling turns' rows — prompt and completion
+                    // bodies included — to a caller who named one turn. One turn is
+                    // one trace today, so this was latent; it stops being latent the
+                    // moment a session-level trace exists, which is exactly what the
+                    // PT arc's OTel phase was building toward (review-079 R8).
+                    //
+                    // The trace id remains a first-class key on its own, for callers
+                    // that hold a trace and no turn.
                     when {
-                        !turnRef.isNullOrBlank() && !traceId.isNullOrBlank() ->
-                            (PromptLogs.turnRef eq turnRef) or (PromptLogs.traceId eq traceId)
-
                         !turnRef.isNullOrBlank() -> PromptLogs.turnRef eq turnRef
                         else -> PromptLogs.traceId eq traceId
                     }
@@ -166,7 +177,7 @@ fun PromptLogRow.toJson(): kotlinx.serialization.json.JsonObject =
         put("ttfbMs", kotlinx.serialization.json.JsonPrimitive(ttfbMs))
         put("costUsd", kotlinx.serialization.json.JsonPrimitive(costUsd))
         put("status", kotlinx.serialization.json.JsonPrimitive(status))
-        put("createdAt", kotlinx.serialization.json.JsonPrimitive(createdAt.toString()))
+        put("createdAt", kotlinx.serialization.json.JsonPrimitive(createdAt?.toString()))
         put("promptText", kotlinx.serialization.json.JsonPrimitive(promptText))
         put("responseText", kotlinx.serialization.json.JsonPrimitive(responseText))
     }
