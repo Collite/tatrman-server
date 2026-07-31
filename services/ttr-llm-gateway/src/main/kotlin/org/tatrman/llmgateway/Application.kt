@@ -66,8 +66,11 @@ import org.tatrman.llmgateway.governance.Settle
 import org.tatrman.llmgateway.governance.TokenEstimator
 import org.tatrman.llmgateway.governance.Usage
 import org.tatrman.llmgateway.observability.GatewayMetrics
+import org.tatrman.llmgateway.observability.clampPromptLogLimit
 import org.tatrman.llmgateway.observability.PromptLogRecord
+import org.tatrman.llmgateway.observability.PromptLogRepo
 import org.tatrman.llmgateway.observability.PromptLogWriter
+import org.tatrman.llmgateway.observability.toJson
 import org.tatrman.llmgateway.provider.PassthroughHandler
 import org.tatrman.llmgateway.provider.ProviderRegistry
 import org.tatrman.llmgateway.provider.ProviderResult
@@ -186,6 +189,9 @@ fun Application.module(
     val engine = InferenceEngine(gateway.providers, circuit, metrics = gwMetrics, tracer = tracer)
     // Prompt-log sink (F-1): async write-behind over PG. Present only with a store.
     val promptLog = pg?.let { PromptLogWriter(it.db, this, metrics) }
+    // Read side of the same table — the inspect surface (contracts §5). Present only
+    // with a store, exactly like the writer.
+    val promptLogRepo = pg?.let { PromptLogRepo(it.db) }
 
     // Admission + budgets (LG-P4·S2). Rate limiting rides Redis (fail-open on outage); money budgets ride PG
     // (so they exist only with a store — storeless boots skip both). Team rpm / budget / cost-center prefixes
@@ -686,6 +692,43 @@ fun Application.module(
                     }
                 },
             )
+        }
+
+        // ── Inspect plane: prompt-log read surface (PT arc S2.2 T1, PT contracts §5) ────────────
+        //
+        // A generally useful operator/debug capability, not a PT-private hook: the gateway is the
+        // only component that knows what was actually sent to a model and what came back, and
+        // until now that was write-only — the rows existed and nothing could read them. Anyone
+        // debugging a bad answer, auditing spend, or reconciling a fallback needs this.
+        //
+        // Correlation keys ONLY (turn_ref / trace_id, at least one required). There is deliberately
+        // no "list recent" or date-range form: an unfiltered listing of this table is a bulk export
+        // of every prompt and completion the estate has ever produced.
+        //
+        // Gated on the SAME admin role as /admin/keys. See the PT STATUS note — whether iris-bff
+        // reaches this with a service identity or the user's OBO bearer is an open identity
+        // question, and gating narrowly now is the reversible choice.
+        if (adminAuth != null && promptLogRepo != null) {
+            get("/v1/prompt-logs") {
+                if (!call.adminOk(adminAuth)) return@get
+                val turnRef = call.request.queryParameters["turn_ref"]
+                val traceId = call.request.queryParameters["trace_id"]
+                if (turnRef.isNullOrBlank() && traceId.isNullOrBlank()) {
+                    return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "one of 'turn_ref' or 'trace_id' is required") },
+                    )
+                }
+                // Cap the cap: a caller asking for 10_000 rows gets PROMPT_LOGS_MAX_LIMIT.
+                val limit = clampPromptLogLimit(call.request.queryParameters["limit"]?.toIntOrNull())
+
+                val rows = promptLogRepo.find(turnRef = turnRef, traceId = traceId, limit = limit)
+                call.respond(
+                    buildJsonObject {
+                        putJsonArray("items") { rows.forEach { add(it.toJson()) } }
+                    },
+                )
+            }
         }
 
         // ── Admin plane (Keycloak JWT, realm role llm-gateway-admin — LG-P4·S3, contracts §1.8) ──
