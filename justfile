@@ -148,7 +148,9 @@ test-kt module="":
 # GATING: ci.yml's `component-test` job runs exactly this command on every PR.
 # Needs a running Docker daemon (postgres:16-alpine, redis:7-alpine).
 test-component:
-    ./gradlew componentTest
+    # `--continue`: one module's failure must not hide the other eight. The tier's
+    # first CI run stopped at ttr-translate and left the rest of the estate unknown.
+    ./gradlew componentTest --continue
 
 # ── Python lane (uv + ruff + pytest) — services/ttr-nlp, workers/ttr-worker-polars ─
 
