@@ -159,7 +159,7 @@ class TranslateUnparseComponentSpec :
                     Path.of(
                         System.getProperty("integrationHarness.repoRoot")
                             ?: error("integrationHarness.repoRoot not set — cannot record goldens"),
-                        "services/translate/src/componentTest/resources/translate",
+                        "services/ttr-translate/src/componentTest/resources/translate",
                     )
                 Files.createDirectories(dir)
                 Files.writeString(dir.resolve("$name.sql"), actual.trimEnd() + "\n")
