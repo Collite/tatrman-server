@@ -206,6 +206,28 @@ spec:
       targetPort: 7221
 
 ---
+# Source: tatrman-server/charts/grounding-mcp/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: grounding-mcp
+  labels:
+    app.kubernetes.io/name: grounding-mcp
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: grounding-mcp-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: grounding-mcp
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7153
+      targetPort: 7153
+
+---
 # Source: tatrman-server/charts/health/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -516,53 +538,6 @@ spec:
       targetPort: 7306
 
 ---
-# Source: tatrman-server/charts/translate/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: translate
-  labels:
-    app.kubernetes.io/name: translate
-    app.kubernetes.io/instance: tatrman-server
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "dev"
-    helm.sh/chart: translate-0.1.0
-spec:
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: translate
-    app.kubernetes.io/instance: tatrman-server
-  ports:
-    - name: http
-      port: 7275
-      targetPort: 7275
-    - name: grpc
-      port: 7276
-      targetPort: 7276
-
----
-# Source: tatrman-server/charts/grounding-mcp/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: grounding-mcp
-  labels:
-    app.kubernetes.io/name: grounding-mcp
-    app.kubernetes.io/instance: tatrman-server
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "dev"
-    helm.sh/chart: grounding-mcp-0.1.0
-spec:
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: grounding-mcp
-    app.kubernetes.io/instance: tatrman-server
-  ports:
-    - name: http
-      port: 7153
-      targetPort: 7153
-
----
 # Source: tatrman-server/charts/resolver/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -578,6 +553,31 @@ spec:
   type: ClusterIP
   selector:
     app.kubernetes.io/name: resolver
+    app.kubernetes.io/instance: tatrman-server
+  ports:
+    - name: http
+      port: 7275
+      targetPort: 7275
+    - name: grpc
+      port: 7276
+      targetPort: 7276
+
+---
+# Source: tatrman-server/charts/translate/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: translate
+  labels:
+    app.kubernetes.io/name: translate
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: translate-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: translate
     app.kubernetes.io/instance: tatrman-server
   ports:
     - name: http
@@ -1225,6 +1225,75 @@ spec:
             requests:
               cpu: 150m
               memory: 384Mi
+
+---
+# Source: tatrman-server/charts/grounding-mcp/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grounding-mcp
+  labels:
+    app.kubernetes.io/name: grounding-mcp
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: grounding-mcp-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grounding-mcp
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: grounding-mcp
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: grounding-mcp
+          image: "ghcr.io/collite/grounding-mcp:0.9.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7153
+          env:
+            - name: MCP_GROUNDING_SERVER_PORT
+              value: "7153"
+            - name: CHRONO_HOST
+              value: "chrono"
+            - name: CHRONO_GRPC_PORT
+              value: "7220"
+            - name: GEO_HOST
+              value: "geo"
+            - name: GEO_GRPC_PORT
+              value: "7221"
+            - name: MONEY_HOST
+              value: "money"
+            - name: MONEY_GRPC_PORT
+              value: "7222"
+            - name: OTEL_ENABLED_GROUNDING_MCP
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7153
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7153
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 384Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
 
 ---
 # Source: tatrman-server/charts/health/templates/deployment.yaml
@@ -2080,142 +2149,6 @@ spec:
               memory: 512Mi
 
 ---
-# Source: tatrman-server/charts/translate/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: translate
-  labels:
-    app.kubernetes.io/name: translate
-    app.kubernetes.io/instance: tatrman-server
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "dev"
-    helm.sh/chart: translate-0.1.0
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: translate
-      app.kubernetes.io/instance: tatrman-server
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: translate
-        app.kubernetes.io/instance: tatrman-server
-    spec:
-      containers:
-        - name: translate
-          image: "ghcr.io/collite/translate:0.9.0"
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: http
-              containerPort: 7275
-            - name: grpc
-              containerPort: 7276
-          env:
-            - name: TRANSLATE_SERVER_PORT
-              value: "7275"
-            - name: TRANSLATE_SERVER_GRPC_PORT
-              value: "7276"
-            - name: OTEL_SERVICE_NAME
-              value: "translate"
-            - name: OTEL_ENABLED_TRANSLATE
-              value: "false"
-            - name: VELES_GRPC_HOST
-              value: veles
-            - name: VELES_GRPC_PORT
-              value: "7261"
-          readinessProbe:
-            httpGet:
-              path: /ready
-              port: 7275
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            failureThreshold: 30
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 7275
-            initialDelaySeconds: 10
-            periodSeconds: 15
-          resources:
-            limits:
-              cpu: "1"
-              memory: 1Gi
-            requests:
-              cpu: 250m
-              memory: 512Mi
-
----
-# Source: tatrman-server/charts/grounding-mcp/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: grounding-mcp
-  labels:
-    app.kubernetes.io/name: grounding-mcp
-    app.kubernetes.io/instance: tatrman-server
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "dev"
-    helm.sh/chart: grounding-mcp-0.1.0
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: grounding-mcp
-      app.kubernetes.io/instance: tatrman-server
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: grounding-mcp
-        app.kubernetes.io/instance: tatrman-server
-    spec:
-      containers:
-        - name: grounding-mcp
-          image: "ghcr.io/collite/grounding-mcp:0.9.0"
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: http
-              containerPort: 7153
-          env:
-            - name: MCP_GROUNDING_SERVER_PORT
-              value: "7153"
-            - name: CHRONO_HOST
-              value: "chrono"
-            - name: CHRONO_GRPC_PORT
-              value: "7220"
-            - name: GEO_HOST
-              value: "geo"
-            - name: GEO_GRPC_PORT
-              value: "7221"
-            - name: MONEY_HOST
-              value: "money"
-            - name: MONEY_GRPC_PORT
-              value: "7222"
-            - name: OTEL_ENABLED_GROUNDING_MCP
-              value: "false"
-          readinessProbe:
-            httpGet:
-              path: /ready
-              port: 7153
-            initialDelaySeconds: 2
-            periodSeconds: 3
-            failureThreshold: 20
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 7153
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          resources:
-            limits:
-              cpu: 500m
-              memory: 384Mi
-            requests:
-              cpu: 100m
-              memory: 192Mi
-
----
 # Source: tatrman-server/charts/resolver/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -2301,6 +2234,73 @@ spec:
               port: 7275
             initialDelaySeconds: 5
             periodSeconds: 10
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: tatrman-server/charts/translate/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: translate
+  labels:
+    app.kubernetes.io/name: translate
+    app.kubernetes.io/instance: tatrman-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "dev"
+    helm.sh/chart: translate-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: translate
+      app.kubernetes.io/instance: tatrman-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: translate
+        app.kubernetes.io/instance: tatrman-server
+    spec:
+      containers:
+        - name: translate
+          image: "ghcr.io/collite/translate:0.9.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7275
+            - name: grpc
+              containerPort: 7276
+          env:
+            - name: TRANSLATE_SERVER_PORT
+              value: "7275"
+            - name: TRANSLATE_SERVER_GRPC_PORT
+              value: "7276"
+            - name: OTEL_SERVICE_NAME
+              value: "translate"
+            - name: OTEL_ENABLED_TRANSLATE
+              value: "false"
+            - name: VELES_GRPC_HOST
+              value: veles
+            - name: VELES_GRPC_PORT
+              value: "7261"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 7275
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7275
+            initialDelaySeconds: 10
+            periodSeconds: 15
           resources:
             limits:
               cpu: "1"
