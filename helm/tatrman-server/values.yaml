@@ -7,7 +7,7 @@
 # same key here. See helm/tatrman-server/values-contract.md for the documented keys.
 #
 # Value KEYS are the chart names, which differ from the image/dir names for a few
-# services (identity → `whois`, ttr-query → `query`, ttr-meta-mcp → `veles-mcp`, …).
+# services (identity → `whois`, query → `query`, meta-mcp → `veles-mcp`, …).
 # The mapping is in the values contract.
 
 # ── The single product-tag knob ───────────────────────────────────────────────
@@ -83,19 +83,19 @@ fuzzy-mcp: { enabled: true, image: { tag: "0.9.1" } }
 nlp-mcp: { enabled: true, image: { tag: "0.9.1" } }
 chrono: { enabled: true }
 money: { enabled: true }
-ttr-grounding-mcp: { enabled: true }
+grounding-mcp: { enabled: true }
 
 nlp:
   enabled: true
   # Real F1 publish tag (per-service override of the product tag).
   image:
     tag: "0.9.2"
-  # FI-4 opt-in (S0 disposition 2026-07-17): ttr-nlp degrades gracefully when the
+  # FI-4 opt-in (S0 disposition 2026-07-17): nlp degrades gracefully when the
   # UFAL backends are absent, so the CC BY-NC-SA UFAL engines ship OFF by default.
   # Enabling them is a per-install licence decision (see values contract). The
   # permissive-licence backends stay on so the default install has working NLP.
   # The backends template renders its own image tag (not via the global knob), so
-  # each carries the ttr-nlp-* image-family tag explicitly.
+  # each carries the nlp-* image-family tag explicitly.
   backends:
     morphodita: { enabled: false, image: { tag: "0.9.2" } }  # UFAL CC BY-NC-SA — opt-in
     nametag3: { enabled: false, image: { tag: "0.9.1" } }    # UFAL CC BY-NC-SA — opt-in
@@ -110,7 +110,7 @@ geo:
   nominatim:
     baseUrl: ""
 
-ttr-resolver:
+resolver:
   enabled: true
   # Real F1 publish tag.
   image:

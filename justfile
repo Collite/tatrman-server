@@ -13,7 +13,7 @@ set shell := ["bash", "-uc"]
 
 # The 22 container-image modules release-image.yml builds (per-module `<module>/v*`
 # tag → ghcr.io/collite/<module>). Kept in lockstep with release-image.yml's map.
-image_modules := "veles ttr-query ttr-translate ttr-validate ttr-dispatch charon ttr-fuzzy ttr-llm-gateway ttr-nlp chrono geo money ttr-grounding-mcp ttr-resolver ttr-meta-mcp ttr-query-mcp ttr-fuzzy-mcp ttr-nlp-mcp ttr-worker-postgres ttr-worker-mssql ttr-worker-polars ttr-identity health"
+image_modules := "veles query translate validate dispatch charon lex-matcher llm-gateway nlp chrono geo money grounding-mcp resolver meta-mcp query-mcp lex-matcher-mcp nlp-mcp worker-postgres worker-mssql worker-polars identity health"
 
 # List available recipes
 default:
@@ -149,17 +149,17 @@ test-kt module="":
 # Needs a running Docker daemon (postgres:16-alpine, redis:7-alpine).
 test-component:
     # `--continue`: one module's failure must not hide the other eight. The tier's
-    # first CI run stopped at ttr-translate and left the rest of the estate unknown.
+    # first CI run stopped at translate and left the rest of the estate unknown.
     ./gradlew componentTest --continue
 
-# ── Python lane (uv + ruff + pytest) — services/ttr-nlp, workers/ttr-worker-polars ─
+# ── Python lane (uv + ruff + pytest) — services/nlp, workers/worker-polars ─
 
-# ruff lint every Python module, or one: `just lint-py` / `just lint-py ttr-nlp`.
+# ruff lint every Python module, or one: `just lint-py` / `just lint-py nlp`.
 lint-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/ttr-nlp workers/ttr-worker-polars; do just lint-py "$d"; done
+        for d in services/nlp workers/worker-polars; do just lint-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -171,19 +171,19 @@ build-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/ttr-nlp workers/ttr-worker-polars; do just build-py "$d"; done
+        for d in services/nlp workers/worker-polars; do just build-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
     cd "$path" && uv sync --frozen
 
 # pytest every Python module, or one; trailing args pass through, e.g.
-# `just test-py workers/ttr-worker-polars -m component`.
+# `just test-py workers/worker-polars -m component`.
 test-py module="" *args:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/ttr-nlp workers/ttr-worker-polars; do just test-py "$d" {{args}}; done
+        for d in services/nlp workers/worker-polars; do just test-py "$d" {{args}}; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -229,10 +229,10 @@ conformance-service-level:
     # Kotest 6.x's JUnit-Platform engine does not OR multiple Gradle `--tests` filters on one
     # test task — passing more than one makes Gradle report "No tests found for given includes"
     # and the whole task fails. A single filter per task works, so each spec runs on its own.
-    ./gradlew :services:ttr-resolver:test --tests '*Q20ParityTest*'
-    ./gradlew :services:ttr-resolver:test --tests '*CallsSeedConformanceTest*'
-    ./gradlew :services:ttr-resolver:test --tests '*RefusalOverGuessConformanceTest*'
-    ./gradlew :services:ttr-fuzzy:test --tests '*MatchQualityCorpusTest*'
+    ./gradlew :services:resolver:test --tests '*Q20ParityTest*'
+    ./gradlew :services:resolver:test --tests '*CallsSeedConformanceTest*'
+    ./gradlew :services:resolver:test --tests '*RefusalOverGuessConformanceTest*'
+    ./gradlew :services:lex-matcher:test --tests '*MatchQualityCorpusTest*'
     just eval-grounding-test
 
 # Pin the three-tier corpora by content hash (RG-P6 review I): the recorded provenance
@@ -250,7 +250,7 @@ conformance-verify-hashes:
 # ── charts — the SV-P4 umbrella (helm/tatrman-server) ───────────────────────────
 #
 # The product install: one umbrella chart subsuming the full service roster as
-# file:// subcharts over the ttr-service library. `just charts` is the CI gate;
+# file:// subcharts over the tatrman-service library. `just charts` is the CI gate;
 # scripts/helm-deps.sh vendors the (gitignored) subchart deps offline.
 
 # Lint the umbrella + verify golden templates are current (the `helm` CI gate).
@@ -305,10 +305,10 @@ charts-publish:
 # inverted, because internal patches vastly outnumber real releases, and a
 # release now needs to be marked explicitly.
 #
-# `what`: one of the 17 image modules (by name or path — veles, ttr-query,
-#   ttr-translate, ttr-validate, ttr-dispatch, ttr-fuzzy, ttr-llm-gateway,
-#   ttr-nlp, ttr-meta-mcp, ttr-query-mcp, ttr-fuzzy-mcp, ttr-nlp-mcp,
-#   ttr-worker-postgres, ttr-worker-mssql, ttr-worker-polars, ttr-identity,
+# `what`: one of the 17 image modules (by name or path — veles, query,
+#   translate, validate, dispatch, lex-matcher, llm-gateway,
+#   nlp, meta-mcp, query-mcp, lex-matcher-mcp, nlp-mcp,
+#   worker-postgres, worker-mssql, worker-polars, identity,
 #   health — GHCR only, RELEASE accepted for interface uniformity but changes
 #   nothing), or `bundle server-libs` (the 11-module Maven library set — GH
 #   Packages always, + Maven Central on RELEASE).
@@ -316,7 +316,7 @@ charts-publish:
 # Usage:
 #   just publish veles                          # internal (GHCR), patch bump
 #   just publish veles set 0.9.2                 # internal, explicit version
-#   just publish services/ttr-query patch          # image module, path form
+#   just publish services/query patch          # image module, path form
 #   just publish bundle server-libs                 # internal, patch bump
 #   just publish bundle server-libs release set 0.9.2  # + Maven Central, explicit
 publish *args:
@@ -357,8 +357,8 @@ publish *args:
         PREFIX=server-libs
         # The set is Gradle-derived (build.gradle.kts `publishableLibs`) — this count is the
         # human echo in the confirm prompt, keep it in sync when publishableLibs changes.
-        # 14 since CH-P2 (+ttr-transfer-core; ttr-server-proto now also carries transfer.v1+metis.v1).
-        DESC="the 14 org.tatrman:* Maven libs (publishableLibs — incl. ttr-server-proto + ttr-transfer-core)"
+        # 14 since CH-P2 (+transfer-core; server-proto now also carries transfer.v1+metis.v1).
+        DESC="the 14 org.tatrman:* Maven libs (publishableLibs — incl. server-proto + transfer-core)"
     else
         MOD_PATH=$(just _resolve "$WHAT")
         MOD_NAME=$(basename "$MOD_PATH")

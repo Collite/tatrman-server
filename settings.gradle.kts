@@ -44,13 +44,13 @@ include(":tools:_smoke-test")
 // ── SV-P0 S3 move set — spine transplanted from kantheon@355c68d, renamed on
 // arrival (ledger §3). Package/proto internals are swept in S4; the build is
 // intentionally RED until then (S3+S4 = one change window).
-// Python modules (services/ttr-nlp, workers/ttr-worker-polars) and the non-Gradle
+// Python modules (services/nlp, workers/worker-polars) and the non-Gradle
 // infra/backstage are built out-of-band, not included here.
 
 // Shared wire protos + Kotlin libs
 include(":shared:proto")
 // LLM gateway wire contract — split out of :shared:proto so its gRPC stub does
-// not reach zero-LLM services (RS-23). Only the ttr-llm-gateway server depends on it.
+// not reach zero-LLM services (RS-23). Only the llm-gateway server depends on it.
 include(":shared:proto-llm")
 include(":shared:libs:kotlin:otel-config")
 include(":shared:libs:kotlin:logging-config")
@@ -59,20 +59,20 @@ include(":shared:libs:kotlin:mcp-identity")
 include(":shared:libs:kotlin:db-common")
 include(":shared:libs:kotlin:data-formatter")
 // RG-P0.S3 — S-2 shared normalization (fold) + RG-* diagnostics registry.
-include(":shared:libs:kotlin:ttr-text")
-include(":shared:libs:kotlin:ttr-diagnostics")
+include(":shared:libs:kotlin:text")
+include(":shared:libs:kotlin:diagnostics")
 // RG-P3 grounding kernel (workstream D) — consolidated PlanExpr/SqlRenderer/RecipeBuilder scaffolding.
-include(":shared:libs:kotlin:ttr-grounding-core")
+include(":shared:libs:kotlin:grounding-core")
 // FZ-P3 — the pure fuzzy engine, extracted so ai-platform consumes it instead of a copy.
-include(":shared:libs:kotlin:ttr-fuzzy-core")
+include(":shared:libs:kotlin:lex-matcher-core")
 include(":shared:libs:kotlin:fuzzy-common")
 include(":shared:libs:kotlin:whois-common")
 include(":shared:libs:kotlin:keycloak-auth")
-include(":shared:libs:kotlin:ttr-meta-client")
-include(":shared:libs:kotlin:ttr-llm-client")
+include(":shared:libs:kotlin:meta-client")
+include(":shared:libs:kotlin:llm-client")
 // CH-D5 — the published Charon transfer seam (MoveExecutor + Plan + Either +
 // CharonError + MoveRpc), embedded in-process by radegast behind TransferMover.
-include(":shared:libs:kotlin:ttr-transfer-core")
+include(":shared:libs:kotlin:transfer-core")
 // Grafted from kantheon per Bora's decision (S4) — capability-registration client
 // (4 MCP tools) + the component/integration test-tier harness libs.
 include(":shared:libs:kotlin:capabilities-client")
@@ -81,14 +81,14 @@ include(":shared:libs:kotlin:integration-harness")
 
 // Spine services
 include(":services:veles")
-include(":services:ttr-query")
-include(":services:ttr-translate")
-include(":services:ttr-validate")
-include(":services:ttr-dispatch")
-include(":services:ttr-fuzzy")
-include(":services:ttr-llm-gateway")
+include(":services:query")
+include(":services:translate")
+include(":services:validate")
+include(":services:dispatch")
+include(":services:lex-matcher")
+include(":services:llm-gateway")
 // RG-P5 — the deterministic resolver core (workstream E). ZERO LLM by arch test.
-include(":services:ttr-resolver")
+include(":services:resolver")
 // RG-P3 grounding services (workstream D) — moved from ai-platform, J-v2 renamed.
 include(":services:chrono")
 include(":services:money")
@@ -96,18 +96,18 @@ include(":services:geo")
 // CH — Charon (Arrow data mover, strangler ④): the one open Charon, unified from the
 // kantheon/platform siblings (arc CH; base = platform PL-P3 copy). transfer.v1 → :shared:proto.
 include(":services:charon")
-include(":services:ttr-grounding-mcp")
+include(":services:grounding-mcp")
 
 // Engine workers (JVM; the Polars worker is Python — out of the Gradle build)
-include(":workers:ttr-worker-postgres")
-include(":workers:ttr-worker-mssql")
+include(":workers:worker-postgres")
+include(":workers:worker-mssql")
 
 // MCP tools
-include(":tools:ttr-meta-mcp")
-include(":tools:ttr-query-mcp")
-include(":tools:ttr-fuzzy-mcp")
-include(":tools:ttr-nlp-mcp")
+include(":tools:meta-mcp")
+include(":tools:query-mcp")
+include(":tools:lex-matcher-mcp")
+include(":tools:nlp-mcp")
 
 // Infra (RO-22: health + backstage ride the server repo)
-include(":infra:ttr-identity")
+include(":infra:identity")
 include(":infra:health")

@@ -1,0 +1,75 @@
+# RG-P1.S2 — local OFFLINE bring-up: engine-free front + the two self-hosted
+# UFAL backends (MorphoDiTa + NameTag 3). No Lindat/HF egress at run time — the
+# determinism/offline claim (RG-P1 DoD). This is the harness for the S2.T7 hero
+# parse and for running the component parity suite (`-m component`) locally.
+#
+#   # build (x86 target; QEMU on arm64 dev boxes). UFAL backends need
+#   # --build-arg MODEL_URL=<DSpace bitstream URL> (see their Dockerfiles):
+#   docker buildx build --platform linux/amd64 -t nlp-morphodita:dev services/nlp/backends/morphodita
+#   docker buildx build --platform linux/amd64 -t nlp-nametag3:dev   services/nlp/backends/nametag3
+#   docker build -t nlp-stanza:dev services/nlp/backends/stanza
+#   docker build -t nlp-spacy:dev  services/nlp/backends/spacy
+#   docker build -t nlp:dev -f services/nlp/Dockerfile .
+#   # run (from repo root):
+#   docker compose -f services/nlp/docker-compose.offline.yml up
+#   # hero parse over gRPC (host):
+#   grpcurl -plaintext -d '{"text":"Kolik jsme utržili za Octavie v pražských pobočkách za poslední fiskální čtvrtletí?","language":"cs","ops":["TOKENIZE","LEMMATIZE","POS_TAG","DEP_PARSE","NER"]}' \
+#     localhost:7271 org.tatrman.nlp.v1.NlpService/Analyze
+#   # component parity suite against the running backends:
+#   NLP_MORPHODITA_URL=http://localhost:8080/tag NLP_NAMETAG3_URL=http://localhost:8001/recognize \
+#     just test-py services/nlp -m component
+
+services:
+  # Service names match the config.yaml default in-cluster hostnames, so the
+  # front reaches the backends with no URL override.
+  nlp-morphodita:
+    image: nlp-morphodita:dev
+    build:
+      context: ./backends/morphodita
+    ports:
+      - "8080:8080"
+
+  nlp-nametag3:
+    image: nlp-nametag3:dev
+    build:
+      context: ./backends/nametag3
+    ports:
+      - "8001:8001"
+
+  # Stanza serves the hero's cs DEP_PARSE (+ en). spaCy is the en NER fallback.
+  nlp-stanza:
+    image: nlp-stanza:dev
+    build:
+      context: ./backends/stanza
+    ports:
+      - "8090:8090"
+
+  nlp-spacy:
+    image: nlp-spacy:dev
+    build:
+      context: ./backends/spacy
+    ports:
+      - "8091:8091"
+
+  front:
+    image: nlp:dev
+    build:
+      context: ../..
+      dockerfile: services/nlp/Dockerfile
+    depends_on:
+      nlp-morphodita:
+        condition: service_healthy
+      nlp-nametag3:
+        condition: service_healthy
+      nlp-stanza:
+        condition: service_healthy
+      nlp-spacy:
+        condition: service_healthy
+    environment:
+      NLP_SERVICE_GRPC_PORT: "7271"
+      NLP_SERVICE_PORT: "7270"
+      # Self-hosted tier (default). Do NOT set NLP_UFAL_ENDPOINT_MODE=lindat here
+      # — the whole point is offline, no Lindat egress.
+    ports:
+      - "7270:7270"  # REST mirror (dev/health)
+      - "7271:7271"  # gRPC contract

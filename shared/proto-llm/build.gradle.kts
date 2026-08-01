@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // :shared:proto-llm — the LLM gateway wire contract (org.tatrman.llm.v1), split
 // out of the monolithic :shared:proto so the generated LlmGatewayService gRPC
-// STUB reaches ONLY the modules that legitimately need it (the ttr-llm-gateway
-// server). Zero-LLM services (e.g. ttr-resolver, RS-23) depend on :shared:proto
+// STUB reaches ONLY the modules that legitimately need it (the llm-gateway
+// server). Zero-LLM services (e.g. resolver, RS-23) depend on :shared:proto
 // and therefore no longer receive a callable LLM client stub on their classpath.
 //
 // This module deliberately mirrors :shared:proto's protobuf config MINUS the

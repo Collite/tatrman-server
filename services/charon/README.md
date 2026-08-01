@@ -5,11 +5,11 @@
 > `395ec99` (`kotlin/services/charon` → `services/charon`), carrying the full
 > kantheon→platform→server chain. Re-homed onto the server: Kotlin root
 > `org.tatrman.charon.*`; `transfer.v1` + `metis.v1` → `:shared:proto` (published in
-> `ttr-server-proto`), `common.v1` reuses the server's `org.tatrman.common.v1`;
+> `server-proto`), `common.v1` reuses the server's `org.tatrman.common.v1`;
 > secrets via the open `ConnectionSecretResolver` port (the `cz.tatrman:secrets-spi`
 > wiring is the platform's CH-P2 adapter, not here); `installKtorServerBase` bootstrap;
 > image via Jib (`charon`, CH-D7). Platform + kantheon become consumers by published
-> version (CH-P2/CH-P3). Suite: 21 specs / 248 tests. **Consumed core (`ttr-transfer-core`,
+> version (CH-P2/CH-P3). Suite: 21 specs / 248 tests. **Consumed core (`transfer-core`,
 > CH-D5) publishes when radegast switches to it at CH-P2.**
 
 > **Status:** **Arc complete (`charon/v0.3.0`).** Seaweed + Redis object-store movers (P1) + DB edges (P2: connection registry, JDBC extract/ingest for PG + MSSQL, allow-lists, `Describe(db_table)`) + **worker edges (P3)**: a `WorkerEndpoint` over a `WorkerGateway` SPI — **both METIS and POLARS** have the full stage-in / scan-out / describe / evict surface; the `tools/charon-mcp` wrapper + `move.*` capability registration + the throughput bench. Pythia Phase 4 unblocked.

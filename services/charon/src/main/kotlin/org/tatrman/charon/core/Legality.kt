@@ -11,7 +11,7 @@ import org.tatrman.charon.core.MoveRpc.EVICT
 import org.tatrman.charon.core.MoveRpc.MATERIALIZE
 import org.tatrman.charon.core.MoveRpc.STAGE
 
-// `MoveRpc` and `LocationKind` now live in the published `ttr-transfer-core`
+// `MoveRpc` and `LocationKind` now live in the published `transfer-core`
 // seam lib (CH-D5) — same package `org.tatrman.charon.core`, so the value
 // imports above resolve across the module boundary. The legality matrix that
 // is *keyed* by them stays here, service-side.

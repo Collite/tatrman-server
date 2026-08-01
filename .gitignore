@@ -63,6 +63,6 @@ agents/themis/eval/results/
 helm/tatrman-server/charts/
 helm/tatrman-server/Chart.lock
 
-# RG-P1.S1 — ttr-nlp Python proto stubs (regenerated from shared/proto via
-# services/ttr-nlp/scripts/gen_proto.py; canonical source is the .proto file).
-services/ttr-nlp/generated/
+# RG-P1.S1 — nlp Python proto stubs (regenerated from shared/proto via
+# services/nlp/scripts/gen_proto.py; canonical source is the .proto file).
+services/nlp/generated/

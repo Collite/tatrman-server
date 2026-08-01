@@ -17,7 +17,7 @@
 ## 1. Shape
 
 One umbrella, the full service roster as `file://` subcharts, each a thin wrapper over
-the shared `ttr-service` library. Every service is toggled by `<name>.enabled`; per-service
+the shared `tatrman-service` library. Every service is toggled by `<name>.enabled`; per-service
 tuning nests under the same key and is passed to that service's own chart
 (`services/<x>/k8s/values.yaml` etc.). Vendored subchart deps (`charts/`, `Chart.lock`) are
 gitignored build artifacts rebuilt by `scripts/helm-deps.sh` (offline).
@@ -33,27 +33,27 @@ directory names for several services. Use the key in the left column in your val
 | Value key | Image (`ghcr.io/collite/…`) | Source dir | Role |
 |---|---|---|---|
 | `veles` | `veles` | `services/veles` | model graph / metadata |
-| `query` | `ttr-query` | `services/ttr-query` | query spine |
-| `translate` | `ttr-translate` | `services/ttr-translate` | query spine |
-| `validate` | `ttr-validate` | `services/ttr-validate` | query spine |
-| `dispatch` | `ttr-dispatch` | `services/ttr-dispatch` | query spine |
-| `llm-gateway` | `ttr-llm-gateway` | `services/ttr-llm-gateway` | LLM gateway |
-| `mssql` | `ttr-worker-mssql` | `workers/ttr-worker-mssql` | worker |
-| `postgres` | `ttr-worker-postgres` | `workers/ttr-worker-postgres` | worker |
-| `polars` | `ttr-worker-polars` | `workers/ttr-worker-polars` | worker |
-| `whois` | `ttr-identity` | `infra/ttr-identity` | identity resolver |
+| `query` | `query` | `services/query` | query spine |
+| `translate` | `translate` | `services/translate` | query spine |
+| `validate` | `validate` | `services/validate` | query spine |
+| `dispatch` | `dispatch` | `services/dispatch` | query spine |
+| `llm-gateway` | `llm-gateway` | `services/llm-gateway` | LLM gateway |
+| `mssql` | `worker-mssql` | `workers/worker-mssql` | worker |
+| `postgres` | `worker-postgres` | `workers/worker-postgres` | worker |
+| `polars` | `worker-polars` | `workers/worker-polars` | worker |
+| `whois` | `identity` | `infra/identity` | identity resolver |
 | `health` | `health` | `infra/health` | health aggregator |
-| `query-mcp` | `ttr-query-mcp` | `tools/ttr-query-mcp` | MCP door |
-| `veles-mcp` | `ttr-meta-mcp` | `tools/ttr-meta-mcp` | MCP door |
-| `fuzzy` | `ttr-fuzzy` | `services/ttr-fuzzy` | vocabulary matcher (understanding layer) |
-| `fuzzy-mcp` | `ttr-fuzzy-mcp` | `tools/ttr-fuzzy-mcp` | MCP door |
-| `nlp` | `ttr-nlp` | `services/ttr-nlp` | NLP front + backends (understanding layer) |
-| `nlp-mcp` | `ttr-nlp-mcp` | `tools/ttr-nlp-mcp` | MCP door |
+| `query-mcp` | `query-mcp` | `tools/query-mcp` | MCP door |
+| `veles-mcp` | `meta-mcp` | `tools/meta-mcp` | MCP door |
+| `fuzzy` | `lex-matcher` | `services/lex-matcher` | vocabulary matcher (understanding layer) |
+| `fuzzy-mcp` | `lex-matcher-mcp` | `tools/lex-matcher-mcp` | MCP door |
+| `nlp` | `nlp` | `services/nlp` | NLP front + backends (understanding layer) |
+| `nlp-mcp` | `nlp-mcp` | `tools/nlp-mcp` | MCP door |
 | `chrono` | `chrono` | `services/chrono` | grounding — time |
 | `geo` | `geo` | `services/geo` | grounding — location |
 | `money` | `money` | `services/money` | grounding — money |
-| `ttr-grounding-mcp` | `ttr-grounding-mcp` | `services/ttr-grounding-mcp` | grounding MCP door |
-| `ttr-resolver` | `ttr-resolver` | `services/ttr-resolver` | resolve core + `resolve.bind:v1` door |
+| `grounding-mcp` | `grounding-mcp` | `services/grounding-mcp` | grounding MCP door |
+| `resolver` | `resolver` | `services/resolver` | resolve core + `resolve.bind:v1` door |
 | `backstage` | `backstage` (upstream) | `infra/backstage` | developer portal (RO-22, opt-in) |
 
 > **Designer viewer (RO-9):** ships in-chart but is **not yet a subchart** — its Veles
@@ -68,7 +68,7 @@ directory names for several services. Use the key in the left column in your val
 | `global.image.tag` | string | `"0.9.4"` | every service | The single product-tag knob: applied to every image unless that service sets `<name>.image.tag`. Finalized against published digests at T7. |
 
 Per-service override: set `<name>.image.tag` (and `<name>.image.repository`, `<name>.image.pullPolicy`).
-Tag precedence in the `ttr-service` library: `image.tag` → `global.image.tag` → the chart's `appVersion`.
+Tag precedence in the `tatrman-service` library: `image.tag` → `global.image.tag` → the chart's `appVersion`.
 The four NLP backends (§5.1) render their own tag and are pinned individually.
 
 Image pull secrets: set per service (`<name>.imagePullSecrets`), or supply cluster-default pull secrets.
@@ -82,7 +82,7 @@ Every service defaults **on** except `backstage` and `devIdp`. `<name>.enabled: 
 | Group | Keys (all `.enabled`) | Default |
 |---|---|---|
 | Query spine | `veles`, `query`, `translate`, `validate`, `dispatch`, `llm-gateway`, `mssql`, `postgres`, `polars`, `whois`, `health`, `query-mcp`, `veles-mcp` | `true` |
-| Understanding layer | `fuzzy`, `fuzzy-mcp`, `nlp`, `nlp-mcp`, `chrono`, `geo`, `money`, `ttr-grounding-mcp`, `ttr-resolver` | `true` |
+| Understanding layer | `fuzzy`, `fuzzy-mcp`, `nlp`, `nlp-mcp`, `chrono`, `geo`, `money`, `grounding-mcp`, `resolver` | `true` |
 | Developer portal | `backstage` | `false` (upstream image, opt-in) |
 | Dev IdP | `devIdp` | `false` (quickstart only, §4.2) |
 
@@ -141,7 +141,7 @@ enabled, the in-cluster issuer is `http://<release>-keycloak.<ns>.svc:8080/realm
 
 ### 5.1 NLP backends & FI-4 (`nlp.backends.*`)
 
-`ttr-nlp` degrades gracefully when a backend is absent, so the **UFAL (CC BY-NC-SA) engines
+`nlp` degrades gracefully when a backend is absent, so the **UFAL (CC BY-NC-SA) engines
 ship OFF by default** (S0 disposition 2026-07-17) and the permissive-licence engines stay on —
 the default install has working NLP that degrades rather than dies.
 
@@ -161,7 +161,7 @@ images may be published to a **public** registry — the open FI-4 tail).
 
 Each backend also takes `image.{repository,tag,pullPolicy}`, `replicaCount`, `resources`,
 `port`. The backends render their **own** image tag (not via `global.image.tag`) — pin per
-backend (default `0.9.2`, the ttr-nlp image family).
+backend (default `0.9.2`, the nlp image family).
 
 ### 5.2 Geo / location (`geo.*`)
 
@@ -179,14 +179,14 @@ backend (default `0.9.2`, the ttr-nlp image family).
 Tuning `geo.confidenceThreshold` is env-driven (`GEO_CONFIDENCE_THRESHOLD`) — set via
 `geo.extraEnv` until surfaced as a first-class key.
 
-### 5.3 Resolver (`ttr-resolver.*`)
+### 5.3 Resolver (`resolver.*`)
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `ttr-resolver.resumeToken.activeKeyId` | string | `""` | HMAC resume-token signing key id. |
-| `ttr-resolver.resumeToken.allowEphemeralKey` | bool | `false` | **Fail-closed:** with no key and this `false`, the service refuses to boot. `true` = a throwaway per-process key (local/test only — breaks stateless resume across replicas/restarts). |
-| `ttr-resolver.secretEnv` | list | `[]` | The key material by **Secret ref** — e.g. `{ name: RESOLVER_RESUME_KEY_K1, secretName: resolver-resume-keys, secretKey: k1 }`. |
-| `ttr-resolver.mcp.{host,requireIdentity,trustNetwork}` | | `127.0.0.1` / `true` / `false` | The `resolve.bind:v1` MCP door: loopback + require-identity by default (RG-P6 review D — the door decodes but does not signature-verify the OBO JWT, so it must not be off-host-reachable unless fronted by an auth-terminating ingress). |
+| `resolver.resumeToken.activeKeyId` | string | `""` | HMAC resume-token signing key id. |
+| `resolver.resumeToken.allowEphemeralKey` | bool | `false` | **Fail-closed:** with no key and this `false`, the service refuses to boot. `true` = a throwaway per-process key (local/test only — breaks stateless resume across replicas/restarts). |
+| `resolver.secretEnv` | list | `[]` | The key material by **Secret ref** — e.g. `{ name: RESOLVER_RESUME_KEY_K1, secretName: resolver-resume-keys, secretKey: k1 }`. |
+| `resolver.mcp.{host,requireIdentity,trustNetwork}` | | `127.0.0.1` / `true` / `false` | The `resolve.bind:v1` MCP door: loopback + require-identity by default (RG-P6 review D — the door decodes but does not signature-verify the OBO JWT, so it must not be off-host-reachable unless fronted by an auth-terminating ingress). |
 
 Gating thresholds (`threshold-bind`, `threshold-ambiguity-gap`, `threshold-exact`) are
 config-baked in the resolver image (`application.conf`), not values-exposed.

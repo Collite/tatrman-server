@@ -45,7 +45,7 @@ dependencies {
     implementation("org.tatrman:ttr-plan-proto:$spineVersion")
     implementation("org.tatrman:ttr-translator:$spineVersion")
     // tatrman-server libs (Collite/tatrman-server)
-    implementation("org.tatrman:ttr-server-proto:$spineVersion")
+    implementation("org.tatrman:server-proto:$spineVersion")
     implementation("org.tatrman:otel-config:$spineVersion")
     implementation("org.tatrman:logging-config:$spineVersion")
     implementation("org.tatrman:ktor-configurator:$spineVersion")
@@ -54,16 +54,16 @@ dependencies {
     implementation("org.tatrman:fuzzy-common:$spineVersion")
     implementation("org.tatrman:whois-common:$spineVersion")
     implementation("org.tatrman:keycloak-auth:$spineVersion")
-    implementation("org.tatrman:ttr-meta-client:$spineVersion")
-    implementation("org.tatrman:ttr-llm-client:$spineVersion")
+    implementation("org.tatrman:meta-client:$spineVersion")
+    implementation("org.tatrman:llm-client:$spineVersion")
 }
 
 // The 18 org.tatrman:* coordinates the spine must expose on Central.
 val expectedSpine = listOf(
     "ttr-parser", "ttr-writer", "ttr-semantics", "ttr-metadata", "ttr-metadata-git",
-    "ttr-plan-proto", "ttr-translator", "ttr-server-proto", "otel-config", "logging-config",
+    "ttr-plan-proto", "ttr-translator", "server-proto", "otel-config", "logging-config",
     "ktor-configurator", "db-common", "data-formatter", "fuzzy-common", "whois-common",
-    "keycloak-auth", "ttr-meta-client", "ttr-llm-client",
+    "keycloak-auth", "meta-client", "llm-client",
 )
 
 tasks.register("verifyPublicResolution") {

@@ -4,7 +4,7 @@
 > runnable. It is **not CI-gating yet** — RG-P6 tiers it. The no-cluster tier (corpus validity +
 > the pure `report.py` eval core) runs green with no services:
 > `python3 -m venv .venv && .venv/bin/pip install pytest pytest-asyncio && .venv/bin/python -m pytest tests/`.
-> The live tiers (`run_eval.py` → `ttr-grounding-mcp`; e2e → the agent chat surface) run against a
+> The live tiers (`run_eval.py` → `grounding-mcp`; e2e → the agent chat surface) run against a
 > deployed stack. `.venv/`, `.pytest_cache/`, `__pycache__/` are gitignored.
 
 Standalone, reference-clock-pinned eval for the deterministic time/geo/money grounding

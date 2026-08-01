@@ -29,7 +29,7 @@ class ResolveAreaSpec :
         // bundled `model-ttr` tree on the classpath (getResource returns the first match).
         val fixtureRoot: Path =
             Path
-                .of(checkNotNull(this::class.java.classLoader.getResource("model-ttr-areas/areas")).toURI())
+                .of(checkNotNull(this::class.java.classLoader.getResource("model-areas/areas")).toURI())
                 .parent
 
         fun service(): MetadataServiceImpl {

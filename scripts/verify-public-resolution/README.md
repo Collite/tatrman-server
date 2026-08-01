@@ -23,9 +23,9 @@ certain no cached credentialed copy is used.
 
 The 7 tatrman toolchain modules (`ttr-parser`, `ttr-writer`, `ttr-semantics`,
 `ttr-metadata`, `ttr-metadata-git`, `ttr-plan-proto`, `ttr-translator`) and the
-11 tatrman-server libs (`ttr-server-proto`, `otel-config`, `logging-config`,
+11 tatrman-server libs (`server-proto`, `otel-config`, `logging-config`,
 `ktor-configurator`, `db-common`, `data-formatter`, `fuzzy-common`,
-`whois-common`, `keycloak-auth`, `ttr-meta-client`, `ttr-llm-client`).
+`whois-common`, `keycloak-auth`, `meta-client`, `llm-client`).
 
 ## Versions
 

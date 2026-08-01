@@ -1,5 +1,5 @@
 {{/*
-Charon overrides the ttr-service volume hooks (the consuming chart's define wins over
+Charon overrides the tatrman-service volume hooks (the consuming chart's define wins over
 the library's empty default). Two independent, off-by-default features share these
 hooks, so the `volumeMounts:`/`volumes:` keys are emitted once when EITHER is on:
 
@@ -15,7 +15,7 @@ hooks, so the `volumeMounts:`/`volumes:` keys are emitted once when EITHER is on
      secret volume (the FileSecretStore material) and a refs ConfigMap ride alongside.
      Gated on pluginDir.image; empty ⇒ no initContainer, no mount, env-default resolver.
 */}}
-{{- define "ttr-service.initContainers" -}}
+{{- define "tatrman-service.initContainers" -}}
 {{- with .Values.pluginDir }}
 {{- if .image }}
       initContainers:
@@ -33,7 +33,7 @@ hooks, so the `volumeMounts:`/`volumes:` keys are emitted once when EITHER is on
 {{- end }}
 {{- end }}
 {{- end -}}
-{{- define "ttr-service.volumeMounts" -}}
+{{- define "tatrman-service.volumeMounts" -}}
 {{- $conn := and .Values.connections .Values.connections.configMapName }}
 {{- $plugin := and .Values.pluginDir .Values.pluginDir.image }}
 {{- if or $conn $plugin }}
@@ -62,7 +62,7 @@ hooks, so the `volumeMounts:`/`volumes:` keys are emitted once when EITHER is on
 {{- end }}
 {{- end }}
 {{- end -}}
-{{- define "ttr-service.volumes" -}}
+{{- define "tatrman-service.volumes" -}}
 {{- $conn := and .Values.connections .Values.connections.configMapName }}
 {{- $plugin := and .Values.pluginDir .Values.pluginDir.image }}
 {{- if or $conn $plugin }}
