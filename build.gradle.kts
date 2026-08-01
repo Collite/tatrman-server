@@ -107,43 +107,43 @@ val publishableLibs =
         ":shared:libs:kotlin:db-common",
         ":shared:libs:kotlin:data-formatter",
         // FZ-P3 — the extracted fuzzy engine, consumed by ai-platform (NX-B pattern).
-        ":shared:libs:kotlin:ttr-fuzzy-core",
-        // ttr-text (RG-P0.S3 — the one S-2 fold) is now published: ttr-fuzzy-core depends on it, so
-        // ai-platform (consuming ttr-fuzzy-core) needs the fold resolvable — exactly the cross-repo
-        // consumer the RG-P0.S3 note anticipated. ttr-diagnostics still has no external consumer.
-        ":shared:libs:kotlin:ttr-text",
+        ":shared:libs:kotlin:lex-matcher-core",
+        // text (RG-P0.S3 — the one S-2 fold) is now published: lex-matcher-core depends on it, so
+        // ai-platform (consuming lex-matcher-core) needs the fold resolvable — exactly the cross-repo
+        // consumer the RG-P0.S3 note anticipated. diagnostics still has no external consumer.
+        ":shared:libs:kotlin:text",
         ":shared:libs:kotlin:fuzzy-common",
         ":shared:libs:kotlin:whois-common",
         ":shared:libs:kotlin:keycloak-auth",
-        ":shared:libs:kotlin:ttr-meta-client",
-        ":shared:libs:kotlin:ttr-llm-client",
+        ":shared:libs:kotlin:meta-client",
+        ":shared:libs:kotlin:llm-client",
         // CH-D5 — the Charon transfer seam, consumed by tatrman-platform's radegast
         // (CH-P2 cutover) behind the unchanged TransferMover in-process seam.
-        ":shared:libs:kotlin:ttr-transfer-core",
+        ":shared:libs:kotlin:transfer-core",
         // capabilities-client TRIMMED at SV-P1 S2 (2026-07-11): no external consumer
         // (kantheon keeps its own copy; nothing published depends on it). Publishing it
         // would be a maintenance promise with no taker — re-add here if a consumer appears.
     )
 // SV-P1 S4 — Maven Central coordinates need a per-artifact name + description
 // (the GH Packages POM did not). artifactId = project.name except `:shared:proto`
-// → `ttr-server-proto` (a bare "proto" coordinate is too generic).
+// → `server-proto` (a bare "proto" coordinate is too generic).
 val pomMeta: Map<String, Triple<String, String, String>> =
     mapOf(
         // path to Triple(artifactId, POM name, POM description)
-        ":shared:proto" to Triple("ttr-server-proto", "TTR Server Proto", "gRPC/protobuf wire contracts for the TTR read-spine services (meta.v1, query.v1, translate.v1, validate.v1, dispatch.v1, worker.v1, transfer.v1, metis.v1, …)."),
+        ":shared:proto" to Triple("server-proto", "TTR Server Proto", "gRPC/protobuf wire contracts for the TTR read-spine services (meta.v1, query.v1, translate.v1, validate.v1, dispatch.v1, worker.v1, transfer.v1, metis.v1, …)."),
         ":shared:libs:kotlin:otel-config" to Triple("otel-config", "TTR Server OTel Config", "OpenTelemetry bootstrap shared by the TTR read-spine services."),
         ":shared:libs:kotlin:logging-config" to Triple("logging-config", "TTR Server Logging Config", "Logback/structured-logging bootstrap shared by the TTR read-spine services."),
         ":shared:libs:kotlin:ktor-configurator" to Triple("ktor-configurator", "TTR Server Ktor Configurator", "Shared Ktor server bootstrap (routing, health, OTel, error handling) for the TTR read-spine services."),
         ":shared:libs:kotlin:db-common" to Triple("db-common", "TTR Server DB Common", "Shared JDBC/connection-pool helpers for the TTR worker services."),
         ":shared:libs:kotlin:data-formatter" to Triple("data-formatter", "TTR Server Data Formatter", "Shared result/value formatting for the TTR read-spine services."),
-        ":shared:libs:kotlin:ttr-fuzzy-core" to Triple("ttr-fuzzy-core", "TTR Fuzzy Core", "The embedded fuzzy-matching engine (token index + vocabulary, index-first retrieval, cascade) for the TTR services."),
-        ":shared:libs:kotlin:ttr-text" to Triple("ttr-text", "TTR Text", "The one S-2 text fold (lowercase → NFD → strip marks) every TTR matcher shares."),
+        ":shared:libs:kotlin:lex-matcher-core" to Triple("lex-matcher-core", "TTR Lex Matcher Core", "The embedded fuzzy-matching engine (token index + vocabulary, index-first retrieval, cascade) for the TTR services."),
+        ":shared:libs:kotlin:text" to Triple("text", "TTR Text", "The one S-2 text fold (lowercase → NFD → strip marks) every TTR matcher shares."),
         ":shared:libs:kotlin:fuzzy-common" to Triple("fuzzy-common", "TTR Server Fuzzy Common", "Shared fuzzy-matching types for the TTR services."),
         ":shared:libs:kotlin:whois-common" to Triple("whois-common", "TTR Server Whois Common", "Shared identity/role-source (roleSource: bearer|whois) types for the TTR services."),
         ":shared:libs:kotlin:keycloak-auth" to Triple("keycloak-auth", "TTR Server Keycloak Auth", "Shared Keycloak/OBO bearer-auth helpers for the TTR services."),
-        ":shared:libs:kotlin:ttr-meta-client" to Triple("ttr-meta-client", "TTR Meta Client", "gRPC client for the Veles metadata service (meta.v1)."),
-        ":shared:libs:kotlin:ttr-llm-client" to Triple("ttr-llm-client", "TTR LLM Client", "Client for the ttr-llm-gateway service (llm.v1)."),
-        ":shared:libs:kotlin:ttr-transfer-core" to Triple("ttr-transfer-core", "TTR Transfer Core", "The Charon transfer seam (MoveExecutor + Plan + CharonError over transfer.v1) for in-process embedding behind a TransferMover."),
+        ":shared:libs:kotlin:meta-client" to Triple("meta-client", "TTR Meta Client", "gRPC client for the Veles metadata service (meta.v1)."),
+        ":shared:libs:kotlin:llm-client" to Triple("llm-client", "TTR LLM Client", "Client for the llm-gateway service (llm.v1)."),
+        ":shared:libs:kotlin:transfer-core" to Triple("transfer-core", "TTR Transfer Core", "The Charon transfer seam (MoveExecutor + Plan + CharonError over transfer.v1) for in-process embedding behind a TransferMover."),
     )
 
 subprojects {

@@ -4,7 +4,7 @@
 //
 // Shared by all three grounding services (chrono, geo, money); each implements
 // the same GroundingService with domain-specific behavior. One proto keeps the
-// tools/ttr-grounding-mcp wrapper generic.
+// tools/grounding-mcp wrapper generic.
 //
 // Recipes reuse org.tatrman.plan.v1 (Expression, ParameterBinding, QualifiedName,
 // JoinType) wholesale — the Translator's MAP_TO_PHYSICAL handles DB mapping.

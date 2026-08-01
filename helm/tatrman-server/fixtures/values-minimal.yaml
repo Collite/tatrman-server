@@ -8,8 +8,8 @@ nlp-mcp: { enabled: false }
 chrono: { enabled: false }
 geo: { enabled: false }
 money: { enabled: false }
-ttr-grounding-mcp: { enabled: false }
-ttr-resolver: { enabled: false }
+grounding-mcp: { enabled: false }
+resolver: { enabled: false }
 
 # charon OFF (CH-P1, review-074·F9). Charon is spine muscle by the CH union ruling —
 # but it is not on the QUERY PATH, which is the one claim this fixture makes. It moves

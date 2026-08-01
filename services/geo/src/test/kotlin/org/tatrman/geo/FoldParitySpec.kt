@@ -20,7 +20,7 @@ import org.tatrman.text.Normalization
  * diverge for a script with spacing/enclosing marks (`Mc`/`Me`, e.g. Indic vowel
  * signs). The `Mn`-scope case below pins that boundary so any future widening back
  * to `\p{M}` is a conscious, tested change, not silent drift. The golden vectors are
- * canonically `shared/libs/kotlin/ttr-text/.../NormalizationSpec`; a place-name subset
+ * canonically `shared/libs/kotlin/text/.../NormalizationSpec`; a place-name subset
  * is mirrored here (that module is not importable from a test source set — the
  * documented characterization bridge).
  */

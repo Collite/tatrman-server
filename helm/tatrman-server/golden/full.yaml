@@ -329,14 +329,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ttr-nlp-morphodita
+  name: nlp-morphodita
   labels:
-    app.kubernetes.io/name: ttr-nlp-morphodita
-    app.kubernetes.io/part-of: ttr-nlp
+    app.kubernetes.io/name: nlp-morphodita
+    app.kubernetes.io/part-of: nlp
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: ttr-nlp-morphodita
+    app.kubernetes.io/name: nlp-morphodita
   ports:
     - name: http
       port: 8080
@@ -346,14 +346,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ttr-nlp-nametag3
+  name: nlp-nametag3
   labels:
-    app.kubernetes.io/name: ttr-nlp-nametag3
-    app.kubernetes.io/part-of: ttr-nlp
+    app.kubernetes.io/name: nlp-nametag3
+    app.kubernetes.io/part-of: nlp
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: ttr-nlp-nametag3
+    app.kubernetes.io/name: nlp-nametag3
   ports:
     - name: http
       port: 8001
@@ -363,14 +363,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ttr-nlp-spacy
+  name: nlp-spacy
   labels:
-    app.kubernetes.io/name: ttr-nlp-spacy
-    app.kubernetes.io/part-of: ttr-nlp
+    app.kubernetes.io/name: nlp-spacy
+    app.kubernetes.io/part-of: nlp
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: ttr-nlp-spacy
+    app.kubernetes.io/name: nlp-spacy
   ports:
     - name: http
       port: 8091
@@ -380,14 +380,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ttr-nlp-stanza
+  name: nlp-stanza
   labels:
-    app.kubernetes.io/name: ttr-nlp-stanza
-    app.kubernetes.io/part-of: ttr-nlp
+    app.kubernetes.io/name: nlp-stanza
+    app.kubernetes.io/part-of: nlp
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: ttr-nlp-stanza
+    app.kubernetes.io/name: nlp-stanza
   ports:
     - name: http
       port: 8090
@@ -541,21 +541,21 @@ spec:
       targetPort: 7276
 
 ---
-# Source: tatrman-server/charts/ttr-grounding-mcp/templates/service.yaml
+# Source: tatrman-server/charts/grounding-mcp/templates/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: ttr-grounding-mcp
+  name: grounding-mcp
   labels:
-    app.kubernetes.io/name: ttr-grounding-mcp
+    app.kubernetes.io/name: grounding-mcp
     app.kubernetes.io/instance: tatrman-server
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "dev"
-    helm.sh/chart: ttr-grounding-mcp-0.1.0
+    helm.sh/chart: grounding-mcp-0.1.0
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: ttr-grounding-mcp
+    app.kubernetes.io/name: grounding-mcp
     app.kubernetes.io/instance: tatrman-server
   ports:
     - name: http
@@ -563,21 +563,21 @@ spec:
       targetPort: 7153
 
 ---
-# Source: tatrman-server/charts/ttr-resolver/templates/service.yaml
+# Source: tatrman-server/charts/resolver/templates/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: ttr-resolver
+  name: resolver
   labels:
-    app.kubernetes.io/name: ttr-resolver
+    app.kubernetes.io/name: resolver
     app.kubernetes.io/instance: tatrman-server
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "dev"
-    helm.sh/chart: ttr-resolver-0.1.0
+    helm.sh/chart: resolver-0.1.0
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: ttr-resolver
+    app.kubernetes.io/name: resolver
     app.kubernetes.io/instance: tatrman-server
   ports:
     - name: http
@@ -960,7 +960,7 @@ spec:
     spec:
       containers:
         - name: dispatch
-          image: "ghcr.io/collite/ttr-dispatch:0.9.0"
+          image: "ghcr.io/collite/dispatch:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1029,7 +1029,7 @@ spec:
     spec:
       containers:
         - name: fuzzy-mcp
-          image: "ghcr.io/collite/ttr-fuzzy-mcp:0.9.1"
+          image: "ghcr.io/collite/lex-matcher-mcp:0.9.1"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1094,7 +1094,7 @@ spec:
     spec:
       containers:
         - name: fuzzy
-          image: "ghcr.io/collite/ttr-fuzzy:0.9.4"
+          image: "ghcr.io/collite/lex-matcher:0.9.4"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1311,7 +1311,7 @@ spec:
     spec:
       containers:
         - name: llm-gateway
-          image: "ghcr.io/collite/ttr-llm-gateway:0.9.0"
+          image: "ghcr.io/collite/llm-gateway:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1468,7 +1468,7 @@ spec:
     spec:
       containers:
         - name: mssql
-          image: "ghcr.io/collite/ttr-worker-mssql:0.9.0"
+          image: "ghcr.io/collite/worker-mssql:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1535,7 +1535,7 @@ spec:
     spec:
       containers:
         - name: nlp-mcp
-          image: "ghcr.io/collite/ttr-nlp-mcp:0.9.1"
+          image: "ghcr.io/collite/nlp-mcp:0.9.1"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1581,23 +1581,23 @@ kind: Deployment
 metadata:
   name: tatrman-server-morphodita
   labels:
-    app.kubernetes.io/name: ttr-nlp-morphodita
-    app.kubernetes.io/part-of: ttr-nlp
+    app.kubernetes.io/name: nlp-morphodita
+    app.kubernetes.io/part-of: nlp
     app.kubernetes.io/component: engine-backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ttr-nlp-morphodita
+      app.kubernetes.io/name: nlp-morphodita
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ttr-nlp-morphodita
-        app.kubernetes.io/part-of: ttr-nlp
+        app.kubernetes.io/name: nlp-morphodita
+        app.kubernetes.io/part-of: nlp
     spec:
       containers:
         - name: morphodita
-          image: "ghcr.io/collite/ttr-nlp-morphodita:0.9.2"
+          image: "ghcr.io/collite/nlp-morphodita:0.9.2"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1625,23 +1625,23 @@ kind: Deployment
 metadata:
   name: tatrman-server-nametag3
   labels:
-    app.kubernetes.io/name: ttr-nlp-nametag3
-    app.kubernetes.io/part-of: ttr-nlp
+    app.kubernetes.io/name: nlp-nametag3
+    app.kubernetes.io/part-of: nlp
     app.kubernetes.io/component: engine-backend
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app.kubernetes.io/name: ttr-nlp-nametag3
+      app.kubernetes.io/name: nlp-nametag3
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ttr-nlp-nametag3
-        app.kubernetes.io/part-of: ttr-nlp
+        app.kubernetes.io/name: nlp-nametag3
+        app.kubernetes.io/part-of: nlp
     spec:
       containers:
         - name: nametag3
-          image: "ghcr.io/collite/ttr-nlp-nametag3:0.9.1"
+          image: "ghcr.io/collite/nlp-nametag3:0.9.1"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1669,23 +1669,23 @@ kind: Deployment
 metadata:
   name: tatrman-server-spacy
   labels:
-    app.kubernetes.io/name: ttr-nlp-spacy
-    app.kubernetes.io/part-of: ttr-nlp
+    app.kubernetes.io/name: nlp-spacy
+    app.kubernetes.io/part-of: nlp
     app.kubernetes.io/component: engine-backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ttr-nlp-spacy
+      app.kubernetes.io/name: nlp-spacy
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ttr-nlp-spacy
-        app.kubernetes.io/part-of: ttr-nlp
+        app.kubernetes.io/name: nlp-spacy
+        app.kubernetes.io/part-of: nlp
     spec:
       containers:
         - name: spacy
-          image: "ghcr.io/collite/ttr-nlp-spacy:0.9.0"
+          image: "ghcr.io/collite/nlp-spacy:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1713,23 +1713,23 @@ kind: Deployment
 metadata:
   name: tatrman-server-stanza
   labels:
-    app.kubernetes.io/name: ttr-nlp-stanza
-    app.kubernetes.io/part-of: ttr-nlp
+    app.kubernetes.io/name: nlp-stanza
+    app.kubernetes.io/part-of: nlp
     app.kubernetes.io/component: engine-backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ttr-nlp-stanza
+      app.kubernetes.io/name: nlp-stanza
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ttr-nlp-stanza
-        app.kubernetes.io/part-of: ttr-nlp
+        app.kubernetes.io/name: nlp-stanza
+        app.kubernetes.io/part-of: nlp
     spec:
       containers:
         - name: stanza
-          image: "ghcr.io/collite/ttr-nlp-stanza:0.9.0"
+          image: "ghcr.io/collite/nlp-stanza:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1776,7 +1776,7 @@ spec:
     spec:
       containers:
         - name: nlp
-          image: "ghcr.io/collite/ttr-nlp:0.9.2"
+          image: "ghcr.io/collite/nlp:0.9.2"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1837,7 +1837,7 @@ spec:
     spec:
       containers:
         - name: polars
-          image: "ghcr.io/collite/ttr-worker-polars:0.9.0"
+          image: "ghcr.io/collite/worker-polars:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1900,7 +1900,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: "ghcr.io/collite/ttr-worker-postgres:0.9.0"
+          image: "ghcr.io/collite/worker-postgres:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -1967,7 +1967,7 @@ spec:
     spec:
       containers:
         - name: query-mcp
-          image: "ghcr.io/collite/ttr-query-mcp:0.9.0"
+          image: "ghcr.io/collite/query-mcp:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2036,7 +2036,7 @@ spec:
     spec:
       containers:
         - name: query
-          image: "ghcr.io/collite/ttr-query:0.9.0"
+          image: "ghcr.io/collite/query:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2105,7 +2105,7 @@ spec:
     spec:
       containers:
         - name: translate
-          image: "ghcr.io/collite/ttr-translate:0.9.0"
+          image: "ghcr.io/collite/translate:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2147,32 +2147,32 @@ spec:
               memory: 512Mi
 
 ---
-# Source: tatrman-server/charts/ttr-grounding-mcp/templates/deployment.yaml
+# Source: tatrman-server/charts/grounding-mcp/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ttr-grounding-mcp
+  name: grounding-mcp
   labels:
-    app.kubernetes.io/name: ttr-grounding-mcp
+    app.kubernetes.io/name: grounding-mcp
     app.kubernetes.io/instance: tatrman-server
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "dev"
-    helm.sh/chart: ttr-grounding-mcp-0.1.0
+    helm.sh/chart: grounding-mcp-0.1.0
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ttr-grounding-mcp
+      app.kubernetes.io/name: grounding-mcp
       app.kubernetes.io/instance: tatrman-server
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ttr-grounding-mcp
+        app.kubernetes.io/name: grounding-mcp
         app.kubernetes.io/instance: tatrman-server
     spec:
       containers:
-        - name: ttr-grounding-mcp
-          image: "ghcr.io/collite/ttr-grounding-mcp:0.9.0"
+        - name: grounding-mcp
+          image: "ghcr.io/collite/grounding-mcp:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2216,32 +2216,32 @@ spec:
               memory: 192Mi
 
 ---
-# Source: tatrman-server/charts/ttr-resolver/templates/deployment.yaml
+# Source: tatrman-server/charts/resolver/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ttr-resolver
+  name: resolver
   labels:
-    app.kubernetes.io/name: ttr-resolver
+    app.kubernetes.io/name: resolver
     app.kubernetes.io/instance: tatrman-server
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "dev"
-    helm.sh/chart: ttr-resolver-0.1.0
+    helm.sh/chart: resolver-0.1.0
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ttr-resolver
+      app.kubernetes.io/name: resolver
       app.kubernetes.io/instance: tatrman-server
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ttr-resolver
+        app.kubernetes.io/name: resolver
         app.kubernetes.io/instance: tatrman-server
     spec:
       containers:
-        - name: ttr-resolver
-          image: "ghcr.io/collite/ttr-resolver:0.9.2"
+        - name: resolver
+          image: "ghcr.io/collite/resolver:0.9.2"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2335,7 +2335,7 @@ spec:
     spec:
       containers:
         - name: validate
-          image: "ghcr.io/collite/ttr-validate:0.9.0"
+          image: "ghcr.io/collite/validate:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2402,7 +2402,7 @@ spec:
     spec:
       containers:
         - name: veles-mcp
-          image: "ghcr.io/collite/ttr-meta-mcp:0.9.0"
+          image: "ghcr.io/collite/meta-mcp:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -2546,7 +2546,7 @@ spec:
     spec:
       containers:
         - name: whois
-          image: "ghcr.io/collite/ttr-identity:0.9.0"
+          image: "ghcr.io/collite/identity:0.9.0"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

@@ -30,7 +30,7 @@ Since the ttr-metadata swap (arc doc: [`docs/architecture/fork/ttr-metadata-adop
 
 - HTTP: **7260** (`VELES_HTTP_PORT`)
 - gRPC: **7261** (`VELES_GRPC_PORT`)
-- ttr-meta-mcp wrapper: **7262** (separate module)
+- meta-mcp wrapper: **7262** (separate module)
 
 ## Run
 

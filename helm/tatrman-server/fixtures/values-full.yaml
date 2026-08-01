@@ -25,7 +25,7 @@ geo:
     enabled: true
     places: "Praha,Brno,Ostrava"
 
-ttr-resolver:
+resolver:
   # A real HMAC resume-token key by Secret ref (the production shape; no ephemeral).
   resumeToken:
     activeKeyId: "k1"

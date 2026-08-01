@@ -39,9 +39,9 @@ nlp: { enabled: false }
 chrono: { enabled: false }
 geo: { enabled: false }
 money: { enabled: false }
-ttr-resolver: { enabled: false }
+resolver: { enabled: false }
 query-mcp: { enabled: false }
 veles-mcp: { enabled: false }
 fuzzy-mcp: { enabled: false }
 nlp-mcp: { enabled: false }
-ttr-grounding-mcp: { enabled: false }
+grounding-mcp: { enabled: false }

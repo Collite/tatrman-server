@@ -80,7 +80,7 @@ dependencies {
     // The ④ transfer proto: transfer.v1 (CharonService) + metis.v1 (the worker-session
     // endpoint's wire — CharonMetisInteropSpec / MetisWorkerGateway) + org.tatrman.common.v1.
     // CH-P1/CH-D2: both now ride the server's :shared:proto umbrella (published as
-    // ttr-server-proto) beside worker.v1/plan.v1/etc.; the platform-only :proto:hall-proto is
+    // server-proto) beside worker.v1/plan.v1/etc.; the platform-only :proto:hall-proto is
     // left behind (charon carries only transfer.v1 + metis.v1, its own two protos).
     implementation(project(":shared:proto"))
     // CH-D5 — the published transfer seam (MoveExecutor + Plan + Either + CharonError +
@@ -88,7 +88,7 @@ dependencies {
     // CH-P2 without depending on this whole service. `api` because the service's own core
     // (CharonMoveExecutor, MovePlanner, the legality matrix) references these types in
     // public signatures. Same package `org.tatrman.charon.core` — a deliberate split.
-    api(project(":shared:libs:kotlin:ttr-transfer-core"))
+    api(project(":shared:libs:kotlin:transfer-core"))
     // CH-D4 house bootstrap: the shared ktor base (ContentNegotiation/CORS/CallLogging/
     // ForwardedHeaders) via installKtorServerBase — charon was the last service hand-rolling
     // its Ktor module; this aligns it with the 9 siblings. (logging-config/otel-config +

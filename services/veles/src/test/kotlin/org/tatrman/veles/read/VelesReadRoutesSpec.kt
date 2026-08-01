@@ -34,7 +34,7 @@ import java.time.Instant
 
 /**
  * Component proof for the read-only catalog JSON surface. Uses Ktor's `testApplication`
- * (the ttr-llm-gateway HealthSpec pattern) driving a hand-built model through the real
+ * (the llm-gateway HealthSpec pattern) driving a hand-built model through the real
  * registry + search stack, so the assertions exercise the same domain APIs the routes
  * call in production.
  */

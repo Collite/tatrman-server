@@ -12,7 +12,7 @@ body:
     attributes:
       label: Version
       description: Which image tag / chart version / commit are you on?
-      placeholder: "e.g. ghcr.io/collite/ttr-query:0.9.4, chart 0.9.4, or a commit SHA"
+      placeholder: "e.g. ghcr.io/collite/query:0.9.4, chart 0.9.4, or a commit SHA"
     validations:
       required: true
   - type: dropdown

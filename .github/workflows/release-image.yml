@@ -4,7 +4,7 @@ name: Release Image (GHCR)
 # Registry (ghcr.io/collite/<module>:<version>). Cloned shape from kantheon's
 # release-image.yml (SV-P0 S6 T1), retargeted to tatrman-server's module layout
 # with the N1 rename folded in: image repository names are publish-adjacent, so
-# they use FUNCTIONAL names (ttr-query, ttr-validate, …) per the J-v2 guardrail —
+# they use FUNCTIONAL names (query, validate, …) per the J-v2 guardrail —
 # personas are legal only in Helm *release* names + k8s labels, NOT image repos.
 # `veles` is a SURVIVING persona and keeps its name.
 #
@@ -15,14 +15,14 @@ name: Release Image (GHCR)
 # Python lane's known Dockerfile breakage (see ⚑ below) must be fixed first.
 #
 # ⚑ KNOWN PRE-EXISTING GAP (S4 sweep blind spot, recorded in S6 findings): the
-# Python Dockerfiles still COPY the old persona dir paths — services/ttr-nlp
-# COPYs `services/kadmos/...`, workers/ttr-worker-polars COPYs `workers/steropes/...`
-# — and ttr-nlp's uv.lock still carries `kadmos-service`. The Python lane below is
+# Python Dockerfiles still COPY the old persona dir paths — services/nlp
+# COPYs `services/kadmos/...`, workers/worker-polars COPYs `workers/steropes/...`
+# — and nlp's uv.lock still carries `kadmos-service`. The Python lane below is
 # structurally correct but will fail until those paths are renamed + uv.lock
 # regenerated (SV-P1 image-publish work).
 #
 # Two triggers:
-#   1. push of a per-module tag `<module>/v<X.Y.Z>` (e.g. `ttr-query/v0.9.0`)
+#   1. push of a per-module tag `<module>/v<X.Y.Z>` (e.g. `query/v0.9.0`)
 #      -> builds just that module at that version.
 #   2. workflow_dispatch -> pick a version and `all` or a space-separated subset.
 #
@@ -49,7 +49,7 @@ on:
         required: true
         default: '0.9.0'
       modules:
-        description: '"all" for every deployable module, or a space-separated list (e.g. "ttr-query veles")'
+        description: '"all" for every deployable module, or a space-separated list (e.g. "query veles")'
         required: true
         default: 'all'
 
@@ -74,30 +74,30 @@ jobs:
           # veles is a surviving persona and stays veles.
           declare -A PATHS=(
             [veles]=services/veles
-            [ttr-query]=services/ttr-query
-            [ttr-translate]=services/ttr-translate
-            [ttr-validate]=services/ttr-validate
-            [ttr-dispatch]=services/ttr-dispatch
+            [query]=services/query
+            [translate]=services/translate
+            [validate]=services/validate
+            [dispatch]=services/dispatch
             [charon]=services/charon
-            [ttr-fuzzy]=services/ttr-fuzzy
-            [ttr-llm-gateway]=services/ttr-llm-gateway
-            [ttr-nlp]=services/ttr-nlp
+            [lex-matcher]=services/lex-matcher
+            [llm-gateway]=services/llm-gateway
+            [nlp]=services/nlp
             [chrono]=services/chrono
             [geo]=services/geo
             [money]=services/money
-            [ttr-grounding-mcp]=services/ttr-grounding-mcp
-            [ttr-resolver]=services/ttr-resolver
-            [ttr-meta-mcp]=tools/ttr-meta-mcp
-            [ttr-query-mcp]=tools/ttr-query-mcp
-            [ttr-fuzzy-mcp]=tools/ttr-fuzzy-mcp
-            [ttr-nlp-mcp]=tools/ttr-nlp-mcp
-            [ttr-worker-postgres]=workers/ttr-worker-postgres
-            [ttr-worker-mssql]=workers/ttr-worker-mssql
-            [ttr-worker-polars]=workers/ttr-worker-polars
-            [ttr-identity]=infra/ttr-identity
+            [grounding-mcp]=services/grounding-mcp
+            [resolver]=services/resolver
+            [meta-mcp]=tools/meta-mcp
+            [query-mcp]=tools/query-mcp
+            [lex-matcher-mcp]=tools/lex-matcher-mcp
+            [nlp-mcp]=tools/nlp-mcp
+            [worker-postgres]=workers/worker-postgres
+            [worker-mssql]=workers/worker-mssql
+            [worker-polars]=workers/worker-polars
+            [identity]=infra/identity
             [health]=infra/health
           )
-          ALL="veles ttr-query ttr-translate ttr-validate ttr-dispatch charon ttr-fuzzy ttr-llm-gateway ttr-nlp chrono geo money ttr-grounding-mcp ttr-resolver ttr-meta-mcp ttr-query-mcp ttr-fuzzy-mcp ttr-nlp-mcp ttr-worker-postgres ttr-worker-mssql ttr-worker-polars ttr-identity health"
+          ALL="veles query translate validate dispatch charon lex-matcher llm-gateway nlp chrono geo money grounding-mcp resolver meta-mcp query-mcp lex-matcher-mcp nlp-mcp worker-postgres worker-mssql worker-polars identity health"
 
           declare -a NAMES
           if [ "${{ github.event_name }}" = "push" ]; then

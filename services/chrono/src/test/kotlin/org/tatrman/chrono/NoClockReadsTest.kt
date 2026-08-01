@@ -76,8 +76,8 @@ class NoClockReadsTest :
                     "services/chrono/src/main",
                     "services/money/src/main",
                     "services/geo/src/main",
-                    "services/ttr-grounding-mcp/src/main",
-                    "shared/libs/kotlin/ttr-grounding-core/src/main",
+                    "services/grounding-mcp/src/main",
+                    "shared/libs/kotlin/grounding-core/src/main",
                 ).map { File(root, it) }
 
             // Wall-clock reads — forbidden. System.nanoTime()/nanoTime is a monotonic timer, NOT here.

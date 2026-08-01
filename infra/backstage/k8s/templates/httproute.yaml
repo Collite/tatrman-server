@@ -1,1 +1,1 @@
-{{ include "ttr-service.httproute" . }}
+{{ include "tatrman-service.httproute" . }}

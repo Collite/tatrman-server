@@ -41,8 +41,8 @@ jobs:
   # unit classpath). The tier was always meant to run — it just never had a caller.
   #
   # Until this job existed, `./gradlew build` compiled these specs and ktlint linted
-  # them, and nothing ran them: 30 specs across 9 modules (ttr-llm-gateway,
-  # ttr-translate, ttr-validate, veles, geo, both workers, and two shared libs) were
+  # them, and nothing ran them: 30 specs across 9 modules (llm-gateway,
+  # translate, validate, veles, geo, both workers, and two shared libs) were
   # written, maintained, and dark. Found while reviewing the PT arc, whose gateway
   # inspect surface has no other integration coverage.
   #

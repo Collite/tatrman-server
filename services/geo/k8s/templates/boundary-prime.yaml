@@ -9,9 +9,9 @@ not block the release. Rendered only when boundaryPrime.enabled.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "ttr-service.fullname" . }}-boundary-prime
+  name: {{ include "tatrman-service.fullname" . }}-boundary-prime
   labels:
-    {{- include "ttr-service.labels" . | nindent 4 }}
+    {{- include "tatrman-service.labels" . | nindent 4 }}
     app.kubernetes.io/component: boundary-prime
   annotations:
     "helm.sh/hook": post-install,post-upgrade
@@ -22,7 +22,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "ttr-service.selectorLabels" . | nindent 8 }}
+        {{- include "tatrman-service.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: boundary-prime
     spec:
       restartPolicy: Never
@@ -32,7 +32,7 @@ spec:
       {{- end }}
       containers:
         - name: boundary-prime
-          image: {{ include "ttr-service.image" . | quote }}
+          image: {{ include "tatrman-service.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             {{- toYaml .Values.boundaryPrime.command | nindent 12 }}

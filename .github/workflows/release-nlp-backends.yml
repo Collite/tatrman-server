@@ -1,13 +1,13 @@
 name: Release NLP Backends (GHCR)
 
-# Build + push the four ttr-nlp ENGINE BACKEND images — MorphoDiTa, NameTag 3, Stanza, spaCy —
-# to ghcr.io/collite/ttr-nlp-<backend>:<version>.
+# Build + push the four nlp ENGINE BACKEND images — MorphoDiTa, NameTag 3, Stanza, spaCy —
+# to ghcr.io/collite/nlp-<backend>:<version>.
 #
 # WHY A SEPARATE, MANUAL-ONLY WORKFLOW (not release-image.yml):
-#   - Each backend is its own image built from services/ttr-nlp/backends/<backend>/ with a
+#   - Each backend is its own image built from services/nlp/backends/<backend>/ with a
 #     self-contained context (its own baked-model stage); they are not in the module map.
 #   - The UFAL backends (morphodita, nametag3) bake CC BY-NC-SA models — *publishing* the images
-#     is a gated legal item (FI-4, see services/ttr-nlp/README.md). So there is NO push trigger:
+#     is a gated legal item (FI-4, see services/nlp/README.md). So there is NO push trigger:
 #     every publish is a deliberate human `workflow_dispatch`. spaCy/Stanza carry permissive models.
 #
 # MODEL SOURCE (UFAL backends only) — set these as repo Actions VARIABLES
@@ -17,7 +17,7 @@ name: Release NLP Backends (GHCR)
 # spaCy/Stanza need no model arg (models are baked from pip in their Dockerfiles).
 #
 # Auth: GITHUB_TOKEN with packages:write — this repo is in the Collite org, so it can CREATE and push
-# the ghcr.io/collite/ttr-nlp-* packages (a local PAT needs the write:packages scope to do the same).
+# the ghcr.io/collite/nlp-* packages (a local PAT needs the write:packages scope to do the same).
 
 on:
   workflow_dispatch:
@@ -88,8 +88,8 @@ jobs:
         run: |
           set -euo pipefail
           B="${{ matrix.backend }}"
-          echo "context=services/ttr-nlp/backends/$B" >> "$GITHUB_OUTPUT"
-          echo "image=${REGISTRY}/${IMAGE_ORG}/ttr-nlp-$B" >> "$GITHUB_OUTPUT"
+          echo "context=services/nlp/backends/$B" >> "$GITHUB_OUTPUT"
+          echo "image=${REGISTRY}/${IMAGE_ORG}/nlp-$B" >> "$GITHUB_OUTPUT"
 
           # UFAL backends require MODEL_URL; MODEL_SHA256 is optional (digest-pin). Only emit an arg
           # when set — passing an empty MODEL_SHA256 would trip the Dockerfile's checksum guard.
@@ -114,6 +114,6 @@ jobs:
           context: ${{ steps.cfg.outputs.context }}
           platforms: linux/amd64
           push: true
-          provenance: false          # plain single-arch manifest, matching the other ttr-* images
+          provenance: false          # plain single-arch manifest, matching the other server images
           tags: ${{ steps.cfg.outputs.image }}:${{ github.event.inputs.version }}
           build-args: ${{ steps.cfg.outputs.build_args }}

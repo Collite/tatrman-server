@@ -45,7 +45,7 @@ component tier proved against a container.
            wm.reset()
            wm.importMappingsFromResource("wiremock/query-runquery/<scenario>/mappings.json")
            // drive the service via its resolved in-cluster URL
-           val queryMcp = handle.url("ttr-query-mcp")
+           val queryMcp = handle.url("query-mcp")
            // … assertions …
        }
    })

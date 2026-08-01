@@ -10,7 +10,7 @@ import org.tatrman.transfer.v1.MaterializeRequest
 import org.tatrman.transfer.v1.MoveOptions
 import org.tatrman.transfer.v1.StageRequest
 
-// `Plan`, `MoveRpc`, `LocationKind` now live in the published `ttr-transfer-core`
+// `Plan`, `MoveRpc`, `LocationKind` now live in the published `transfer-core`
 // seam lib (CH-D5) — same package `org.tatrman.charon.core`, so referenced here
 // without an import. The planner that *produces* validated `Plan`s stays here.
 
