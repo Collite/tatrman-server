@@ -133,6 +133,19 @@ jobs:
       - name: check dependency rules
         run: bash scripts/check-dependency-rules.sh
 
+  # Naming gate (RV-P(-1), ⚑RV-6): the `ttr-` prefix (naming-gate-ok) was dropped
+  # from every service/lib/tool/worker/infra module; this stops it creeping back. Only two
+  # classes stay: upstream `org.tatrman:ttr-*` toolchain coordinates (a
+  # third-party dep) and K8s namespace names. See scripts/check-name-prefix.sh.
+  naming:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: check the legacy name prefix has not crept back
+        run: bash scripts/check-name-prefix.sh
+
   # DCO gate (SV-P2·S2, RO-18): every non-merge commit in a PR must carry a
   # `Signed-off-by:` trailer (`git commit -s`). Agent-authored patches included —
   # the human submitter's sign-off carries the DCO. See CONTRIBUTING.md.
