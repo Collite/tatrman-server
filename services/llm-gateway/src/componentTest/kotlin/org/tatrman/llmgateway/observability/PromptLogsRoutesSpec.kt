@@ -128,6 +128,10 @@ class PromptLogsRoutesSpec :
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application { module(cfg) } // Flyway runs V1..V4 at boot
+                // `application {}` only REGISTERS the module — testApplication boots LAZILY, on the
+                // first client call. Without this the seeds below hit an unmigrated database and
+                // every test here dies on `relation "prompt_logs" does not exist`.
+                startApplication()
 
                 // Seeded after boot so the schema exists.
                 seed(turnRef = "turn-A", traceId = "trace-A", prompt = "first for A")
@@ -205,6 +209,7 @@ class PromptLogsRoutesSpec :
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application { module(cfg) }
+                startApplication() // boot before seeding — see the note above
 
                 // Two turns, ONE trace — what a session-level trace looks like.
                 seed(turnRef = "turn-mine", traceId = "trace-shared", prompt = "mine")
@@ -238,6 +243,7 @@ class PromptLogsRoutesSpec :
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application { module(cfg) }
+                startApplication() // boot before seeding — see the note above
 
                 seed(turnRef = "turn-null-ts", traceId = null, prompt = "no timestamp")
                 DriverManager

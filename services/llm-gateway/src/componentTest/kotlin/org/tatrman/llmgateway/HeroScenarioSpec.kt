@@ -5,7 +5,6 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
-import com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
@@ -39,6 +38,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.PostgreSQLContainer
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.net.URI
 
 /**
  * LG-P5·S2·T6 — THE HERO (design §7), the phase-exit gate. One streaming run exercises the whole stack:
@@ -80,7 +80,13 @@ class HeroScenarioSpec :
                 base.catalog.models.map {
                     if (it.id == "azure-gpt-4o") it.copy(fallback = listOf("anthropic-sonnet-4-6")) else it
                 }
-            val providers = base.providers.providers.mapValues { (_, p) -> p.copy(baseUrl = wm.baseUrl()) }
+            val providers =
+                base.providers.providers.mapValues { (_, p) ->
+                    p.copy(
+                        baseUrl =
+                            wm.baseUrl() + URI(p.baseUrl).path,
+                    )
+                }
             return base.copy(
                 catalog = base.catalog.copy(models = models),
                 governance =
@@ -118,7 +124,7 @@ class HeroScenarioSpec :
             wm.resetAll()
             exporter.reset()
             wm.stubFor(
-                post(urlPathMatching("/openai/deployments/.*/chat/completions")).willReturn(
+                post(urlPathEqualTo("/openai/v1/chat/completions")).willReturn(
                     aResponse().withStatus(429).withHeader("Content-Type", "application/json").withBody(
                         """{"error":{"message":"slow down","type":"rate_limit_error","code":"rate_limit_exceeded"}}""",
                     ),

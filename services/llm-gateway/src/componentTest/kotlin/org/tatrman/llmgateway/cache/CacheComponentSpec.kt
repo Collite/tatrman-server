@@ -6,7 +6,7 @@ import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.exactly
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor
-import com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching
+import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
@@ -37,6 +37,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.PostgreSQLContainer
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.net.URI
 
 /**
  * LG-P5·S1·T2/T5/T6 — the exact-match cache through the wire (E-1). Real PG + Redis + a WireMock upstream.
@@ -70,7 +71,7 @@ class CacheComponentSpec :
                     base.providers.copy(
                         providers =
                             base.providers.providers.mapValues { (_, p) ->
-                                p.copy(baseUrl = wm.baseUrl())
+                                p.copy(baseUrl = wm.baseUrl() + URI(p.baseUrl).path)
                             },
                     ),
                 governance =
@@ -107,7 +108,7 @@ class CacheComponentSpec :
 
         fun stubAzureNonStream() =
             wm.stubFor(
-                post(urlPathMatching("/openai/deployments/.*/chat/completions"))
+                post(urlPathEqualTo("/openai/v1/chat/completions"))
                     .willReturn(
                         aResponse()
                             .withStatus(
@@ -119,7 +120,7 @@ class CacheComponentSpec :
 
         fun stubAzureStream() =
             wm.stubFor(
-                post(urlPathMatching("/openai/deployments/.*/chat/completions"))
+                post(urlPathEqualTo("/openai/v1/chat/completions"))
                     .willReturn(
                         aResponse()
                             .withStatus(
@@ -194,7 +195,7 @@ class CacheComponentSpec :
                 budgets.usedUsd("golem", month) shouldBe usedAfterFirst
             }
             // upstream hit exactly once across the two calls
-            wm.verify(exactly(1), postRequestedFor(urlPathMatching("/openai/deployments/.*/chat/completions")))
+            wm.verify(exactly(1), postRequestedFor(urlPathEqualTo("/openai/v1/chat/completions")))
         }
 
         "stream: a second identical request is served as a synthetic replay — no second upstream call" {
@@ -223,7 +224,7 @@ class CacheComponentSpec :
                 body shouldContain "\"cached\":true"
                 body shouldContain "[DONE]"
             }
-            wm.verify(exactly(1), postRequestedFor(urlPathMatching("/openai/deployments/.*/chat/completions")))
+            wm.verify(exactly(1), postRequestedFor(urlPathEqualTo("/openai/v1/chat/completions")))
         }
 
         "X-Gateway-Cache: bypass skips the read and re-hits the upstream" {
@@ -248,7 +249,7 @@ class CacheComponentSpec :
                         setBody(chat("bypass-me"))
                     }.status shouldBe HttpStatusCode.OK
             }
-            wm.verify(exactly(2), postRequestedFor(urlPathMatching("/openai/deployments/.*/chat/completions")))
+            wm.verify(exactly(2), postRequestedFor(urlPathEqualTo("/openai/v1/chat/completions")))
         }
 
         "a would-be cache hit still spends a rate-limit token (admission runs before the cache)" {

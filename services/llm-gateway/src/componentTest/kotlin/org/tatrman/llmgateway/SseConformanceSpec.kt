@@ -4,7 +4,7 @@ package org.tatrman.llmgateway
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.post
-import com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching
+import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.typesafe.config.ConfigFactory
 import io.kotest.core.spec.style.StringSpec
@@ -27,6 +27,7 @@ import org.tatrman.llmgateway.auth.sha256Hex
 import org.tatrman.llmgateway.config.ConfigLoader
 import org.tatrman.llmgateway.config.GatewayConfig
 import org.tatrman.llmgateway.config.SeededKey
+import java.net.URI
 
 /**
  * LG-P2·S2·T7 — the streaming P-1 runtime smoke: a `stream:true` chat completion proxied through the
@@ -49,7 +50,7 @@ class SseConformanceSpec :
             val base = ConfigLoader.loadFromResources()
             val providers =
                 base.providers.providers.mapValues { (_, p) ->
-                    if (p.kind == "openai-wire") p.copy(baseUrl = wm.baseUrl()) else p
+                    if (p.kind == "openai-wire") p.copy(baseUrl = wm.baseUrl() + URI(p.baseUrl).path) else p
                 }
             return base.copy(
                 governance =
@@ -93,7 +94,7 @@ class SseConformanceSpec :
         "streamed tool_calls reassemble into the exact arguments JSON with index integrity (FI-4)" {
             wm.resetAll()
             wm.stubFor(
-                post(urlPathMatching("/openai/deployments/.*/chat/completions")).willReturn(
+                post(urlPathEqualTo("/openai/v1/chat/completions")).willReturn(
                     aResponse()
                         .withStatus(
                             200,
@@ -123,7 +124,7 @@ class SseConformanceSpec :
         "before-first-token upstream 429 → real HTTP 429 (S2 deviation resolved by the P3·S2 engine)" {
             wm.resetAll()
             wm.stubFor(
-                post(urlPathMatching("/openai/deployments/.*/chat/completions")).willReturn(
+                post(urlPathEqualTo("/openai/v1/chat/completions")).willReturn(
                     aResponse()
                         .withStatus(429)
                         .withHeader("Content-Type", "application/json")

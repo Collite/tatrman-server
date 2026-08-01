@@ -20,6 +20,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.config.MapApplicationConfig
 import io.ktor.server.testing.testApplication
 import com.typesafe.config.ConfigFactory
+import java.net.URI
 import org.tatrman.llmgateway.auth.sha256Hex
 import org.tatrman.llmgateway.config.ConfigLoader
 import org.tatrman.llmgateway.config.GatewayConfig
@@ -40,12 +41,15 @@ class PassthroughConformanceSpec :
         beforeSpec { wm.start() }
         afterSpec { wm.stop() }
 
-        // point every openai-wire provider at WireMock + seed the auth key
+        // point every openai-wire provider at WireMock + seed the auth key.
+        // Swap the ORIGIN only, keeping each provider's baseUrl path: azure's surface is
+        // `…/openai/v1` + urlPattern `/{path}` (e5582a7), so flattening the whole baseUrl to
+        // wm.baseUrl() would silently test a path the deployed provider never calls.
         fun gateway(): GatewayConfig {
             val base = ConfigLoader.loadFromResources()
             val providers =
                 base.providers.providers.mapValues { (_, p) ->
-                    if (p.kind == "openai-wire") p.copy(baseUrl = wm.baseUrl()) else p
+                    if (p.kind == "openai-wire") p.copy(baseUrl = wm.baseUrl() + URI(p.baseUrl).path) else p
                 }
             return base.copy(
                 governance =
@@ -60,7 +64,7 @@ class PassthroughConformanceSpec :
         "non-stream chat: upstream body passes through + usage extension injected + gateway headers" {
             wm.resetAll()
             wm.stubFor(
-                post(urlPathEqualTo("/openai/deployments/gpt-4o/chat/completions")).willReturn(
+                post(urlPathEqualTo("/openai/v1/chat/completions")).willReturn(
                     aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(
                         """{"id":"cmpl-1","object":"chat.completion","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}""",
                     ),
@@ -89,13 +93,13 @@ class PassthroughConformanceSpec :
             }
 
             // the request reached the upstream with the model rewritten to the deployment name
-            wm.verify(postRequestedFor(urlPathEqualTo("/openai/deployments/gpt-4o/chat/completions")))
+            wm.verify(postRequestedFor(urlPathEqualTo("/openai/v1/chat/completions")))
         }
 
         "upstream 429 maps through the OpenAI-wire converter → 429 rate_limit" {
             wm.resetAll()
             wm.stubFor(
-                post(urlPathEqualTo("/openai/deployments/tatrman-gpt-4.1/chat/completions")).willReturn(
+                post(urlPathEqualTo("/openai/v1/chat/completions")).willReturn(
                     aResponse()
                         .withStatus(429)
                         .withHeader("Content-Type", "application/json")
@@ -122,7 +126,7 @@ class PassthroughConformanceSpec :
         "embeddings ride passthrough; the 1.x {text|texts} shape is rejected 400 (LG-D3)" {
             wm.resetAll()
             wm.stubFor(
-                post(urlPathEqualTo("/openai/deployments/text-embedding-ada-002/embeddings")).willReturn(
+                post(urlPathEqualTo("/openai/v1/embeddings")).willReturn(
                     aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(
                         """{"object":"list","data":[{"object":"embedding","index":0,"embedding":[0.1,0.2]}],"model":"text-embedding-ada-002","usage":{"prompt_tokens":8,"total_tokens":8}}""",
                     ),

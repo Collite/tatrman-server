@@ -4,7 +4,7 @@ package org.tatrman.llmgateway.admin
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.post
-import com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching
+import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
@@ -27,6 +27,7 @@ import org.tatrman.llmgateway.config.SeededKey
 import org.tatrman.llmgateway.governance.KeyMint
 import org.tatrman.llmgateway.module
 import org.testcontainers.containers.PostgreSQLContainer
+import java.net.URI
 
 /**
  * LG-P4·S3·T3/T5 — attribution headers (D-2, contracts §1.2) + the Hebe-shape regression (G-3, GI-1).
@@ -55,7 +56,7 @@ class AttributionSpec :
                     base.providers.copy(
                         providers =
                             base.providers.providers.mapValues { (_, p) ->
-                                p.copy(baseUrl = wm.baseUrl())
+                                p.copy(baseUrl = wm.baseUrl() + URI(p.baseUrl).path)
                             },
                     ),
                 governance =
@@ -72,7 +73,7 @@ class AttributionSpec :
             pgc.start()
             wm.start()
             wm.stubFor(
-                post(urlPathMatching("/openai/deployments/.*/chat/completions")).willReturn(
+                post(urlPathEqualTo("/openai/v1/chat/completions")).willReturn(
                     aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(
                         """{"id":"c1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":8,"completion_tokens":4,"total_tokens":12}}""",
                     ),

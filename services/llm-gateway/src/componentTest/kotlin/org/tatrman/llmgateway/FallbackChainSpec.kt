@@ -28,6 +28,7 @@ import org.tatrman.llmgateway.config.CircuitConfig
 import org.tatrman.llmgateway.config.ConfigLoader
 import org.tatrman.llmgateway.config.GatewayConfig
 import org.tatrman.llmgateway.config.SeededKey
+import java.net.URI
 
 /**
  * LG-P3·S2·T2/T4/T7 — fallback chains + circuit-breaker-lite through the wire. Azure retry-exhausts, the
@@ -61,7 +62,13 @@ class FallbackChainSpec :
                         it
                     }
                 }
-            val providers = base.providers.providers.mapValues { (_, p) -> p.copy(baseUrl = wm.baseUrl()) }
+            val providers =
+                base.providers.providers.mapValues { (_, p) ->
+                    p.copy(
+                        baseUrl =
+                            wm.baseUrl() + URI(p.baseUrl).path,
+                    )
+                }
             return base.copy(
                 catalog = base.catalog.copy(models = models),
                 governance =
@@ -78,7 +85,7 @@ class FallbackChainSpec :
 
         fun stubAzure(status: Int) =
             wm.stubFor(
-                post(urlPathMatching("/openai/deployments/.*/chat/completions")).willReturn(
+                post(urlPathEqualTo("/openai/v1/chat/completions")).willReturn(
                     aResponse().withStatus(status).withHeader("Content-Type", "application/json").withBody(
                         """{"error":{"message":"upstream","type":"error"}}""",
                     ),
@@ -116,7 +123,7 @@ class FallbackChainSpec :
                 res.bodyAsText() shouldContain "fallback served"
             }
             // azure was retried to exhaustion (maxAttempts=3), then the converter path served once
-            wm.verify(postRequestedFor(urlPathMatching("/openai/deployments/.*/chat/completions")))
+            wm.verify(postRequestedFor(urlPathEqualTo("/openai/v1/chat/completions")))
             wm.verify(exactly(1), postRequestedFor(urlPathEqualTo("/v1/messages")))
         }
 
@@ -125,7 +132,7 @@ class FallbackChainSpec :
             // No HTTP status ever reaches the gateway — the upstream connection is reset. Before the H-1 fix
             // this threw straight through the engine to a 500 with no retry and no fallback.
             wm.stubFor(
-                post(urlPathMatching("/openai/deployments/.*/chat/completions"))
+                post(urlPathEqualTo("/openai/v1/chat/completions"))
                     .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)),
             )
             stubAnthropicOk()
@@ -163,7 +170,7 @@ class FallbackChainSpec :
                 res.status shouldBe HttpStatusCode.Unauthorized
             }
             // Auth is non-retryable → one azure try, and non-chain-eligible → the converter is never called.
-            wm.verify(exactly(1), postRequestedFor(urlPathMatching("/openai/deployments/.*/chat/completions")))
+            wm.verify(exactly(1), postRequestedFor(urlPathEqualTo("/openai/v1/chat/completions")))
             wm.verify(exactly(0), postRequestedFor(urlPathEqualTo("/v1/messages")))
         }
 
