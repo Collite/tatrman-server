@@ -144,7 +144,9 @@ test-kt module="":
         ./gradlew "${gradle_path}:test"
     fi
 
-# The real-dependency (Testcontainers) component tier — separate from `test`.
+# The real-dependency (Testcontainers) component tier — separate from `test`, and
+# GATING: ci.yml's `component-test` job runs exactly this command on every PR.
+# Needs a running Docker daemon (postgres:16-alpine, redis:7-alpine).
 test-component:
     ./gradlew componentTest
 

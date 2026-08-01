@@ -33,6 +33,65 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # The real-dependency (Testcontainers) component tier.
+  #
+  # A SEPARATE job, deliberately, and not wired into `check`: the root build script
+  # keeps `componentTest` out of the `test` source set on purpose, so that the unit
+  # gate stays mocked-only and fast (it even fails if component classes leak onto the
+  # unit classpath). The tier was always meant to run — it just never had a caller.
+  #
+  # Until this job existed, `./gradlew build` compiled these specs and ktlint linted
+  # them, and nothing ran them: 30 specs across 9 modules (ttr-llm-gateway,
+  # ttr-translate, ttr-validate, veles, geo, both workers, and two shared libs) were
+  # written, maintained, and dark. Found while reviewing the PT arc, whose gateway
+  # inspect surface has no other integration coverage.
+  #
+  # The tier was WRITTEN for this job — `testkit.CiOnly` reads "always runs in CI;
+  # `CI` is set by GitHub Actions on a native amd64 runner" and gates the MSSQL spec
+  # on it. The condition was right; nothing ever satisfied it.
+  #
+  # Needs Docker; ubuntu-latest has it. Images are public and pinned in
+  # `testkit.Containers`: postgres:16-alpine, redis:7-alpine, wiremock:3.13.2, and —
+  # only here, never on a dev laptop — mssql/server:2022-latest, which is a ~1.5 GB
+  # pull with a 5-minute startup allowance. That one image is most of the budget
+  # below. `just test-component` is the same command a developer runs locally, where
+  # the MSSQL spec reports *skipped* rather than failing on Apple Silicon.
+  component-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - uses: extractions/setup-just@v2
+
+      - name: component tier (Testcontainers)
+        run: just test-component
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # A container tier fails in ways the console line does not explain — a pull
+      # timeout and a real assertion failure look identical from the outside.
+      - name: test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: component-test-reports
+          path: |
+            **/build/reports/tests/componentTest/
+            **/build/test-results/componentTest/
+          retention-days: 7
+          if-no-files-found: ignore
+
   # RG-P6.S2.T1 — the gating service-level conformance tier (the SV-P3 parity
   # instrument): the three service-level corpora (ENTITIES_ONLY resolver + Q-17
   # fuzzy + grounding hermetic), self-contained with NO DFP dependency. Green
