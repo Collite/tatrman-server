@@ -36,4 +36,13 @@ interface MatchRepository {
      * as unknown. The many existing fakes take the default and simply say nothing.
      */
     fun knownCategories(): Set<String>? = null
+
+    /**
+     * RV-P1.4 T6 — the estate overlay (RV-P6), empty by default.
+     *
+     * Hung off the repository because the repository is the **layer owner**: it already owns the
+     * member index and the declared source, and hanging the third layer somewhere else would give
+     * the same tuple two homes. [FuzzyMatcher] consults it; the repository reports its version.
+     */
+    fun overlay(): OverlayStore = NoopOverlayStore
 }

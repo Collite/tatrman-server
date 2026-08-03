@@ -34,6 +34,13 @@ class StringRepository(
     // RG-P2.S2: declared vocabulary (lexicon terms + valueLabels) — VOCABULARY
     // categories merged alongside the member data. Null = member data only.
     private val snapshotSource: SnapshotVocabularySource? = null,
+    /**
+     * RV-P1.4 T6 — the estate overlay (RV-P6). [NoopOverlayStore] until that store exists, which is
+     * what every deployment runs today: no version in the tuple, nothing consulted, results
+     * untouched. Injected here rather than into [FuzzyMatcher] so the third layer has ONE home —
+     * the repository owns the other two, and the matcher reaches it through `overlay()`.
+     */
+    private val overlayStore: OverlayStore = NoopOverlayStore,
 ) : MatchRepository {
     private val logger = LoggerFactory.getLogger(StringRepository::class.java)
 
@@ -178,7 +185,10 @@ class StringRepository(
         LayerVersions(
             lexiconArtifactHash = snapshotSource?.artifactHash() ?: "",
             memberIndexVersions = memberVersions,
-            overlayVersion = null,
+            // T6 — sourced from the overlay slot at last. Still null in every deployment, because
+            // the slot holds NoopOverlayStore until RV-P6; the difference is that it is now null
+            // because the store says so, not because the field was hardcoded.
+            overlayVersion = overlayStore.version(),
         )
 
     /**
@@ -201,6 +211,8 @@ class StringRepository(
      * an empty list that could equally mean "no match".
      */
     override fun knownCategories(): Set<String> = cache.keys
+
+    override fun overlay(): OverlayStore = overlayStore
 
     /** Per-category discovery + staleness for `GetStatus` (contracts §2). */
     fun categoryStatuses(): List<CategoryStatusInfo> =

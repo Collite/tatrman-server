@@ -108,6 +108,12 @@ data class FuzzyMatchResult(
      *
      * The decision travels, not just the number, so the floor stays one value in one place instead
      * of every consumer re-deciding what "close enough" means.
+     *
+     * **Reason-agnostic** (RV-P1.4 T6). Two independent things set it false: an RV-32 margin under
+     * the floor, and an estate overlay entry with NEGATIVE polarity. The caller's action is the same
+     * either way — offer it, rank it, ask about it, do not bind it unattended — so one channel
+     * carries both. If RV-P6 turns out to need the reason, that is an additive field then, not a
+     * second flag now.
      */
     val autoBindable: Boolean? = null,
     /**

@@ -266,7 +266,30 @@ class FuzzyMatcher(
         // through (match / matchCascade / batchMatch), so no caller can route around it. Inside the
         // cascade rather than after it on purpose: a candidate the author's method rejects must not
         // be allowed to satisfy a cascade step's min-score and stop the fallback.
-        return methodDispatcher.dispatch(query, scored, methodOverride)
+        val dispatched = methodDispatcher.dispatch(query, scored, methodOverride)
+        return consultOverlay(query, listOfNotNull(category), dispatched, limit)
+    }
+
+    /**
+     * RV-P1.4 T6 — the third layer, consulted after the other two have spoken.
+     *
+     * Additions merge in and are ranked with everything else; suppressed targets are **flagged, not
+     * removed** ([OverlayVerdict.suppressedTargets]). With the default [NoopOverlayStore] the
+     * verdict is empty and the input list is returned as-is, so a deployment with no learning
+     * history is byte-identical to the pre-overlay service.
+     */
+    private suspend fun consultOverlay(
+        term: String,
+        categories: List<String>,
+        results: List<FuzzyMatchResult>,
+        limit: Int,
+    ): List<FuzzyMatchResult> {
+        val verdict = repository.overlay().consult(OverlayRequest(term, categories, results))
+        if (verdict.isEmpty) return results
+
+        val flagged =
+            results.map { if (it.targetRef in verdict.suppressedTargets) it.copy(autoBindable = false) else it }
+        return (flagged + verdict.additions).sortedByDescending { it.score }.take(limit)
     }
 
     private suspend fun matchWithTokenBased(
