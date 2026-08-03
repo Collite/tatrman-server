@@ -64,6 +64,9 @@ class FuzzyMatcher(
     // seam FZO plugs OpenSearch into; the in-memory default resolves against the interned vocabulary.
     private val retrievalMode: RetrievalMode = RetrievalMode.LEGACY,
     private val retriever: CandidateRetriever = IndexFirstRetriever(repository::getVocabulary),
+    // RV-P1.4 T4 — honours the authored match method (RV-32) on whatever the cascade produced.
+    // A no-op for candidates with no authored method, so the pre-RV service is unaffected.
+    private val methodDispatcher: MethodDispatcher = MethodDispatcher(),
 ) {
     suspend fun match(
         query: String,
@@ -160,13 +163,19 @@ class FuzzyMatcher(
         limit: Int,
     ): List<FuzzyMatchResult> {
         val candidates = repository.getCandidates(category)
-        return if (algorithmType == AlgorithmType.TATRMAN) {
-            matchWithTokenBased(query, category, candidates, limit)
-        } else {
-            withContext(Dispatchers.Default) {
-                matchWithStandardAlgorithm(query, category, algorithmType, candidates, limit)
+        val scored =
+            if (algorithmType == AlgorithmType.TATRMAN) {
+                matchWithTokenBased(query, category, candidates, limit)
+            } else {
+                withContext(Dispatchers.Default) {
+                    matchWithStandardAlgorithm(query, category, algorithmType, candidates, limit)
+                }
             }
-        }
+        // RV-P1.4 T4 — the authored method gates here, at the single point every entry point funnels
+        // through (match / matchCascade / batchMatch), so no caller can route around it. Inside the
+        // cascade rather than after it on purpose: a candidate the author's method rejects must not
+        // be allowed to satisfy a cascade step's min-score and stop the fallback.
+        return methodDispatcher.dispatch(query, scored)
     }
 
     private suspend fun matchWithTokenBased(

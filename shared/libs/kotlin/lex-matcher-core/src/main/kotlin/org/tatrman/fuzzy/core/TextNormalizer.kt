@@ -21,4 +21,10 @@ import org.tatrman.text.Normalization
  */
 object TextNormalizer {
     fun fold(input: String): String = Normalization.fold(input)
+
+    /**
+     * RV-P1.4 T4 — the authored form (diacritics preserved), used by `EXACT` and `TYPOS(n)`
+     * dispatch. See [Normalization.canonical] for why the matcher needs two forms, not one.
+     */
+    fun canonical(input: String): String = Normalization.canonical(input)
 }

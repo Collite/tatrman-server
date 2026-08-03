@@ -21,6 +21,7 @@ import org.tatrman.fuzzy.config.ConfigLoader
 import org.tatrman.fuzzy.core.Candidate
 import org.tatrman.fuzzy.core.FuzzyMatcher
 import org.tatrman.fuzzy.core.Lemmatizer
+import org.tatrman.fuzzy.core.MethodDispatcher
 import org.tatrman.fuzzy.core.NoopLemmatizer
 import org.tatrman.fuzzy.core.StringRepository
 import org.tatrman.fuzzy.db.DatabaseFactory
@@ -171,6 +172,7 @@ fun Application.module(serverConfig: KtorServerConfig) {
             lemmatizer,
             idfEnabled = config.tokenBasedConfig.idfEnabled,
             retrievalMode = config.tokenBasedConfig.retrieval,
+            methodDispatcher = MethodDispatcher(config.lexicon.uniquenessMarginFloor),
         )
     log.info("Fuzzy retrieval mode: ${config.tokenBasedConfig.retrieval}")
     val grpcService = GrpcService(fuzzyMatcher, repository, telemetry)

@@ -84,4 +84,30 @@ data class FuzzyMatchResult(
      * value has to survive the loader and the cascade before the dispatcher can be trusted to read it.
      */
     val matchMethod: String? = null,
+    /**
+     * RV-32 — the uniqueness margin, **contractual for TOKENS** and null for every other method.
+     *
+     * `bestScore(this target) − bestScore(the best other target)`, over the TOKENS candidates in
+     * this response. Negative for a target that lost to a better one; equal to the candidate's own
+     * score when nothing competes.
+     *
+     * Measured **within the declared layer**, not across layers. A declared term is not made
+     * ambiguous by a member value that happens to score near it — that is the 0..n-bindings case
+     * (RV-2) the resolver's evidence-class gate exists to arbitrate, and computing the margin
+     * across layers would smuggle that decision into the matcher, which never picks a winner
+     * across layers (T2's rule).
+     *
+     * Competing *aliases of the same target* are not competition: identity is the target ref, so
+     * two spellings of one measure yield one target, not a tie.
+     */
+    val uniquenessMargin: Double? = null,
+    /**
+     * RV-32 — false ⇒ the caller **must not auto-bind** this candidate; offer it, rank it, ask
+     * about it, but do not resolve to it unattended. Null means no such decision was made (no
+     * authored TOKENS method), which is every pre-RV candidate.
+     *
+     * The decision travels, not just the number, so the floor stays one value in one place instead
+     * of every consumer re-deciding what "close enough" means.
+     */
+    val autoBindable: Boolean? = null,
 )

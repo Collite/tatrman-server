@@ -167,6 +167,11 @@ class GrpcService(
                 )
         targetRef?.let { b.setTargetRef(it) }
         matchMethod?.let { b.setMatchMethod(it) }
+        // RV-32 — both left UNSET when null. `auto_bindable` especially: proto3's default for an
+        // unset bool is `false`, so writing the null case would tell every caller "do not bind
+        // this", which is the opposite of "no decision applies".
+        uniquenessMargin?.let { b.setUniquenessMargin(it) }
+        autoBindable?.let { b.setAutoBindable(it) }
         return b.build()
     }
 }

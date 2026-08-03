@@ -126,4 +126,11 @@ message FuzzyMatch {
   // Provenance.method, which is the algorithm that produced the score. Absent for member values:
   // nobody authored a method for a data value.
   optional string match_method = 8;
+  // RV-32 (RV-P1.4 T4): TOKENS only — how far this candidate's target beat the best OTHER target
+  // in the declared layer for this query. Negative when a better target exists. ABSENT for every
+  // other method: absence means "no uniqueness decision applies here", which `0` would not.
+  optional double uniqueness_margin = 9;
+  // RV-32: false ⇒ the caller MUST NOT auto-bind this candidate (the margin is under the floor, or
+  // another target won). Absent ⇒ no such decision was made — the pre-RV shape.
+  optional bool auto_bindable = 10;
 }

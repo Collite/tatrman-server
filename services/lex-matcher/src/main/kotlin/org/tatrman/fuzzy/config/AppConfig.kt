@@ -3,6 +3,7 @@ package org.tatrman.fuzzy.config
 
 import com.typesafe.config.ConfigFactory
 import io.ktor.server.config.*
+import org.tatrman.fuzzy.core.MethodDispatcher
 
 data class AppConfig(
     val serverPort: Int,
@@ -64,6 +65,12 @@ data class LoaderSourceConfig(
  */
 data class LexiconConfig(
     val archivePath: String = "",
+    /**
+     * RV-32 (T4) — the uniqueness floor a TOKENS match must clear to be auto-bindable. Lives here
+     * rather than under `token-based` because it is an authoring rule, not an engine tuning knob:
+     * `token-based` shapes how things score, this decides what a score is allowed to mean.
+     */
+    val uniquenessMarginFloor: Double = MethodDispatcher.DEFAULT_UNIQUENESS_FLOOR,
 )
 
 data class MetadataConfig(
@@ -216,6 +223,12 @@ object ConfigLoader {
             LexiconConfig(
                 archivePath =
                     if (lexicon.hasPath("archive-path")) lexicon.getString("archive-path") else defaults.archivePath,
+                uniquenessMarginFloor =
+                    if (lexicon.hasPath("uniqueness-margin-floor")) {
+                        lexicon.getDouble("uniqueness-margin-floor")
+                    } else {
+                        defaults.uniquenessMarginFloor
+                    },
             )
         } catch (e: com.typesafe.config.ConfigException) {
             LexiconConfig()
