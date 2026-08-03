@@ -45,4 +45,19 @@ interface MatchRepository {
      * the same tuple two homes. [FuzzyMatcher] consults it; the repository reports its version.
      */
     fun overlay(): OverlayStore = NoopOverlayStore
+
+    /**
+     * RV-P1.4 T4 — true when this store serves a declared layer, i.e. when some candidate can carry
+     * an authored method or a target class.
+     *
+     * [FuzzyMatcher] scores wider than the caller's limit when this is true, so the authored-method
+     * gate and T5's class filter have rows to reject without emptying the answer. That widening is
+     * **not** free of consequence — `TokenBasedMatcher` sizes its defensive non-seed sample by the
+     * limit it is given, so a wider limit changes which candidates get fuzzy-scored. Gating it here
+     * is what keeps T7's promise exact: with no artifact loaded, the member path is byte-identical
+     * to the pre-RV engine, goldens and all.
+     *
+     * Defaults to false — the honest answer for a member-only store, and for the many fakes.
+     */
+    fun servesDeclaredLayer(): Boolean = false
 }

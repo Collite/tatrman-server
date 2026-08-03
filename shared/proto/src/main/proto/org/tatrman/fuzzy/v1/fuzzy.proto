@@ -173,9 +173,16 @@ message LookupRequest {
   // never impose one on rows nobody authored, or a caller widening its declared layer would
   // narrow the estate's data layer.
   optional string method_override = 4;
-  int32 max_candidates = 5;  // <= 0 ⇒ 10
+  // <= 0 ⇒ 10, and CAPPED AT 200 — the rung's question is bounded by construction, and an uncapped
+  // int32 would let one request ask for the whole estate scored and serialised. A caller that needs
+  // a wider answer narrows its `categories` instead; that is the scoping this surface is for.
+  int32 max_candidates = 5;
 }
 
+// Failure is signalled by gRPC STATUS, not by an in-band flag: INVALID_ARGUMENT for a malformed
+// request (e.g. an unparseable `method_override`), INTERNAL for a fault on the server. This is
+// deliberately unlike FuzzyMatchResponse's legacy `is_error` — a status tells a caller whether
+// retrying can help, which a bool and a string cannot.
 message LookupResponse {
   repeated FuzzyMatch candidates = 1;
   LayerVersions layer_versions = 2;             // RV-39, per S-1

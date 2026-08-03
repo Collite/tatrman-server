@@ -41,6 +41,27 @@ data class Candidate(
      */
     val foldedValue: String = TextNormalizer.fold(value)
 
+    /**
+     * RV-P1.4 T4 — [matchMethod] parsed **once at load**, not once per candidate per request.
+     *
+     * [MethodDispatcher] runs on every query that surfaces this candidate, and used to re-parse the
+     * string each time (twice, on the paths that also re-margin). Parsing here moves the regex to
+     * the refresh that built the index. Free for member rows: `parse(null)` is a null check.
+     *
+     * A body `val`, so it stays out of the generated equals/hashCode/copy like [foldedValue].
+     */
+    val authoredMethod: MatchMethod? = MatchMethod.parse(matchMethod)
+
+    /**
+     * RV-P1.4 T4 — the authored form (diacritics intact) that `EXACT`/`TYPOS(n)` dispatch compares
+     * against, precomputed for the same reason as [foldedValue].
+     *
+     * **Null when no method was authored**, which is every member value — deliberately, so the
+     * member path pays no NFC normalisation at load. Nothing reads it for those rows: dispatch
+     * admits an unauthored candidate without ever looking at its canonical form.
+     */
+    val canonicalValue: String? = if (authoredMethod == null) null else TextNormalizer.canonical(value)
+
     companion object {
         val WHITESPACE_REGEX = Regex("\\s+")
 

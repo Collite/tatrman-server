@@ -26,13 +26,4 @@ enum class TargetClass {
 
     /** A `ground:` trigger slice — chrono · money · geo (RV-42). */
     GROUNDING_TRIGGER,
-    ;
-
-    companion object {
-        /** Case-insensitive; null for null, blank, or anything unrecognised (no throw — see [MatchMethod.parse]). */
-        fun parse(raw: String?): TargetClass? =
-            raw?.trim()?.takeIf { it.isNotEmpty() }?.let { text ->
-                entries.firstOrNull { it.name.equals(text, ignoreCase = true) }
-            }
-    }
 }

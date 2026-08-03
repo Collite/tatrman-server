@@ -121,4 +121,22 @@ data class FuzzyMatchResult(
      * stored. T5's lookup scopes on it.
      */
     val targetClass: TargetClass? = null,
+    /**
+     * RV-P1.4 T4 — [matchMethod] already parsed, threaded through from [Candidate.authoredMethod]
+     * so the dispatcher never re-parses it per request.
+     *
+     * The default keeps every direct construction (tests, overlay additions) honest: a result built
+     * from a method string alone still gets the right parse, just at construction rather than at
+     * load. `copy()` carries it, which matters — the dispatcher copies rows to stamp margins and
+     * must not lose the method it dispatched on.
+     */
+    val authoredMethod: MatchMethod? = MatchMethod.parse(matchMethod),
+    /**
+     * RV-P1.4 T4 — [candidate] in its authored form, threaded through from [Candidate.canonicalValue].
+     *
+     * Null when there is no authored method, exactly as on [Candidate]: `EXACT`/`TYPOS(n)` are the
+     * only readers, and they only ever look at rows that have one. [MethodDispatcher] falls back to
+     * normalising on the spot for a row that arrived without it.
+     */
+    val canonicalCandidate: String? = null,
 )

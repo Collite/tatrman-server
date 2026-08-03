@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.fuzzy.api
 
+import io.grpc.Status
 import io.grpc.StatusException
 import io.grpc.inprocess.InProcessChannelBuilder
 import io.grpc.inprocess.InProcessServerBuilder
@@ -8,6 +9,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotBeBlank
 import kotlinx.coroutines.runBlocking
 import org.tatrman.fuzzy.config.AppConfig
@@ -191,17 +193,24 @@ class LookupGrpcTest :
             }
         }
 
-        "an unparseable method override fails the call instead of quietly using another rule" {
+        "an unparseable method override fails the call with INVALID_ARGUMENT" {
+            // The code matters, not just that it threw. grpc-kotlin maps any exception that is not
+            // a StatusException to UNKNOWN, which tells a caller nothing — it cannot distinguish
+            // "your request is malformed, retrying will not help" from "the server fell over".
             withStub { stub ->
-                shouldThrow<StatusException> {
-                    stub.lookup(
-                        LookupRequest
-                            .newBuilder()
-                            .setTerm("obrat")
-                            .setMethodOverride("SEMANTIC(0.8)")
-                            .build(),
-                    )
-                }
+                val thrown =
+                    shouldThrow<StatusException> {
+                        stub.lookup(
+                            LookupRequest
+                                .newBuilder()
+                                .setTerm("obrat")
+                                .setMethodOverride("SEMANTIC(0.8)")
+                                .build(),
+                        )
+                    }
+
+                thrown.status.code shouldBe Status.Code.INVALID_ARGUMENT
+                thrown.status.description!! shouldContain "SEMANTIC(0.8)"
             }
         }
 

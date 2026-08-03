@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.fuzzy.api
 
+import io.grpc.Status
+import io.grpc.StatusException
 import org.tatrman.fuzzy.core.AlgorithmType
 import org.tatrman.fuzzy.core.CascadeStep
 import org.tatrman.fuzzy.core.FuzzyMatchResult
@@ -127,28 +129,43 @@ class GrpcService(
      * under a rule nobody chose. That is the opposite of the loader's degrade-never-fail posture,
      * and correctly so — a broken archive is the estate's problem to survive, a malformed request
      * is the caller's to fix.
+     *
+     * Unlike [match], failure is signalled by **gRPC status**, not by an in-band `is_error` flag.
+     * That is deliberate for a surface being frozen: `INVALID_ARGUMENT` tells a caller its request
+     * is wrong and retrying will not help, which `is_error` + a string cannot. The status has to be
+     * set explicitly — grpc-kotlin maps any other exception to `UNKNOWN`, which is indistinguishable
+     * from a server fault.
      */
     override suspend fun lookup(request: LookupRequest): LookupResponse {
         val override =
             if (request.hasMethodOverride()) {
                 MatchMethod.parse(request.methodOverride)
-                    ?: throw IllegalArgumentException(
-                        "Unrecognised method_override '${request.methodOverride}' (expected EXACT | TOKENS | TYPOS(n))",
+                    ?: throw StatusException(
+                        Status.INVALID_ARGUMENT.withDescription(
+                            "Unrecognised method_override '${request.methodOverride}' " +
+                                "(expected EXACT | TOKENS | TYPOS(n))",
+                        ),
                     )
             } else {
                 null
             }
 
         val result =
-            fuzzyMatcher.lookup(
-                LookupQuery(
-                    term = request.term,
-                    categories = request.categoriesList.toList(),
-                    targetClasses = request.targetClassesList.mapNotNull { it.toCore() }.toSet(),
-                    methodOverride = override,
-                    maxCandidates = request.maxCandidates,
-                ),
-            )
+            try {
+                fuzzyMatcher.lookup(
+                    LookupQuery(
+                        term = request.term,
+                        categories = request.categoriesList.toList(),
+                        targetClasses = request.targetClassesList.mapNotNull { it.toCore() }.toSet(),
+                        methodOverride = override,
+                        maxCandidates = request.maxCandidates,
+                    ),
+                )
+            } catch (e: Exception) {
+                // A fault on our side, told apart from the caller's malformed request above.
+                logger.error("Lookup failed for term '{}'", request.term, e)
+                throw StatusException(Status.INTERNAL.withDescription(e.message ?: "Lookup failed").withCause(e))
+            }
 
         val b =
             LookupResponse

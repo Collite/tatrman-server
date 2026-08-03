@@ -153,6 +153,28 @@ class LexiconArchiveSourceTest :
             source.hash() shouldNotBe source.artifactHash()
         }
 
+        "artifactHash never touches the disk — it reports what the last read loaded" {
+            // `StringRepository.layerVersions()` calls this, and `GrpcService` calls THAT on every
+            // response. Loading here meant a full file read plus a content hash of the archive on
+            // the hot path of every question. Reading is `hash()`'s job, once per refresh.
+            val dir = Files.createTempDirectory("lex-archive")
+            val path = writeArchive(dir, aliases)
+            val source = LexiconArchiveSource(path)
+
+            // Nothing has read the file yet, so there is no artifact to name.
+            source.artifactHash() shouldBe ""
+
+            val loaded = source.hash()
+            loaded shouldNotBe ""
+            val artifact = source.artifactHash()
+            artifact shouldNotBe ""
+
+            // With the file gone, a method that read the disk would now answer differently. This
+            // one cannot: it never looked.
+            Files.delete(path)
+            source.artifactHash() shouldBe artifact
+        }
+
         "an unchanged file yields an unchanged hash, so the refresh loop does not reload" {
             val dir = Files.createTempDirectory("lex-archive")
             val source = LexiconArchiveSource(writeArchive(dir, aliases))
@@ -233,7 +255,9 @@ class LexiconArchiveSourceTest :
             val path = dir.resolve("lexicon.tar.zst").also { it.writeBytes(mislabelled) }
 
             // The payload is readable — proven by `good` — so only the kind gate stands between
-            // this and a silently-loaded vocabulary.
+            // this and a silently-loaded vocabulary. `hash()` first because that is the method that
+            // reads the file; `artifactHash()` only reports what a read already loaded.
+            good.hash() shouldNotBe ""
             good.artifactHash() shouldNotBe ""
 
             val source = LexiconArchiveSource(path)

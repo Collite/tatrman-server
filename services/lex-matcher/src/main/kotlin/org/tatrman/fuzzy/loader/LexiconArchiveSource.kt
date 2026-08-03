@@ -2,6 +2,7 @@
 package org.tatrman.fuzzy.loader
 
 import org.slf4j.LoggerFactory
+import org.tatrman.fuzzy.core.MatchMethod
 import org.tatrman.fuzzy.core.SourceTag
 import org.tatrman.fuzzy.core.TargetClass
 import org.tatrman.ttr.lexicon.CompiledEntry
@@ -60,8 +61,15 @@ class LexiconArchiveSource(
      * The **vocabulary** id — RV-39's `lexicon_artifact_hash`, which covers the entry table only.
      * Different question from [hash]: this one is "did the vocabulary change?", and an operator
      * body edit must not answer it yes.
+     *
+     * **A pure accessor: it never touches the disk.** `StringRepository.layerVersions()` calls this,
+     * and `GrpcService` calls that on *every* response — match, status, lookup, and the error path.
+     * Loading here meant a full file read plus a content hash of the whole archive on the hot path
+     * of every question, concurrently across every in-flight request. Reading the file is [hash]'s
+     * job, which the two-clock refresh calls once per interval; this reports what that last read
+     * loaded. Empty until the first refresh, which is honest — no artifact is serving yet.
      */
-    override fun artifactHash(): String = load()?.lexicon?.contentHash ?: ""
+    override fun artifactHash(): String = cached?.lexicon?.contentHash ?: ""
 
     /**
      * Entries grouped by target ref, which IS the category key here — the convention the declared
@@ -93,7 +101,40 @@ class LexiconArchiveSource(
             entries.size,
             lexicon.contentHash,
         )
+        reportUnrecognisedMethods(entries)
         return DeclaredVocabulary(entries)
+    }
+
+    /**
+     * One WARN per load naming the **distinct** methods this build cannot parse, and how many rows
+     * carry each.
+     *
+     * `MatchMethod.parse` used to warn itself, but it runs per candidate per request: a single
+     * `SEMANTIC(0.8)` row from a newer toolchain would then log on every query that surfaced it,
+     * forever. The condition is a property of the *archive*, so it is reported where the archive is
+     * read — bounded, and far more useful (a count, not a drip).
+     *
+     * Still a warning, not a failure: an unparseable method degrades that row to "unauthored" and
+     * the rest of the lexicon serves normally (T3's posture).
+     */
+    private fun reportUnrecognisedMethods(entries: List<DeclaredVocabularyEntry>) {
+        val unrecognised =
+            entries
+                .asSequence()
+                .flatMap { it.values.asSequence() }
+                .mapNotNull { it.matchMethod }
+                .filter { MatchMethod.parse(it) == null }
+                .groupingBy { it }
+                .eachCount()
+        if (unrecognised.isEmpty()) return
+
+        logger.warn(
+            "Compiled lexicon at {} carries {} unrecognised match method(s) — those rows serve as " +
+                "unauthored (no EXACT/TYPOS gate, no RV-32 margin): {}",
+            archivePath,
+            unrecognised.values.sum(),
+            unrecognised.entries.joinToString(", ") { "${it.key} x${it.value}" },
+        )
     }
 
     /**

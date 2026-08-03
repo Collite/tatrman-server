@@ -56,6 +56,12 @@ data class OverlayVerdict(
     /**
      * Learned aliases to add (POSITIVE entries), already shaped as results — the store owns their
      * score and provenance, since only it knows how many users confirmed them and when.
+     *
+     * A store that wants its additions to survive a **class-scoped** lookup must set
+     * [FuzzyMatchResult.targetClass] on them: T5's filter holds learned rows to the same bar as
+     * every other row, and a row with no class is excluded exactly as a member value is. Silently
+     * exempting them would let "which operator is this?" be answered with a learned alias for a
+     * measure.
      */
     val additions: List<FuzzyMatchResult> = emptyList(),
     /**

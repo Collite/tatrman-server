@@ -40,7 +40,7 @@ class MethodDispatcher(
         // not impose a method on rows nobody authored: `method_override = EXACT` on a lookup round
         // would otherwise gate the entire data layer on exact equality and silently drop every
         // member candidate — a caller widening its own declared layer would narrow the estate's.
-        val parsed = results.map { it to MatchMethod.parse(it.matchMethod)?.let { authored -> override ?: authored } }
+        val parsed = results.map { it to it.effectiveMethod(override) }
         if (parsed.none { (_, method) -> method != null }) return results
 
         val canonicalQuery = TextNormalizer.canonical(query)
@@ -59,6 +59,12 @@ class MethodDispatcher(
      * about — the failure T4's `LexiconArchiveSource` category convention predicted.
      *
      * Admission is not re-run: it is per-candidate and already decided.
+     *
+     * **Must run BEFORE the overlay is consulted.** This recomputes `autoBindable` from the margin
+     * alone, so it overwrites whatever was there — including an overlay NEGATIVE's `false`. Running
+     * it after [FuzzyMatcher.consultOverlay] would silently re-enable auto-binding on a candidate
+     * the estate explicitly denied. Every path in [FuzzyMatcher] orders it that way, and
+     * `OverlayLayerTest` pins the ordering on the merged paths specifically.
      */
     fun recomputeMargins(
         results: List<FuzzyMatchResult>,
@@ -68,8 +74,19 @@ class MethodDispatcher(
             // Same override rule as [dispatch] — and it has to be repeated here, because a row's
             // reported `matchMethod` is always the AUTHORED one. Reading it back without the
             // override would recompute the margin over the wrong set of rows.
-            results.map { it to MatchMethod.parse(it.matchMethod)?.let { authored -> override ?: authored } },
+            results.map { it to it.effectiveMethod(override) },
         )
+
+    /**
+     * The method this call actually dispatches by: the caller's [override] where one is given, the
+     * authored method otherwise — and **null stays null**.
+     *
+     * The override replaces a method, it never grants one: a row nobody authored has nothing to
+     * override, so `method_override = EXACT` cannot reach into the data layer and gate it on exact
+     * equality. A caller widening its own declared layer must not narrow the estate's.
+     */
+    private fun FuzzyMatchResult.effectiveMethod(override: MatchMethod?): MatchMethod? =
+        authoredMethod?.let { override ?: it }
 
     /**
      * `null` (unauthored) and [MatchMethod.Tokens] admit everything the engine scored — TOKENS *is*
@@ -84,14 +101,21 @@ class MethodDispatcher(
     ): Boolean =
         when (method) {
             null, MatchMethod.Tokens -> true
-            MatchMethod.Exact -> canonicalQuery == TextNormalizer.canonical(result.candidate)
+            MatchMethod.Exact -> canonicalQuery == result.canonical
             // Unbounded on purpose: debatty's bounded overload *returns the limit* when the true
             // distance exceeds it, so `distance(a, b, n) <= n` is vacuously true and would admit
             // everything. Terms are short; the cap is the author's `n`, applied here.
             is MatchMethod.Typos ->
-                levenshtein.distance(canonicalQuery, TextNormalizer.canonical(result.candidate)) <=
-                    method.maxDistance.toDouble()
+                levenshtein.distance(canonicalQuery, result.canonical) <= method.maxDistance.toDouble()
         }
+
+    /**
+     * The candidate's authored form — precomputed at load ([Candidate.canonicalValue]) for every row
+     * that came off the index, normalised on the spot for one that did not (an overlay addition, a
+     * hand-built test row). Only [MatchMethod.Exact] and [MatchMethod.Typos] read it.
+     */
+    private val FuzzyMatchResult.canonical: String
+        get() = canonicalCandidate ?: TextNormalizer.canonical(candidate)
 
     /**
      * RV-32 — annotates each TOKENS candidate with how far its target beat the best *other* target,
@@ -111,12 +135,18 @@ class MethodDispatcher(
 
         if (bestByTarget.isEmpty()) return admitted.map { (result, _) -> result }
 
+        // "The best OTHER target" needs only the top two targets, found once — the previous
+        // filterKeys-per-row rebuilt the whole map for every candidate.
+        val ranked = bestByTarget.entries.sortedByDescending { it.value }
+        val leader = ranked[0]
+        val runnerUp = ranked.getOrNull(1)?.value
+
         return admitted.map { (result, method) ->
             if (method != MatchMethod.Tokens) {
                 result
             } else {
                 val mine = bestByTarget.getValue(result.identity)
-                val rival = bestByTarget.filterKeys { it != result.identity }.values.maxOrNull()
+                val rival = if (result.identity == leader.key) runnerUp else leader.value
                 // Unopposed ⇒ the gap is measured from zero, which clears any sane floor. That is
                 // the right reading: nothing else in the layer answers to this query.
                 val margin = if (rival == null) mine else mine - rival

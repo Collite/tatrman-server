@@ -53,6 +53,10 @@ class LookupTest :
                 override fun vocabularyVersion() = "v1"
 
                 override fun knownCategories() = cache.keys
+
+                // Every fixture here serves declared rows, which is what turns on the scoring
+                // headroom the authored-method gate and the class filter need.
+                override fun servesDeclaredLayer() = all.any { it.authoredMethod != null }
             }
         }
 
@@ -182,6 +186,69 @@ class LookupTest :
 
                 hits.size shouldBe 1
                 hits.single().autoBindable shouldBe false
+            }
+        }
+
+        // ---- the gate narrows AFTER scoring, so scoring leaves it headroom ----------------------
+
+        "a candidate the gate admits is not lost to rows the gate rejects ranking above it" {
+            // The engine scores, THEN dispatch rejects. Scoring at exactly `limit` let candidates
+            // the author's method refuses consume every slot, so the one admissible answer — ranked
+            // below them by the deliberately recall-oriented folded index — was truncated before
+            // the gate ever saw it, and the query answered "nothing" where the answer existed.
+            //
+            // `zákazník` authored EXACT does not admit the unaccented `zakaznik` (T4), but the
+            // folded index scores every one of them a perfect hit. The TOKENS row matches one token
+            // of two, so it scores strictly lower and lands 13th of 13.
+            val crowded =
+                repo(
+                    "md.crowded" to
+                        (1..12).map { n ->
+                            vocab("x$n", "zákazník", "md.decoy$n", TargetClass.MODEL_OBJECT, "EXACT")
+                        } + vocab("real", "zákazník klient", "md.real", TargetClass.MODEL_OBJECT, "TOKENS"),
+                )
+            runBlocking {
+                val hits = FuzzyMatcher(crowded).lookup(LookupQuery("zakaznik", maxCandidates = 10)).candidates
+
+                hits.map { it.targetRef } shouldContainExactly listOf("md.real")
+            }
+        }
+
+        "a class-scoped lookup is not emptied by out-of-class rows ranking above the match" {
+            // Same failure, one stage later: the class filter also runs after scoring, so twelve
+            // MODEL_OBJECT rows scoring above the single OPERATOR row used to truncate it away and
+            // answer "no operator" for a term that names one.
+            val crowded =
+                repo(
+                    "md.crowded" to
+                        (1..12).map { n ->
+                            vocab("x$n", "obrat", "md.decoy$n", TargetClass.MODEL_OBJECT)
+                        } + vocab("op", "obrat vývoj", "op:trend", TargetClass.OPERATOR),
+                )
+            runBlocking {
+                val hits =
+                    FuzzyMatcher(crowded)
+                        .lookup(
+                            LookupQuery("obrat", targetClasses = setOf(TargetClass.OPERATOR), maxCandidates = 10),
+                        ).candidates
+
+                hits.map { it.targetRef } shouldContainExactly listOf("op:trend")
+            }
+        }
+
+        "max_candidates is capped, so one request cannot ask for the whole estate" {
+            // `int32` on the wire with no ceiling is an invitation; the rung's question is bounded
+            // by construction and a caller that wants more narrows its categories instead.
+            val big =
+                repo(
+                    "md.big" to
+                        (1..250).map { n -> vocab("b$n", "obrat $n", "md.b$n", TargetClass.MODEL_OBJECT) },
+                )
+            runBlocking {
+                FuzzyMatcher(big)
+                    .lookup(LookupQuery("obrat", maxCandidates = Int.MAX_VALUE))
+                    .candidates
+                    .size shouldBe FuzzyMatcher.MAX_LOOKUP_CANDIDATES
             }
         }
 

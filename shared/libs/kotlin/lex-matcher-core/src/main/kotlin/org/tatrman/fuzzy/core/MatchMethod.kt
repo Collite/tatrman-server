@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.fuzzy.core
 
-import org.slf4j.LoggerFactory
-
 /**
  * RV-32 — the **authored** match method, parsed from the compiled lexicon's per-entry `method`.
  *
@@ -26,7 +24,6 @@ sealed interface MatchMethod {
     ) : MatchMethod
 
     companion object {
-        private val logger = LoggerFactory.getLogger(MatchMethod::class.java)
         private val TYPOS = Regex("""TYPOS\((\d+)\)""", RegexOption.IGNORE_CASE)
 
         /**
@@ -36,6 +33,13 @@ sealed interface MatchMethod {
          * a lexicon the matcher cannot fully understand must be loud in the log and invisible in
          * the response, not a 500. The compiler validates the vocabulary (RG-LEX rules) — this is
          * the last line, for an archive built by an older or newer toolchain.
+         *
+         * **Silent by design.** This used to warn on unrecognised text, but it is called per
+         * candidate per request: an archive from a newer toolchain carrying one `SEMANTIC(0.8)` row
+         * would emit a WARN on every query that surfaced it, forever. "Loud in the log" has to mean
+         * *once per load*, so the observation moved to where loading happens — see
+         * `LexiconArchiveSource.fetch`, which reports the distinct unrecognised methods per archive.
+         * Keeping this a pure function is also what lets [Candidate] parse once at load time.
          */
         fun parse(raw: String?): MatchMethod? {
             val text = raw?.trim() ?: return null
@@ -44,10 +48,7 @@ sealed interface MatchMethod {
             return when (text.uppercase()) {
                 "EXACT" -> Exact
                 "TOKENS" -> Tokens
-                else -> {
-                    logger.warn("Unrecognised authored match method '{}' — treating the entry as unauthored", text)
-                    null
-                }
+                else -> null
             }
         }
     }

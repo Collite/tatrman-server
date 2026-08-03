@@ -177,6 +177,52 @@ class OverlayLayerTest :
             }
         }
 
+        "a NEGATIVE entry survives the LOOKUP path, where the margin is recomputed after the merge" {
+            // The regression this exists to prevent. `lookup` re-asks the RV-32 margin over the
+            // union of the requested categories, and that recompute derives `autoBindable` from the
+            // margin ALONE — so running it after the overlay silently re-enabled auto-binding on a
+            // target the estate had explicitly denied. Every path now orders the overlay last.
+            //
+            // Only `match()` was covered before, which is the one path with no re-margin, so the
+            // suite could not see it.
+            val store = FakeOverlay(negatives = mapOf("čistý obrat" to setOf("md.net")))
+            runBlocking {
+                val hits = FuzzyMatcher(repo(declared, store)).lookup(LookupQuery("čistý obrat")).candidates
+
+                hits.single().targetRef shouldBe "md.net"
+                hits.single().autoBindable shouldBe false
+            }
+        }
+
+        "a NEGATIVE entry survives the BATCH-MATCH span path too" {
+            val store = FakeOverlay(negatives = mapOf("čistý obrat" to setOf("md.net")))
+            runBlocking {
+                val out =
+                    FuzzyMatcher(repo(declared, store))
+                        .batchMatch(listOf(SpanQuery("čistý obrat", emptyList(), 10)))
+
+                out.results
+                    .single()
+                    .matches
+                    .single()
+                    .autoBindable shouldBe false
+            }
+        }
+
+        "the overlay is consulted ONCE per lookup, not once per requested category" {
+            // A NEGATIVE entry is a statement about a candidate, so a store handed one category's
+            // slice at a time could not make it — and once RV-P6 backs this with a real store, a
+            // consult per category is a round trip per category.
+            val store = FakeOverlay()
+            runBlocking {
+                FuzzyMatcher(repo(declared, store))
+                    .lookup(LookupQuery("obrat", categories = listOf("md.net", "md.gross", "op:trend")))
+
+                store.consultations shouldBe 1
+                store.lastRequest!!.categories shouldContainExactly listOf("md.net", "md.gross", "op:trend")
+            }
+        }
+
         "a NEGATIVE entry for another target leaves this one bindable" {
             val store = FakeOverlay(negatives = mapOf("čistý obrat" to setOf("md.gross")))
             runBlocking {
