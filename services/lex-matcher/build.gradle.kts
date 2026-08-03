@@ -81,6 +81,13 @@ dependencies {
     implementation(libs.java.string.similarity)
     // FZ-P3 — the extracted pure fuzzy engine (org.tatrman.fuzzy.core.*). The service keeps
     // StringRepository/loaders/api/telemetry and composes the engine over them.
+    // RV-P1.4 T3 — the compiled lexicon archive: ttr-snapshot untars it, ttr-lexicon decodes it.
+    // What the a3 ruling buys is that the COMPILER stays out of the serving artifact; ttr-metadata
+    // and ttr-parser still arrive transitively, because ttr-snapshot `api`s ttr-metadata (its
+    // SnapshotArchiveStorage implements that module's ModelStorage SPI). Unavoidable, and cheap
+    // next to dragging in the compiler and its stdlib resources.
+    implementation(libs.tatrman.ttr.snapshot)
+    implementation(libs.tatrman.ttr.lexicon)
     implementation(project(":shared:libs:kotlin:lex-matcher-core"))
     implementation(project(":shared:libs:kotlin:fuzzy-common"))
     // RG-P0.S3 — fold() now comes from the shared S-2 lib (was inline here).
@@ -114,6 +121,10 @@ dependencies {
     implementation(libs.postgresql)
     implementation(libs.mssql.jdbc)
 
+    // TEST SCOPE ONLY — the reader is exercised against the REAL packer, so a layout change in
+    // the producer breaks this test rather than silently diverging. The serving artifact still
+    // ships neither the compiler nor its ttr-parser/ttr-metadata closure.
+    testImplementation(libs.tatrman.ttr.lexicon.compile)
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
     testImplementation(libs.grpc.inprocess)
