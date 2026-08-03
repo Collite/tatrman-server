@@ -38,6 +38,7 @@ message FuzzyStatusResponse {
   string vocabulary_version = 2;      // snapshot hash + load stamp (S-1)
   repeated CategoryStatus categories = 3;
   repeated LoaderWarning warnings = 4; // B-T4: PK-skipped declared columns (RG-FUZ-001)
+  LayerVersions layer_versions = 5;    // RV-39 (RV-P1.4)
 }
 
 message CategoryStatus {
@@ -80,12 +81,29 @@ message FuzzyMatchResponse {
   // RG-P2 additive (S-1): snapshot hash + per-category load timestamp of the
   // vocabulary that produced these results. Populated from RG-P2.S2 (refresh).
   string vocabulary_version = 5;
+  // RV-39 (RV-P1.4): the layer tuple. Additive — `vocabulary_version` above is untouched.
+  LayerVersions layer_versions = 6;
 }
 
 // RG-P2 (contracts §2, RS-15): how a candidate's category was sourced.
+// RV-P1.4: widened to RV contracts §1's four layers (additive, J-v2 — existing values keep
+// their numbers). MEMBER *is* RV's DATA; VOCABULARY is the pre-RV conflation of DECLARED and
+// METADATA, kept for the fixture-stub source that cannot tell them apart.
 enum SourceTag {
-  MEMBER = 0;      // data value — candidate_id is a data PK (→ resolved_id)
-  VOCABULARY = 1;  // declared lexicon/valueLabels — carries target_ref
+  MEMBER = 0;      // data value — candidate_id is a data PK (→ resolved_id). RV: DATA.
+  VOCABULARY = 1;  // legacy: declared lexicon/valueLabels, undifferentiated
+  DECLARED = 2;    // authored in the lexicon/ area or as TTR-M `def term` sugar
+  METADATA = 3;    // harvested from model labels (displayLabel/labelPlural/aliases/valueLabels)
+  LEARNED = 4;     // the RV-P6 estate overlay; nothing produces it yet
+}
+
+// RV-39 — the layer-version tuple, echoed per S-1. Additive alongside the older opaque
+// `vocabulary_version` string, which stays: the two answer different questions, and the old one
+// bakes in the member load stamp so it moves on every refresh whether or not a layer changed.
+message LayerVersions {
+  string lexicon_artifact_hash = 1;               // CompiledLexicon.contentHash; "" when none loaded
+  map<string, string> member_index_versions = 2;  // category → content-derived version
+  optional string overlay_version = 3;            // ABSENT until RV-P6 — absence is the contract
 }
 
 // RG-P2 (S-4): confidence provenance — producer + scoring method + raw score.
@@ -102,6 +120,10 @@ message FuzzyMatch {
   string category = 4;
   // RG-P2 additive (response-side; the pinned MatchRequest is untouched):
   SourceTag source = 5;
-  optional string target_ref = 6;  // set iff source = VOCABULARY (→ lexicon target)
+  optional string target_ref = 6;  // set iff the candidate is vocabulary (→ lexicon target)
   Provenance provenance = 7;       // S-4
+  // RV-32 (RV-P1.4): the AUTHORED match method — EXACT | TOKENS | TYPOS(n). A different axis from
+  // Provenance.method, which is the algorithm that produced the score. Absent for member values:
+  // nobody authored a method for a data value.
+  optional string match_method = 8;
 }

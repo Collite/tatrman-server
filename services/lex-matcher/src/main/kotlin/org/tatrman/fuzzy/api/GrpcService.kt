@@ -5,6 +5,7 @@ import org.tatrman.fuzzy.core.AlgorithmType
 import org.tatrman.fuzzy.core.CascadeStep
 import org.tatrman.fuzzy.core.FuzzyMatchResult
 import org.tatrman.fuzzy.core.FuzzyMatcher
+import org.tatrman.fuzzy.core.LayerVersions
 import org.tatrman.fuzzy.core.SourceTag as CoreSourceTag
 import org.tatrman.fuzzy.core.SpanQuery
 import org.tatrman.fuzzy.core.StringRepository
@@ -21,6 +22,7 @@ import org.tatrman.fuzzy.v1.FuzzyStatusResponse
 import org.tatrman.fuzzy.v1.LoaderWarning
 import org.tatrman.fuzzy.v1.MatchRequest
 import org.tatrman.fuzzy.v1.Provenance as ProtoProvenance
+import org.tatrman.fuzzy.v1.LayerVersions as ProtoLayerVersions
 import org.tatrman.fuzzy.v1.SourceTag as ProtoSourceTag
 import org.slf4j.LoggerFactory
 
@@ -52,6 +54,7 @@ class GrpcService(
                 .newBuilder()
                 .setIsError(true)
                 .setError(e.message ?: "Unknown gRPC error")
+                .setLayerVersions(repository.layerVersions().toProto())
                 .build()
         }
     }
@@ -77,6 +80,7 @@ class GrpcService(
                 .newBuilder()
                 .setReady(repository.isCatalogReady())
                 .setVocabularyVersion(repository.vocabularyVersion())
+                .setLayerVersions(repository.layerVersions().toProto())
         repository.categoryStatuses().forEach { s ->
             builder.addCategories(
                 CategoryStatus
@@ -118,7 +122,24 @@ class GrpcService(
             .addAllMatches(matches.map { it.toProto() })
             .setMatchedAlgorithm(matchedAlgorithm)
             .setVocabularyVersion(vocabularyVersion)
+            // RV-39 — on EVERY response, including the error-free empty one: a caller that got no
+            // candidates still needs to know which layers it got none from.
+            .setLayerVersions(repository.layerVersions().toProto())
             .build()
+
+    /**
+     * RV-39 tuple → wire. `overlayVersion` is left UNSET when null rather than written as `""` —
+     * the field is `optional` precisely so "no overlay exists" is expressible.
+     */
+    private fun LayerVersions.toProto(): ProtoLayerVersions {
+        val b =
+            ProtoLayerVersions
+                .newBuilder()
+                .setLexiconArtifactHash(lexiconArtifactHash)
+                .putAllMemberIndexVersions(memberIndexVersions)
+        overlayVersion?.let { b.setOverlayVersion(it) }
+        return b.build()
+    }
 
     private fun FuzzyMatchResult.toProto(): FuzzyMatch {
         val b =
@@ -132,6 +153,9 @@ class GrpcService(
                     when (source) {
                         CoreSourceTag.MEMBER -> ProtoSourceTag.MEMBER
                         CoreSourceTag.VOCABULARY -> ProtoSourceTag.VOCABULARY
+                        CoreSourceTag.DECLARED -> ProtoSourceTag.DECLARED
+                        CoreSourceTag.METADATA -> ProtoSourceTag.METADATA
+                        CoreSourceTag.LEARNED -> ProtoSourceTag.LEARNED
                     },
                 ).setProvenance(
                     ProtoProvenance
@@ -142,6 +166,7 @@ class GrpcService(
                         .build(),
                 )
         targetRef?.let { b.setTargetRef(it) }
+        matchMethod?.let { b.setMatchMethod(it) }
         return b.build()
     }
 }

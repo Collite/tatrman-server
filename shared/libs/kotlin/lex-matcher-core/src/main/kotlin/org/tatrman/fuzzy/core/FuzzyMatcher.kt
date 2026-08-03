@@ -256,6 +256,11 @@ class FuzzyMatcher(
  * Maps a scored [Candidate] to a [FuzzyMatchResult], carrying its source tag +
  * lexicon target_ref (RS-15) and stamping S-4 provenance (producer=fuzzy,
  * method=the algorithm that scored it).
+ *
+ * Note the two `method`s are different axes and both travel: [FuzzyMatchResult.matchMethod] is the
+ * AUTHORED method from the lexicon (RV-32), while [Provenance.method] is the algorithm that
+ * produced this score. Conflating them would make "the author asked for EXACT" indistinguishable
+ * from "the TATRMAN cascade happened to win".
  */
 private fun Candidate.toResult(
     score: Double,
@@ -270,4 +275,5 @@ private fun Candidate.toResult(
         source = source,
         targetRef = targetRef,
         provenance = Provenance(producer = "fuzzy", method = method, rawScore = score),
+        matchMethod = matchMethod,
     )

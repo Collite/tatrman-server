@@ -19,4 +19,11 @@ interface MatchRepository {
     fun getVocabulary(category: String? = null): TokenVocabulary
 
     fun vocabularyVersion(): String
+
+    /**
+     * RV-39 — the layer-version tuple (S-1). Defaulted so the many existing fakes in the suites
+     * keep compiling: a repository that knows about no layers reports none, which is the honest
+     * answer for a member-only store.
+     */
+    fun layerVersions(): LayerVersions = LayerVersions()
 }

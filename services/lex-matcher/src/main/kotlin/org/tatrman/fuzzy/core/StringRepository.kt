@@ -86,6 +86,12 @@ class StringRepository(
     @Volatile
     private var declaredHash: String = ""
 
+    // RV-39 — content-derived version per MEMBER category, computed at refresh. Deliberately
+    // excludes the declared layer: the tuple names the layers separately, and folding them would
+    // make "the artifact changed" indistinguishable from "a data column changed".
+    @Volatile
+    private var memberVersions: Map<String, String> = emptyMap()
+
     init {
         startRefreshLoop()
     }
@@ -138,6 +144,7 @@ class StringRepository(
 
         cache.clear()
         cache.putAll(nextCache)
+        memberVersions = memberCache.mapValues { (_, candidates) -> categoryVersion(candidates) }
         loadedAtMs = System.currentTimeMillis()
         version = computeVersion(nextCache, declaredHash, loadedAtMs)
         isCatalogReady.set(true)
@@ -156,6 +163,37 @@ class StringRepository(
 
     /** The vocabulary version (S-1): content signature + load stamp. */
     override fun vocabularyVersion(): String = version
+
+    /**
+     * RV-39 — the layer-version tuple (S-1).
+     *
+     * Every component is content-derived, which is the point: the older [vocabularyVersion] string
+     * bakes in [loadedAtMs] and therefore changes on every refresh whether or not any vocabulary
+     * did, so it cannot answer the one question a version tuple is asked.
+     *
+     * `overlayVersion` is null, not `""` — no overlay store exists before RV-P6, and "absent" and
+     * "present at an empty version" are different facts.
+     */
+    override fun layerVersions(): LayerVersions =
+        LayerVersions(
+            lexiconArtifactHash = snapshotSource?.artifactHash() ?: "",
+            memberIndexVersions = memberVersions,
+            overlayVersion = null,
+        )
+
+    /**
+     * A category's content signature: its candidates by id+value, order-independent. Same content
+     * ⇒ same version across refreshes; one added row changes it.
+     */
+    private fun categoryVersion(candidates: List<Candidate>): String {
+        val sig =
+            candidates
+                .map { "${it.id}\u0000${it.value}" }
+                .sorted()
+                .joinToString("\u0001")
+                .hashCode()
+        return "%08x".format(sig)
+    }
 
     /** Per-category discovery + staleness for `GetStatus` (contracts §2). */
     fun categoryStatuses(): List<CategoryStatusInfo> =
@@ -219,6 +257,7 @@ class StringRepository(
                 lemmaTokens = lemmaTokens,
                 source = c.source,
                 targetRef = c.targetRef,
+                matchMethod = c.matchMethod,
             )
         }
     }

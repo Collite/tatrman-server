@@ -20,6 +20,11 @@ data class Candidate(
     // (default) → `id` is a data PK; VOCABULARY → `targetRef` is the lexicon target.
     val source: SourceTag = SourceTag.MEMBER,
     val targetRef: String? = null,
+    /**
+     * RV-32 — the authored match method (`EXACT` · `TOKENS` · `TYPOS(n)`) from the compiled
+     * lexicon. Null for member candidates: nobody authored a method for a data value.
+     */
+    val matchMethod: String? = null,
 ) {
     /** Surface tokens ∪ lemma tokens — used to seed the candidate set for a query. */
     val allTokenSet: Set<String> get() = tokenSet + lemmaTokenSet
@@ -50,11 +55,18 @@ data class Candidate(
             )
         }
 
-        /** A declared-vocabulary candidate (contracts §2): carries the lexicon [targetRef]. */
+        /**
+         * A declared-vocabulary candidate (contracts §2): carries the lexicon [targetRef].
+         *
+         * [source] and [matchMethod] default to the pre-RV behaviour so every existing call site
+         * is unchanged; the compiled-artifact loader (RV-P1.4 T3) passes the artifact's own values.
+         */
         fun vocabulary(
             id: String,
             value: String,
             targetRef: String,
+            source: SourceTag = SourceTag.VOCABULARY,
+            matchMethod: String? = null,
         ): Candidate {
             val tokens = tokenize(value)
             val set = tokens.toSet()
@@ -65,8 +77,9 @@ data class Candidate(
                 tokenSet = set,
                 lemmaTokens = tokens,
                 lemmaTokenSet = set,
-                source = SourceTag.VOCABULARY,
+                source = source,
                 targetRef = targetRef,
+                matchMethod = matchMethod,
             )
         }
 
@@ -79,6 +92,7 @@ data class Candidate(
             lemmaTokens: List<String>,
             source: SourceTag = SourceTag.MEMBER,
             targetRef: String? = null,
+            matchMethod: String? = null,
         ): Candidate =
             Candidate(
                 id = id,
@@ -89,6 +103,7 @@ data class Candidate(
                 lemmaTokenSet = lemmaTokens.toSet(),
                 source = source,
                 targetRef = targetRef,
+                matchMethod = matchMethod,
             )
 
         /** Tokens used for matching: lower-cased, NFD-folded, whitespace-split. */
