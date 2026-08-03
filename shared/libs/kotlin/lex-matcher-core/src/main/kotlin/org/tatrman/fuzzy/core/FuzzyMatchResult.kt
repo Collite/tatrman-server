@@ -110,4 +110,9 @@ data class FuzzyMatchResult(
      * of every consumer re-deciding what "close enough" means.
      */
     val autoBindable: Boolean? = null,
+    /**
+     * RV-38 — the target's class. Null for member values; the kind is derived from this, never
+     * stored. T5's lookup scopes on it.
+     */
+    val targetClass: TargetClass? = null,
 )

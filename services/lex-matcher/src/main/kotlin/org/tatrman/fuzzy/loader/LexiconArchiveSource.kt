@@ -3,6 +3,7 @@ package org.tatrman.fuzzy.loader
 
 import org.slf4j.LoggerFactory
 import org.tatrman.fuzzy.core.SourceTag
+import org.tatrman.fuzzy.core.TargetClass
 import org.tatrman.ttr.lexicon.CompiledEntry
 import org.tatrman.ttr.lexicon.CompiledLexicon
 import org.tatrman.ttr.lexicon.LexiconArchive
@@ -13,6 +14,7 @@ import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
 import org.tatrman.ttr.lexicon.SourceTag as ArtifactSourceTag
+import org.tatrman.ttr.lexicon.TargetClass as ArtifactTargetClass
 
 /**
  * RV-P1.4 T3 — the real declared-vocabulary layer: the RV-P1.2 compiled lexicon archive.
@@ -108,6 +110,16 @@ class LexiconArchiveSource(
                     ArtifactSourceTag.METADATA -> SourceTag.METADATA
                 },
             matchMethod = method,
+            // RV-38 — carried, never derived here. The artifact states the class; the *kind* is
+            // what downstream derives from it, and re-deriving the class from the ref's prefix
+            // would be a second, quietly divergent rule.
+            targetClass =
+                when (targetClass) {
+                    ArtifactTargetClass.MODEL_OBJECT -> TargetClass.MODEL_OBJECT
+                    ArtifactTargetClass.MEMBER -> TargetClass.MEMBER
+                    ArtifactTargetClass.OPERATOR -> TargetClass.OPERATOR
+                    ArtifactTargetClass.GROUNDING_TRIGGER -> TargetClass.GROUNDING_TRIGGER
+                },
         )
 
     /**

@@ -34,14 +34,42 @@ class MethodDispatcher(
     fun dispatch(
         query: String,
         results: List<FuzzyMatchResult>,
+        override: MatchMethod? = null,
     ): List<FuzzyMatchResult> {
-        val parsed = results.map { it to MatchMethod.parse(it.matchMethod) }
+        // The override replaces the authored method on rows that HAVE one, and only those. It must
+        // not impose a method on rows nobody authored: `method_override = EXACT` on a lookup round
+        // would otherwise gate the entire data layer on exact equality and silently drop every
+        // member candidate — a caller widening its own declared layer would narrow the estate's.
+        val parsed = results.map { it to MatchMethod.parse(it.matchMethod)?.let { authored -> override ?: authored } }
         if (parsed.none { (_, method) -> method != null }) return results
 
         val canonicalQuery = TextNormalizer.canonical(query)
         val admitted = parsed.filter { (result, method) -> admits(canonicalQuery, result, method) }
         return withUniquenessMargin(admitted)
     }
+
+    /**
+     * Recomputes the margins over an already-admitted, **merged** result set.
+     *
+     * [dispatch] runs per category, so its margins are category-local — and since the compiled
+     * artifact keys one category per target ref, cross-target competition is invisible there by
+     * construction. Any path that merges several categories into one answer (a BatchMatch span, a
+     * T5 lookup) has to ask the uniqueness question again over the union, or it would report a
+     * clean margin for a term that is in fact ambiguous across the very categories the caller asked
+     * about — the failure T4's `LexiconArchiveSource` category convention predicted.
+     *
+     * Admission is not re-run: it is per-candidate and already decided.
+     */
+    fun recomputeMargins(
+        results: List<FuzzyMatchResult>,
+        override: MatchMethod? = null,
+    ): List<FuzzyMatchResult> =
+        withUniquenessMargin(
+            // Same override rule as [dispatch] — and it has to be repeated here, because a row's
+            // reported `matchMethod` is always the AUTHORED one. Reading it back without the
+            // override would recompute the margin over the wrong set of rows.
+            results.map { it to MatchMethod.parse(it.matchMethod)?.let { authored -> override ?: authored } },
+        )
 
     /**
      * `null` (unauthored) and [MatchMethod.Tokens] admit everything the engine scored — TOKENS *is*

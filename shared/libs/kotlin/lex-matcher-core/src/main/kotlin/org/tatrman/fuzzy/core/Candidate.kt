@@ -25,6 +25,11 @@ data class Candidate(
      * lexicon. Null for member candidates: nobody authored a method for a data value.
      */
     val matchMethod: String? = null,
+    /**
+     * RV-38 — the target's class, for T5's target-class-scoped lookup. Null for member values and
+     * for any source that does not carry one.
+     */
+    val targetClass: TargetClass? = null,
 ) {
     /** Surface tokens ∪ lemma tokens — used to seed the candidate set for a query. */
     val allTokenSet: Set<String> get() = tokenSet + lemmaTokenSet
@@ -67,6 +72,7 @@ data class Candidate(
             targetRef: String,
             source: SourceTag = SourceTag.VOCABULARY,
             matchMethod: String? = null,
+            targetClass: TargetClass? = null,
         ): Candidate {
             val tokens = tokenize(value)
             val set = tokens.toSet()
@@ -80,6 +86,7 @@ data class Candidate(
                 source = source,
                 targetRef = targetRef,
                 matchMethod = matchMethod,
+                targetClass = targetClass,
             )
         }
 
@@ -93,6 +100,7 @@ data class Candidate(
             source: SourceTag = SourceTag.MEMBER,
             targetRef: String? = null,
             matchMethod: String? = null,
+            targetClass: TargetClass? = null,
         ): Candidate =
             Candidate(
                 id = id,
@@ -104,6 +112,7 @@ data class Candidate(
                 source = source,
                 targetRef = targetRef,
                 matchMethod = matchMethod,
+                targetClass = targetClass,
             )
 
         /** Tokens used for matching: lower-cased, NFD-folded, whitespace-split. */

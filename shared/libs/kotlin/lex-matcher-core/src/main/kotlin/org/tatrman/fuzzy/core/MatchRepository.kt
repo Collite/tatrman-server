@@ -26,4 +26,14 @@ interface MatchRepository {
      * answer for a member-only store.
      */
     fun layerVersions(): LayerVersions = LayerVersions()
+
+    /**
+     * RV-P1.4 T5 — every category key this store can answer for (lower-cased), or **null when the
+     * store does not report them**.
+     *
+     * Null rather than an empty set on purpose: "I don't publish my categories" and "I have none"
+     * are different facts, and a lookup that conflated them would report every requested category
+     * as unknown. The many existing fakes take the default and simply say nothing.
+     */
+    fun knownCategories(): Set<String>? = null
 }

@@ -34,6 +34,50 @@ data class BatchMatchResult(
     val vocabularyVersion: String,
 )
 
+/**
+ * RV-P1.4 T5 — a category-scoped lookup: the request shape the resolver's **lookup rung** calls
+ * (RV-33 — "deterministic, anchored, category-scoped; always eligible first"), and the contract
+ * P2.3's lookup rounds are written against.
+ *
+ * Distinct from [SpanQuery], which is a *span* of a parsed question inside a batch. This is one
+ * term, deliberately scoped, asked on its own — the rung already knows what it is looking for and
+ * wants a bounded deterministic answer, not a cascade over the estate.
+ */
+data class LookupQuery(
+    val term: String,
+    /**
+     * Category keys to search — the same keys [MatchRepository.getCandidates] uses, which for the
+     * compiled lexicon means target refs (`md.measure.net`, `op:trend`). **Empty = every category**:
+     * a deliberate cross-category lookup, the shape a rung uses when it does not yet know the
+     * target. An explicit-but-unknown category contributes nothing (the per-slot leak guard) and is
+     * reported back in [LookupResult.unknownCategories] rather than silently yielding zero hits.
+     */
+    val categories: List<String> = emptyList(),
+    /**
+     * Restrict to these target classes (RV-38). Empty = no class filter. Scoping by class rather
+     * than by ref is what lets a rung ask "which operator is this?" without first enumerating the
+     * estate's operators.
+     */
+    val targetClasses: Set<TargetClass> = emptySet(),
+    /**
+     * Replaces the **authored** method for this call — the rung's strict-first, then widen pass.
+     * Applies only to rows that carry an authored method; see [MethodDispatcher.dispatch].
+     */
+    val methodOverride: MatchMethod? = null,
+    val maxCandidates: Int = 10,
+)
+
+/** One lookup's answer: the surviving candidates plus what was actually searched. */
+data class LookupResult(
+    val candidates: List<FuzzyMatchResult>,
+    /**
+     * Requested categories that do not exist in the loaded vocabulary. The leak guard already
+     * returns nothing for these; naming them turns "no candidates" into a diagnosable answer
+     * instead of an ambiguous one — a stale ref and a genuine miss look identical otherwise.
+     */
+    val unknownCategories: List<String> = emptyList(),
+)
+
 /** Outcome of a cascade run: the matches returned and which algorithm produced them (null if no steps). */
 data class CascadeOutcome(
     val matches: List<FuzzyMatchResult>,
@@ -137,6 +181,51 @@ class FuzzyMatcher(
         return BatchMatchResult(results, version)
     }
 
+    /**
+     * RV-P1.4 T5 — one term, deliberately scoped: the resolver's lookup rung (RV-33).
+     *
+     * Deterministic by construction — a single TATRMAN pass, no cascade. The rung's contract is
+     * "anchored and category-scoped, always eligible first", so trying progressively looser
+     * algorithms would be answering a question it did not ask; widening is the caller's job, via
+     * [LookupQuery.methodOverride] and a second round it chose to run.
+     */
+    suspend fun lookup(query: LookupQuery): LookupResult {
+        val limit = if (query.maxCandidates > 0) query.maxCandidates else 10
+        val unknown =
+            repository.knownCategories()?.let { known ->
+                query.categories.filter { it.lowercase() !in known }
+            } ?: emptyList()
+
+        // Empty ⇒ the deliberate cross-category lookup. An explicit-but-unknown category is left in
+        // the list: it contributes nothing (the leak guard) and is reported separately.
+        val targets: List<String?> = query.categories.ifEmpty { listOf(null) }
+        val scored =
+            targets.flatMap { category ->
+                runSingle(query.term, category, AlgorithmType.TATRMAN, limit, query.methodOverride)
+            }
+
+        val filtered =
+            if (query.targetClasses.isEmpty()) {
+                scored
+            } else {
+                // Member values carry no target class, so a class-scoped lookup excludes them —
+                // which is the point: "which operator is this?" must not be answered with a row of
+                // data that happens to read alike.
+                scored.filter { it.targetClass in query.targetClasses }
+            }
+
+        val merged =
+            filtered
+                .sortedByDescending { it.score }
+                .distinctBy { it.candidateId to it.category }
+        // Re-asked over the union, BEFORE the limit: per-category margins cannot see a rival in a
+        // sibling category, and dropping rivals first would manufacture uniqueness.
+        return LookupResult(
+            candidates = methodDispatcher.recomputeMargins(merged, query.methodOverride).take(limit),
+            unknownCategories = unknown,
+        )
+    }
+
     private suspend fun matchSpan(span: SpanQuery): BatchSpanResult {
         val limit = if (span.limit > 0) span.limit else 10
         val steps = cascadeFrom(emptyList(), AlgorithmType.TATRMAN.name)
@@ -152,8 +241,9 @@ class FuzzyMatcher(
                 .flatMap { it.matches }
                 .sortedByDescending { it.score }
                 .distinctBy { it.candidateId to it.category }
-                .take(limit)
-        return BatchSpanResult(merged, matchedAlgorithm)
+        // Same reason as in [lookup]: a span asked about several categories, so the RV-32 margin has
+        // to be re-asked over their union. Before `take`, so a rival cannot be dropped into silence.
+        return BatchSpanResult(methodDispatcher.recomputeMargins(merged).take(limit), matchedAlgorithm)
     }
 
     private suspend fun runSingle(
@@ -161,6 +251,7 @@ class FuzzyMatcher(
         category: String?,
         algorithmType: AlgorithmType,
         limit: Int,
+        methodOverride: MatchMethod? = null,
     ): List<FuzzyMatchResult> {
         val candidates = repository.getCandidates(category)
         val scored =
@@ -175,7 +266,7 @@ class FuzzyMatcher(
         // through (match / matchCascade / batchMatch), so no caller can route around it. Inside the
         // cascade rather than after it on purpose: a candidate the author's method rejects must not
         // be allowed to satisfy a cascade step's min-score and stop the fallback.
-        return methodDispatcher.dispatch(query, scored)
+        return methodDispatcher.dispatch(query, scored, methodOverride)
     }
 
     private suspend fun matchWithTokenBased(
@@ -285,4 +376,5 @@ private fun Candidate.toResult(
         targetRef = targetRef,
         provenance = Provenance(producer = "fuzzy", method = method, rawScore = score),
         matchMethod = matchMethod,
+        targetClass = targetClass,
     )

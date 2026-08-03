@@ -195,6 +195,13 @@ class StringRepository(
         return "%08x".format(sig)
     }
 
+    /**
+     * RV-P1.4 T5 — the loaded category keys, already lower-cased (the cache is keyed that way).
+     * Lets a lookup name the categories a caller asked for that do not exist, instead of returning
+     * an empty list that could equally mean "no match".
+     */
+    override fun knownCategories(): Set<String> = cache.keys
+
     /** Per-category discovery + staleness for `GetStatus` (contracts §2). */
     fun categoryStatuses(): List<CategoryStatusInfo> =
         cache
@@ -258,6 +265,7 @@ class StringRepository(
                 source = c.source,
                 targetRef = c.targetRef,
                 matchMethod = c.matchMethod,
+                targetClass = c.targetClass,
             )
         }
     }

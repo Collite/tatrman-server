@@ -6,7 +6,10 @@ import org.tatrman.fuzzy.core.CascadeStep
 import org.tatrman.fuzzy.core.FuzzyMatchResult
 import org.tatrman.fuzzy.core.FuzzyMatcher
 import org.tatrman.fuzzy.core.LayerVersions
+import org.tatrman.fuzzy.core.LookupQuery
+import org.tatrman.fuzzy.core.MatchMethod
 import org.tatrman.fuzzy.core.SourceTag as CoreSourceTag
+import org.tatrman.fuzzy.core.TargetClass as CoreTargetClass
 import org.tatrman.fuzzy.core.SpanQuery
 import org.tatrman.fuzzy.core.StringRepository
 import org.tatrman.fuzzy.core.cascadeFrom
@@ -20,10 +23,13 @@ import org.tatrman.fuzzy.v1.FuzzyServiceGrpcKt
 import org.tatrman.fuzzy.v1.FuzzyStatusRequest
 import org.tatrman.fuzzy.v1.FuzzyStatusResponse
 import org.tatrman.fuzzy.v1.LoaderWarning
+import org.tatrman.fuzzy.v1.LookupRequest
+import org.tatrman.fuzzy.v1.LookupResponse
 import org.tatrman.fuzzy.v1.MatchRequest
 import org.tatrman.fuzzy.v1.Provenance as ProtoProvenance
 import org.tatrman.fuzzy.v1.LayerVersions as ProtoLayerVersions
 import org.tatrman.fuzzy.v1.SourceTag as ProtoSourceTag
+import org.tatrman.fuzzy.v1.TargetClass as ProtoTargetClass
 import org.slf4j.LoggerFactory
 
 class GrpcService(
@@ -112,6 +118,67 @@ class GrpcService(
         return builder.build()
     }
 
+    /**
+     * RV-P1.4 T5 — the lookup rung's call (RV-33). One term, scoped by category and/or target
+     * class, with an optional method override; deterministic, no cascade.
+     *
+     * An unparseable `method_override` is an **error**, not a silent fallback: the caller asked for
+     * a specific precision, and quietly using a different one would return plausible candidates
+     * under a rule nobody chose. That is the opposite of the loader's degrade-never-fail posture,
+     * and correctly so — a broken archive is the estate's problem to survive, a malformed request
+     * is the caller's to fix.
+     */
+    override suspend fun lookup(request: LookupRequest): LookupResponse {
+        val override =
+            if (request.hasMethodOverride()) {
+                MatchMethod.parse(request.methodOverride)
+                    ?: throw IllegalArgumentException(
+                        "Unrecognised method_override '${request.methodOverride}' (expected EXACT | TOKENS | TYPOS(n))",
+                    )
+            } else {
+                null
+            }
+
+        val result =
+            fuzzyMatcher.lookup(
+                LookupQuery(
+                    term = request.term,
+                    categories = request.categoriesList.toList(),
+                    targetClasses = request.targetClassesList.mapNotNull { it.toCore() }.toSet(),
+                    methodOverride = override,
+                    maxCandidates = request.maxCandidates,
+                ),
+            )
+
+        val b =
+            LookupResponse
+                .newBuilder()
+                .addAllCandidates(result.candidates.map { it.toProto() })
+                .setLayerVersions(repository.layerVersions().toProto())
+                .setVocabularyVersion(repository.vocabularyVersion())
+                .addAllUnknownCategories(result.unknownCategories)
+        if (request.hasMethodOverride()) b.setAppliedMethodOverride(request.methodOverride)
+        return b.build()
+    }
+
+    /** UNSPECIFIED means "no class", which as a *filter* means "do not filter" — so it drops out. */
+    private fun ProtoTargetClass.toCore(): CoreTargetClass? =
+        when (this) {
+            ProtoTargetClass.TARGET_CLASS_MODEL_OBJECT -> CoreTargetClass.MODEL_OBJECT
+            ProtoTargetClass.TARGET_CLASS_MEMBER -> CoreTargetClass.MEMBER
+            ProtoTargetClass.TARGET_CLASS_OPERATOR -> CoreTargetClass.OPERATOR
+            ProtoTargetClass.TARGET_CLASS_GROUNDING_TRIGGER -> CoreTargetClass.GROUNDING_TRIGGER
+            ProtoTargetClass.TARGET_CLASS_UNSPECIFIED, ProtoTargetClass.UNRECOGNIZED -> null
+        }
+
+    private fun CoreTargetClass.toProto(): ProtoTargetClass =
+        when (this) {
+            CoreTargetClass.MODEL_OBJECT -> ProtoTargetClass.TARGET_CLASS_MODEL_OBJECT
+            CoreTargetClass.MEMBER -> ProtoTargetClass.TARGET_CLASS_MEMBER
+            CoreTargetClass.OPERATOR -> ProtoTargetClass.TARGET_CLASS_OPERATOR
+            CoreTargetClass.GROUNDING_TRIGGER -> ProtoTargetClass.TARGET_CLASS_GROUNDING_TRIGGER
+        }
+
     private fun buildResponse(
         matches: List<FuzzyMatchResult>,
         matchedAlgorithm: String,
@@ -172,6 +239,7 @@ class GrpcService(
         // this", which is the opposite of "no decision applies".
         uniquenessMargin?.let { b.setUniquenessMargin(it) }
         autoBindable?.let { b.setAutoBindable(it) }
+        targetClass?.let { b.setTargetClass(it.toProto()) }
         return b.build()
     }
 }

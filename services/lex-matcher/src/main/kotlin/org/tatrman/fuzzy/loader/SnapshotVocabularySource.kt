@@ -3,6 +3,7 @@ package org.tatrman.fuzzy.loader
 
 import org.tatrman.fuzzy.core.Candidate
 import org.tatrman.fuzzy.core.SourceTag
+import org.tatrman.fuzzy.core.TargetClass
 
 /**
  * One declared value: a lexicon `term`/`example` or a `valueLabels` entry.
@@ -18,6 +19,8 @@ data class DeclaredValue(
     val source: SourceTag = SourceTag.VOCABULARY,
     /** `EXACT` · `TOKENS` · `TYPOS(n)`, or null when the source has no authored method. */
     val matchMethod: String? = null,
+    /** RV-38 — what the target IS, for T5's class-scoped lookup. Null when the source has none. */
+    val targetClass: TargetClass? = null,
 )
 
 /**
@@ -67,7 +70,14 @@ object DeclaredVocabularyLoader {
         vocab.entries.associate { entry ->
             entry.category.lowercase() to
                 entry.values.map {
-                    Candidate.vocabulary(it.id, it.value, entry.targetRef, it.source, it.matchMethod)
+                    Candidate.vocabulary(
+                        it.id,
+                        it.value,
+                        entry.targetRef,
+                        it.source,
+                        it.matchMethod,
+                        it.targetClass,
+                    )
                 }
         }
 }
