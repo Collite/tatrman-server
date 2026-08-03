@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: Apache-2.0
+# RV-P1.4 T7 — hartland_cz declared-layer conformance fixture.
+#
+# The Czech world of the hartland demo estate (BM arc: one model, two connections — CZ is a full
+# Czech world, not a labels-only re-skin). Targets are hartland's REAL refs; this file is what an
+# estate author writes, and the conformance harness compiles and packs it with the actual RV-P1.2
+# toolchain rather than hand-building an artifact.
+#
+# The methods here are chosen to exercise all three, not for authoring taste:
+#   EXACT     on short codes and words where a near-miss means something else ("DC", "zásoba")
+#   TYPOS(n)  where a typo or a dropped diacritic is the likely input ("zákazník", "prodejna")
+#   TOKENS    on multi-word phrases, which is also what makes the RV-32 margin observable
+schema: ttr-lexicon/v1
+defaults: { lang: cs, method: TOKENS }
+entries:
+  # ── measures ────────────────────────────────────────────────────────────────────────────
+  - terms:
+      - { text: "tržby" }
+      - { text: "obrat" }
+      - { text: "výnosy", method: TYPOS(1) }
+      - { text: "tržby celkem" }
+    target: md.revenue
+
+  - terms:
+      - { text: "množství" }
+      - { text: "počet kusů" }
+    target: md.quantity
+
+  - terms:
+      - { text: "vratky" }
+      - { text: "vratky celkem" }
+    target: md.returnAmount
+
+  # `zásoba` is EXACT on purpose: `zásobování` (supply) is a different word, and one edit away.
+  - terms:
+      - { text: "zásoba", method: EXACT }
+      - { text: "stav zásob" }
+    target: md.onHandQty
+
+  # ── dimensions ──────────────────────────────────────────────────────────────────────────
+  # "DC" EXACT: a two-letter code under TYPOS(1) would match most two-letter noise.
+  - terms:
+      - { text: "distribuční centrum" }
+      - { text: "DC", method: EXACT }
+    target: md.DistributionCentre
+
+  - terms:
+      - { text: "prodejna", method: TYPOS(1) }
+    target: md.Store
+
+  # ── entities ────────────────────────────────────────────────────────────────────────────
+  - terms:
+      - { text: "zákazník", method: TYPOS(1) }
+      - { text: "odběratel", method: TYPOS(1) }
+    target: er.entity.customer
