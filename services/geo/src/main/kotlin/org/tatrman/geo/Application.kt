@@ -9,6 +9,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
@@ -26,6 +27,7 @@ import org.tatrman.geo.discover.GeoDiscovery
 import org.tatrman.geo.geocode.NominatimClient
 import org.tatrman.geo.grpc.GeoGroundingService
 import org.tatrman.geo.obs.GeoMetrics
+import org.tatrman.grounding.lexicon.GroundingSliceSource
 import org.tatrman.geo.resolve.ChainedPlaceResolver
 import org.tatrman.geo.resolve.ModelPoiResolver
 import org.tatrman.geo.resolve.NominatimPlaceResolver
@@ -82,6 +84,10 @@ fun Application.module(config: Config) {
                 ModelPoiResolver(discovery),
             ),
         )
+    // RV-P1.6 T5 (RV-42) — the `ground:geo` CATEGORY-word slice. Unset path ⇒ disabled ⇒ the
+    // pre-RV parser. The place gazetteer is untouched by this either way (parked).
+    val triggerSlice = groundingSlice(config)
+
     val geoService =
         GeoGroundingService(
             discovery = discovery,
@@ -92,6 +98,7 @@ fun Application.module(config: Config) {
             // RS-19 / D-T2 capability posture surfaced through GetStatus.
             nominatimConfigured = config.getString("geo.nominatim.base-url").isNotBlank(),
             postgisAvailable = boundaryStore is PostgresBoundaryStore,
+            triggers = triggerSlice,
         )
 
     val grpcPort = config.getInt("grpc.port")
@@ -124,6 +131,20 @@ fun Application.module(config: Config) {
                     put("service", "geo")
                     put("grpc_port", grpcPort)
                     put("llm_fallback", llmFallback != null)
+                    // RV-39/S-1 — which trigger vocabulary is serving.
+                    put("lexicon_slice", triggerSlice.current().version)
+                    put("lexicon_slice_terms", triggerSlice.current().terms.size)
+                },
+            )
+        }
+        // RV-P1.6 T5 — the S-3 reload hook, as in chrono and money.
+        post("/refresh") {
+            val reloaded = triggerSlice.refresh()
+            call.respond(
+                buildJsonObject {
+                    put("service", "geo")
+                    put("lexicon_slice", reloaded.version)
+                    put("lexicon_slice_terms", reloaded.terms.size)
                 },
             )
         }
@@ -185,4 +206,26 @@ private fun buildLlmFallbackClient(config: Config): LlmGatewayClient? {
     val apiKey = config.getString("geo.llm-fallback.api-key").takeIf { it.isNotBlank() }
     log.info("geo llm-gateway fallback configured at {} (timeout {}ms)", baseUrl, timeoutMs)
     return KtorLlmGatewayClient(baseUrl = baseUrl, timeoutMs = timeoutMs, apiKey = apiKey)
+}
+
+/**
+ * The compiled-lexicon archive the `ground:geo` slice is read from. Absent/blank ⇒ disabled. Same
+ * path convention as chrono, money and lex-matcher.
+ */
+private fun groundingSlice(config: Config): GroundingSliceSource {
+    val path =
+        if (config.hasPath("geo.lexicon.archive-path")) config.getString("geo.lexicon.archive-path").trim() else ""
+    if (path.isEmpty()) {
+        log.info("geo: no lexicon archive configured — no ground:geo category words (place resolution is unaffected)")
+        return GroundingSliceSource.disabled("geo")
+    }
+    val source =
+        GroundingSliceSource(
+            "geo",
+            java.nio.file.Path
+                .of(path),
+        )
+    val loaded = source.refresh()
+    log.info("geo: ground:geo slice loaded from {} ({} category terms)", path, loaded.terms.size)
+    return source
 }

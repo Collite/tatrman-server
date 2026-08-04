@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.money.recognize
 
+import org.tatrman.grounding.lexicon.GroundingSlice
 import org.tatrman.text.Normalization
 import java.math.BigDecimal
 
@@ -18,9 +19,23 @@ import java.math.BigDecimal
  * numeric magnitude can be read (caller → llm-gateway fallback).
  */
 class AmountRecognizer {
+    /**
+     * @param triggers RV-P1.6/RV-42 — the estate's `ground:money` trigger slice. As in chrono, it
+     *   answers ONE question: "is this span mine?". Every magnitude, currency and comparator below
+     *   is still parsed by this class's own grammar, so an empty slice (no lexicon archive) leaves
+     *   recognition byte-for-byte as it was.
+     *
+     *   What a trigger buys money is narrower than what it buys chrono, and the difference is the
+     *   kernels', not the mechanism's: chrono can read a bare declared noun as a period, whereas
+     *   money still needs a magnitude — "tisíc" without a number is not an amount. So here the
+     *   trigger is EVIDENCE, and it raises confidence: a plain magnitude scores 0.65, low enough to
+     *   route to clarification or the LLM fallback, and an estate declaring the surrounding words as
+     *   its own money vocabulary is exactly the evidence that was missing.
+     */
     fun recognize(
         span: String,
         locale: String,
+        triggers: GroundingSlice = GroundingSlice.empty(MONEY_KIND),
     ): MoneyAmount? {
         val norm = Normalization.fold(span)
         val amount = parseMagnitude(span, norm, locale) ?: return null
@@ -28,7 +43,12 @@ class AmountRecognizer {
         val tolerance = TOLERANCE.containsMatchIn(norm)
         val atCurrentRate = CURRENT_RATE.containsMatchIn(norm)
         val currency = detectCurrency(span, norm)
-        val confidence = if (comparator != null || tolerance) 0.9 else 0.65
+        val confidence =
+            when {
+                comparator != null || tolerance -> 0.9
+                triggers.matches(span) -> TRIGGERED_CONFIDENCE
+                else -> 0.65
+            }
         return MoneyAmount(amount, currency, comparator, tolerance, atCurrentRate, confidence)
     }
 
@@ -118,6 +138,15 @@ class AmountRecognizer {
     }
 
     private companion object {
+        const val MONEY_KIND = "money"
+
+        /**
+         * RV-P1.6 (RV-42) — a declared money word is real evidence, but weaker than an authored
+         * comparator ("nad 100 000" states a filter; "100 000 Kč" states a number). Between the
+         * two, and well clear of money's clarification floor.
+         */
+        const val TRIGGERED_CONFIDENCE = 0.8
+
         val THOUSAND = BigDecimal(1_000)
         val MILLION = BigDecimal(1_000_000)
         val BILLION = BigDecimal(1_000_000_000)

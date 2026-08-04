@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.chrono.recognize
 
+import org.tatrman.grounding.lexicon.GroundingSlice
 import org.tatrman.text.Normalization
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -17,12 +18,32 @@ import java.time.temporal.TemporalAdjusters
  * Intervals are half-open `[start, end)` with an EXCLUSIVE end (contracts §1.1).
  */
 class DateRecognizer {
+    private companion object {
+        const val CHRONO_KIND = "chrono"
+
+        /**
+         * A trigger-supplied scope is weaker evidence than an authored "tento"/"minulý", but it is
+         * still above chrono's 0.6 clarification floor — the estate declared the word.
+         */
+        const val TRIGGERED_SCOPELESS_CONFIDENCE = 0.8
+    }
+
+    /**
+     * @param triggers RV-P1.6/RV-42 — the estate's `ground:chrono` trigger slice. It answers ONE
+     *   question: "is this span mine?". It never says what the span means — every interval below
+     *   is still decided by the rules in this class, so an empty slice (no lexicon archive) leaves
+     *   recognition exactly as it was. What a trigger buys is the SCOPE-FREE reading: "fiskální
+     *   rok" with no year, or a bare "čtvrtletí", is a period at the reference rather than a
+     *   fall-through — the estate said the words are its own, so a bare mention is not noise.
+     */
     fun recognize(
         span: String,
         reference: LocalDate,
+        triggers: GroundingSlice = GroundingSlice.empty(CHRONO_KIND),
     ): ChronoRecognition? {
         val n = Normalization.fold(span).trim()
         if (n.isEmpty()) return null
+        val triggered = triggers.matches(span)
         val target = detectTarget(n)
         val base =
             fiscalYear(n)
@@ -31,7 +52,7 @@ class DateRecognizer {
                 ?: isoDate(n)
                 ?: numericDate(n, reference)
                 ?: namedMonthDate(n, reference)
-                ?: relative(n, reference)
+                ?: relative(n, reference, triggered)
                 ?: return null
         return if (target != null) base.copy(target = target) else base
     }
@@ -49,6 +70,9 @@ class DateRecognizer {
     // ----- fiscal year: "fiscal year 2026" / "fiskalni rok 2026" -----
 
     private val fiscalYearRe = Regex("""(?:fiscal|financial|fiskaln\w*|financn\w*|ucetni)\s+(?:year|rok)\s+(\d{4})""")
+
+    /** The fiscal/accounting adjectives alone — used when a trigger supplies the missing scope. */
+    private val fiscalWordRe = Regex("""(?:fiscal|financial|fiskaln\w*|financn\w*|ucetni)""")
 
     private fun fiscalYear(n: String): ChronoRecognition? {
         val y =
@@ -205,6 +229,7 @@ class DateRecognizer {
     private fun relative(
         n: String,
         reference: LocalDate,
+        triggered: Boolean = false,
     ): ChronoRecognition? {
         when {
             hasAny(n, "today", "dnes") -> return dayInterval(reference, 0.95)
@@ -224,8 +249,13 @@ class DateRecognizer {
         }
         val thisScope = hasAny(n, "this", "tento", "tato", "letos") // "letos" = this year
         val lastScope = hasAny(n, "last", "minul", "loni", "predchoz") // "loni" = last year
-        if (!thisScope && !lastScope) return null
+        // A declared trigger with no scope word reads as the CURRENT period (RV-42): the estate
+        // put the word in its slice, so "fiskální rok" is a period it means, not noise. Scoped at
+        // a lower confidence than an authored "tento"/"minulý", because the scope is inferred.
+        val scopeless = !thisScope && !lastScope
+        if (scopeless && !triggered) return null
         val delta = if (lastScope) -1L else 0L
+        val confidence = if (scopeless) TRIGGERED_SCOPELESS_CONFIDENCE else 0.9
         return when {
             hasAny(n, "week", "tyden", "tydnu") -> weekInterval(reference, delta)
             hasAny(n, "month", "mesic") -> {
@@ -238,12 +268,18 @@ class DateRecognizer {
                     base.year,
                     base.monthValue,
                     ChronoKind.RELATIVE,
-                    0.9,
+                    confidence,
                     "%04d%02d".format(base.year, base.monthValue),
                 )
             }
             hasAny(n, "year", "rok", "letos", "loni") ->
-                yearInterval(reference.year + delta.toInt(), ChronoKind.RELATIVE, 0.9)
+                yearInterval(
+                    reference.year + delta.toInt(),
+                    // A scopeless fiscal mention is a FISCAL_YEAR, not a plain calendar year —
+                    // same kind the explicit `fiskalni rok 2026` rule produces.
+                    if (scopeless && fiscalWordRe.containsMatchIn(n)) ChronoKind.FISCAL_YEAR else ChronoKind.RELATIVE,
+                    confidence,
+                )
             else -> null
         }
     }

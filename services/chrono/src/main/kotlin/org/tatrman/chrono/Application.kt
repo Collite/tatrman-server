@@ -9,6 +9,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
@@ -21,6 +22,7 @@ import org.tatrman.chrono.discover.EmptySemanticDiscovery
 import org.tatrman.chrono.discover.SemanticDiscovery
 import org.tatrman.chrono.grpc.ChronoGroundingService
 import org.tatrman.chrono.obs.ChronoMetrics
+import org.tatrman.grounding.lexicon.GroundingSliceSource
 import shared.ktor.KtorConfigFactory
 import shared.ktor.KtorServerBootstrap
 import shared.ktor.installKtorServerBase
@@ -55,6 +57,12 @@ fun Application.module(config: Config) {
     val discovery = pickDiscovery(config, useFixture)
     val llmFallback = buildLlmFallbackClient(config)
 
+    // RV-P1.6 T4 (RV-42) — the `ground:chrono` trigger slice, read from the compiled lexicon
+    // archive at startup. An unset path (the default) is a disabled source: chrono then runs on
+    // its own generative rules exactly as it did before RV, which is what keeps an estate without
+    // a lexicon deployable.
+    val triggerSlice = groundingSlice(config)
+
     val chronoService =
         ChronoGroundingService(
             discovery = discovery,
@@ -62,6 +70,7 @@ fun Application.module(config: Config) {
             llmModel = config.getString("chrono.llm-fallback.model"),
             confidenceThreshold = config.getDouble("chrono.confidence-threshold"),
             metrics = metrics,
+            triggers = triggerSlice,
         )
 
     val grpcPort = config.getInt("grpc.port")
@@ -94,6 +103,22 @@ fun Application.module(config: Config) {
                     put("service", "chrono")
                     put("grpc_port", grpcPort)
                     put("llm_fallback", llmFallback != null)
+                    // RV-39/S-1 — which trigger vocabulary is serving.
+                    put("lexicon_slice", triggerSlice.current().version)
+                    put("lexicon_slice_terms", triggerSlice.current().terms.size)
+                },
+            )
+        }
+        // RV-P1.6 T4 — the S-3 reload hook. lex-matcher already had one; the grounding kernels
+        // did not, so this is where the list's "existing refresh hook" is made true for them.
+        // Idempotent and cheap: the archive id is compared before anything is parsed.
+        post("/refresh") {
+            val reloaded = triggerSlice.refresh()
+            call.respond(
+                buildJsonObject {
+                    put("service", "chrono")
+                    put("lexicon_slice", reloaded.version)
+                    put("lexicon_slice_terms", reloaded.terms.size)
                 },
             )
         }
@@ -105,6 +130,33 @@ fun Application.module(config: Config) {
         if (discovery is AutoCloseable) discovery.close()
         llmFallback?.close()
     }
+}
+
+/**
+ * The compiled-lexicon archive the `ground:chrono` slice is read from. Absent/blank ⇒ disabled.
+ * Mirrors lex-matcher's `fuzzy.lexicon.archive-path` (RV-P1.4), including the env override, so an
+ * estate configures one path convention across every service that reads the artifact.
+ */
+private fun groundingSlice(config: Config): GroundingSliceSource {
+    val path =
+        if (config.hasPath("chrono.lexicon.archive-path")) {
+            config.getString("chrono.lexicon.archive-path").trim()
+        } else {
+            ""
+        }
+    if (path.isEmpty()) {
+        log.info("chrono: no lexicon archive configured — running on generative rules only (no ground:chrono slice)")
+        return GroundingSliceSource.disabled("chrono")
+    }
+    val source =
+        GroundingSliceSource(
+            "chrono",
+            java.nio.file.Path
+                .of(path),
+        )
+    val loaded = source.refresh()
+    log.info("chrono: ground:chrono slice loaded from {} ({} terms)", path, loaded.terms.size)
+    return source
 }
 
 private fun pickDiscovery(

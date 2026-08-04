@@ -4,6 +4,7 @@ package org.tatrman.chrono.grpc
 import com.google.protobuf.util.JsonFormat
 import org.tatrman.grounding.v1.ClarificationOption
 import org.tatrman.grounding.v1.DateTimeInterval
+import org.tatrman.grounding.lexicon.GroundingSliceSource
 import org.tatrman.grounding.v1.GetStatusRequest
 import org.tatrman.grounding.v1.GetStatusResponse
 import org.tatrman.grounding.v1.GroundRequest
@@ -45,6 +46,12 @@ class ChronoGroundingService(
     private val llmModel: String = "claude-haiku-4-5",
     private val confidenceThreshold: Double = 0.6,
     private val metrics: ChronoMetrics = ChronoMetrics.noop(),
+    /**
+     * RV-P1.6 T4 (RV-42) — the `ground:chrono` trigger slice. Optional by construction: the
+     * default source never loads anything, which is the pre-RV service (own rules, no estate
+     * vocabulary) and the supported deployment for an estate with no compiled lexicon.
+     */
+    private val triggers: GroundingSliceSource = GroundingSliceSource.disabled("chrono"),
 ) : GroundingServiceGrpcKt.GroundingServiceCoroutineImplBase() {
     private val logger = LoggerFactory.getLogger(ChronoGroundingService::class.java)
     private val recognizer = DateRecognizer()
@@ -77,7 +84,7 @@ class ChronoGroundingService(
                 ?: return ungroundable("reference_datetime is required (chrono never reads a clock)")
 
         val recognition =
-            recognizer.recognize(request.spanText, reference)
+            recognizer.recognize(request.spanText, reference, triggers.current())
                 ?: return fallback(request, "could not recognize a time expression in '${request.spanText}'")
 
         val resolved: ChronoRecognition =
@@ -117,7 +124,17 @@ class ChronoGroundingService(
             .setService("chrono")
             .putCapabilities("metadata", if (metadataOk) "ok" else "down")
             .putCapabilities("llm_fallback", (llmFallback != null).toString())
-            .build()
+            // RV-39/S-1: which vocabulary answered. Empty means no slice is serving, which is a
+            // legitimate deployment — the capability map is the existing echo channel, so this
+            // needs no wire change (J-v2).
+            .putCapabilities("lexicon_slice", triggers.current().version)
+            .putCapabilities(
+                "lexicon_slice_terms",
+                triggers
+                    .current()
+                    .terms.size
+                    .toString(),
+            ).build()
     }
 
     // ----- clarification (A8.6) -----

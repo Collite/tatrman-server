@@ -69,6 +69,8 @@ jib {
 dependencies {
     implementation(libs.tatrman.ttr.translator)
     implementation(project(":shared:libs:kotlin:grounding-core"))
+    // RV-P1.6 T5 (RV-42) — the `ground:geo` CATEGORY-word slice (the gazetteer stays parked).
+    implementation(project(":shared:libs:kotlin:grounding-lexicon"))
     // S-2 fold — the one shared normalization spec (RG-P6.S2.T4: geo place-key /
     // resolver fold via text, no private copy). Explicit (was transitive).
     implementation(project(":shared:libs:kotlin:text"))

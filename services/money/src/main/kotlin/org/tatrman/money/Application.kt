@@ -9,6 +9,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
@@ -20,6 +21,7 @@ import org.tatrman.money.client.MetaV1MoneyDiscovery
 import org.tatrman.money.discover.EmptyMoneyDiscovery
 import org.tatrman.money.discover.MoneyDiscovery
 import org.tatrman.money.grpc.MoneyGroundingService
+import org.tatrman.grounding.lexicon.GroundingSliceSource
 import org.tatrman.money.obs.MoneyMetrics
 import shared.ktor.KtorConfigFactory
 import shared.ktor.KtorServerBootstrap
@@ -55,6 +57,10 @@ fun Application.module(config: Config) {
     val discovery = pickDiscovery(config, useFixture)
     val llmFallback = buildLlmFallbackClient(config)
 
+    // RV-P1.6 T4 (RV-42) — the `ground:money` trigger slice. Unset path ⇒ disabled ⇒ the pre-RV
+    // service, which keeps an estate without a compiled lexicon deployable.
+    val triggerSlice = groundingSlice(config)
+
     val moneyService =
         MoneyGroundingService(
             discovery = discovery,
@@ -64,6 +70,7 @@ fun Application.module(config: Config) {
             defaultCurrency = config.getString("money.default-currency"),
             defaultTolerancePct = config.getDouble("money.default-tolerance-pct"),
             metrics = metrics,
+            triggers = triggerSlice,
         )
 
     val grpcPort = config.getInt("grpc.port")
@@ -96,6 +103,20 @@ fun Application.module(config: Config) {
                     put("service", "money")
                     put("grpc_port", grpcPort)
                     put("llm_fallback", llmFallback != null)
+                    // RV-39/S-1 — which trigger vocabulary is serving.
+                    put("lexicon_slice", triggerSlice.current().version)
+                    put("lexicon_slice_terms", triggerSlice.current().terms.size)
+                },
+            )
+        }
+        // RV-P1.6 T4 — the S-3 reload hook (the kernels had none; lex-matcher's is the precedent).
+        post("/refresh") {
+            val reloaded = triggerSlice.refresh()
+            call.respond(
+                buildJsonObject {
+                    put("service", "money")
+                    put("lexicon_slice", reloaded.version)
+                    put("lexicon_slice_terms", reloaded.terms.size)
                 },
             )
         }
@@ -131,4 +152,30 @@ private fun buildLlmFallbackClient(config: Config): LlmGatewayClient? {
     val apiKey = config.getString("money.llm-fallback.api-key").takeIf { it.isNotBlank() }
     log.info("money llm-gateway fallback configured at {} (timeout {}ms)", baseUrl, timeoutMs)
     return KtorLlmGatewayClient(baseUrl = baseUrl, timeoutMs = timeoutMs, apiKey = apiKey)
+}
+
+/**
+ * The compiled-lexicon archive the `ground:money` slice is read from. Absent/blank ⇒ disabled.
+ * Same path convention as chrono and lex-matcher, so one estate setting covers every reader.
+ */
+private fun groundingSlice(config: Config): GroundingSliceSource {
+    val path =
+        if (config.hasPath("money.lexicon.archive-path")) {
+            config.getString("money.lexicon.archive-path").trim()
+        } else {
+            ""
+        }
+    if (path.isEmpty()) {
+        log.info("money: no lexicon archive configured — running on generative rules only (no ground:money slice)")
+        return GroundingSliceSource.disabled("money")
+    }
+    val source =
+        GroundingSliceSource(
+            "money",
+            java.nio.file.Path
+                .of(path),
+        )
+    val loaded = source.refresh()
+    log.info("money: ground:money slice loaded from {} ({} terms)", path, loaded.terms.size)
+    return source
 }
