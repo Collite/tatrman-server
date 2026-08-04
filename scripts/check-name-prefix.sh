@@ -10,8 +10,9 @@
 # Two — and only two — classes of `ttr-` are legitimate here:
 #
 #   1. Coordinates of the UPSTREAM toolchain published by the `Collite/tatrman`
-#      repo (`org.tatrman:ttr-parser`, `ttr-metadata`, `ttr-translator`, …).
-#      Those are a third-party dependency; this repo does not get to rename them.
+#      repo (`org.tatrman:ttr-parser`, `ttr-metadata`, `ttr-translator`,
+#      `ttr-snapshot`, `ttr-lexicon`, …). Those are a third-party dependency;
+#      this repo does not get to rename them.
 #   2. Kubernetes namespace names (`ttr-server`, and the ephemeral CI namespace
 #      `ttr-umbrella`). Renaming a live namespace is a destructive estate
 #      migration, not a code rename — explicitly out of scope for ⚑RV-6.
@@ -32,7 +33,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Longest alternatives first: `metadata-git` must match before `metadata`.
-ALLOW='ttr-(metadata-git|metadata-adoption|metadata|translator-extraction|translator|plan-proto|parser|writer|semantics|server-proto|lexicon|skill|nlp-routing|server|umbrella-ci|umbrella|\*|\{)'
+#
+# `snapshot` is class 1 — the upstream `org.tatrman:ttr-snapshot` (tar+zstd archive
+# container), taken at RV-P1.4 T3 alongside the already-listed `ttr-lexicon`, which
+# it carries. `ttr-lexicon-compile` needs no entry of its own: `lexicon` strips the
+# prefix and leaves `-compile`, which the left-hand guard no longer matches.
+ALLOW='ttr-(metadata-git|metadata-adoption|metadata|translator-extraction|translator|plan-proto|parser|writer|semantics|server-proto|snapshot|lexicon|skill|nlp-routing|server|umbrella-ci|umbrella|\*|\{)'
 
 hits="$(
   git grep -nI -P '(?<![A-Za-z0-9_])ttr-' -- . ':(exclude)scripts/check-name-prefix.sh' \
