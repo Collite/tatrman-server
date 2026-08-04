@@ -112,4 +112,34 @@ class GroundingSliceRecognitionSpec :
         "an empty slice is exactly the no-slice case" {
             recognizer.recognize("fiskální rok", reference, GroundingSlice.empty("chrono")) shouldBe null
         }
+
+        // ---- quarter: the third scopeless period, and the one the KDoc promised ----------------
+
+        "a declared bare `čtvrtletí` reads as the current quarter, with a period code" {
+            val r = recognizer.recognize("čtvrtletí", reference, stdlibish)
+
+            r shouldNotBe null
+            r!!.kind shouldBe ChronoKind.PERIOD
+            r.startInclusive shouldBe LocalDate.of(2026, 4, 1) // the reference's own quarter
+            r.endExclusive shouldBe LocalDate.of(2026, 7, 1)
+            r.periodCode shouldBe "2026Q2"
+            r.confidence shouldBe 0.8 // inferred scope, same rung as a scopeless month or year
+        }
+
+        "an authored quarter scope still wins, at full confidence" {
+            val r = recognizer.recognize("poslední čtvrtletí", reference, stdlibish)
+
+            r!!.periodCode shouldBe "2026Q1"
+            r.confidence shouldBe 0.9
+        }
+
+        "an AMBIGUOUS quarter scope is still not a match, trigger or no trigger" {
+            recognizer.recognize("tento poslední čtvrtletí", reference, stdlibish) shouldBe null
+        }
+
+        "a scopeless week is scored like the other inferred periods, not above them" {
+            val r = recognizer.recognize("týden", reference, slice("týden" to TriggerMethod.Typos(1)))
+
+            r!!.confidence shouldBe 0.8
+        }
     })

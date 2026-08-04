@@ -47,7 +47,7 @@ class DateRecognizer {
         val target = detectTarget(n)
         val base =
             fiscalYear(n)
-                ?: fiscalQuarter(n, reference)
+                ?: fiscalQuarter(n, reference, triggered)
                 ?: periodCode(n)
                 ?: isoDate(n)
                 ?: numericDate(n, reference)
@@ -93,23 +93,35 @@ class DateRecognizer {
     /**
      * A relative fiscal/accounting quarter → a PERIOD recognition carrying a `yyyyQn` period code plus
      * the calendar-quarter interval (relative to [reference]). "this/current" = the reference's own
-     * quarter; "last/previous" = one quarter earlier (with year rollover). Requires an explicit scope
-     * word — a bare "quarter" is ambiguous and left for the LLM fallback.
+     * quarter; "last/previous" = one quarter earlier (with year rollover).
+     *
+     * A bare "quarter" is ambiguous and left for the LLM fallback — UNLESS [triggered], in which case
+     * it reads as the CURRENT quarter at the lower [TRIGGERED_SCOPELESS_CONFIDENCE], exactly as a
+     * scopeless month or year does in [relative]. The estate declared the word; a bare mention of it
+     * is not noise. An ambiguous BOTH scopes is still not a match either way.
      */
     private fun fiscalQuarter(
         n: String,
         reference: LocalDate,
+        triggered: Boolean = false,
     ): ChronoRecognition? {
         if (!quarterWordRe.containsMatchIn(n)) return null
         val thisScope = hasAny(n, "this", "current", "tento", "toto", "soucasn", "aktualn")
         val lastScope = hasAny(n, "last", "previous", "past", "posledni", "minul", "predchoz")
-        if (thisScope == lastScope) return null // neither, or an ambiguous both → not a quarter match
-        return quarterInterval(reference, if (lastScope) -1 else 0)
+        val scopeless = !thisScope && !lastScope
+        if (scopeless && !triggered) return null // no scope and no trigger → the LLM fallback's
+        if (thisScope && lastScope) return null // ambiguous both → not a quarter match
+        return quarterInterval(
+            reference,
+            if (lastScope) -1 else 0,
+            if (scopeless) TRIGGERED_SCOPELESS_CONFIDENCE else 0.9,
+        )
     }
 
     private fun quarterInterval(
         reference: LocalDate,
         deltaQuarters: Int,
+        confidence: Double = 0.9,
     ): ChronoRecognition {
         val refQuarter = reference.year * 4 + (reference.monthValue - 1) / 3 + deltaQuarters
         val year = Math.floorDiv(refQuarter, 4)
@@ -119,7 +131,7 @@ class DateRecognizer {
             start,
             start.plusMonths(3),
             ChronoKind.PERIOD,
-            0.9,
+            confidence,
             periodCode = "%04dQ%d".format(year, q + 1),
         )
     }
@@ -257,7 +269,7 @@ class DateRecognizer {
         val delta = if (lastScope) -1L else 0L
         val confidence = if (scopeless) TRIGGERED_SCOPELESS_CONFIDENCE else 0.9
         return when {
-            hasAny(n, "week", "tyden", "tydnu") -> weekInterval(reference, delta)
+            hasAny(n, "week", "tyden", "tydnu") -> weekInterval(reference, delta, confidence)
             hasAny(n, "month", "mesic") -> {
                 val base = reference.plusMonths(delta)
                 // Carry a period code (yyyyMM) so a period-coded package (e.g. an
@@ -314,9 +326,10 @@ class DateRecognizer {
     private fun weekInterval(
         reference: LocalDate,
         weekDelta: Long,
+        confidence: Double = 0.9,
     ): ChronoRecognition {
         val monday = reference.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(weekDelta)
-        return ChronoRecognition(monday, monday.plusWeeks(1), ChronoKind.RELATIVE, 0.9)
+        return ChronoRecognition(monday, monday.plusWeeks(1), ChronoKind.RELATIVE, confidence)
     }
 
     private fun hasAny(

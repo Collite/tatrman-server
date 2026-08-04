@@ -120,10 +120,18 @@ class GeoSpanParser {
             val cleaned = word.trim('.', ',', '?', '!', ';', ':')
             if (cleaned.isEmpty()) continue
             if (Normalization.fold(cleaned) in PLACE_STOP_WORDS) break
-            // RV-42 T5: a declared CATEGORY word in front of the place is not part of the name.
-            // Only leading ones are dropped — "Ústí nad Labem" must survive intact, and a
-            // category word deeper in the name is far more likely to be part of it.
-            if (kept.isEmpty() && triggers.matches(cleaned)) continue
+            // RV-42 T5: a declared CATEGORY word in front of the place is not part of the name —
+            // "v kraji Vysočina" asks about Vysočina, not about a place called "kraji Vysočina".
+            //
+            // Two guards, because a leading category word CAN be part of the name: **Město
+            // Albrechtice**, **Město Touškov** and **Městec Králové** are real municipalities.
+            //  1. only a LOWERCASE occurrence is dropped — Czech writes the common noun in
+            //     lowercase ("v kraji Vysočina") and capitalises it when it belongs to the name
+            //     ("v Městě Albrechticích"); and
+            //  2. only a LEADING one, so a category word deeper in the name survives regardless.
+            // A capitalised leading category word therefore falls back to the pre-RV reading,
+            // which is the safe direction: the gazetteer gets the whole name, as it always did.
+            if (kept.isEmpty() && cleaned.first().isLowerCase() && triggers.matches(cleaned)) continue
             kept += cleaned
             if (kept.size >= MAX_PLACE_WORDS) break
         }

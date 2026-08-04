@@ -45,6 +45,23 @@ data class GroundingSlice(
      */
     fun matches(span: String): Boolean = matched(span) != null
 
+    /**
+     * This slice narrowed to the terms an estate declared for [locale]'s language.
+     *
+     * A term carries the `lang` its author gave it (`cs`, `en`, `cs|en`), and until the request's
+     * locale is applied that field is decoration: an English trigger would be live on a Czech
+     * question. Callers pass the BCP-47 locale from the request context (`cs-CZ`); only the primary
+     * subtag is compared.
+     *
+     * A blank or unknown locale narrows nothing — every term stays eligible, which is the pre-RV
+     * reading and the right default for a request that did not say.
+     */
+    fun forLang(locale: String?): GroundingSlice {
+        val lang = languageOf(locale) ?: return this
+        val narrowed = terms.filter { it.appliesTo(lang) }
+        return if (narrowed.size == terms.size) this else copy(terms = narrowed)
+    }
+
     /** The first term that fires, or null — the same question as [matches], with the evidence. */
     fun matched(span: String): GroundingTerm? {
         if (terms.isEmpty()) return null
@@ -59,6 +76,14 @@ data class GroundingSlice(
 
         /** An absent artifact is an empty slice, never a failure — see `GroundingSliceSource`. */
         fun empty(kind: String): GroundingSlice = GroundingSlice(kind, emptyList(), "")
+
+        /** `cs-CZ` → `cs`; blank/null → null, meaning "the request did not say". */
+        internal fun languageOf(locale: String?): String? =
+            locale
+                ?.trim()
+                ?.substringBefore('-')
+                ?.lowercase()
+                ?.takeIf { it.isNotEmpty() }
     }
 }
 
@@ -74,6 +99,21 @@ data class GroundingTerm(
 ) {
     private val tokens: List<String> =
         GroundingSlice.TOKEN_SPLIT.split(folded).filter { it.isNotBlank() }
+
+    /**
+     * Is this term declared for [lang]? `cs|en` applies to both; an unparseable `lang` applies to
+     * everything, because dropping a term over a field the estate got slightly wrong would be a
+     * silent loss of vocabulary.
+     */
+    internal fun appliesTo(lang: String): Boolean {
+        val declared = lang.lowercase()
+        val own =
+            this.lang
+                .split('|')
+                .map { it.trim().lowercase() }
+                .filter { it.isNotEmpty() }
+        return own.isEmpty() || own.contains(declared)
+    }
 
     internal fun fires(spanWords: List<String>): Boolean =
         when (method) {

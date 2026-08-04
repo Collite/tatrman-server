@@ -10,6 +10,7 @@ import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
@@ -24,6 +25,7 @@ import org.tatrman.chrono.grpc.ChronoGroundingService
 import org.tatrman.chrono.obs.ChronoMetrics
 import org.tatrman.grounding.lexicon.GroundingSliceSource
 import shared.ktor.KtorConfigFactory
+import shared.ktor.adminOnly
 import shared.ktor.KtorServerBootstrap
 import shared.ktor.installKtorServerBase
 import shared.logging.IncomingCallLoggingInterceptor
@@ -111,16 +113,23 @@ fun Application.module(config: Config) {
         }
         // RV-P1.6 T4 — the S-3 reload hook. lex-matcher already had one; the grounding kernels
         // did not, so this is where the list's "existing refresh hook" is made true for them.
-        // Idempotent and cheap: the archive id is compared before anything is parsed.
-        post("/refresh") {
-            val reloaded = triggerSlice.refresh()
-            call.respond(
-                buildJsonObject {
-                    put("service", "chrono")
-                    put("lexicon_slice", reloaded.version)
-                    put("lexicon_slice_terms", reloaded.terms.size)
-                },
-            )
+        // Idempotent and cheap in the common case: the archive id is compared before anything is
+        // parsed — but it still reads and hashes the file, so it is ADMIN-GATED like every other
+        // operator endpoint (S-3: never open in the offering). Scoped to /refresh, so the
+        // interceptor cannot reach /health or /ready (SV-P3·F1).
+        route("/refresh") {
+            adminOnly(config) {
+                post {
+                    val reloaded = triggerSlice.refresh()
+                    call.respond(
+                        buildJsonObject {
+                            put("service", "chrono")
+                            put("lexicon_slice", reloaded.version)
+                            put("lexicon_slice_terms", reloaded.terms.size)
+                        },
+                    )
+                }
+            }
         }
     }
 

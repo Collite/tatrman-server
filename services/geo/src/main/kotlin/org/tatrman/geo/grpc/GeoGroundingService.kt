@@ -86,7 +86,8 @@ class GeoGroundingService(
     }
 
     private suspend fun groundInternal(request: GroundRequest): GroundResponse =
-        when (val query = parser.parse(request.spanText, triggers.current())) {
+        // RV-P1.6: category words are narrowed to the request's language (blank ⇒ all).
+        when (val query = parser.parse(request.spanText, triggers.current().forLang(request.context.locale))) {
             is GeoQuery.Distance -> handleDistance(query, request)
             is GeoQuery.Containment -> handleContainment(query, request)
             null -> fallback(request, "could not recognize a location expression in '${request.spanText}'")

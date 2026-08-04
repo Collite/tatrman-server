@@ -10,6 +10,7 @@ import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
@@ -32,6 +33,7 @@ import org.tatrman.geo.resolve.ChainedPlaceResolver
 import org.tatrman.geo.resolve.ModelPoiResolver
 import org.tatrman.geo.resolve.NominatimPlaceResolver
 import shared.ktor.KtorConfigFactory
+import shared.ktor.adminOnly
 import shared.libs.db.common.DatabaseConnection
 import shared.ktor.KtorServerBootstrap
 import shared.ktor.installKtorServerBase
@@ -137,16 +139,21 @@ fun Application.module(config: Config) {
                 },
             )
         }
-        // RV-P1.6 T5 — the S-3 reload hook, as in chrono and money.
-        post("/refresh") {
-            val reloaded = triggerSlice.refresh()
-            call.respond(
-                buildJsonObject {
-                    put("service", "geo")
-                    put("lexicon_slice", reloaded.version)
-                    put("lexicon_slice_terms", reloaded.terms.size)
-                },
-            )
+        // RV-P1.6 T5 — the S-3 reload hook, as in chrono and money: admin-gated, scoped to
+        // /refresh so the interceptor cannot reach the probes.
+        route("/refresh") {
+            adminOnly(config) {
+                post {
+                    val reloaded = triggerSlice.refresh()
+                    call.respond(
+                        buildJsonObject {
+                            put("service", "geo")
+                            put("lexicon_slice", reloaded.version)
+                            put("lexicon_slice_terms", reloaded.terms.size)
+                        },
+                    )
+                }
+            }
         }
     }
 

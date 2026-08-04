@@ -84,7 +84,10 @@ class ChronoGroundingService(
                 ?: return ungroundable("reference_datetime is required (chrono never reads a clock)")
 
         val recognition =
-            recognizer.recognize(request.spanText, reference, triggers.current())
+            // RV-P1.6: the slice is narrowed to the request's language — a term carries the
+            // `lang` its author declared, and an English trigger has no business firing on a
+            // Czech question. A blank locale narrows nothing.
+            recognizer.recognize(request.spanText, reference, triggers.current().forLang(request.context.locale))
                 ?: return fallback(request, "could not recognize a time expression in '${request.spanText}'")
 
         val resolved: ChronoRecognition =

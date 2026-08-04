@@ -10,6 +10,7 @@ import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
@@ -24,6 +25,7 @@ import org.tatrman.money.grpc.MoneyGroundingService
 import org.tatrman.grounding.lexicon.GroundingSliceSource
 import org.tatrman.money.obs.MoneyMetrics
 import shared.ktor.KtorConfigFactory
+import shared.ktor.adminOnly
 import shared.ktor.KtorServerBootstrap
 import shared.ktor.installKtorServerBase
 import shared.logging.IncomingCallLoggingInterceptor
@@ -109,16 +111,21 @@ fun Application.module(config: Config) {
                 },
             )
         }
-        // RV-P1.6 T4 — the S-3 reload hook (the kernels had none; lex-matcher's is the precedent).
-        post("/refresh") {
-            val reloaded = triggerSlice.refresh()
-            call.respond(
-                buildJsonObject {
-                    put("service", "money")
-                    put("lexicon_slice", reloaded.version)
-                    put("lexicon_slice_terms", reloaded.terms.size)
-                },
-            )
+        // RV-P1.6 T4 — the S-3 reload hook (the kernels had none; lex-matcher's is the precedent,
+        // ADMIN GATE INCLUDED: an operator endpoint is never open in the offering).
+        route("/refresh") {
+            adminOnly(config) {
+                post {
+                    val reloaded = triggerSlice.refresh()
+                    call.respond(
+                        buildJsonObject {
+                            put("service", "money")
+                            put("lexicon_slice", reloaded.version)
+                            put("lexicon_slice_terms", reloaded.terms.size)
+                        },
+                    )
+                }
+            }
         }
     }
 

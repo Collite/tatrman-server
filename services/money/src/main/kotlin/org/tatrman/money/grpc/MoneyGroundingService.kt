@@ -76,7 +76,8 @@ class MoneyGroundingService(
         // way defaultCurrency is defaulted, so a CZK-first deployment stays on cs separator rules.
         val locale = ctx.locale.ifEmpty { defaultLocale }
         val amount =
-            recognizer.recognize(request.spanText, locale, triggers.current())
+            // RV-P1.6: the slice is narrowed to the same locale the magnitude grammar uses.
+            recognizer.recognize(request.spanText, locale, triggers.current().forLang(locale))
                 ?: return fallback(request, "could not recognize a monetary amount in '${request.spanText}'")
         if (amount.confidence < confidenceThreshold) {
             return fallback(request, "recognition confidence ${amount.confidence} below threshold $confidenceThreshold")

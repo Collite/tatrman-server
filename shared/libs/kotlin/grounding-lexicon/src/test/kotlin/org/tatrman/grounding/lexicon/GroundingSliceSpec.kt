@@ -91,4 +91,45 @@ class GroundingSliceSpec :
             source.current().isEmpty shouldBe true
             source.refresh().isEmpty shouldBe true
         }
+
+        // ----- the declared `lang` is applied, not just carried -----
+
+        fun multilingual() =
+            GroundingSlice(
+                kind = "chrono",
+                terms =
+                    listOf(
+                        GroundingTerm("rok", "rok", TriggerMethod.Exact, "cs"),
+                        GroundingTerm("year", "year", TriggerMethod.Exact, "en"),
+                        GroundingTerm("q1", "Q1", TriggerMethod.Exact, "cs|en"),
+                    ),
+                version = "sha256:test",
+            )
+
+        "a term only fires for the language its author declared" {
+            val cs = multilingual().forLang("cs-CZ")
+            cs.matches("v roce 2026 rok") shouldBe true
+            cs.matches("this year") shouldBe false // en-only term, cs request
+
+            val en = multilingual().forLang("en-GB")
+            en.matches("this year") shouldBe true
+            en.matches("rok 2026") shouldBe false
+        }
+
+        "`cs|en` applies to both" {
+            multilingual().forLang("cs").matches("Q1") shouldBe true
+            multilingual().forLang("en").matches("Q1") shouldBe true
+        }
+
+        "a request that names no locale narrows nothing" {
+            // The pre-RV reading, and the right default: the caller did not say.
+            multilingual().forLang(null).matches("this year") shouldBe true
+            multilingual().forLang("").matches("rok") shouldBe true
+            multilingual().forLang("   ").matches("this year") shouldBe true
+        }
+
+        "narrowing keeps the artifact version — it is the same vocabulary, read narrowly" {
+            multilingual().forLang("cs").version shouldBe "sha256:test"
+            multilingual().forLang("cs").kind shouldBe "chrono"
+        }
     })

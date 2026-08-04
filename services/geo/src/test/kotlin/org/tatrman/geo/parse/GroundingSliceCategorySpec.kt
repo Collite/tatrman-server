@@ -99,4 +99,28 @@ class GroundingSliceCategorySpec :
             parser.parse("v kraji Vysočina", GroundingSlice.empty("geo")) shouldBe
                 parser.parse("v kraji Vysočina")
         }
+
+        // ---- a leading category word that IS part of the name ----------------------------------
+        //
+        // "only leading ones are dropped" is not enough on its own: Czech has real municipalities
+        // whose name STARTS with a category noun. Capitalisation is what separates the two — the
+        // common noun is written lowercase ("v kraji Vysočina"), the name's own word is not.
+
+        "a CAPITALISED leading category word belongs to the name and is kept" {
+            // Město Albrechtice, Město Touškov, Městec Králové are real places.
+            parser
+                .parse("ve Městě Albrechticích", categories)
+                .shouldBeInstanceOf<GeoQuery.Containment>()
+                .place shouldBe "Městě Albrechticích"
+            parser
+                .parse("v Městě Touškov", categories)
+                .shouldBeInstanceOf<GeoQuery.Containment>()
+                .place shouldBe "Městě Touškov"
+        }
+
+        "a capitalised leading category word parses exactly as it did before the slice" {
+            // The safe direction: the gazetteer gets the whole name, as it always did.
+            parser.parse("ve Městě Albrechticích", categories) shouldBe
+                parser.parse("ve Městě Albrechticích")
+        }
     })
