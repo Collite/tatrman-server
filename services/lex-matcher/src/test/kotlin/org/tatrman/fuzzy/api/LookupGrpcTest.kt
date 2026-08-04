@@ -88,6 +88,20 @@ class LookupGrpcTest :
                                     TargetClass.OPERATOR,
                                 ),
                             ),
+                        // RV-P1.6 T6 (RV-42) — a grounding trigger row, so the lookup round the
+                        // resolver runs can ask "which grounding kernel does this word anchor?"
+                        // exactly as it asks "which operator is this?".
+                        "ground:chrono" to
+                            listOf(
+                                Candidate.vocabulary(
+                                    "t4",
+                                    "fiskální rok",
+                                    "ground:chrono",
+                                    SourceTag.DECLARED,
+                                    "TOKENS",
+                                    TargetClass.GROUNDING_TRIGGER,
+                                ),
+                            ),
                         "db.t.col" to listOf(Candidate.fromValues("pk-1", "Praha")),
                     )
             }
@@ -114,6 +128,47 @@ class LookupGrpcTest :
             }
         }
 
+        // RV-P1.6 T6 — the half of the lattice work that is possible before P2 exists: a
+        // ground-trigger hit is retrievable through the SAME lookup round as any other class, and
+        // carries `target_class=GROUNDING_TRIGGER` on the wire. What is still owed at P2 is the
+        // lattice ANNOTATION and the rung-log narrowing evidence — there is no ResolutionState to
+        // put them in yet (see the ⚠ on the p1-6 list and the note on p2-5 T2).
+        "a ground-trigger hit is an ordinary class-scoped lookup result (RV-42)" {
+            withStub { stub ->
+                val resp =
+                    stub.lookup(
+                        LookupRequest
+                            .newBuilder()
+                            .setTerm("fiskální rok")
+                            .addTargetClasses(ProtoTargetClass.TARGET_CLASS_GROUNDING_TRIGGER)
+                            .build(),
+                    )
+
+                resp.candidatesCount shouldBe 1
+                val hit = resp.getCandidates(0)
+                hit.targetRef shouldBe "ground:chrono"
+                hit.targetClass shouldBe ProtoTargetClass.TARGET_CLASS_GROUNDING_TRIGGER
+                hit.matchMethod shouldBe "TOKENS"
+                resp.vocabularyVersion.shouldNotBeBlank()
+            }
+        }
+
+        "class scoping keeps operators and grounding triggers apart" {
+            withStub { stub ->
+                // Same round, the other class: a grounding trigger must not answer "which
+                // operator is this?" and vice versa.
+                val operators =
+                    stub.lookup(
+                        LookupRequest
+                            .newBuilder()
+                            .setTerm("fiskální rok")
+                            .addTargetClasses(ProtoTargetClass.TARGET_CLASS_OPERATOR)
+                            .build(),
+                    )
+                operators.candidatesCount shouldBe 0
+            }
+        }
+
         "a class-scoped lookup returns only operators, with the class on the wire" {
             withStub { stub ->
                 val resp =
@@ -133,7 +188,9 @@ class LookupGrpcTest :
                 // Not a TOKENS row, so no uniqueness decision applies — and absent must stay absent.
                 hit.hasUniquenessMargin() shouldBe false
                 hit.hasAutoBindable() shouldBe false
-                resp.layerVersions.memberIndexVersionsCount shouldBe 4
+                // Five categories in the fixture loader (the ground:chrono slice row joined at
+                // RV-P1.6 T6) — every one gets a member-index version in the RV-39 tuple.
+                resp.layerVersions.memberIndexVersionsCount shouldBe 5
                 resp.vocabularyVersion.shouldNotBeBlank()
             }
         }
