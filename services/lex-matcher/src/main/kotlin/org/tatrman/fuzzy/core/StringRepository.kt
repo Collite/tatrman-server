@@ -8,6 +8,7 @@ import org.tatrman.fuzzy.loader.SnapshotVocabularySource
 import org.tatrman.fuzzy.telemetry.FuzzyTelemetry
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
+import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -34,6 +35,13 @@ class StringRepository(
     // RG-P2.S2: declared vocabulary (lexicon terms + valueLabels) — VOCABULARY
     // categories merged alongside the member data. Null = member data only.
     private val snapshotSource: SnapshotVocabularySource? = null,
+    /**
+     * RV-P1.4 T6 — the estate overlay (RV-P6). [NoopOverlayStore] until that store exists, which is
+     * what every deployment runs today: no version in the tuple, nothing consulted, results
+     * untouched. Injected here rather than into [FuzzyMatcher] so the third layer has ONE home —
+     * the repository owns the other two, and the matcher reaches it through `overlay()`.
+     */
+    private val overlayStore: OverlayStore = NoopOverlayStore,
 ) : MatchRepository {
     private val logger = LoggerFactory.getLogger(StringRepository::class.java)
 
@@ -43,6 +51,14 @@ class StringRepository(
 
         /** FZ-P2 — vocabulary counterpart of [EMPTY_TOKEN_INDEX] for the explicit-unknown case. */
         val EMPTY_VOCABULARY = TokenVocabulary(emptyList())
+
+        // RV-39 — 64-bit FNV-1a, used only to fold a row into a sortable primitive; the version
+        // string's collision resistance comes from the SHA-256 over the sorted run, not from this.
+        const val FNV_OFFSET_BASIS: Long = -3750763034362895579L // 0xcbf29ce484222325
+        const val FNV_PRIME: Long = 1099511628211L
+
+        /** Bytes of the digest kept in a category version — 16 hex chars, ample to compare on. */
+        const val VERSION_BYTES: Int = 8
     }
 
     private val cache = ConcurrentHashMap<String, List<Candidate>>()
@@ -85,6 +101,17 @@ class StringRepository(
 
     @Volatile
     private var declaredHash: String = ""
+
+    // RV-39 — content-derived version per MEMBER category, computed at refresh. Deliberately
+    // excludes the declared layer: the tuple names the layers separately, and folding them would
+    // make "the artifact changed" indistinguishable from "a data column changed".
+    @Volatile
+    private var memberVersions: Map<String, String> = emptyMap()
+
+    // RV-P1.4 T5 — an immutable snapshot of the cache's keys, republished after each refresh so
+    // `knownCategories()` never observes the clear/putAll window. See its KDoc.
+    @Volatile
+    private var categoryKeys: Set<String> = emptySet()
 
     init {
         startRefreshLoop()
@@ -138,6 +165,10 @@ class StringRepository(
 
         cache.clear()
         cache.putAll(nextCache)
+        // Published only once the cache is whole — a reader mid-refresh keeps the previous keys
+        // rather than seeing a half-filled map (see [knownCategories]).
+        categoryKeys = java.util.Collections.unmodifiableSet(LinkedHashSet(nextCache.keys))
+        memberVersions = memberCache.mapValues { (_, candidates) -> categoryVersion(candidates) }
         loadedAtMs = System.currentTimeMillis()
         version = computeVersion(nextCache, declaredHash, loadedAtMs)
         isCatalogReady.set(true)
@@ -156,6 +187,89 @@ class StringRepository(
 
     /** The vocabulary version (S-1): content signature + load stamp. */
     override fun vocabularyVersion(): String = version
+
+    /**
+     * RV-39 — the layer-version tuple (S-1).
+     *
+     * Every component is content-derived, which is the point: the older [vocabularyVersion] string
+     * bakes in [loadedAtMs] and therefore changes on every refresh whether or not any vocabulary
+     * did, so it cannot answer the one question a version tuple is asked.
+     *
+     * `overlayVersion` is null, not `""` — no overlay store exists before RV-P6, and "absent" and
+     * "present at an empty version" are different facts.
+     */
+    override fun layerVersions(): LayerVersions =
+        LayerVersions(
+            lexiconArtifactHash = snapshotSource?.artifactHash() ?: "",
+            memberIndexVersions = memberVersions,
+            // T6 — sourced from the overlay slot at last. Still null in every deployment, because
+            // the slot holds NoopOverlayStore until RV-P6; the difference is that it is now null
+            // because the store says so, not because the field was hardcoded.
+            overlayVersion = overlayStore.version(),
+        )
+
+    /**
+     * A category's content signature: its candidates by id+value, order-independent. Same content
+     * ⇒ same version across refreshes; one added row changes it.
+     *
+     * Streamed, never materialised. The first cut of this concatenated every `id`+`value` into ONE
+     * string and took its `hashCode` — for a member category of a million rows that is a ~100 MB
+     * transient String built on every refresh, per category. Here each row is folded to a 64-bit
+     * signature, the signatures are sorted as primitives (which is what makes the result
+     * order-independent), and SHA-256 covers the sorted run. Peak cost is a `LongArray`, and the
+     * digest matches the sha256 every other identity in this service is expressed in — a 32-bit
+     * `String.hashCode` is a weak answer to "did this layer change?".
+     */
+    private fun categoryVersion(candidates: List<Candidate>): String {
+        val signatures = LongArray(candidates.size) { rowSignature(candidates[it]) }
+        signatures.sort()
+
+        val digest = MessageDigest.getInstance("SHA-256")
+        val row = ByteArray(Long.SIZE_BYTES)
+        signatures.forEach { signature ->
+            for (i in row.indices) row[i] = (signature ushr (8 * i)).toByte()
+            digest.update(row)
+        }
+        return digest.digest().take(VERSION_BYTES).joinToString("") { "%02x".format(it) }
+    }
+
+    /** FNV-1a over `id` + a separator + `value`, without building the concatenation. */
+    private fun rowSignature(candidate: Candidate): Long {
+        var hash = FNV_OFFSET_BASIS
+
+        fun mix(code: Int) {
+            hash = hash xor code.toLong()
+            hash *= FNV_PRIME
+        }
+
+        candidate.id.forEach { mix(it.code) }
+        mix(0)
+        candidate.value.forEach { mix(it.code) }
+        return hash
+    }
+
+    /**
+     * RV-P1.4 T5 — the loaded category keys, already lower-cased (the cache is keyed that way).
+     * Lets a lookup name the categories a caller asked for that do not exist, instead of returning
+     * an empty list that could equally mean "no match".
+     *
+     * An immutable snapshot published after each refresh, **not** `cache.keys`. That is a live view
+     * of a map the refresh does `clear()` then `putAll()` on, so a lookup landing in that window saw
+     * a partial key set and reported perfectly good categories as unknown — turning a transient into
+     * what reads like a stale-ref diagnosis. A caller in that window now gets the previous refresh's
+     * keys: stale by at most one interval, never wrong about what the estate declares.
+     */
+    override fun knownCategories(): Set<String> = categoryKeys
+
+    override fun overlay(): OverlayStore = overlayStore
+
+    /**
+     * RV-P1.4 T4 — whether a declared layer is loaded, read from the second clock's cache.
+     *
+     * O(1), and false for every estate that has not authored a lexicon — which is what keeps the
+     * gate's scoring headroom off the member-only path entirely.
+     */
+    override fun servesDeclaredLayer(): Boolean = declaredCache.isNotEmpty()
 
     /** Per-category discovery + staleness for `GetStatus` (contracts §2). */
     fun categoryStatuses(): List<CategoryStatusInfo> =
@@ -219,6 +333,8 @@ class StringRepository(
                 lemmaTokens = lemmaTokens,
                 source = c.source,
                 targetRef = c.targetRef,
+                matchMethod = c.matchMethod,
+                targetClass = c.targetClass,
             )
         }
     }

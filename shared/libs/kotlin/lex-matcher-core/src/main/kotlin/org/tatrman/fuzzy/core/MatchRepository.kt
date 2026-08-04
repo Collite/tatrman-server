@@ -19,4 +19,45 @@ interface MatchRepository {
     fun getVocabulary(category: String? = null): TokenVocabulary
 
     fun vocabularyVersion(): String
+
+    /**
+     * RV-39 — the layer-version tuple (S-1). Defaulted so the many existing fakes in the suites
+     * keep compiling: a repository that knows about no layers reports none, which is the honest
+     * answer for a member-only store.
+     */
+    fun layerVersions(): LayerVersions = LayerVersions()
+
+    /**
+     * RV-P1.4 T5 — every category key this store can answer for (lower-cased), or **null when the
+     * store does not report them**.
+     *
+     * Null rather than an empty set on purpose: "I don't publish my categories" and "I have none"
+     * are different facts, and a lookup that conflated them would report every requested category
+     * as unknown. The many existing fakes take the default and simply say nothing.
+     */
+    fun knownCategories(): Set<String>? = null
+
+    /**
+     * RV-P1.4 T6 — the estate overlay (RV-P6), empty by default.
+     *
+     * Hung off the repository because the repository is the **layer owner**: it already owns the
+     * member index and the declared source, and hanging the third layer somewhere else would give
+     * the same tuple two homes. [FuzzyMatcher] consults it; the repository reports its version.
+     */
+    fun overlay(): OverlayStore = NoopOverlayStore
+
+    /**
+     * RV-P1.4 T4 — true when this store serves a declared layer, i.e. when some candidate can carry
+     * an authored method or a target class.
+     *
+     * [FuzzyMatcher] scores wider than the caller's limit when this is true, so the authored-method
+     * gate and T5's class filter have rows to reject without emptying the answer. That widening is
+     * **not** free of consequence — `TokenBasedMatcher` sizes its defensive non-seed sample by the
+     * limit it is given, so a wider limit changes which candidates get fuzzy-scored. Gating it here
+     * is what keeps T7's promise exact: with no artifact loaded, the member path is byte-identical
+     * to the pre-RV engine, goldens and all.
+     *
+     * Defaults to false — the honest answer for a member-only store, and for the many fakes.
+     */
+    fun servesDeclaredLayer(): Boolean = false
 }

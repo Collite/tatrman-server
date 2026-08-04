@@ -3,6 +3,7 @@ package org.tatrman.fuzzy.config
 
 import com.typesafe.config.ConfigFactory
 import io.ktor.server.config.*
+import org.tatrman.fuzzy.core.MethodDispatcher
 
 data class AppConfig(
     val serverPort: Int,
@@ -13,6 +14,7 @@ data class AppConfig(
     val nlp: NlpConfig = NlpConfig(),
     val loaderSource: LoaderSourceConfig = LoaderSourceConfig(),
     val metadata: MetadataConfig = MetadataConfig(),
+    val lexicon: LexiconConfig = LexiconConfig(),
     /**
      * Warehouse connection for the `metadata` loader source. Null for the
      * default `static` (in-repo JSON catalog) source, which needs no DB.
@@ -51,6 +53,24 @@ data class MssqlConfig(
 
 data class LoaderSourceConfig(
     val source: String = "static",
+)
+
+/**
+ * RV-P1.4 — the compiled-lexicon layer (RV-39). Absent path = no declared layer, which is the
+ * pre-RV service: member vocabulary only. Optional on purpose, so an estate that has not authored
+ * a lexicon yet is a supported deployment rather than a broken one.
+ *
+ * A local path, not a URL: the estate build writes the archive and the deployment mounts it.
+ * Pulling it over the snapshot channel from veles is the RO-13 step and is deliberately not this.
+ */
+data class LexiconConfig(
+    val archivePath: String = "",
+    /**
+     * RV-32 (T4) — the uniqueness floor a TOKENS match must clear to be auto-bindable. Lives here
+     * rather than under `token-based` because it is an authoring rule, not an engine tuning knob:
+     * `token-based` shapes how things score, this decides what a score is allowed to mean.
+     */
+    val uniquenessMarginFloor: Double = MethodDispatcher.DEFAULT_UNIQUENESS_FLOOR,
 )
 
 data class MetadataConfig(
@@ -108,6 +128,7 @@ object ConfigLoader {
             nlp = loadNlpConfig(fuzzyConfig),
             loaderSource = loadLoaderSourceConfig(fuzzyConfig),
             metadata = loadMetadataConfig(fuzzyConfig),
+            lexicon = loadLexiconConfig(fuzzyConfig),
             database = loadDatabaseConfig(fuzzyConfig),
         )
     }
@@ -192,6 +213,25 @@ object ConfigLoader {
             )
         } catch (e: com.typesafe.config.ConfigException) {
             LoaderSourceConfig()
+        }
+
+    /** RV-P1.4 — absent block or absent path both mean "no declared layer", not a failure. */
+    private fun loadLexiconConfig(fuzzyConfig: com.typesafe.config.Config): LexiconConfig =
+        try {
+            val lexicon = fuzzyConfig.getConfig("lexicon")
+            val defaults = LexiconConfig()
+            LexiconConfig(
+                archivePath =
+                    if (lexicon.hasPath("archive-path")) lexicon.getString("archive-path") else defaults.archivePath,
+                uniquenessMarginFloor =
+                    if (lexicon.hasPath("uniqueness-margin-floor")) {
+                        lexicon.getDouble("uniqueness-margin-floor")
+                    } else {
+                        defaults.uniquenessMarginFloor
+                    },
+            )
+        } catch (e: com.typesafe.config.ConfigException) {
+            LexiconConfig()
         }
 
     private fun loadMetadataConfig(fuzzyConfig: com.typesafe.config.Config): MetadataConfig =

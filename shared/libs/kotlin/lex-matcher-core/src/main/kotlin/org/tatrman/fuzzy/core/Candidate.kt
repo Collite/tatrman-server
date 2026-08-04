@@ -20,6 +20,16 @@ data class Candidate(
     // (default) → `id` is a data PK; VOCABULARY → `targetRef` is the lexicon target.
     val source: SourceTag = SourceTag.MEMBER,
     val targetRef: String? = null,
+    /**
+     * RV-32 — the authored match method (`EXACT` · `TOKENS` · `TYPOS(n)`) from the compiled
+     * lexicon. Null for member candidates: nobody authored a method for a data value.
+     */
+    val matchMethod: String? = null,
+    /**
+     * RV-38 — the target's class, for T5's target-class-scoped lookup. Null for member values and
+     * for any source that does not carry one.
+     */
+    val targetClass: TargetClass? = null,
 ) {
     /** Surface tokens ∪ lemma tokens — used to seed the candidate set for a query. */
     val allTokenSet: Set<String> get() = tokenSet + lemmaTokenSet
@@ -30,6 +40,27 @@ data class Candidate(
      * class's generated equals/hashCode/copy/componentN, so equality is unchanged.
      */
     val foldedValue: String = TextNormalizer.fold(value)
+
+    /**
+     * RV-P1.4 T4 — [matchMethod] parsed **once at load**, not once per candidate per request.
+     *
+     * [MethodDispatcher] runs on every query that surfaces this candidate, and used to re-parse the
+     * string each time (twice, on the paths that also re-margin). Parsing here moves the regex to
+     * the refresh that built the index. Free for member rows: `parse(null)` is a null check.
+     *
+     * A body `val`, so it stays out of the generated equals/hashCode/copy like [foldedValue].
+     */
+    val authoredMethod: MatchMethod? = MatchMethod.parse(matchMethod)
+
+    /**
+     * RV-P1.4 T4 — the authored form (diacritics intact) that `EXACT`/`TYPOS(n)` dispatch compares
+     * against, precomputed for the same reason as [foldedValue].
+     *
+     * **Null when no method was authored**, which is every member value — deliberately, so the
+     * member path pays no NFC normalisation at load. Nothing reads it for those rows: dispatch
+     * admits an unauthored candidate without ever looking at its canonical form.
+     */
+    val canonicalValue: String? = if (authoredMethod == null) null else TextNormalizer.canonical(value)
 
     companion object {
         val WHITESPACE_REGEX = Regex("\\s+")
@@ -50,11 +81,19 @@ data class Candidate(
             )
         }
 
-        /** A declared-vocabulary candidate (contracts §2): carries the lexicon [targetRef]. */
+        /**
+         * A declared-vocabulary candidate (contracts §2): carries the lexicon [targetRef].
+         *
+         * [source] and [matchMethod] default to the pre-RV behaviour so every existing call site
+         * is unchanged; the compiled-artifact loader (RV-P1.4 T3) passes the artifact's own values.
+         */
         fun vocabulary(
             id: String,
             value: String,
             targetRef: String,
+            source: SourceTag = SourceTag.VOCABULARY,
+            matchMethod: String? = null,
+            targetClass: TargetClass? = null,
         ): Candidate {
             val tokens = tokenize(value)
             val set = tokens.toSet()
@@ -65,8 +104,10 @@ data class Candidate(
                 tokenSet = set,
                 lemmaTokens = tokens,
                 lemmaTokenSet = set,
-                source = SourceTag.VOCABULARY,
+                source = source,
                 targetRef = targetRef,
+                matchMethod = matchMethod,
+                targetClass = targetClass,
             )
         }
 
@@ -79,6 +120,8 @@ data class Candidate(
             lemmaTokens: List<String>,
             source: SourceTag = SourceTag.MEMBER,
             targetRef: String? = null,
+            matchMethod: String? = null,
+            targetClass: TargetClass? = null,
         ): Candidate =
             Candidate(
                 id = id,
@@ -89,6 +132,8 @@ data class Candidate(
                 lemmaTokenSet = lemmaTokens.toSet(),
                 source = source,
                 targetRef = targetRef,
+                matchMethod = matchMethod,
+                targetClass = targetClass,
             )
 
         /** Tokens used for matching: lower-cased, NFD-folded, whitespace-split. */

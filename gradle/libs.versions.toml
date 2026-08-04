@@ -3,8 +3,8 @@
 # https://docs.gradle.org/current/userguide/version_catalogs.html
 
 [versions]
-tatrman-grammar           = "0.11.0"
-tatrman-ttr-metadata      = "0.11.0"
+tatrman-grammar           = "0.11.1"
+tatrman-ttr-metadata      = "0.11.1"
 tatrman-ttr-translator    = "0.10.1"
 tatrman-ttr-plan-proto    = "0.10.1"
 # SV-P1 S4 — Maven Central publishing via the Central Portal.
@@ -286,6 +286,17 @@ tatrman-ttr-writer                  = { module = "org.tatrman:ttr-writer",      
 tatrman-ttr-semantics               = { module = "org.tatrman:ttr-semantics",                               version.ref = "tatrman-grammar" }
 tatrman-ttr-metadata                = { module = "org.tatrman:ttr-metadata",                                version.ref = "tatrman-ttr-metadata" }
 tatrman-ttr-metadata-git            = { module = "org.tatrman:ttr-metadata-git",                            version.ref = "tatrman-ttr-metadata" }
+# RV-P1.4 T3 — the compiled-lexicon archive: `ttr-snapshot` is the container (tar+zstd reader),
+# `ttr-lexicon` is the artifact model + codec. Both ride the `grammar` bundle, which is why the
+# two refs above moved to 0.11.1 together: ttr-lexicon-compile's POM names ttr-metadata 0.11.1,
+# so leaving metadata at 0.11.0 would put two versions of one api closure in the graph.
+# NOTE the server deliberately does NOT take `ttr-lexicon-compile` at runtime — that is what the
+# a3 ruling buys. (ttr-metadata/ttr-parser still arrive transitively: ttr-snapshot `api`s
+# ttr-metadata. Unavoidable, and far cheaper than the compiler.) The compiler is test-scope in
+# lex-matcher only, so the reader is exercised against the real packer, not a copy of it.
+tatrman-ttr-snapshot                = { module = "org.tatrman:ttr-snapshot",                                version.ref = "tatrman-grammar" }
+tatrman-ttr-lexicon                 = { module = "org.tatrman:ttr-lexicon",                                 version.ref = "tatrman-grammar" }
+tatrman-ttr-lexicon-compile         = { module = "org.tatrman:ttr-lexicon-compile",                         version.ref = "tatrman-grammar" }
 # translate.v1 public line (SV-P1 gate 2, kotlin-translator/v0.9.0): the renamed
 # ttr-plan-proto/ttr-translator now resolve from GitHub Packages — the SV-P0
 # 0.0.1-LOCAL/mavenLocal interim is retired. 0.9.0 carries org/tatrman/translate/v1/.

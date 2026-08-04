@@ -218,9 +218,10 @@ eval-grounding:
     cd eval/grounding && .venv/bin/python run_eval.py
 
 # RG-P6.S2.T1 — the GATING service-level conformance tier (the SV-P3 instrument):
-# the three service-level corpora — ENTITIES_ONLY (resolver), Q-17 match-quality
-# (fuzzy), grounding hermetic — run self-contained, no DFP dependency. Green is
-# required; CI gates on it. Provenance + corpus hashes: conformance/README.md.
+# the four service-level corpora — ENTITIES_ONLY (resolver), Q-17 match-quality
+# (fuzzy), hartland_cz declared layer (fuzzy, RV-P1.4 T7), grounding hermetic —
+# run self-contained, no DFP dependency. Green is required; CI gates on it.
+# Provenance + corpus hashes: conformance/README.md.
 conformance-service-level:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -233,6 +234,7 @@ conformance-service-level:
     ./gradlew :services:resolver:test --tests '*CallsSeedConformanceTest*'
     ./gradlew :services:resolver:test --tests '*RefusalOverGuessConformanceTest*'
     ./gradlew :services:lex-matcher:test --tests '*MatchQualityCorpusTest*'
+    ./gradlew :services:lex-matcher:test --tests '*LexiconConformanceTest*'
     just eval-grounding-test
 
 # Pin the three-tier corpora by content hash (RG-P6 review I): the recorded provenance

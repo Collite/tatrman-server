@@ -105,6 +105,55 @@ class BatchMatchTest :
             }
         }
 
+        "RV-32: a span's uniqueness margin is re-asked over the categories it merged" {
+            // RV-P1.4 T5. Per-category dispatch cannot see a rival in a sibling category — and the
+            // compiled lexicon keys one category per target ref, so for a declared term EVERY rival
+            // is in a sibling category. Without the re-margin after the merge, a span that asked
+            // about two rival measures would report each as uniquely bindable.
+            val rivals =
+                object : LoaderSource {
+                    override suspend fun loadNextCache(): Map<String, List<Candidate>> =
+                        mapOf(
+                            "md.net" to
+                                listOf(
+                                    Candidate.vocabulary(
+                                        "t1",
+                                        "čistý obrat",
+                                        "md.net",
+                                        SourceTag.DECLARED,
+                                        "TOKENS",
+                                    ),
+                                ),
+                            "md.gross" to
+                                listOf(
+                                    Candidate.vocabulary(
+                                        "t2",
+                                        "hrubý obrat",
+                                        "md.gross",
+                                        SourceTag.DECLARED,
+                                        "TOKENS",
+                                    ),
+                                ),
+                        )
+                }
+            val repo = StringRepository(cfg, rivals, telemetry = null)
+            try {
+                runBlocking {
+                    repo.forceRefresh()
+                    val out =
+                        FuzzyMatcher(repo).batchMatch(
+                            listOf(SpanQuery("obrat", listOf("md.net", "md.gross"), 5)),
+                        )
+
+                    val matches = out.results[0].matches
+                    matches.size shouldBe 2
+                    matches.forEach { it.autoBindable shouldBe false }
+                }
+            } finally {
+                repo.close()
+            }
+        }
+
         "a span can match across multiple categories in one slot" {
             withMatcher { m, _ ->
                 val out =

@@ -21,9 +21,11 @@ import org.tatrman.fuzzy.config.ConfigLoader
 import org.tatrman.fuzzy.core.Candidate
 import org.tatrman.fuzzy.core.FuzzyMatcher
 import org.tatrman.fuzzy.core.Lemmatizer
+import org.tatrman.fuzzy.core.MethodDispatcher
 import org.tatrman.fuzzy.core.NoopLemmatizer
 import org.tatrman.fuzzy.core.StringRepository
 import org.tatrman.fuzzy.db.DatabaseFactory
+import org.tatrman.fuzzy.loader.LexiconArchiveSource
 import org.tatrman.fuzzy.loader.FuzzyCatalog
 import org.tatrman.fuzzy.loader.LoaderSource
 import org.tatrman.fuzzy.loader.MetadataLoaderSource
@@ -151,13 +153,26 @@ fun Application.module(serverConfig: KtorServerConfig) {
             StaticLoaderSource(catalog)
         }
 
-    val repository = StringRepository(config, loaderSource, telemetry, lemmatizer)
+    // RV-P1.4 T3 — the declared layer, when an archive is configured. Null otherwise, which is
+    // exactly the pre-RV wiring: StringRepository treats a null source as "member data only".
+    val lexiconSource =
+        config.lexicon.archivePath
+            .takeIf { it.isNotBlank() }
+            ?.let { path ->
+                log.info("Compiled lexicon layer enabled: {}", path)
+                LexiconArchiveSource(
+                    java.nio.file.Path
+                        .of(path),
+                )
+            }
+    val repository = StringRepository(config, loaderSource, telemetry, lemmatizer, lexiconSource)
     val fuzzyMatcher =
         FuzzyMatcher(
             repository,
             lemmatizer,
             idfEnabled = config.tokenBasedConfig.idfEnabled,
             retrievalMode = config.tokenBasedConfig.retrieval,
+            methodDispatcher = MethodDispatcher(config.lexicon.uniquenessMarginFloor),
         )
     log.info("Fuzzy retrieval mode: ${config.tokenBasedConfig.retrieval}")
     val grpcService = GrpcService(fuzzyMatcher, repository, telemetry)

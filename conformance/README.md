@@ -6,13 +6,13 @@ demonstrated" gate; the other two tiers seed the fuller E2E coverage that SV-P4 
 
 | Tier | Runnable | Gating? | What it asserts |
 |---|---|---|---|
-| **Service-level** | `just conformance-service-level` | **YES** (CI) | The three service-level corpora pass, hermetic + self-contained + **no DFP dependency**. |
+| **Service-level** | `just conformance-service-level` | **YES** (CI) | The four service-level corpora pass, hermetic + self-contained + **no DFP dependency**. |
 | **E2E core** (`calls:`) | `services/resolver/.../conformance/calls/` seeds (`CallsSeedConformanceTest`, `RefusalOverGuessConformanceTest`, gated) | drivable seeds run vs the REAL pipeline; full at SV-P4 | Multi-turn door conversations. The refusal-over-guess + clarification-round-trip seeds drive the actual `ResolverPipeline` (SpanProposal → GateSpans → HMAC codec) via hermetic nlp/fuzzy fakes; `seed_only` fixtures (hero, geo-dark) are shape-validated pending the live SV-P4 stack. |
 | **Extended** (pilot) | `just eval-grounding` (live) | **NO** (scored-not-gating) | Live grounding eval over the pilot corpus (arrives via RO-19 ask ③). Reports pass-rate; never fails CI. |
 
 ## The gating service-level tier — `just conformance-service-level`
 
-Runs three **hermetic** service-level corpora (zero live services, zero DFP):
+Runs four **hermetic** service-level corpora (zero live services, zero DFP):
 
 1. **ENTITIES_ONLY** (resolver) — `Q20ParityTest` over
    `services/resolver/src/test/resources/q20/ucetnictvi_entities_only.jsonl` (12 cases).
@@ -22,7 +22,21 @@ Runs three **hermetic** service-level corpora (zero live services, zero DFP):
 2. **Q-17 match-quality** (fuzzy) — `MatchQualityCorpusTest` over
    `services/lex-matcher/src/test/resources/match-quality-corpus.jsonl` (40 cases: diacritics /
    inflection / multi-word-order / typos), lemma axis ON, asserting the expected top id per case.
-3. **Grounding hermetic** — `eval/grounding/tests/` (`test_corpus_valid.py` + `test_report.py`,
+3. **hartland_cz declared layer** (fuzzy — RV-P1.4 T7) — `LexiconConformanceTest` over
+   `services/lex-matcher/src/test/resources/conformance/hartland-cz/` (16 cases + 4 per-run
+   assertions). The fixture is the **authored source**, not an artifact: `aliases.lex.yaml` +
+   `skills/trend.md` are compiled and packed by the real RV-P1.2 toolchain
+   (`LexiconValidator` → `LexiconCompiler` → `LexiconPacker`) and read back through
+   `LexiconArchiveSource`, so a red case means the *chain* broke rather than that a fixture
+   drifted. Classes: `declared` · `operator` (an `op:` trigger from skill **frontmatter**; the body
+   must never become a candidate, RV-35) · `method` (EXACT/TYPOS(n) admission, RV-32) ·
+   `tokens-margin` (an ambiguous term is returned but never auto-bindable) · `member`.
+   Also asserts the **RV-39 layer tuple** (artifact hash, per-category member versions, overlay
+   absent) and that **with no archive present the member path is byte-identical** — the
+   no-behaviour-change-without-the-artifact promise.
+   Provenance: hand-authored 2026-08-03 against the hartland BM-arc Czech world and hartland's real
+   `md`/`er` refs.
+4. **Grounding hermetic** — `eval/grounding/tests/` (`test_corpus_valid.py` + `test_report.py`,
    18 checks): corpus-validity of the 109-case bulk + 21-case e2e corpora, and the pure `report.py`
    scoring logic. The **live** run (`run_eval.py` → grounding-mcp + Golem) is the extended tier, NOT here.
 
@@ -35,7 +49,14 @@ ucetnictvi_entities_only.jsonl  d0e8b17fa6e989ff9e17bd4a035825946e2b551802d1edd3
 match-quality-corpus.jsonl      4f4daa416dff6c40227887ff9573903ca489ee8c5fb0e0a5387a52134f1310e2
 grounding-cases.json            a54491aa20ee4eac37b68c9b12a74658ed9b88e03051533289ce506e63590100
 e2e-cases.json                  0034ed387f31c1dca8ba1a56b22b72f968193ee5f1aacb0f20aa7336facf77f7
+hartland-cz/aliases.lex.yaml    68a368558013f6fb22fa4d7ab30038d81aaa450e145a254416c27c3bda406df2
+hartland-cz/skills/trend.md     3db553d63ab7dcbecd021326dbb13f9cab72b71ee9d7d571c663f65349208bc2
+hartland-cz/cases.jsonl         ae5643b88678deb282c15b5b1f7412c845b260e3f8189a73290cdc4a076dd232
 ```
+
+The hartland_cz leg pins **three** files, not one: the corpus is authored source compiled at test
+time, so the lexicon and the skill are as much fixture as the cases are. A silent edit to either
+would change what is served without changing a single expectation.
 
 ### Why hermetic (no DFP)
 The gate must be green in CI without a deployed stack or any DFP client — that is the SV-P3 promise.

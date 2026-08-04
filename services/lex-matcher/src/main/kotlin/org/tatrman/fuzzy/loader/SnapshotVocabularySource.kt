@@ -2,11 +2,25 @@
 package org.tatrman.fuzzy.loader
 
 import org.tatrman.fuzzy.core.Candidate
+import org.tatrman.fuzzy.core.SourceTag
+import org.tatrman.fuzzy.core.TargetClass
 
-/** One declared value: a lexicon `term`/`example` or a `valueLabels` entry. */
+/**
+ * One declared value: a lexicon `term`/`example` or a `valueLabels` entry.
+ *
+ * [source] and [matchMethod] were added at RV-P1.4: the compiled artifact distinguishes an
+ * authored term (DECLARED) from a harvested model label (METADATA) and carries the authored match
+ * method per row. Both default to the pre-RV behaviour so the fixture stub — which genuinely
+ * cannot tell the two apart — is unchanged.
+ */
 data class DeclaredValue(
     val id: String,
     val value: String,
+    val source: SourceTag = SourceTag.VOCABULARY,
+    /** `EXACT` · `TOKENS` · `TYPOS(n)`, or null when the source has no authored method. */
+    val matchMethod: String? = null,
+    /** RV-38 — what the target IS, for T5's class-scoped lookup. Null when the source has none. */
+    val targetClass: TargetClass? = null,
 )
 
 /**
@@ -37,13 +51,33 @@ interface SnapshotVocabularySource {
     suspend fun fetch(): DeclaredVocabulary
 
     fun hash(): String
+
+    /**
+     * RV-39 — the compiled artifact's own content hash for the layer tuple's
+     * `lexicon_artifact_hash`. Defaults to [hash] because for the artifact reader they ARE the
+     * same value; the fixture stub overrides nothing and reports its stub hash, which is honest —
+     * it says which vocabulary is loaded, and there is no artifact behind it to name.
+     */
+    fun artifactHash(): String = hash()
 }
 
-/** Converts declared vocabulary into VOCABULARY-tagged categories keyed by target kind. */
+/**
+ * Converts declared vocabulary into candidates keyed by target kind, preserving each value's own
+ * source tag and authored method (RV-P1.4). Categories are lowercased to match the query side.
+ */
 object DeclaredVocabularyLoader {
     fun toCategories(vocab: DeclaredVocabulary): Map<String, List<Candidate>> =
         vocab.entries.associate { entry ->
             entry.category.lowercase() to
-                entry.values.map { Candidate.vocabulary(it.id, it.value, entry.targetRef) }
+                entry.values.map {
+                    Candidate.vocabulary(
+                        it.id,
+                        it.value,
+                        entry.targetRef,
+                        it.source,
+                        it.matchMethod,
+                        it.targetClass,
+                    )
+                }
         }
 }

@@ -14,6 +14,11 @@ service FuzzyService {
   rpc BatchMatch (BatchMatchRequest) returns (BatchMatchResponse) {}
   // Category discovery + staleness (contracts §2).
   rpc GetStatus (FuzzyStatusRequest) returns (FuzzyStatusResponse) {}
+  // RV-P1.4 T5 (additive, J-v2): ONE term, deliberately scoped — the resolver's lookup rung
+  // (RV-33: deterministic, anchored, category-scoped, always eligible first) and the contract
+  // P2.3's lookup rounds are written against. Distinct from BatchMatch, which is N spans of a
+  // parsed question; this is a single term the caller already knows it is asking about.
+  rpc Lookup (LookupRequest) returns (LookupResponse) {}
 }
 
 message BatchMatchRequest {
@@ -38,6 +43,7 @@ message FuzzyStatusResponse {
   string vocabulary_version = 2;      // snapshot hash + load stamp (S-1)
   repeated CategoryStatus categories = 3;
   repeated LoaderWarning warnings = 4; // B-T4: PK-skipped declared columns (RG-FUZ-001)
+  LayerVersions layer_versions = 5;    // RV-39 (RV-P1.4)
 }
 
 message CategoryStatus {
@@ -80,12 +86,29 @@ message FuzzyMatchResponse {
   // RG-P2 additive (S-1): snapshot hash + per-category load timestamp of the
   // vocabulary that produced these results. Populated from RG-P2.S2 (refresh).
   string vocabulary_version = 5;
+  // RV-39 (RV-P1.4): the layer tuple. Additive — `vocabulary_version` above is untouched.
+  LayerVersions layer_versions = 6;
 }
 
 // RG-P2 (contracts §2, RS-15): how a candidate's category was sourced.
+// RV-P1.4: widened to RV contracts §1's four layers (additive, J-v2 — existing values keep
+// their numbers). MEMBER *is* RV's DATA; VOCABULARY is the pre-RV conflation of DECLARED and
+// METADATA, kept for the fixture-stub source that cannot tell them apart.
 enum SourceTag {
-  MEMBER = 0;      // data value — candidate_id is a data PK (→ resolved_id)
-  VOCABULARY = 1;  // declared lexicon/valueLabels — carries target_ref
+  MEMBER = 0;      // data value — candidate_id is a data PK (→ resolved_id). RV: DATA.
+  VOCABULARY = 1;  // legacy: declared lexicon/valueLabels, undifferentiated
+  DECLARED = 2;    // authored in the lexicon/ area or as TTR-M `def term` sugar
+  METADATA = 3;    // harvested from model labels (displayLabel/labelPlural/aliases/valueLabels)
+  LEARNED = 4;     // the RV-P6 estate overlay; nothing produces it yet
+}
+
+// RV-39 — the layer-version tuple, echoed per S-1. Additive alongside the older opaque
+// `vocabulary_version` string, which stays: the two answer different questions, and the old one
+// bakes in the member load stamp so it moves on every refresh whether or not a layer changed.
+message LayerVersions {
+  string lexicon_artifact_hash = 1;               // CompiledLexicon.contentHash; "" when none loaded
+  map<string, string> member_index_versions = 2;  // category → content-derived version
+  optional string overlay_version = 3;            // ABSENT until RV-P6 — absence is the contract
 }
 
 // RG-P2 (S-4): confidence provenance — producer + scoring method + raw score.
@@ -102,6 +125,72 @@ message FuzzyMatch {
   string category = 4;
   // RG-P2 additive (response-side; the pinned MatchRequest is untouched):
   SourceTag source = 5;
-  optional string target_ref = 6;  // set iff source = VOCABULARY (→ lexicon target)
+  optional string target_ref = 6;  // set iff the candidate is vocabulary (→ lexicon target)
   Provenance provenance = 7;       // S-4
+  // RV-32 (RV-P1.4): the AUTHORED match method — EXACT | TOKENS | TYPOS(n). A different axis from
+  // Provenance.method, which is the algorithm that produced the score. Absent for member values:
+  // nobody authored a method for a data value.
+  optional string match_method = 8;
+  // RV-32 (RV-P1.4 T4): TOKENS only — how far this candidate's target beat the best OTHER target
+  // in the declared layer for this query. Negative when a better target exists. ABSENT for every
+  // other method: absence means "no uniqueness decision applies here", which `0` would not.
+  optional double uniqueness_margin = 9;
+  // RV-32: false ⇒ the caller MUST NOT auto-bind this candidate (the margin is under the floor, or
+  // another target won). Absent ⇒ no such decision was made — the pre-RV shape.
+  optional bool auto_bindable = 10;
+  // RV-38: what the target IS. The *kind* derives from this and is never stored. UNSPECIFIED for
+  // member values — a data value points at nothing but itself.
+  TargetClass target_class = 11;
+}
+
+// RV-38 — the target classes a declared term can point at (contracts §1, `Binding.target_class`).
+// Values are prefixed because proto3 enum values are siblings in the ENCLOSING scope, not scoped to
+// their enum: an unprefixed `MEMBER` here would collide with `SourceTag.MEMBER` above. (They are
+// also different axes with the same word — SourceTag.MEMBER is RV's DATA layer, TargetClass MEMBER
+// is a member of a model object.)
+enum TargetClass {
+  TARGET_CLASS_UNSPECIFIED = 0;       // member values and any source that carries no class
+  TARGET_CLASS_MODEL_OBJECT = 1;      // er./db./md. object, at any attribute depth
+  TARGET_CLASS_MEMBER = 2;            // a member of a model object — a value, not a structure
+  TARGET_CLASS_OPERATOR = 3;          // an `op:` skill trigger (RV-35 — bodies never enter the matcher)
+  TARGET_CLASS_GROUNDING_TRIGGER = 4; // a `ground:` slice — chrono | money | geo (RV-42)
+}
+
+// RV-P1.4 T5 — the category-scoped lookup request. FROZEN as the P2.3 lookup-round contract.
+message LookupRequest {
+  string term = 1;
+  // Category keys to search — for the compiled lexicon these are target refs (`md.measure.net`,
+  // `op:trend`). EMPTY = every category: the deliberate cross-category lookup a rung uses before
+  // it knows the target. An explicit-but-unknown category contributes nothing (the per-slot leak
+  // guard) and comes back in `unknown_categories` rather than silently yielding zero hits.
+  repeated string categories = 2;
+  // Restrict to these target classes (RV-38). EMPTY = no class filter. Scoping by class is what
+  // lets a rung ask "which operator is this?" without first enumerating the estate's operators.
+  // Member values carry no class, so a class-scoped lookup excludes them — that is the point.
+  repeated TargetClass target_classes = 3;
+  // Replaces the AUTHORED method for this call (`EXACT` | `TOKENS` | `TYPOS(n)`) — the rung's
+  // strict-first-then-widen pass. Applies ONLY to rows that carry an authored method: it must
+  // never impose one on rows nobody authored, or a caller widening its declared layer would
+  // narrow the estate's data layer.
+  optional string method_override = 4;
+  // <= 0 ⇒ 10, and CAPPED AT 200 — the rung's question is bounded by construction, and an uncapped
+  // int32 would let one request ask for the whole estate scored and serialised. A caller that needs
+  // a wider answer narrows its `categories` instead; that is the scoping this surface is for.
+  int32 max_candidates = 5;
+}
+
+// Failure is signalled by gRPC STATUS, not by an in-band flag: INVALID_ARGUMENT for a malformed
+// request (e.g. an unparseable `method_override`), INTERNAL for a fault on the server. This is
+// deliberately unlike FuzzyMatchResponse's legacy `is_error` — a status tells a caller whether
+// retrying can help, which a bool and a string cannot.
+message LookupResponse {
+  repeated FuzzyMatch candidates = 1;
+  LayerVersions layer_versions = 2;             // RV-39, per S-1
+  string vocabulary_version = 3;                // the older opaque string, unchanged
+  // Echoed back so a response is self-describing: the candidates carry their AUTHORED method, and
+  // without this a reader cannot tell which method actually decided admission.
+  optional string applied_method_override = 4;
+  // Requested categories absent from the loaded vocabulary. Naming them turns "no candidates" into
+  // a diagnosable answer — a stale ref and a genuine miss are indistinguishable otherwise.
+  repeated string unknown_categories = 5;
 }

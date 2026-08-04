@@ -34,6 +34,55 @@ data class BatchMatchResult(
     val vocabularyVersion: String,
 )
 
+/**
+ * RV-P1.4 T5 — a category-scoped lookup: the request shape the resolver's **lookup rung** calls
+ * (RV-33 — "deterministic, anchored, category-scoped; always eligible first"), and the contract
+ * P2.3's lookup rounds are written against.
+ *
+ * Distinct from [SpanQuery], which is a *span* of a parsed question inside a batch. This is one
+ * term, deliberately scoped, asked on its own — the rung already knows what it is looking for and
+ * wants a bounded deterministic answer, not a cascade over the estate.
+ */
+data class LookupQuery(
+    val term: String,
+    /**
+     * Category keys to search — the same keys [MatchRepository.getCandidates] uses, which for the
+     * compiled lexicon means target refs (`md.measure.net`, `op:trend`). **Empty = every category**:
+     * a deliberate cross-category lookup, the shape a rung uses when it does not yet know the
+     * target. An explicit-but-unknown category contributes nothing (the per-slot leak guard) and is
+     * reported back in [LookupResult.unknownCategories] rather than silently yielding zero hits.
+     */
+    val categories: List<String> = emptyList(),
+    /**
+     * Restrict to these target classes (RV-38). Empty = no class filter. Scoping by class rather
+     * than by ref is what lets a rung ask "which operator is this?" without first enumerating the
+     * estate's operators.
+     */
+    val targetClasses: Set<TargetClass> = emptySet(),
+    /**
+     * Replaces the **authored** method for this call — the rung's strict-first, then widen pass.
+     * Applies only to rows that carry an authored method; see [MethodDispatcher.dispatch].
+     */
+    val methodOverride: MatchMethod? = null,
+    /**
+     * `<= 0` ⇒ [FuzzyMatcher.DEFAULT_LOOKUP_CANDIDATES]; anything above
+     * [FuzzyMatcher.MAX_LOOKUP_CANDIDATES] is clamped to it. The rung's question is bounded by
+     * construction, and an uncapped `int32` on the wire is an invitation to ask for the estate.
+     */
+    val maxCandidates: Int = FuzzyMatcher.DEFAULT_LOOKUP_CANDIDATES,
+)
+
+/** One lookup's answer: the surviving candidates plus what was actually searched. */
+data class LookupResult(
+    val candidates: List<FuzzyMatchResult>,
+    /**
+     * Requested categories that do not exist in the loaded vocabulary. The leak guard already
+     * returns nothing for these; naming them turns "no candidates" into a diagnosable answer
+     * instead of an ambiguous one — a stale ref and a genuine miss look identical otherwise.
+     */
+    val unknownCategories: List<String> = emptyList(),
+)
+
 /** Outcome of a cascade run: the matches returned and which algorithm produced them (null if no steps). */
 data class CascadeOutcome(
     val matches: List<FuzzyMatchResult>,
@@ -64,13 +113,19 @@ class FuzzyMatcher(
     // seam FZO plugs OpenSearch into; the in-memory default resolves against the interned vocabulary.
     private val retrievalMode: RetrievalMode = RetrievalMode.LEGACY,
     private val retriever: CandidateRetriever = IndexFirstRetriever(repository::getVocabulary),
+    // RV-P1.4 T4 — honours the authored match method (RV-32) on whatever the cascade produced.
+    // A no-op for candidates with no authored method, so the pre-RV service is unaffected.
+    private val methodDispatcher: MethodDispatcher = MethodDispatcher(),
 ) {
     suspend fun match(
         query: String,
         category: String?,
         algorithmType: AlgorithmType?,
         limit: Int,
-    ): List<FuzzyMatchResult> = runSingle(query, category, algorithmType ?: AlgorithmType.TATRMAN, limit)
+    ): List<FuzzyMatchResult> {
+        val scored = runSingle(query, category, algorithmType ?: AlgorithmType.TATRMAN, limit)
+        return consultOverlay(query, listOfNotNull(category), scored).take(limit)
+    }
 
     /**
      * Runs an algorithm cascade. The steps are tried in order; the first whose
@@ -97,7 +152,12 @@ class FuzzyMatcher(
         var lastResults: List<FuzzyMatchResult> = emptyList()
         var lastAlgorithm: AlgorithmType? = null
         for (step in steps) {
-            val results = runSingle(query, category, step.algorithm, limit)
+            // The overlay is consulted per step, before the gate: a learned alias is evidence like
+            // any other, and a step it satisfies should win rather than fall through to a looser
+            // algorithm. Cascades return on the first qualifying step, so this is 1-2 consults.
+            val results =
+                consultOverlay(query, listOfNotNull(category), runSingle(query, category, step.algorithm, limit))
+                    .take(limit)
             lastResults = results
             lastAlgorithm = step.algorithm
             val topScore = results.firstOrNull()?.score ?: Double.NEGATIVE_INFINITY
@@ -134,39 +194,195 @@ class FuzzyMatcher(
         return BatchMatchResult(results, version)
     }
 
+    /**
+     * RV-P1.4 T5 — one term, deliberately scoped: the resolver's lookup rung (RV-33).
+     *
+     * Deterministic by construction — a single TATRMAN pass, no cascade. The rung's contract is
+     * "anchored and category-scoped, always eligible first", so trying progressively looser
+     * algorithms would be answering a question it did not ask; widening is the caller's job, via
+     * [LookupQuery.methodOverride] and a second round it chose to run.
+     *
+     * The stage order is load-bearing, and each step is where it is for a reason:
+     * score+dispatch per category → merge → **re-margin over the union** → **consult the overlay**
+     * → filter by class → take the limit. Re-margining after the overlay would overwrite a NEGATIVE
+     * entry's `autoBindable=false`; taking the limit before either would manufacture uniqueness by
+     * truncation.
+     */
+    suspend fun lookup(query: LookupQuery): LookupResult {
+        val limit =
+            if (query.maxCandidates > 0) {
+                query.maxCandidates.coerceAtMost(MAX_LOOKUP_CANDIDATES)
+            } else {
+                DEFAULT_LOOKUP_CANDIDATES
+            }
+        val unknown =
+            repository.knownCategories()?.let { known ->
+                query.categories.filter { it.lowercase() !in known }
+            } ?: emptyList()
+
+        // Empty ⇒ the deliberate cross-category lookup. An explicit-but-unknown category is left in
+        // the list: it contributes nothing (the leak guard) and is reported separately.
+        val targets: List<String?> = query.categories.ifEmpty { listOf(null) }
+        val scored =
+            targets.flatMap { category ->
+                runSingle(query.term, category, AlgorithmType.TATRMAN, limit, query.methodOverride)
+            }
+
+        val merged =
+            scored
+                .sortedByDescending { it.score }
+                .distinctBy { it.candidateId to it.category }
+        // Re-asked over the union: per-category margins cannot see a rival in a sibling category,
+        // and the compiled artifact keys one category per target ref, so for a declared term EVERY
+        // rival is in a sibling category.
+        val remargined = methodDispatcher.recomputeMargins(merged, query.methodOverride)
+        // ONE consult over the whole answer, not one per category — a NEGATIVE entry is a statement
+        // about a candidate, and a store that saw only one category's slice could not make it.
+        val withOverlay = consultOverlay(query.term, query.categories, remargined)
+
+        val filtered =
+            if (query.targetClasses.isEmpty()) {
+                withOverlay
+            } else {
+                // Member values carry no target class, so a class-scoped lookup excludes them —
+                // which is the point: "which operator is this?" must not be answered with a row of
+                // data that happens to read alike. Overlay additions are held to the same bar, so a
+                // store that wants its learned aliases to survive this must state their class.
+                withOverlay.filter { it.targetClass in query.targetClasses }
+            }
+
+        return LookupResult(candidates = filtered.take(limit), unknownCategories = unknown)
+    }
+
     private suspend fun matchSpan(span: SpanQuery): BatchSpanResult {
-        val limit = if (span.limit > 0) span.limit else 10
-        val steps = cascadeFrom(emptyList(), AlgorithmType.TATRMAN.name)
+        val limit = if (span.limit > 0) span.limit else DEFAULT_LOOKUP_CANDIDATES
 
         // Empty categories ⇒ deliberate global (cross-category) lookup; otherwise
         // match per explicit category (unknown ones contribute nothing — leak guard).
+        //
+        // One TATRMAN pass per category, which is what `cascadeFrom(emptyList(), TATRMAN)` always
+        // produced here — a single step with no min-score. Calling [runSingle] directly is the same
+        // matching, and it is what lets the overlay be consulted ONCE below over the merged answer
+        // rather than once per category inside each cascade.
         val targets: List<String?> = span.categories.ifEmpty { listOf(null) }
-        val perCategory = targets.map { cat -> matchCascade(span.query, cat, steps, limit) }
+        val perCategory = targets.map { cat -> runSingle(span.query, cat, AlgorithmType.TATRMAN, limit) }
 
-        val matchedAlgorithm = perCategory.firstOrNull { it.matches.isNotEmpty() }?.matchedAlgorithm
+        val matchedAlgorithm = if (perCategory.any { it.isNotEmpty() }) AlgorithmType.TATRMAN else null
         val merged =
             perCategory
-                .flatMap { it.matches }
+                .flatten()
                 .sortedByDescending { it.score }
                 .distinctBy { it.candidateId to it.category }
-                .take(limit)
-        return BatchSpanResult(merged, matchedAlgorithm)
+        // Same stage order as [lookup], for the same reasons: re-margin over the union first (a span
+        // asked about several categories), then ONE overlay consult over the whole answer, then the
+        // limit — so neither a rival nor a NEGATIVE verdict can be lost to truncation or overwritten.
+        val remargined = methodDispatcher.recomputeMargins(merged)
+        val withOverlay = consultOverlay(span.query, span.categories, remargined)
+        return BatchSpanResult(withOverlay.take(limit), matchedAlgorithm)
     }
 
+    /**
+     * Scores one category and applies the authored-method gate. **Does not consult the overlay and
+     * does not truncate** — both belong to the caller, which knows whether more narrowing follows.
+     *
+     * @param limit what the caller ultimately wants; scoring uses [scoringLimit] headroom on top.
+     */
     private suspend fun runSingle(
         query: String,
         category: String?,
         algorithmType: AlgorithmType,
         limit: Int,
+        methodOverride: MatchMethod? = null,
     ): List<FuzzyMatchResult> {
         val candidates = repository.getCandidates(category)
-        return if (algorithmType == AlgorithmType.TATRMAN) {
-            matchWithTokenBased(query, category, candidates, limit)
-        } else {
-            withContext(Dispatchers.Default) {
-                matchWithStandardAlgorithm(query, category, algorithmType, candidates, limit)
+        // Headroom, because dispatch and the T5 class filter narrow AFTER scoring. Scoring at
+        // exactly `limit` lets a candidate the author's method rejects consume a slot an admissible
+        // one needed: an EXACT term ranked limit+1 by the deliberately recall-oriented folded index
+        // would be truncated before the gate ever saw it, and the query would answer "nothing"
+        // where the right answer existed. Same shape as the INDEX_FIRST retriever's topN headroom.
+        //
+        // Only when a declared layer is actually loaded, though — see
+        // [MatchRepository.servesDeclaredLayer]. Widening is observable (TokenBasedMatcher sizes its
+        // defensive non-seed sample by the limit), so a member-only estate must not pay it: that is
+        // T7's byte-identical promise, and the parity goldens hold it.
+        val fetchLimit = if (repository.servesDeclaredLayer()) scoringLimit(limit) else limit
+        val scored =
+            if (algorithmType == AlgorithmType.TATRMAN) {
+                matchWithTokenBased(query, category, candidates, fetchLimit)
+            } else {
+                withContext(Dispatchers.Default) {
+                    matchWithStandardAlgorithm(query, category, algorithmType, candidates, fetchLimit)
+                }
             }
-        }
+        // RV-P1.4 T4 — the authored method gates here, at the single point every entry point funnels
+        // through (match / matchCascade / batchMatch / lookup), so no caller can route around it.
+        // Inside the cascade rather than after it on purpose: a candidate the author's method
+        // rejects must not be allowed to satisfy a cascade step's min-score and stop the fallback.
+        return methodDispatcher.dispatch(query, scored, methodOverride)
+    }
+
+    /**
+     * RV-P1.4 T6 — the third layer, consulted after the other two have spoken.
+     *
+     * Additions merge in and are ranked with everything else; suppressed targets are **flagged, not
+     * removed** ([OverlayVerdict.suppressedTargets]). With the default [NoopOverlayStore] the
+     * verdict is empty and the input list is returned as-is, so a deployment with no learning
+     * history is byte-identical to the pre-overlay service.
+     *
+     * **Always the last word on `autoBindable`.** Every caller runs
+     * [MethodDispatcher.recomputeMargins] before this, never after — that function derives the flag
+     * from the margin alone and would overwrite a NEGATIVE entry's `false`.
+     *
+     * **Does not truncate**, deliberately: [lookup] still has its class filter to run afterwards,
+     * and cutting to `limit` here would throw away the very headroom [runSingle] scored to give it.
+     * Every caller applies its own `take(limit)` once nothing further narrows.
+     */
+    private suspend fun consultOverlay(
+        term: String,
+        categories: List<String>,
+        results: List<FuzzyMatchResult>,
+    ): List<FuzzyMatchResult> {
+        val verdict = repository.overlay().consult(OverlayRequest(term, categories, results))
+        if (verdict.isEmpty) return results
+
+        val flagged =
+            results.map { if (it.targetRef in verdict.suppressedTargets) it.copy(autoBindable = false) else it }
+        return (flagged + verdict.additions).sortedByDescending { it.score }
+    }
+
+    /**
+     * How wide to score before the narrowing steps run. Bounded so a caller's `limit` cannot be
+     * multiplied into an unbounded scan, and floored so a small `limit` still leaves room for the
+     * gate to reject a few rows without emptying the answer.
+     */
+    private fun scoringLimit(limit: Int): Int =
+        (limit.coerceAtLeast(1).coerceAtMost(MAX_SCORING_CANDIDATES / GATE_HEADROOM_FACTOR) * GATE_HEADROOM_FACTOR)
+            .coerceAtLeast(MIN_SCORING_CANDIDATES)
+
+    companion object {
+        /** `max_candidates <= 0` on a [LookupQuery] / [SpanQuery]. */
+        const val DEFAULT_LOOKUP_CANDIDATES: Int = 10
+
+        /**
+         * Ceiling on a caller's `max_candidates` (RV-33). The rung asks a bounded, deterministic
+         * question; without a cap an `int32` field lets one request ask for the whole estate scored
+         * and serialised. Callers that want more paginate by narrowing their categories, which is
+         * the scoping the surface exists to provide.
+         */
+        const val MAX_LOOKUP_CANDIDATES: Int = 200
+
+        /**
+         * How much wider than the caller's limit to score, so the post-scoring gate and class
+         * filter have rows to reject without emptying the answer. Mirrors the `topN` headroom the
+         * INDEX_FIRST retriever already applies for the same reason.
+         */
+        const val GATE_HEADROOM_FACTOR: Int = 4
+
+        /** Floor on the headroom, so a `limit` of 1 or 2 still scores a usable window. */
+        const val MIN_SCORING_CANDIDATES: Int = 50
+
+        /** Hard ceiling on the headroom, so `limit * factor` can never become an unbounded scan. */
+        const val MAX_SCORING_CANDIDATES: Int = 2_000
     }
 
     private suspend fun matchWithTokenBased(
@@ -256,6 +472,11 @@ class FuzzyMatcher(
  * Maps a scored [Candidate] to a [FuzzyMatchResult], carrying its source tag +
  * lexicon target_ref (RS-15) and stamping S-4 provenance (producer=fuzzy,
  * method=the algorithm that scored it).
+ *
+ * Note the two `method`s are different axes and both travel: [FuzzyMatchResult.matchMethod] is the
+ * AUTHORED method from the lexicon (RV-32), while [Provenance.method] is the algorithm that
+ * produced this score. Conflating them would make "the author asked for EXACT" indistinguishable
+ * from "the TATRMAN cascade happened to win".
  */
 private fun Candidate.toResult(
     score: Double,
@@ -270,4 +491,11 @@ private fun Candidate.toResult(
         source = source,
         targetRef = targetRef,
         provenance = Provenance(producer = "fuzzy", method = method, rawScore = score),
+        matchMethod = matchMethod,
+        targetClass = targetClass,
+        // Both precomputed at load on the candidate, so the dispatcher parses and NFC-normalises
+        // nothing per request. Passing them explicitly also skips the constructor defaults, which
+        // would otherwise re-derive them here for every scored row on every query.
+        authoredMethod = authoredMethod,
+        canonicalCandidate = canonicalValue,
     )
