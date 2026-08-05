@@ -1,0 +1,52 @@
+{
+  "id": "gate-h1prime-correction",
+  "description": "RV-P2.4.T6 — the H1′ re-gate pair, end to end over gRPC. Turn 1 resolves the typo'd question and must NOT bind the code: `5010O1` is not in the account index, so the honest answer is a G4_METHOD_MISS. Turn 2 is an LLM rung's hypothesis coming back through `resolve.gate:v1` — the correction `5010O1`→`501001` on účet.kód — which the core turns into a lexicon lookup and puts through the SAME evidence-class gate as any other candidate. It survives, the binding appears carrying its proposing rung, and the gap closes. The pair is the whole re-gate contract: a rung may propose, only the gate may bind (RV-7).",
+  "surface": "grpc",
+  "turns": [
+    {
+      "tool": "resolve.bind:v1",
+      "args": {
+        "conversation_id": "gate-h1prime",
+        "text": "Zobraz náklady účtu 5010O1 v roce 2025 podle období",
+        "locale": "cs"
+      },
+      "fixture": "h1prime-cs",
+      "expect": {
+        "outcome": "resolution",
+        "no_binding_below_threshold": true,
+        "gap_kinds": ["GAP_KIND_G4_METHOD_MISS"]
+      }
+    },
+    {
+      "tool": "resolve.gate:v1",
+      "hypotheses": [
+        {
+          "span": { "start": 20, "end": 26, "text": "5010O1" },
+          "correction": "501001",
+          "ref": "md.dimension.Account.code",
+          "proposing_rung": "local"
+        }
+      ],
+      "lookups": {
+        "501001": [
+          {
+            "candidateId": "501001",
+            "candidate": "501001",
+            "score": 1.0,
+            "category": "md.dimension.Account.code",
+            "source": "MEMBER"
+          }
+        ]
+      },
+      "expect": {
+        "outcome": "resolution",
+        "no_binding_below_threshold": true,
+        "min_bindings": 1,
+        "gated_refs": ["md.dimension.Account.code#501001"],
+        "evidence_classes": ["EVIDENCE_CLASS_EXACT"],
+        "proposing_rung": "local",
+        "gap_kinds": []
+      }
+    }
+  ]
+}
