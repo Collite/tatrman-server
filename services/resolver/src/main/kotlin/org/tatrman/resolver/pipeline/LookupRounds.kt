@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.resolver.pipeline
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
+import org.slf4j.LoggerFactory
+import org.tatrman.fuzzy.v1.FuzzyMatch
 import org.tatrman.fuzzy.v1.LookupRequest
 import org.tatrman.resolver.client.FuzzyClient
 import org.tatrman.resolver.model.ResolverEntityType
@@ -21,8 +25,11 @@ import org.tatrman.resolver.v1.Span
  *
  * There is no round cap, and that is not an oversight — the loop is finite by construction. Every
  * round consumes at least one member of a finite query space (spans × tiers, via the planner's
- * asked-set), so it terminates whether or not the clock does. The budget bounds *latency*, not
- * termination, which is the honest division of labour between the two.
+ * asked-set), so it terminates whether or not the clock does. Termination is therefore structural
+ * and the budget is what bounds *latency* — but only because each round's calls carry what is LEFT
+ * of it as their own timeout. Checking the clock between rounds is not enough on its own: the
+ * matcher stub's deadline is 30s (`fuzzy.deadline-seconds`), so a single hung round would otherwise
+ * add two orders of magnitude more than [budgetMs] to a resolve. See [LookupRounds.lookup].
  */
 data class LookupRoundConfig(
     val budgetMs: Long = 250,
@@ -75,6 +82,8 @@ class LookupRounds(
     /** The rung name a round writes into the log (contracts §3 vocabulary). */
     companion object {
         const val RUNG: String = "lookup"
+
+        private val log = LoggerFactory.getLogger(LookupRounds::class.java)
     }
 
     data class Result(
@@ -106,14 +115,18 @@ class LookupRounds(
         var currentLattice = lattice
         var round = 0
 
-        while (nanoTime() < deadline) {
+        while (true) {
+            // What is LEFT of the budget, and it is handed to the round rather than merely checked
+            // before it — the round is what spends it (see [lookup]).
+            val remainingMs = (deadline - nanoTime()) / 1_000_000
+            if (remainingMs <= 0) break
             val queries = RoundPlanner.plan(currentLattice, entityTypes, asked, config)
             if (queries.isEmpty()) break
             asked += queries.map { it.key }
             round++
 
             val startedAt = nanoTime()
-            val answers = ask(queries)
+            val answers = ask(queries, remainingMs)
             var added = 0
             val proposed = mutableListOf<Hypothesis>()
             for ((query, candidates) in answers) {
@@ -155,11 +168,59 @@ class LookupRounds(
     }
 
     /** One round's questions, concurrently — a round costs one round-trip, not one per span. */
-    private suspend fun ask(queries: List<RoundPlanner.Query>) =
+    private suspend fun ask(
+        queries: List<RoundPlanner.Query>,
+        remainingMs: Long,
+    ): Map<RoundPlanner.Query, List<FuzzyMatch>> =
         coroutineScope {
             queries
-                .map { query -> query to async { runCatching { fuzzy.lookup(requestOf(query)) }.getOrNull() } }
-                .associate { (query, deferred) -> query to deferred.await()?.candidatesList.orEmpty() }
+                .map { query -> query to async { lookup(query, remainingMs) } }
+                .associate { (query, deferred) -> query to deferred.await() }
+        }
+
+    /**
+     * One narrowing question, bounded and never silently mistaken for an answer.
+     *
+     * Two things this does NOT do, each of which it used to:
+     *
+     *  - **It does not let a slow matcher outlive the budget.** [remainingMs] is what is left of
+     *    [LookupRoundConfig.budgetMs]; without it the only bound is the stub's own 30s deadline, and
+     *    a rung advertised at 250ms could add 30s to a resolve.
+     *  - **It does not swallow cancellation.** `runCatching` catches [CancellationException] along
+     *    with everything else, which would turn a caller who has hung up into a loop that keeps
+     *    planning rounds for them. It is rethrown, and only a real failure is absorbed.
+     *
+     * A failure absorbs to "no candidates" because a round has no other move — but it is LOGGED, and
+     * that distinction matters more one rung up: the same failure reaching [ReGate] is reported to
+     * the proposer as `LOOKUP_FAILED`, never as the claim that the vocabulary has no such term.
+     */
+    private suspend fun lookup(
+        query: RoundPlanner.Query,
+        remainingMs: Long,
+    ): List<FuzzyMatch> =
+        try {
+            val response = withTimeoutOrNull(remainingMs) { fuzzy.lookup(requestOf(query)) }
+            if (response == null) {
+                log.warn(
+                    "lookup round exhausted its {}ms budget term={} tier={} — round abandoned, gap left open",
+                    remainingMs,
+                    query.term,
+                    query.tier,
+                )
+                emptyList()
+            } else {
+                response.candidatesList
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn(
+                "lookup round failed term={} tier={} — treated as NO ANSWER, not as an empty vocabulary",
+                query.term,
+                query.tier,
+                e,
+            )
+            emptyList()
         }
 
     private fun requestOf(query: RoundPlanner.Query): LookupRequest {

@@ -2,11 +2,16 @@
 package org.tatrman.resolver
 
 import com.google.protobuf.util.JsonFormat
+import io.grpc.Status
+import io.grpc.StatusException
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -38,9 +43,11 @@ import org.tatrman.resolver.registry.DeclaredVocabularyEntry
 import org.tatrman.resolver.registry.SnapshotRegistry
 import org.tatrman.resolver.registry.StubRegistrySource
 import org.tatrman.resolver.token.ResumeTokenCodec
+import org.tatrman.resolver.v1.Disposition
 import org.tatrman.resolver.v1.EvidenceClass
 import org.tatrman.resolver.v1.FreshQuestion
 import org.tatrman.resolver.v1.GapKind
+import org.tatrman.resolver.v1.GapRecord
 import org.tatrman.resolver.v1.GateRequest
 import org.tatrman.resolver.v1.GateResponse
 import org.tatrman.resolver.v1.Hypothesis
@@ -199,6 +206,107 @@ class ReGateTest :
             // connection cannot double-count a binding or advance a round — which is what the
             // Golem loop's retry semantics rest on.
             first shouldBe second
+        }
+
+        "(review) a matcher that could not be ASKED is LOOKUP_FAILED, never an empty vocabulary" {
+            // The failure mode this replaces: an unreachable matcher answered every hypothesis with
+            // `NO_CANDIDATE`, whose own contract is "the vocabulary has no such term". A rung that
+            // believes that stops proposing something that was right, and nothing in the response
+            // let it tell the two apart.
+            val fuzzy = GateFuzzy(answers = emptyMap(), failLookups = true)
+            val response =
+                gate(
+                    fuzzy,
+                    lattice = h1primeLattice(),
+                    correction("5010O1", 20, 26, to = "501001", ref = ACCOUNT_CODE, rung = "local"),
+                )
+
+            response.gatedBindingsList shouldBe emptyList()
+            response.outcomesList.single().reason shouldBe ReGate.Reason.LOOKUP_FAILED
+            // the gap it aimed at is exactly where it was, and still typed
+            response.updatedGapsList.single().kind shouldBe GapKind.GAP_KIND_G4_METHOD_MISS
+        }
+
+        "(review) a large batch cannot open one matcher call per hypothesis — the fan-out is bounded" {
+            // `Gate` is a public rpc and `hypotheses` is unbounded on the wire, so the bound has to
+            // be this service's rather than the caller's good manners. Every hypothesis is still
+            // ASKED — the cap is on how many are in flight at once.
+            val fuzzy = GateFuzzy(answers = emptyMap(), trackConcurrency = true)
+            val batch =
+                (0 until 64)
+                    .map { correction("5010O1", 20, 26, to = "50100$it", ref = ACCOUNT_CODE, rung = "local") }
+                    .toTypedArray()
+
+            val response = gate(fuzzy, h1primeLattice(), *batch)
+
+            fuzzy.lookups.size shouldBe 64
+            response.outcomesList.size shouldBe 64
+            fuzzy.peakConcurrency shouldBeLessThanOrEqual LookupRoundConfig.DEFAULT.maxQueriesPerRound
+        }
+
+        "(review) a degraded-floor banner survives the re-gate — G5 is carried, not re-derived" {
+            // G5 is minted from the RESOLVE's capability assessment (RS-25), which no lattice
+            // carries, so re-deriving it here could only ever answer `false`. Since `updated_gaps`
+            // is the caller's whole next gap list and not a delta, that silently retired RG-RES-001
+            // across one gate call: a question answered on the fold+fuzzy floor came back looking
+            // undegraded. The G5 is appended to a real lattice here for exactly the reason the tool
+            // has to carry it — nothing in the lattice could have told it apart.
+            val lattice =
+                h1primeLattice()
+                    .toBuilder()
+                    .addGaps(
+                        GapRecord
+                            .newBuilder()
+                            .setKind(GapKind.GAP_KIND_G5_NLP_DARK)
+                            .setDisposition(Disposition.DISPOSITION_DEGRADED)
+                            .setSpan(Span.newBuilder().setStart(0).setEnd(40)),
+                    ).build()
+
+            val response =
+                gate(
+                    GateFuzzy(mapOf("501001" to listOf(member("501001", ACCOUNT_CODE)))),
+                    lattice,
+                    correction("5010O1", 20, 26, to = "501001", ref = ACCOUNT_CODE, rung = "local"),
+                )
+
+            // the G4 the correction closed is gone; the honesty banner is not
+            response.updatedGapsList.map { it.kind } shouldContainExactly listOf(GapKind.GAP_KIND_G5_NLP_DARK)
+        }
+
+        "(review) a hypothesis naming a MEMBER is not confirmed by binding the column it lives in" {
+            // `bound ⊂ proposed` confirms (a member arrives as `<ref>#<id>`); the REVERSE does not.
+            // This hypothesis asked about a value and was answered about a column — and accepting it
+            // would have handed the proposer the column as its binding while saying "yes".
+            val fuzzy = GateFuzzy(answers = mapOf("5010O1" to listOf(declared(ACCOUNT_CODE))))
+            val response =
+                gate(
+                    fuzzy,
+                    lattice = h1primeLattice(),
+                    hypothesis("5010O1", 20, 26, ref = "$ACCOUNT_CODE#501001", rung = "capable"),
+                )
+
+            response.gatedBindingsList shouldBe emptyList()
+            response.outcomesList.single().reason shouldBe ReGate.Reason.REF_MISMATCH
+        }
+
+        "(review) the rung-log entry names a round, and never claims round 0" {
+            // Round 0 is reserved for the core's own deterministic pass, so an unset field was a
+            // gate entry impersonating one. Derived from the caller's own log, so the response
+            // stays a pure function of the request — the T4 idempotency case below still passes.
+            val lattice = h1primeLattice()
+            val response =
+                gate(
+                    GateFuzzy(mapOf("501001" to listOf(member("501001", ACCOUNT_CODE)))),
+                    lattice,
+                    correction("5010O1", 20, 26, to = "501001", ref = ACCOUNT_CODE, rung = "local"),
+                )
+
+            response.rungLogEntry.round shouldBe (lattice.rungLogList.maxOfOrNull { it.round } ?: 0) + 1
+            response.rungLogEntry.round shouldNotBe 0
+            // what it touched: the h1′ value span the correction aimed at
+            response.rungLogEntry.valueIdsCount shouldBe 1
+            // and NOT the clock — `elapsed_ms` stays unset so the response is byte-reproducible
+            response.rungLogEntry.elapsedMs shouldBe 0L
         }
 
         "the caller's lattice is never mutated — `updated_gaps` describes a world it can choose to adopt" {
@@ -421,15 +529,33 @@ class ReGateTest :
     /** Answers `Lookup` by term and records every request — the gate's only upstream. */
     private class GateFuzzy(
         private val answers: Map<String, List<FuzzyMatch>>,
+        /** The matcher is unreachable: every question throws, as a live one would. */
+        private val failLookups: Boolean = false,
+        /** Suspend inside each call so overlap is observable — otherwise the cap check is vacuous. */
+        private val trackConcurrency: Boolean = false,
     ) : FuzzyClient {
         val lookups: MutableList<LookupRequest> = mutableListOf()
+
+        /** The most calls ever in flight at once. Single-threaded `runBlocking`, so no lock needed. */
+        var peakConcurrency: Int = 0
+            private set
+
+        private var inFlight = 0
 
         override suspend fun batchMatch(request: BatchMatchRequest): BatchMatchResponse =
             BatchMatchResponse.getDefaultInstance()
 
         override suspend fun lookup(request: LookupRequest): LookupResponse {
             lookups += request
-            return LookupResponse.newBuilder().addAllCandidates(answers[request.term].orEmpty()).build()
+            inFlight++
+            peakConcurrency = maxOf(peakConcurrency, inFlight)
+            try {
+                if (trackConcurrency) delay(1)
+                if (failLookups) throw StatusException(Status.UNAVAILABLE.withDescription("lex-matcher is down"))
+                return LookupResponse.newBuilder().addAllCandidates(answers[request.term].orEmpty()).build()
+            } finally {
+                inFlight--
+            }
         }
 
         override suspend fun getStatus(): FuzzyStatusResponse = FuzzyStatusResponse.getDefaultInstance()

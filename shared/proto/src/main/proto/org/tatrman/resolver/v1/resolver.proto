@@ -58,7 +58,11 @@ message HypothesisOutcome {
   // Why not, when not. A short machine-readable reason, not a sentence: NO_CANDIDATE (the
   // vocabulary has no such term — the H2 pre-learning case), WEAK (found, refused by the class
   // floor), AMBIGUOUS (several identities, refuse over guess), NO_SPAN (the hypothesis names a
-  // span the lattice does not have).
+  // span the lattice does not have), REF_MISMATCH (something bound, but not the ref proposed —
+  // contradicted, not confirmed), LOOKUP_FAILED (the matcher could not be ASKED).
+  // The last one is not a verdict about the hypothesis and a rung must not treat it as one:
+  // reporting an infrastructure failure as NO_CANDIDATE would teach a proposer that a correct
+  // guess does not exist. Retrying a LOOKUP_FAILED batch is safe — `Gate` is idempotent.
   string reason = 4;
 }
 

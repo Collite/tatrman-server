@@ -2,11 +2,16 @@
 package org.tatrman.resolver
 
 import com.google.protobuf.util.JsonFormat
+import io.grpc.Status
+import io.grpc.StatusException
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import kotlin.system.measureTimeMillis
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -168,6 +173,49 @@ class LookupRoundsTest :
             state.gapsList shouldBe emptyList()
             fuzzy.lookups shouldBe emptyList()
         }
+
+        "(review) a matcher that FAILS is not an empty vocabulary — the gap stays open and typed" {
+            // The answer is right there and would bind; the matcher just cannot be reached. The
+            // rung has no move but to leave the gap alone, and the thing being pinned is that it
+            // leaves it TYPED rather than quietly emitting a lattice that looks settled.
+            val fuzzy =
+                RoundFuzzy(
+                    broadMisses = setOf("501001"),
+                    answers = mapOf("501001" to listOf(member("501001", "md.dimension.Account.code", 1.0))),
+                    failLookups = true,
+                )
+            val state = resolve(fuzzy)
+
+            fuzzy.lookups.isNotEmpty().shouldBeTrue()
+            val value = state.valuesList.single { it.span.text == "501001" }
+            value.attributionsList shouldBe emptyList()
+            state.gapsList.single { it.valueId == value.id }.kind shouldBe GapKind.GAP_KIND_G4_METHOD_MISS
+            // The rounds are in the log, honestly reporting that they added nothing — a failure is
+            // absorbed, never hidden.
+            val rounds = state.rungLogList.filter { it.rung == LookupRounds.RUNG }
+            rounds.isNotEmpty().shouldBeTrue()
+            rounds.all { it.bindingsAdded == 0 }.shouldBeTrue()
+        }
+
+        "(review) a matcher slower than the budget cannot outlive it — the rung bounds LATENCY too" {
+            // Before the fix the clock was only consulted BETWEEN rounds, so the real bound was the
+            // matcher stub's 30s deadline and a rung advertised at 150ms could add 10s to a resolve.
+            val fuzzy =
+                RoundFuzzy(
+                    broadMisses = setOf("501001"),
+                    answers = mapOf("501001" to listOf(member("501001", "md.dimension.Account.code", 1.0))),
+                    lookupDelayMs = 10_000,
+                )
+            val elapsedMs =
+                measureTimeMillis {
+                    resolve(fuzzy, config = LookupRoundConfig.DEFAULT.copy(budgetMs = 150))
+                }
+
+            // Deliberately loose: the point is two orders of magnitude, not a stopwatch.
+            elapsedMs shouldBeLessThan 5_000L
+            // it did ask — the round is bounded, not skipped
+            fuzzy.lookups.isNotEmpty().shouldBeTrue()
+        }
     }) {
     private companion object {
         private val json = Json { ignoreUnknownKeys = true }
@@ -284,6 +332,10 @@ class LookupRoundsTest :
     private class RoundFuzzy(
         private val broadMisses: Set<String>,
         private val answers: Map<String, List<FuzzyMatch>> = emptyMap(),
+        /** The matcher is unreachable: every round question throws, as a live one would. */
+        private val failLookups: Boolean = false,
+        /** A matcher slower than the rung's whole budget. */
+        private val lookupDelayMs: Long = 0,
     ) : FuzzyClient {
         /** Every round question, in the order the loop asked it — what the tier assertions read. */
         val lookups: MutableList<LookupRequest> = mutableListOf()
@@ -313,6 +365,8 @@ class LookupRoundsTest :
 
         override suspend fun lookup(request: LookupRequest): LookupResponse {
             lookups += request
+            if (lookupDelayMs > 0) delay(lookupDelayMs)
+            if (failLookups) throw StatusException(Status.UNAVAILABLE.withDescription("lex-matcher is down"))
             return LookupResponse
                 .newBuilder()
                 .addAllCandidates(answers[request.term].orEmpty())

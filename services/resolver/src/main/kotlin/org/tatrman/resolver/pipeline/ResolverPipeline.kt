@@ -89,6 +89,10 @@ class ResolverPipeline(
             thresholds = current.thresholds,
             snapshotHash = current.snapshotHash,
             maxCandidates = lookupRounds.config.maxCandidates,
+            // `hypotheses` is unbounded on the wire, so the fan-out is bounded here — by the same
+            // per-round cap the lookup rung gives itself, for the same reason this call already
+            // borrows its `maxCandidates`.
+            maxConcurrentLookups = lookupRounds.config.maxQueriesPerRound,
         )
     }
 
