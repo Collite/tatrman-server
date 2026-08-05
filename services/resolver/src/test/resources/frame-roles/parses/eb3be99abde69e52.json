@@ -1,0 +1,143 @@
+{
+ "tokens": [
+  {
+   "text": "Jaký",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "jaký",
+   "upos": "DET",
+   "xpos": "P4YS1----------",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Nom",
+    "Gender": "Masc",
+    "Number": "Sing",
+    "PronType": "Int,Rel"
+   },
+   "depHead": 2,
+   "depRelation": "det",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "podíl",
+   "charStart": 5,
+   "charEnd": 10,
+   "lemma": "podíl",
+   "upos": "NOUN",
+   "xpos": "NNIS1-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Nom",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 5,
+   "depRelation": "obj",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "na",
+   "charStart": 11,
+   "charEnd": 13,
+   "lemma": "na",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 4,
+   "depRelation": "case",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "tržbách",
+   "charStart": 14,
+   "charEnd": 21,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP6-----A----",
+   "feats": {
+    "Case": "Loc",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "má",
+   "charStart": 22,
+   "charEnd": 24,
+   "lemma": "mít",
+   "upos": "VERB",
+   "xpos": "VB-S---3P-AAI--",
+   "feats": {
+    "Aspect": "Imp",
+    "Mood": "Ind",
+    "Number": "Sing",
+    "Person": "3",
+    "Polarity": "Pos",
+    "Tense": "Pres",
+    "VerbForm": "Fin",
+    "Voice": "Act"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "kategorie",
+   "charStart": 25,
+   "charEnd": 34,
+   "lemma": "kategorie",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 5,
+   "depRelation": "nsubj",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "Knihy",
+   "charStart": 35,
+   "charEnd": 40,
+   "lemma": "kniha",
+   "upos": "NOUN",
+   "xpos": "NNFS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 6,
+   "depRelation": "nmod",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "?",
+   "charStart": 40,
+   "charEnd": 41,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 5,
+   "depRelation": "punct",
+   "depHeadIdx": 4
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 41
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

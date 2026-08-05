@@ -1,0 +1,124 @@
+{
+ "tokens": [
+  {
+   "text": "Jaké",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "jaký",
+   "upos": "DET",
+   "xpos": "P4FP1----------",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur",
+    "PronType": "Int,Rel"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "byly",
+   "charStart": 5,
+   "charEnd": 9,
+   "lemma": "být",
+   "upos": "AUX",
+   "xpos": "VpTP----R-AAI--",
+   "feats": {
+    "Animacy": "Inan",
+    "Aspect": "Imp",
+    "Gender": "Fem,Masc",
+    "Number": "Plur",
+    "Polarity": "Pos",
+    "Tense": "Past",
+    "VerbForm": "Part",
+    "Voice": "Act"
+   },
+   "depHead": 1,
+   "depRelation": "cop",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "tržby",
+   "charStart": 10,
+   "charEnd": 15,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "nsubj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "v",
+   "charStart": 16,
+   "charEnd": 17,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 5,
+   "depRelation": "case",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "Brno",
+   "charStart": 18,
+   "charEnd": 22,
+   "lemma": "Brno",
+   "upos": "PROPN",
+   "xpos": "NNNS4-----A----",
+   "feats": {
+    "Case": "Loc",
+    "Gender": "Neut",
+    "NameType": "Geo",
+    "Number": "Sing"
+   },
+   "depHead": 3,
+   "depRelation": "nmod",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "DC",
+   "charStart": 23,
+   "charEnd": 25,
+   "lemma": "DC",
+   "upos": "NOUN",
+   "xpos": "BNXXX-----A----",
+   "feats": {
+    "Abbr": "Yes"
+   },
+   "depHead": 5,
+   "depRelation": "nmod",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "?",
+   "charStart": 25,
+   "charEnd": 26,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 1,
+   "depRelation": "punct",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 26
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

@@ -1,0 +1,198 @@
+{
+ "tokens": [
+  {
+   "text": "How",
+   "charStart": 0,
+   "charEnd": 3,
+   "lemma": "how",
+   "upos": "ADV",
+   "xpos": "WRB",
+   "feats": {
+    "PronType": "Int"
+   },
+   "depHead": 2,
+   "depRelation": "advmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "many",
+   "charStart": 4,
+   "charEnd": 8,
+   "lemma": "many",
+   "upos": "ADJ",
+   "xpos": "JJ",
+   "feats": {
+    "Degree": "Pos"
+   },
+   "depHead": 3,
+   "depRelation": "amod",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "units",
+   "charStart": 9,
+   "charEnd": 14,
+   "lemma": "unit",
+   "upos": "NOUN",
+   "xpos": "NNS",
+   "feats": {
+    "Number": "Plur"
+   },
+   "depHead": 6,
+   "depRelation": "obj",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "did",
+   "charStart": 15,
+   "charEnd": 18,
+   "lemma": "do",
+   "upos": "AUX",
+   "xpos": "VBD",
+   "feats": {
+    "Mood": "Ind",
+    "Number": "Plur",
+    "Person": "1",
+    "Tense": "Past",
+    "VerbForm": "Fin"
+   },
+   "depHead": 6,
+   "depRelation": "aux",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "we",
+   "charStart": 19,
+   "charEnd": 21,
+   "lemma": "we",
+   "upos": "PRON",
+   "xpos": "PRP",
+   "feats": {
+    "Case": "Nom",
+    "Number": "Plur",
+    "Person": "1",
+    "PronType": "Prs"
+   },
+   "depHead": 6,
+   "depRelation": "nsubj",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "sell",
+   "charStart": 22,
+   "charEnd": 26,
+   "lemma": "sell",
+   "upos": "VERB",
+   "xpos": "VB",
+   "feats": {
+    "VerbForm": "Inf"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "in",
+   "charStart": 27,
+   "charEnd": 29,
+   "lemma": "in",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 8,
+   "depRelation": "case",
+   "depHeadIdx": 7
+  },
+  {
+   "text": "Columbus",
+   "charStart": 30,
+   "charEnd": 38,
+   "lemma": "Columbus",
+   "upos": "PROPN",
+   "xpos": "NNP",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 6,
+   "depRelation": "obl",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "DC",
+   "charStart": 39,
+   "charEnd": 41,
+   "lemma": "DC",
+   "upos": "PROPN",
+   "xpos": "NNP",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 8,
+   "depRelation": "flat",
+   "depHeadIdx": 7
+  },
+  {
+   "text": "in",
+   "charStart": 42,
+   "charEnd": 44,
+   "lemma": "in",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 11,
+   "depRelation": "case",
+   "depHeadIdx": 10
+  },
+  {
+   "text": "December",
+   "charStart": 45,
+   "charEnd": 53,
+   "lemma": "December",
+   "upos": "PROPN",
+   "xpos": "NNP",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 6,
+   "depRelation": "obl",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "?",
+   "charStart": 53,
+   "charEnd": 54,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": ".",
+   "feats": {},
+   "depHead": 6,
+   "depRelation": "punct",
+   "depHeadIdx": 5
+  }
+ ],
+ "entities": [
+  {
+   "text": "Columbus DC",
+   "label": "GPE",
+   "charStart": 30,
+   "charEnd": 41,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  },
+  {
+   "text": "December",
+   "label": "DATE",
+   "charStart": 45,
+   "charEnd": 53,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  }
+ ],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 54
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

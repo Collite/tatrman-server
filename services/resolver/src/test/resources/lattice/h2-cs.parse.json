@@ -1,0 +1,229 @@
+{
+  "language": "cs",
+  "detectedLanguage": "cs",
+  "traceId": "trace-h2-cs",
+  "tokens": [
+    {
+      "text": "Zobraz",
+      "charStart": 0,
+      "charEnd": 6,
+      "lemma": "zobraz",
+      "upos": "NOUN",
+      "xpos": "NNIS1-----A----",
+      "depHead": 0,
+      "depRelation": "root",
+      "feats": {
+        "Case": "Nom",
+        "Gender": "Masc",
+        "Number": "Sing"
+      }
+    },
+    {
+      "text": "prvních",
+      "charStart": 7,
+      "charEnd": 14,
+      "lemma": "první",
+      "upos": "ADJ",
+      "xpos": "CrFP2----------",
+      "depHead": 5,
+      "depRelation": "amod",
+      "feats": {
+        "Case": "Gen",
+        "Gender": "Fem",
+        "NumType": "Ord",
+        "Number": "Plur"
+      }
+    },
+    {
+      "text": "10",
+      "charStart": 15,
+      "charEnd": 17,
+      "lemma": "10",
+      "upos": "NUM",
+      "xpos": "C=-------------",
+      "depHead": 5,
+      "depRelation": "nummod:gov",
+      "feats": {
+        "NumForm": "Digit",
+        "NumType": "Card"
+      }
+    },
+    {
+      "text": "čerpacích",
+      "charStart": 18,
+      "charEnd": 27,
+      "lemma": "čerpací",
+      "upos": "ADJ",
+      "xpos": "AAFP2----1A----",
+      "depHead": 5,
+      "depRelation": "amod",
+      "feats": {
+        "Case": "Gen",
+        "Degree": "Pos",
+        "Gender": "Fem",
+        "Number": "Plur",
+        "Polarity": "Pos"
+      }
+    },
+    {
+      "text": "stanic",
+      "charStart": 28,
+      "charEnd": 34,
+      "lemma": "stanice",
+      "upos": "NOUN",
+      "xpos": "NNFP2-----A----",
+      "depHead": 1,
+      "depRelation": "nmod",
+      "feats": {
+        "Case": "Gen",
+        "Gender": "Fem",
+        "Number": "Plur"
+      }
+    },
+    {
+      "text": "v",
+      "charStart": 35,
+      "charEnd": 36,
+      "lemma": "v",
+      "upos": "ADP",
+      "xpos": "RR--6----------",
+      "depHead": 7,
+      "depRelation": "case",
+      "feats": {
+        "AdpType": "Prep",
+        "Case": "Loc"
+      }
+    },
+    {
+      "text": "Praze",
+      "charStart": 37,
+      "charEnd": 42,
+      "lemma": "Praha",
+      "upos": "PROPN",
+      "xpos": "NNFS6-----A----",
+      "depHead": 5,
+      "depRelation": "nmod",
+      "feats": {
+        "Case": "Loc",
+        "Gender": "Fem",
+        "NameType": "Geo",
+        "Number": "Sing"
+      }
+    },
+    {
+      "text": "podle",
+      "charStart": 43,
+      "charEnd": 48,
+      "lemma": "podle",
+      "upos": "ADP",
+      "xpos": "RR--2----------",
+      "depHead": 9,
+      "depRelation": "case",
+      "feats": {
+        "AdpType": "Prep",
+        "Case": "Gen"
+      }
+    },
+    {
+      "text": "tržby",
+      "charStart": 49,
+      "charEnd": 54,
+      "lemma": "tržba",
+      "upos": "NOUN",
+      "xpos": "NNFS2-----A----",
+      "depHead": 1,
+      "depRelation": "dep",
+      "feats": {
+        "Case": "Gen",
+        "Gender": "Fem",
+        "Number": "Sing"
+      }
+    },
+    {
+      "text": "za",
+      "charStart": 55,
+      "charEnd": 57,
+      "lemma": "za",
+      "upos": "ADP",
+      "xpos": "RR--4----------",
+      "depHead": 12,
+      "depRelation": "case",
+      "feats": {
+        "AdpType": "Prep",
+        "Case": "Acc"
+      }
+    },
+    {
+      "text": "12",
+      "charStart": 58,
+      "charEnd": 60,
+      "lemma": "12",
+      "upos": "NUM",
+      "xpos": "C=-------------",
+      "depHead": 12,
+      "depRelation": "nummod:gov",
+      "feats": {
+        "NumForm": "Digit",
+        "NumType": "Card"
+      }
+    },
+    {
+      "text": "měsíců",
+      "charStart": 61,
+      "charEnd": 67,
+      "lemma": "měsíc",
+      "upos": "NOUN",
+      "xpos": "NNIP2-----A----",
+      "depHead": 9,
+      "depRelation": "nmod",
+      "feats": {
+        "Animacy": "Inan",
+        "Case": "Gen",
+        "Gender": "Masc",
+        "Number": "Plur"
+      }
+    },
+    {
+      "text": ".",
+      "charStart": 67,
+      "charEnd": 68,
+      "lemma": ".",
+      "upos": "PUNCT",
+      "xpos": "Z:-------------",
+      "depHead": 1,
+      "depRelation": "punct"
+    }
+  ],
+  "entities": [
+    {
+      "text": "Praze",
+      "label": "LOC",
+      "charStart": 37,
+      "charEnd": 42,
+      "normalizedValue": "cnec:gu",
+      "sourceEngine": "nametag3"
+    },
+    {
+      "text": "12 měsíců",
+      "label": "DATE",
+      "charStart": 58,
+      "charEnd": 67,
+      "normalizedValue": "P12M",
+      "sourceEngine": "nametag3"
+    }
+  ],
+  "used": [
+    {
+      "op": "DEP_PARSE",
+      "engine": "stanza",
+      "model": "cs",
+      "modelVersion": "stanza-1.13.0"
+    },
+    {
+      "op": "NER",
+      "engine": "nametag3",
+      "model": "cnec2.0",
+      "modelVersion": "240830"
+    }
+  ]
+}

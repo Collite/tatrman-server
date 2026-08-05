@@ -1,0 +1,149 @@
+{
+ "tokens": [
+  {
+   "text": "What",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "what",
+   "upos": "PRON",
+   "xpos": "WP",
+   "feats": {
+    "PronType": "Int"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "was",
+   "charStart": 5,
+   "charEnd": 8,
+   "lemma": "be",
+   "upos": "AUX",
+   "xpos": "VBD",
+   "feats": {
+    "Mood": "Ind",
+    "Number": "Sing",
+    "Person": "3",
+    "Tense": "Past",
+    "VerbForm": "Fin"
+   },
+   "depHead": 1,
+   "depRelation": "cop",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "the",
+   "charStart": 9,
+   "charEnd": 12,
+   "lemma": "the",
+   "upos": "DET",
+   "xpos": "DT",
+   "feats": {
+    "Definite": "Def",
+    "PronType": "Art"
+   },
+   "depHead": 4,
+   "depRelation": "det",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "revenue",
+   "charStart": 13,
+   "charEnd": 20,
+   "lemma": "revenue",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "nsubj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "in",
+   "charStart": 21,
+   "charEnd": 23,
+   "lemma": "in",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 8,
+   "depRelation": "case",
+   "depHeadIdx": 7
+  },
+  {
+   "text": "the",
+   "charStart": 24,
+   "charEnd": 27,
+   "lemma": "the",
+   "upos": "DET",
+   "xpos": "DT",
+   "feats": {
+    "Definite": "Def",
+    "PronType": "Art"
+   },
+   "depHead": 8,
+   "depRelation": "det",
+   "depHeadIdx": 7
+  },
+  {
+   "text": "Memphis",
+   "charStart": 28,
+   "charEnd": 35,
+   "lemma": "Memphis",
+   "upos": "PROPN",
+   "xpos": "NNP",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 8,
+   "depRelation": "compound",
+   "depHeadIdx": 7
+  },
+  {
+   "text": "DC",
+   "charStart": 36,
+   "charEnd": 38,
+   "lemma": "DC",
+   "upos": "PROPN",
+   "xpos": "NNP",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "?",
+   "charStart": 38,
+   "charEnd": 39,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": ".",
+   "feats": {},
+   "depHead": 1,
+   "depRelation": "punct",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [
+  {
+   "text": "the Memphis DC",
+   "label": "GPE",
+   "charStart": 24,
+   "charEnd": 38,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  }
+ ],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 39
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

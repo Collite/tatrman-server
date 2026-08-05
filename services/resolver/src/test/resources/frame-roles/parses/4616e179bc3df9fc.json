@@ -1,0 +1,78 @@
+{
+ "tokens": [
+  {
+   "text": "Zobraz",
+   "charStart": 0,
+   "charEnd": 6,
+   "lemma": "zobraz",
+   "upos": "VERB",
+   "xpos": "VB-S---3P-AAP--",
+   "feats": {
+    "Aspect": "Imp",
+    "Mood": "Ind",
+    "Number": "Sing",
+    "Polarity": "Pos",
+    "VerbForm": "Fin",
+    "Voice": "Act"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "tržby",
+   "charStart": 7,
+   "charEnd": 12,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "nsubj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "podle",
+   "charStart": 13,
+   "charEnd": 18,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 4,
+   "depRelation": "case",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "prodejen",
+   "charStart": 19,
+   "charEnd": 27,
+   "lemma": "prodejna",
+   "upos": "NOUN",
+   "xpos": "NNFP2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 27
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

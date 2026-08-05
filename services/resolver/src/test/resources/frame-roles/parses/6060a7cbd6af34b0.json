@@ -1,0 +1,117 @@
+{
+ "tokens": [
+  {
+   "text": "Compare",
+   "charStart": 0,
+   "charEnd": 7,
+   "lemma": "compare",
+   "upos": "VERB",
+   "xpos": "VB",
+   "feats": {
+    "Mood": "Imp",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "web",
+   "charStart": 8,
+   "charEnd": 11,
+   "lemma": "web",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 5,
+   "depRelation": "compound",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "and",
+   "charStart": 12,
+   "charEnd": 15,
+   "lemma": "and",
+   "upos": "CCONJ",
+   "xpos": "CC",
+   "feats": {},
+   "depHead": 4,
+   "depRelation": "cc",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "store",
+   "charStart": 16,
+   "charEnd": 21,
+   "lemma": "store",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "conj",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "revenue",
+   "charStart": 22,
+   "charEnd": 29,
+   "lemma": "revenue",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "for",
+   "charStart": 30,
+   "charEnd": 33,
+   "lemma": "for",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 7,
+   "depRelation": "case",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "2025",
+   "charStart": 34,
+   "charEnd": 38,
+   "lemma": "2025",
+   "upos": "NUM",
+   "xpos": "CD",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [
+  {
+   "text": "2025",
+   "label": "DATE",
+   "charStart": 34,
+   "charEnd": 38,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  }
+ ],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 38
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

@@ -52,6 +52,10 @@ class ResolverPipeline(
     private val registry: SnapshotRegistry,
     private val siblings: SiblingCatalog,
     private val tokenCodec: ResumeTokenCodec,
+    // The per-language preposition tables the frame-role rules dispatch on (RV-P2.1.T5).
+    // Defaulted to the shipped ones so a caller that has no opinion gets working roles;
+    // the service passes the estate's, which may replace them (see FrameRolePreps).
+    private val preps: FrameRolePreps = FrameRolePreps.shipped(),
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -94,12 +98,21 @@ class ResolverPipeline(
 
         val universals = if (assessment.csNer) UniversalExtraction.extractUniversal(parse) else emptyList()
         val candidates = SpanProposal.proposeDomainSpans(parse, resolverRegistry.entityTypes)
+        // The mention layer is derived BEFORE the batch now (RV-P1.6.T6): a mention nothing in the
+        // model binds can still be a grounding trigger, and it can only be asked about in the one
+        // BatchMatch this pass makes. The gate reads slots [0, candidates), the trigger annotation
+        // reads the trailing ones — one round trip, two questions, kept apart.
+        val ungatedMentions = MentionLayer.propose(parse, candidates)
+        val triggerSpans = GroundingTriggers.spansOf(candidates, ungatedMentions)
         val batchReq =
-            GateSpans.buildBatchRequest(
-                candidates,
-                locale.ifBlank { null },
-                resolverRegistry.thresholds.maxOptions,
-            )
+            GateSpans
+                .buildBatchRequest(
+                    candidates,
+                    locale.ifBlank { null },
+                    resolverRegistry.thresholds.maxOptions,
+                ).toBuilder()
+                .addAllSpans(GroundingTriggers.queries(triggerSpans, resolverRegistry.thresholds.maxOptions))
+                .build()
         val batchResp = fuzzy.batchMatch(batchReq)
         val outcome =
             GateSpans.gate(
@@ -110,6 +123,31 @@ class ResolverPipeline(
                 siblings,
                 resolverRegistry.snapshotHash,
             )
+        // The lattice (RV-P2.1) is annotation, not outcome: it is emitted the same way whether
+        // the gate bound everything or is asking a question, because what the core UNDERSTOOD
+        // does not change with what it decided.
+        val lattice =
+            LatticeAssembler.assemble(
+                parse = parse,
+                gate = outcome,
+                ungatedMentions = ungatedMentions,
+                universals = universals,
+                entityTypes = resolverRegistry.entityTypes,
+                thresholds = resolverRegistry.thresholds,
+                snapshotHash = resolverRegistry.snapshotHash,
+                batch = batchResp,
+                lang = assessment.language,
+                preps = preps,
+                degraded = assessment.degradedFloor,
+                triggers =
+                    GroundingTriggers.collect(
+                        triggerSpans,
+                        batchResp,
+                        offset = candidates.size,
+                        thresholds = resolverRegistry.thresholds,
+                        snapshotHash = resolverRegistry.snapshotHash,
+                    ),
+            )
 
         val builder =
             ResolveResponse
@@ -118,6 +156,7 @@ class ResolverPipeline(
                 .setTraceId(parse.traceId.ifBlank { request.conversationId })
                 .setElapsedMs(parse.elapsedMs)
                 .setCapabilities(capabilities(assessment))
+                .setResolutionState(lattice)
 
         when (outcome) {
             is Clarify ->
@@ -394,6 +433,7 @@ class ResolverPipeline(
                         it.ref,
                         it.categoriesList.toList(),
                         it.anchorsList.toList(),
+                        it.objectKind,
                     )
                 }
             val thresholds =

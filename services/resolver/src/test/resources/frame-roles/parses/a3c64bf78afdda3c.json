@@ -1,0 +1,120 @@
+{
+ "tokens": [
+  {
+   "text": "Show",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "show",
+   "upos": "VERB",
+   "xpos": "VB",
+   "feats": {
+    "Mood": "Imp",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "the",
+   "charStart": 5,
+   "charEnd": 8,
+   "lemma": "the",
+   "upos": "DET",
+   "xpos": "DT",
+   "feats": {
+    "Definite": "Def",
+    "PronType": "Art"
+   },
+   "depHead": 5,
+   "depRelation": "det",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "top",
+   "charStart": 9,
+   "charEnd": 12,
+   "lemma": "top",
+   "upos": "ADJ",
+   "xpos": "JJ",
+   "feats": {
+    "Degree": "Pos"
+   },
+   "depHead": 5,
+   "depRelation": "amod",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "10",
+   "charStart": 13,
+   "charEnd": 15,
+   "lemma": "10",
+   "upos": "NUM",
+   "xpos": "CD",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 5,
+   "depRelation": "nummod",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "products",
+   "charStart": 16,
+   "charEnd": 24,
+   "lemma": "product",
+   "upos": "NOUN",
+   "xpos": "NNS",
+   "feats": {
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "by",
+   "charStart": 25,
+   "charEnd": 27,
+   "lemma": "by",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 7,
+   "depRelation": "case",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "revenue",
+   "charStart": 28,
+   "charEnd": 35,
+   "lemma": "revenue",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [
+  {
+   "text": "10",
+   "label": "CARDINAL",
+   "charStart": 13,
+   "charEnd": 15,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  }
+ ],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 35
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

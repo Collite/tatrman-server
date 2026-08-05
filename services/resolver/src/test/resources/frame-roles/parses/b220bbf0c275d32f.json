@@ -1,0 +1,196 @@
+{
+ "tokens": [
+  {
+   "text": "Show",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "show",
+   "upos": "VERB",
+   "xpos": "VB",
+   "feats": {
+    "Mood": "Imp",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "me",
+   "charStart": 5,
+   "charEnd": 7,
+   "lemma": "I",
+   "upos": "PRON",
+   "xpos": "PRP",
+   "feats": {
+    "Case": "Acc",
+    "Number": "Sing",
+    "Person": "1",
+    "PronType": "Prs"
+   },
+   "depHead": 1,
+   "depRelation": "iobj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "the",
+   "charStart": 8,
+   "charEnd": 11,
+   "lemma": "the",
+   "upos": "DET",
+   "xpos": "DT",
+   "feats": {
+    "Definite": "Def",
+    "PronType": "Art"
+   },
+   "depHead": 4,
+   "depRelation": "det",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "costs",
+   "charStart": 12,
+   "charEnd": 17,
+   "lemma": "cost",
+   "upos": "NOUN",
+   "xpos": "NNS",
+   "feats": {
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "of",
+   "charStart": 18,
+   "charEnd": 20,
+   "lemma": "of",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "account",
+   "charStart": 21,
+   "charEnd": 28,
+   "lemma": "account",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "501001",
+   "charStart": 29,
+   "charEnd": 35,
+   "lemma": "501001",
+   "upos": "NUM",
+   "xpos": "CD",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 6,
+   "depRelation": "flat",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "in",
+   "charStart": 36,
+   "charEnd": 38,
+   "lemma": "in",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 9,
+   "depRelation": "case",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "2025",
+   "charStart": 39,
+   "charEnd": 43,
+   "lemma": "2025",
+   "upos": "NUM",
+   "xpos": "CD",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "by",
+   "charStart": 44,
+   "charEnd": 46,
+   "lemma": "by",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 11,
+   "depRelation": "case",
+   "depHeadIdx": 10
+  },
+  {
+   "text": "period",
+   "charStart": 47,
+   "charEnd": 53,
+   "lemma": "period",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  },
+  {
+   "text": ".",
+   "charStart": 53,
+   "charEnd": 54,
+   "lemma": ".",
+   "upos": "PUNCT",
+   "xpos": ".",
+   "feats": {},
+   "depHead": 1,
+   "depRelation": "punct",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [
+  {
+   "text": "501001",
+   "label": "CARDINAL",
+   "charStart": 29,
+   "charEnd": 35,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  },
+  {
+   "text": "2025",
+   "label": "DATE",
+   "charStart": 39,
+   "charEnd": 43,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  }
+ ],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 54
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

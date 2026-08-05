@@ -64,6 +64,18 @@ protobuf {
     }
     generateProtoTasks {
         all().forEach { task ->
+            // RV-P2.1.T7 — the wire-compatibility guard's input. A descriptor set is the
+            // compiled truth about every message, field number, type and enum value in the
+            // repo; `ProtoCompatSpec` diffs it against the checked-in baseline and fails on
+            // anything that is not purely additive (J-v2). Imports are included so a baseline
+            // resolves its dependencies without a second artifact.
+            task.generateDescriptorSet = true
+            task.descriptorSetOptions.includeImports = true
+            task.descriptorSetOptions.path =
+                layout.buildDirectory
+                    .file("descriptors/${task.sourceSet.name}.desc")
+                    .get()
+                    .asFile.path
             task.builtins {
                 id("kotlin") { }
                 // Phase 1.2 T4 — Python codegen for the shared-proto tree so the
@@ -82,6 +94,34 @@ protobuf {
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
+    // The compat guard reads the descriptor set protoc just produced (RV-P2.1.T7).
+    dependsOn("generateProto")
+    systemProperty(
+        "tatrman.proto.descriptorSet",
+        layout.buildDirectory
+            .file("descriptors/main.desc")
+            .get()
+            .asFile.path,
+    )
+    systemProperty("tatrman.proto.baseline", file("compat/wire-baseline.desc").path)
+    // A FROZEN copy of the resolver contract as it was before the RV-P2.1 lattice, for the
+    // old-client proof. Deliberately a second file: `wire-baseline.desc` moves whenever a wire
+    // change is deliberately accepted, and a proof about a specific historical shape must not
+    // quietly become a proof about the current one.
+    systemProperty("tatrman.proto.preLattice", file("compat/resolver-v1-pre-lattice.desc").path)
+}
+
+// RV-P2.1.T7 — refresh the wire baseline. Deliberately NOT wired into any build: the
+// baseline is the record of what has already shipped, and regenerating it is how you
+// *accept* a wire change, so it must be a conscious commit (`just proto-baseline`), the
+// same discipline as the helm golden templates.
+val refreshProtoBaseline by tasks.registering(Copy::class) {
+    group = "verification"
+    description = "Overwrite the checked-in wire baseline with the CURRENT protos. Review the diff."
+    dependsOn("generateProto")
+    from(layout.buildDirectory.file("descriptors/main.desc"))
+    into(file("compat"))
+    rename { "wire-baseline.desc" }
 }
 
 ktlint {

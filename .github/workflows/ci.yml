@@ -11,6 +11,14 @@ on:
     - cron: '0 3 * * *'
 
 jobs:
+  # Also the WIRE-COMPATIBILITY gate (RV-P2.1.T7). `:shared:proto:check` runs
+  # ProtoCompatSpec, which diffs every in-repo proto against the checked-in baseline
+  # `shared/proto/compat/wire-baseline.desc` and fails on anything that is not purely
+  # additive (J-v2): a removed field, a re-used tag number, a renamed field (proto3 JSON
+  # is name-keyed), a moved enum value. It rides this job deliberately rather than
+  # arriving as a separate `buf` job — the check needs no tool the build does not already
+  # have, and protoc is only available here through the Gradle plugin.
+  # To accept a deliberate wire change: `just proto-baseline`, review, commit.
   build:
     runs-on: ubuntu-latest
     permissions:

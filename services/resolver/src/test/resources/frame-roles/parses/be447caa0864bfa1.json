@@ -1,0 +1,104 @@
+{
+ "tokens": [
+  {
+   "text": "Zobraz",
+   "charStart": 0,
+   "charEnd": 6,
+   "lemma": "zobraz",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "náklady",
+   "charStart": 7,
+   "charEnd": 14,
+   "lemma": "náklad",
+   "upos": "NOUN",
+   "xpos": "NNIP1-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Nom",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "dep",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "podle",
+   "charStart": 15,
+   "charEnd": 20,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 4,
+   "depRelation": "case",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "období",
+   "charStart": 21,
+   "charEnd": 27,
+   "lemma": "období",
+   "upos": "NOUN",
+   "xpos": "NNNS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Neut",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "a",
+   "charStart": 28,
+   "charEnd": 29,
+   "lemma": "a",
+   "upos": "CCONJ",
+   "xpos": "J^-------------",
+   "feats": {},
+   "depHead": 6,
+   "depRelation": "cc",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "středisek",
+   "charStart": 30,
+   "charEnd": 39,
+   "lemma": "středisko",
+   "upos": "NOUN",
+   "xpos": "NNNP2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Neut",
+    "Number": "Plur"
+   },
+   "depHead": 4,
+   "depRelation": "conj",
+   "depHeadIdx": 3
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 39
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

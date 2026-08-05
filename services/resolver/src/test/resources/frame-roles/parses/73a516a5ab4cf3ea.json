@@ -1,0 +1,79 @@
+{
+ "tokens": [
+  {
+   "text": "Porovnej",
+   "charStart": 0,
+   "charEnd": 8,
+   "lemma": "porovnat",
+   "upos": "VERB",
+   "xpos": "Vi-S---2--A-P--",
+   "feats": {
+    "Aspect": "Perf",
+    "Mood": "Imp",
+    "Number": "Sing",
+    "Person": "2",
+    "Polarity": "Pos",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "to",
+   "charStart": 9,
+   "charEnd": 11,
+   "lemma": "ten",
+   "upos": "DET",
+   "xpos": "PDNS1----------",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Neut",
+    "Number": "Sing",
+    "PronType": "Dem"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "s",
+   "charStart": 12,
+   "charEnd": 13,
+   "lemma": "s",
+   "upos": "ADP",
+   "xpos": "RR--7----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Ins"
+   },
+   "depHead": 4,
+   "depRelation": "case",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "loňskem",
+   "charStart": 14,
+   "charEnd": 21,
+   "lemma": "loňsko",
+   "upos": "NOUN",
+   "xpos": "NNNS7-----A----",
+   "feats": {
+    "Case": "Ins",
+    "Gender": "Neut",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 21
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

@@ -1,0 +1,113 @@
+{
+ "tokens": [
+  {
+   "text": "Ukaž",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "ukázat",
+   "upos": "VERB",
+   "xpos": "Vi-S---2--A-P--",
+   "feats": {
+    "Aspect": "Perf",
+    "Mood": "Imp",
+    "Number": "Plur",
+    "Person": "2",
+    "Polarity": "Pos",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "tržby",
+   "charStart": 5,
+   "charEnd": 10,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP4-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "značky",
+   "charStart": 11,
+   "charEnd": 17,
+   "lemma": "značka",
+   "upos": "NOUN",
+   "xpos": "NNFS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "Nike",
+   "charStart": 18,
+   "charEnd": 22,
+   "lemma": "Nike",
+   "upos": "PROPN",
+   "xpos": "NNIS1-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Nom",
+    "Gender": "Masc",
+    "NameType": "Oth",
+    "Number": "Sing"
+   },
+   "depHead": 3,
+   "depRelation": "nmod",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "podle",
+   "charStart": 23,
+   "charEnd": 28,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "měsíce",
+   "charStart": 29,
+   "charEnd": 35,
+   "lemma": "měsíc",
+   "upos": "NOUN",
+   "xpos": "NNIS2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 35
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

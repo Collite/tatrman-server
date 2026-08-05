@@ -1,0 +1,110 @@
+{
+ "tokens": [
+  {
+   "text": "Zobraz",
+   "charStart": 0,
+   "charEnd": 6,
+   "lemma": "zobraz",
+   "upos": "NOUN",
+   "xpos": "NNFS1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "tržby",
+   "charStart": 7,
+   "charEnd": 12,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "dep",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "čerpacích",
+   "charStart": 13,
+   "charEnd": 22,
+   "lemma": "čerpací",
+   "upos": "ADJ",
+   "xpos": "AAFP2----1A----",
+   "feats": {
+    "Case": "Gen",
+    "Degree": "Pos",
+    "Gender": "Fem",
+    "Number": "Plur",
+    "Polarity": "Pos"
+   },
+   "depHead": 4,
+   "depRelation": "amod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "stanic",
+   "charStart": 23,
+   "charEnd": 29,
+   "lemma": "stanice",
+   "upos": "NOUN",
+   "xpos": "NNFP2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "podle",
+   "charStart": 30,
+   "charEnd": 35,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "měsíce",
+   "charStart": 36,
+   "charEnd": 42,
+   "lemma": "měsíc",
+   "upos": "NOUN",
+   "xpos": "NNIS2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 42
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

@@ -20,11 +20,20 @@ data class ResolverRegistry(
  * `term`/`entityAliases` for er/db/md kinds) that Q-20's anchored span proposal
  * ties content subtrees to; [categories] are the fuzzy categories a span gated to
  * this type is matched against (one BatchMatch slot per proposed span).
+ *
+ * [objectKind] is what the ref IS in the model — `measure` | `dimension` | `attribute` |
+ * `entity` | `operator` — and frame-role derivation reads it before it reads any syntax
+ * (RV-P2.1, Q-15 rule R2: "a measure IS the measure", which is what keeps *podle tržby* an
+ * ORDER-BY instead of a GROUP-BY). ⚠ Only the per-request `Registry` override carries it
+ * today: the snapshot channel's [org.tatrman.resolver.registry.DeclaredVocabulary] has no
+ * object kind — it mirrors lex-matcher's vocabulary source field-for-field (RS-24), and the
+ * model facts live on the other side of the RO-13 snapshot reader. Blank ⇒ R2 does not fire.
  */
 data class ResolverEntityType(
     val ref: String,
     val categories: List<String>,
     val anchors: List<String>,
+    val objectKind: String = "",
 )
 
 /**

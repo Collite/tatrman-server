@@ -1,0 +1,206 @@
+{
+ "tokens": [
+  {
+   "text": "What",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "what",
+   "upos": "PRON",
+   "xpos": "WP",
+   "feats": {
+    "PronType": "Int"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "is",
+   "charStart": 5,
+   "charEnd": 7,
+   "lemma": "be",
+   "upos": "AUX",
+   "xpos": "VBZ",
+   "feats": {
+    "Mood": "Ind",
+    "Number": "Sing",
+    "Person": "3",
+    "Tense": "Pres",
+    "VerbForm": "Fin"
+   },
+   "depHead": 1,
+   "depRelation": "cop",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "the",
+   "charStart": 8,
+   "charEnd": 11,
+   "lemma": "the",
+   "upos": "DET",
+   "xpos": "DT",
+   "feats": {
+    "Definite": "Def",
+    "PronType": "Art"
+   },
+   "depHead": 7,
+   "depRelation": "det",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "on",
+   "charStart": 12,
+   "charEnd": 14,
+   "lemma": "on",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "-",
+   "charStart": 14,
+   "charEnd": 15,
+   "lemma": "-",
+   "upos": "PUNCT",
+   "xpos": "HYPH",
+   "feats": {},
+   "depHead": 4,
+   "depRelation": "punct",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "hand",
+   "charStart": 15,
+   "charEnd": 19,
+   "lemma": "hand",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 7,
+   "depRelation": "compound",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "quantity",
+   "charStart": 20,
+   "charEnd": 28,
+   "lemma": "quantity",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "nsubj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "for",
+   "charStart": 29,
+   "charEnd": 32,
+   "lemma": "for",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 9,
+   "depRelation": "case",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "Reno",
+   "charStart": 33,
+   "charEnd": 37,
+   "lemma": "Reno",
+   "upos": "PROPN",
+   "xpos": "NNP",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 7,
+   "depRelation": "nmod",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "DC",
+   "charStart": 38,
+   "charEnd": 40,
+   "lemma": "DC",
+   "upos": "PROPN",
+   "xpos": "NNP",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 9,
+   "depRelation": "flat",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "by",
+   "charStart": 41,
+   "charEnd": 43,
+   "lemma": "by",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 12,
+   "depRelation": "case",
+   "depHeadIdx": 11
+  },
+  {
+   "text": "week",
+   "charStart": 44,
+   "charEnd": 48,
+   "lemma": "week",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 7,
+   "depRelation": "nmod",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "?",
+   "charStart": 48,
+   "charEnd": 49,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": ".",
+   "feats": {},
+   "depHead": 1,
+   "depRelation": "punct",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [
+  {
+   "text": "Reno DC",
+   "label": "GPE",
+   "charStart": 33,
+   "charEnd": 40,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  },
+  {
+   "text": "week",
+   "label": "DATE",
+   "charStart": 44,
+   "charEnd": 48,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  }
+ ],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 49
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

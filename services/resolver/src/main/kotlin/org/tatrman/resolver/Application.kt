@@ -31,6 +31,7 @@ import org.tatrman.resolver.mcp.ResolveDoor
 import org.tatrman.resolver.mcp.ResolveDoorHandler
 import org.tatrman.resolver.mcp.installResolveDoor
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.pipeline.FrameRolePreps
 import org.tatrman.resolver.pipeline.ResolverPipeline
 import org.tatrman.resolver.registry.LiveMetadataRegistryAdapter
 import org.tatrman.resolver.registry.SnapshotRegistry
@@ -86,7 +87,15 @@ fun Application.module(config: Config) {
     // (rotation window). Key management is chart discipline (S-3).
     val tokenCodec = buildResumeTokenCodec(config)
 
-    val pipeline = ResolverPipeline(nlpClient, fuzzyClient, registry, siblings = emptyMap(), tokenCodec = tokenCodec)
+    val pipeline =
+        ResolverPipeline(
+            nlpClient,
+            fuzzyClient,
+            registry,
+            siblings = emptyMap(),
+            tokenCodec = tokenCodec,
+            preps = FrameRolePreps.load(config),
+        )
     val resolverService = ResolverGrpcService(pipeline)
 
     val grpcServer =

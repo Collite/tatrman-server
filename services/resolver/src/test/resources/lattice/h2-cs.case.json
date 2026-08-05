@@ -1,0 +1,116 @@
+{
+  "id": "h2-cs",
+  "source": "issues.md §Not admitting not knowing the entity (2026-07-28) + design.md H2",
+  "expect": "the two failures the live Resolver had, now typed: `čerpacích stanic` binds to nothing in this estate => G1_UNBOUND on the mention (NOT a forced binding), and `Praze` is a universal LOCATION hint nothing attributes => G3_UNATTRIBUTED. `prvních 10` is an operator with its argument, and `12 měsíců` grounds — neither is a gap. Also the RV-P1.6.T6 negative: this estate ships no `ground:` rows, so nothing here is annotated with one — and `Praze` stays a G3 rather than being handed to geo, because the geo slice is category words only (the parked gazetteer boundary, T5).",
+  "text": "Zobraz prvních 10 čerpacích stanic v Praze podle tržby za 12 měsíců.",
+  "locale": "cs",
+  "parseFile": "h2-cs.parse.json",
+  "registry": {
+    "entityTypes": [
+      {
+        "ref": "op:show",
+        "categories": [
+          "op:show"
+        ],
+        "anchors": [
+          "zobraz"
+        ],
+        "objectKind": "operator"
+      },
+      {
+        "ref": "op:top-n",
+        "categories": [
+          "op:top-n"
+        ],
+        "anchors": [
+          "první"
+        ],
+        "objectKind": "operator"
+      },
+      {
+        "ref": "md.measure.revenue",
+        "categories": [
+          "md.measure.revenue"
+        ],
+        "anchors": [
+          "tržba"
+        ],
+        "objectKind": "measure"
+      },
+      {
+        "ref": "md.dimension.Calendar.month",
+        "categories": [
+          "md.dimension.Calendar.month"
+        ],
+        "anchors": [
+          "měsíc"
+        ],
+        "objectKind": "attribute"
+      }
+    ],
+    "locales": [
+      "cs"
+    ],
+    "snapshotHash": "snap-h2"
+  },
+  "matcher": {
+    "vocabularyVersion": "lex-h2-vocab",
+    "layerVersions": {
+      "lexiconArtifactHash": "sha256:h2-lexicon",
+      "memberIndexVersions": {}
+    },
+    "byQuery": {
+      "Zobraz": [
+        {
+          "candidateId": "lex:op:show:zobraz",
+          "candidate": "zobraz",
+          "score": 1.0,
+          "category": "op:show",
+          "source": "DECLARED",
+          "targetRef": "op:show",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "prvních": [
+        {
+          "candidateId": "lex:op:top-n:prvnich",
+          "candidate": "prvních",
+          "score": 1.0,
+          "category": "op:top-n",
+          "source": "DECLARED",
+          "targetRef": "op:top-n",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "tržby": [
+        {
+          "candidateId": "lex:md.measure.revenue:trzby",
+          "candidate": "tržby",
+          "score": 1.0,
+          "category": "md.measure.revenue",
+          "source": "DECLARED",
+          "targetRef": "md.measure.revenue",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ]
+    }
+  }
+}

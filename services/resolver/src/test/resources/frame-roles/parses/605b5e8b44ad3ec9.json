@@ -1,0 +1,188 @@
+{
+ "tokens": [
+  {
+   "text": "Které",
+   "charStart": 0,
+   "charEnd": 5,
+   "lemma": "který",
+   "upos": "DET",
+   "xpos": "P4FP1----------",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur",
+    "PronType": "Int,Rel"
+   },
+   "depHead": 2,
+   "depRelation": "det",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "položky",
+   "charStart": 6,
+   "charEnd": 13,
+   "lemma": "položka",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 4,
+   "depRelation": "nsubj",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "nebyly",
+   "charStart": 14,
+   "charEnd": 20,
+   "lemma": "být",
+   "upos": "AUX",
+   "xpos": "VpTP----R-NAI--",
+   "feats": {
+    "Animacy": "Inan",
+    "Aspect": "Imp",
+    "Gender": "Fem,Masc",
+    "Number": "Plur",
+    "Polarity": "Neg",
+    "Tense": "Past",
+    "VerbForm": "Part",
+    "Voice": "Act"
+   },
+   "depHead": 4,
+   "depRelation": "cop",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "skladem",
+   "charStart": 21,
+   "charEnd": 28,
+   "lemma": "sklad",
+   "upos": "NOUN",
+   "xpos": "NNIS7-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Ins",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "v",
+   "charStart": 29,
+   "charEnd": 30,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "Brno",
+   "charStart": 31,
+   "charEnd": 35,
+   "lemma": "Brno",
+   "upos": "PROPN",
+   "xpos": "NNNS4-----A----",
+   "feats": {
+    "Case": "Loc",
+    "Gender": "Neut",
+    "NameType": "Geo",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "DC",
+   "charStart": 36,
+   "charEnd": 38,
+   "lemma": "DC",
+   "upos": "NOUN",
+   "xpos": "BNXXX-----A----",
+   "feats": {
+    "Abbr": "Yes"
+   },
+   "depHead": 6,
+   "depRelation": "nmod",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "v",
+   "charStart": 39,
+   "charEnd": 40,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 9,
+   "depRelation": "case",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "říjnu",
+   "charStart": 41,
+   "charEnd": 46,
+   "lemma": "říjen",
+   "upos": "NOUN",
+   "xpos": "NNIS6-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Loc",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "obl",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "2025",
+   "charStart": 47,
+   "charEnd": 51,
+   "lemma": "2025",
+   "upos": "NUM",
+   "xpos": "C=-------------",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 9,
+   "depRelation": "nummod",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "?",
+   "charStart": 51,
+   "charEnd": 52,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 4,
+   "depRelation": "punct",
+   "depHeadIdx": 3
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 52
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

@@ -1,23 +1,48 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.resolver.pipeline
 
+import org.tatrman.fuzzy.v1.FuzzyMatch
+
 /**
  * The outcome of gating the proposed spans against the vocabulary (RG-P5.S1.T4).
  * A resolve is EITHER fully bound OR awaiting clarification (the proto `outcome`
  * oneof) — instance ambiguity anywhere forces [Clarify] (refuse-over-guess, RS-26).
  */
-sealed interface GateOutcome
+sealed interface GateOutcome {
+    /**
+     * RV-P2.1 — what the gate saw, span by span, whichever way the outcome went. The
+     * `Bound`/`Clarify` split above answers "what does the door return"; this answers
+     * "what does the lattice say", and the two are different questions: a span that
+     * matched NOTHING contributes to neither a binding nor an option, and is precisely
+     * the G1 the lattice exists to record.
+     */
+    val gated: List<GatedSpan>
+}
 
 /** All spans bound with no unresolved instance ambiguity. */
 data class Bound(
     val bindings: List<DomainBinding>,
     val confidence: Double,
+    override val gated: List<GatedSpan> = emptyList(),
 ) : GateOutcome
 
 /** At least one span was ambiguous among distinct instances — ask, don't guess. */
 data class Clarify(
     val options: List<ClarificationOption>,
+    override val gated: List<GatedSpan> = emptyList(),
 ) : GateOutcome
+
+/**
+ * One proposed span and every candidate that survived the gate's thresholds, in score
+ * order. [ambiguous] is the refuse-over-guess verdict for THIS span: two or more distinct
+ * identities in the contender band, which the door renders as a clarification and the
+ * lattice as a mention with several bindings plus a G2 gap.
+ */
+data class GatedSpan(
+    val candidate: DomainSpanCandidate,
+    val contenders: List<FuzzyMatch>,
+    val ambiguous: Boolean,
+)
 
 /**
  * One resolved domain binding (internal model; T5 maps it to the `EntityBinding`

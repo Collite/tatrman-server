@@ -1,0 +1,150 @@
+{
+ "tokens": [
+  {
+   "text": "Top",
+   "charStart": 0,
+   "charEnd": 3,
+   "lemma": "top",
+   "upos": "ADJ",
+   "xpos": "JJ",
+   "feats": {
+    "Degree": "Pos"
+   },
+   "depHead": 4,
+   "depRelation": "amod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "10",
+   "charStart": 4,
+   "charEnd": 6,
+   "lemma": "10",
+   "upos": "NUM",
+   "xpos": "CD",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 4,
+   "depRelation": "nummod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "gas",
+   "charStart": 7,
+   "charEnd": 10,
+   "lemma": "gas",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "compound",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "stations",
+   "charStart": 11,
+   "charEnd": 19,
+   "lemma": "station",
+   "upos": "NOUN",
+   "xpos": "NNS",
+   "feats": {
+    "Number": "Plur"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "in",
+   "charStart": 20,
+   "charEnd": 22,
+   "lemma": "in",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "Prague",
+   "charStart": 23,
+   "charEnd": 29,
+   "lemma": "Prague",
+   "upos": "PROPN",
+   "xpos": "NNP",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "by",
+   "charStart": 30,
+   "charEnd": 32,
+   "lemma": "by",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 8,
+   "depRelation": "case",
+   "depHeadIdx": 7
+  },
+  {
+   "text": "revenue",
+   "charStart": 33,
+   "charEnd": 40,
+   "lemma": "revenue",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": ".",
+   "charStart": 40,
+   "charEnd": 41,
+   "lemma": ".",
+   "upos": "PUNCT",
+   "xpos": ".",
+   "feats": {},
+   "depHead": 4,
+   "depRelation": "punct",
+   "depHeadIdx": 3
+  }
+ ],
+ "entities": [
+  {
+   "text": "10",
+   "label": "CARDINAL",
+   "charStart": 4,
+   "charEnd": 6,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  },
+  {
+   "text": "Prague",
+   "label": "GPE",
+   "charStart": 23,
+   "charEnd": 29,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  }
+ ],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 41
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

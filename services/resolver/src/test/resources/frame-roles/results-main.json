@@ -1,0 +1,95 @@
+{
+  "fixtures_file": "fixtures.yaml",
+  "corpus": {
+    "cs": 29,
+    "en": 10
+  },
+  "fixtures": 39,
+  "scored_mentions": 137,
+  "roles": {
+    "SUBJECT": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 38,
+      "fp": 0,
+      "fn": 0
+    },
+    "MEASURE": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 39,
+      "fp": 0,
+      "fn": 0
+    },
+    "FILTER": {
+      "precision": 1.0,
+      "recall": 0.9737,
+      "f1": 0.9867,
+      "tp": 37,
+      "fp": 0,
+      "fn": 1
+    },
+    "GROUPING": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 20,
+      "fp": 0,
+      "fn": 0
+    }
+  },
+  "confusion": {
+    "SUBJECT": {
+      "SUBJECT": 38,
+      "MEASURE": 32,
+      "FILTER": 0,
+      "GROUPING": 0,
+      "NONE": 0
+    },
+    "MEASURE": {
+      "SUBJECT": 32,
+      "MEASURE": 39,
+      "FILTER": 0,
+      "GROUPING": 0,
+      "NONE": 0
+    },
+    "FILTER": {
+      "SUBJECT": 0,
+      "MEASURE": 0,
+      "FILTER": 37,
+      "GROUPING": 0,
+      "NONE": 1
+    },
+    "GROUPING": {
+      "SUBJECT": 0,
+      "MEASURE": 0,
+      "FILTER": 0,
+      "GROUPING": 20,
+      "NONE": 0
+    },
+    "NONE": {
+      "SUBJECT": 0,
+      "MEASURE": 0,
+      "FILTER": 0,
+      "GROUPING": 0,
+      "NONE": 34
+    }
+  },
+  "mismatches": [
+    {
+      "mention": "hl-unbound-member-cs#2",
+      "span": "čerpacích stanic",
+      "gold": [
+        "FILTER"
+      ],
+      "predicted": []
+    }
+  ],
+  "gate": {
+    "subject_precision_target": 0.85,
+    "other_recall_target": 0.7,
+    "passed": true
+  }
+}

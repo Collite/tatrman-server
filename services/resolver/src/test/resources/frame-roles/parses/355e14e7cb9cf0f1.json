@@ -1,0 +1,107 @@
+{
+ "tokens": [
+  {
+   "text": "revenue",
+   "charStart": 0,
+   "charEnd": 7,
+   "lemma": "revenue",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "by",
+   "charStart": 8,
+   "charEnd": 10,
+   "lemma": "by",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 3,
+   "depRelation": "case",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "manufacturer",
+   "charStart": 11,
+   "charEnd": 23,
+   "lemma": "manufacturer",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "nmod",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "for",
+   "charStart": 24,
+   "charEnd": 27,
+   "lemma": "for",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 7,
+   "depRelation": "case",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "the",
+   "charStart": 28,
+   "charEnd": 31,
+   "lemma": "the",
+   "upos": "DET",
+   "xpos": "DT",
+   "feats": {
+    "Definite": "Def",
+    "PronType": "Art"
+   },
+   "depHead": 7,
+   "depRelation": "det",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "Books",
+   "charStart": 32,
+   "charEnd": 37,
+   "lemma": "book",
+   "upos": "PROPN",
+   "xpos": "NNPS",
+   "feats": {
+    "Number": "Plur"
+   },
+   "depHead": 7,
+   "depRelation": "compound",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "category",
+   "charStart": 38,
+   "charEnd": 46,
+   "lemma": "category",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "nmod",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 46
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

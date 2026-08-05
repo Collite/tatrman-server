@@ -1,0 +1,67 @@
+{
+ "tokens": [
+  {
+   "text": "Show",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "show",
+   "upos": "VERB",
+   "xpos": "VB",
+   "feats": {
+    "Mood": "Imp",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "revenue",
+   "charStart": 5,
+   "charEnd": 12,
+   "lemma": "revenue",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "by",
+   "charStart": 13,
+   "charEnd": 15,
+   "lemma": "by",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 4,
+   "depRelation": "case",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "store",
+   "charStart": 16,
+   "charEnd": 21,
+   "lemma": "store",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 21
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

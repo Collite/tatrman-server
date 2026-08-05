@@ -1,0 +1,97 @@
+{
+ "tokens": [
+  {
+   "text": "Ukaž",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "ukázat",
+   "upos": "VERB",
+   "xpos": "Vi-P---1--A-P--",
+   "feats": {
+    "Aspect": "Perf",
+    "Mood": "Imp",
+    "Number": "Plur",
+    "Person": "2",
+    "Polarity": "Pos",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "vratky",
+   "charStart": 5,
+   "charEnd": 11,
+   "lemma": "vratek",
+   "upos": "NOUN",
+   "xpos": "NNIP4-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Nom",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "podle",
+   "charStart": 12,
+   "charEnd": 17,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 4,
+   "depRelation": "case",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "důvodu",
+   "charStart": 18,
+   "charEnd": 24,
+   "lemma": "důvod",
+   "upos": "NOUN",
+   "xpos": "NNIS2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "vrácení",
+   "charStart": 25,
+   "charEnd": 32,
+   "lemma": "vrácení",
+   "upos": "NOUN",
+   "xpos": "NNNS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Neut",
+    "Number": "Sing",
+    "VerbForm": "Vnoun"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 32
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

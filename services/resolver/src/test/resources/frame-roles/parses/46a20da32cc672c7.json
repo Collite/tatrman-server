@@ -1,0 +1,134 @@
+{
+ "tokens": [
+  {
+   "text": "How",
+   "charStart": 0,
+   "charEnd": 3,
+   "lemma": "how",
+   "upos": "ADV",
+   "xpos": "WRB",
+   "feats": {
+    "PronType": "Int"
+   },
+   "depHead": 5,
+   "depRelation": "advmod",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "did",
+   "charStart": 4,
+   "charEnd": 7,
+   "lemma": "do",
+   "upos": "AUX",
+   "xpos": "VBD",
+   "feats": {
+    "Mood": "Ind",
+    "Number": "Sing",
+    "Person": "3",
+    "Tense": "Past",
+    "VerbForm": "Fin"
+   },
+   "depHead": 5,
+   "depRelation": "aux",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "marketplace",
+   "charStart": 8,
+   "charEnd": 19,
+   "lemma": "marketplace",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "compound",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "revenue",
+   "charStart": 20,
+   "charEnd": 27,
+   "lemma": "revenue",
+   "upos": "NOUN",
+   "xpos": "NN",
+   "feats": {
+    "Number": "Sing"
+   },
+   "depHead": 5,
+   "depRelation": "nsubj",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "develop",
+   "charStart": 28,
+   "charEnd": 35,
+   "lemma": "develop",
+   "upos": "VERB",
+   "xpos": "VB",
+   "feats": {
+    "VerbForm": "Inf"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "in",
+   "charStart": 36,
+   "charEnd": 38,
+   "lemma": "in",
+   "upos": "ADP",
+   "xpos": "IN",
+   "feats": {},
+   "depHead": 7,
+   "depRelation": "case",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "2025",
+   "charStart": 39,
+   "charEnd": 43,
+   "lemma": "2025",
+   "upos": "NUM",
+   "xpos": "CD",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 5,
+   "depRelation": "obl",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "?",
+   "charStart": 43,
+   "charEnd": 44,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": ".",
+   "feats": {},
+   "depHead": 5,
+   "depRelation": "punct",
+   "depHeadIdx": 4
+  }
+ ],
+ "entities": [
+  {
+   "text": "2025",
+   "label": "DATE",
+   "charStart": 39,
+   "charEnd": 43,
+   "normalizedValue": "",
+   "sourceEngine": "stanza"
+  }
+ ],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 44
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}
