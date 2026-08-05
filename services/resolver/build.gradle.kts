@@ -104,6 +104,14 @@ dependencies {
     implementation(libs.grpc.services)
     implementation(libs.kotlinx.serialization.json)
 
+    // RV-P1.6.T6 (RV-42) — the CLOSED `ground:` kind vocabulary, taken from the artifact that
+    // defines it (`LexiconValidator.GROUNDING_KINDS`) rather than mirrored here. The core asks
+    // lex-matcher which grounding kernel claims a span, and the set of kernels it may ask about is
+    // the producer's to state; a copy in this repo would be a second rule free to drift from the
+    // first. Reading it costs the artifact model only — ttr-lexicon is a leaf (kotlinx-json +
+    // snakeyaml), and NOT the compiler, which is what the P1.2 (a3) ruling buys.
+    implementation(libs.tatrman.ttr.lexicon)
+
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
     testImplementation(libs.grpc.inprocess)

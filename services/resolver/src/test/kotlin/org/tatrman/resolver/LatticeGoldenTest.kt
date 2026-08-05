@@ -171,8 +171,7 @@ class LatticeGoldenTest :
                         .newBuilder()
                         .addAllMatches(
                             byQuery[span.query].orEmpty().filter { scoped.isEmpty() || it.category in scoped },
-                        )
-                        .setMatchedAlgorithm("TATRMAN")
+                        ).setMatchedAlgorithm("TATRMAN")
                         .setVocabularyVersion(vocabularyVersion)
                         .setLayerVersions(layerVersions),
                 )

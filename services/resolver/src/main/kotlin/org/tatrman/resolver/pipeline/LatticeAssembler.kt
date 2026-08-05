@@ -6,6 +6,7 @@ import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.v1.Attribution
+import org.tatrman.resolver.v1.Binding
 import org.tatrman.resolver.v1.Grounding
 import org.tatrman.resolver.v1.LexiconVersions
 import org.tatrman.resolver.v1.Mention
@@ -15,6 +16,7 @@ import org.tatrman.resolver.v1.Span
 import org.tatrman.resolver.v1.TargetClass
 import org.tatrman.resolver.v1.ValueFinding
 import org.tatrman.resolver.v1.ValueKind
+import org.tatrman.ttr.lexicon.LexiconValidator
 
 /**
  * RV-P2.1.T4 — the annotation lattice (contracts §1), assembled from what the deterministic
@@ -43,6 +45,10 @@ object LatticeAssembler {
         lang: String,
         preps: FrameRolePreps,
         degraded: Boolean = false,
+        // RV-P1.6.T6 — the `ground:` slices that claimed each span, keyed by (start, end). Empty
+        // for an estate that ships no grounding vocabulary, which is every estate until the P3
+        // delivery chain lands, and the lattice is then exactly what P2.1 emitted.
+        triggers: Map<Pair<Int, Int>, List<Binding>> = emptyMap(),
     ): ResolutionState {
         val gatedByLayer = gate.gated.groupBy { layerOf(it) }
         val mentionSpans =
@@ -61,6 +67,10 @@ object LatticeAssembler {
                 for (match in span.contenders) {
                     builder.addBindings(Bindings.of(match, span.candidate, thresholds, snapshotHash))
                 }
+                // LAST, deliberately (RV-42): a grounding trigger is evidence about which KERNEL
+                // owns the span, not about which model object the mention is, and the top binding
+                // is what frame-role derivation lets speak for the mention.
+                builder.addAllBindings(triggers[span.candidate.start to span.candidate.end].orEmpty())
                 builder
             }
         // Which mention a literal's scope came from — resolvable only now that ids exist. An
@@ -90,24 +100,55 @@ object LatticeAssembler {
                 }
                 builder
             }
+        // Which mention carries a trigger, by the token it heads (RV-P1.6.T6). A separate map from
+        // `mentionIdByHead` above and NOT a reuse of it: that one answers "whose categories scoped
+        // this lookup?" and therefore admits only bound mentions, while a trigger lends no
+        // categories at all — it names a kernel, and an otherwise unbound mention can do that.
+        val triggerByHead =
+            mentionSpans
+                .zip(mentionBuilders)
+                .mapNotNull { (span, mention) ->
+                    if (span.candidate.headToken < 0) return@mapNotNull null
+                    val kind =
+                        mention.bindingsList
+                            .firstNotNullOfOrNull { GroundingTriggers.kindOf(it.ref).ifBlank { null } }
+                            ?: return@mapNotNull null
+                    span.candidate.headToken to TriggerAnchor(mention.id, kind)
+                }.toMap()
+
+        // A grounded span whose trigger-carrying mention governs it: "the user said *roce*, so the
+        // year beside it is chrono's". Recorded on `Grounding.ref` — the field the contract already
+        // defines for it — and deliberately NOT on `anchor_mention_id`, whose documented meaning is
+        // the categories that scoped an ATTRIBUTION lookup and which Gaps reads to tell G3 from G4.
+        // Overloading it would turn every trigger next to an unattributed literal into a method miss.
+        val narrowed = mutableListOf<Pair<ValueFinding.Builder, String>>()
         val groundedValues =
             universals.map { universal ->
-                ValueFinding
-                    .newBuilder()
-                    .setSpan(span(universal.start, universal.end, universal.text))
-                    .setKind(ValueKind.VALUE_KIND_GROUNDED)
-                    .setGrounding(
-                        Grounding
-                            .newBuilder()
-                            .setKernel(universal.sourceEngine)
-                            .setKind(universal.entityType.name)
-                            .setNormalizedValue(universal.normalizedValue),
-                    )
+                val anchor = triggerAnchorOf(universal, parse, triggerByHead)
+                val grounding =
+                    Grounding
+                        .newBuilder()
+                        .setKernel(universal.sourceEngine)
+                        .setKind(universal.entityType.name)
+                        .setNormalizedValue(universal.normalizedValue)
+                val builder =
+                    ValueFinding
+                        .newBuilder()
+                        .setSpan(span(universal.start, universal.end, universal.text))
+                        .setKind(ValueKind.VALUE_KIND_GROUNDED)
+                // Only when the two independent statements AGREE: the universal layer says what
+                // kind of thing this is, the trigger says which kernel claimed the words beside it.
+                if (anchor != null && GroundingTriggers.kernelOf(universal.entityType) == anchor.kind) {
+                    grounding.ref = LexiconValidator.GROUND_PREFIX + anchor.kind
+                    narrowed += builder to anchor.mentionId
+                }
+                builder.setGrounding(grounding)
             }
-        val values =
+        val valueBuilders =
             (gatedValues + groundedValues)
                 .sortedWith(compareBy({ it.span.start }, { it.span.end }))
-                .mapIndexed { i, builder -> builder.setId("v${i + 1}").build() }
+                .mapIndexed { i, builder -> builder.setId("v${i + 1}") }
+        val values = valueBuilders.map { it.build() }
 
         // Frame roles are a post-binding, pre-emit stage (RV-21): they read the parse AND the
         // bindings, and the anchor relation between a value and its mention is one of their
@@ -168,11 +209,61 @@ object LatticeAssembler {
                 .setBindingsAdded(mentions.sumOf { it.bindingsCount } + values.sumOf { it.attributionsCount })
                 .setGapsOpen(gaps.size),
         )
+        // The narrowing itself (RV-42, GI-14 extended to grounding): one entry per trigger-carrying
+        // mention, naming the values its kernel now owns. This is the audit trail for a decision
+        // the core makes and someone else acts on — a caller reads "chrono, on m4, for v2" instead
+        // of offering the whole question to all three kernels. A mention with no value under it
+        // still gets an entry: the span is chrono's whether or not the universal layer typed
+        // anything beside it. No counters here — `bindings_added`/`gaps_open` describe the PASS,
+        // and the pass has exactly one `annotate` entry.
+        val narrowings = narrowed.groupBy({ it.second }, { it.first.id })
+        for (mention in mentions) {
+            val kind = mention.bindingsList.firstNotNullOfOrNull { GroundingTriggers.kindOf(it.ref).ifBlank { null } }
+            if (kind == null) continue
+            builder.addRungLog(
+                RungLogEntry
+                    .newBuilder()
+                    .setRung(CORE_RUNG)
+                    .setAction(GROUND_NARROW_ACTION)
+                    .addMentionIds(mention.id)
+                    .addAllValueIds(narrowings[mention.id].orEmpty()),
+            )
+        }
         return builder.build()
     }
 
     /** The rung name the core writes for its own deterministic pass (contracts §3 vocabulary). */
     const val CORE_RUNG: String = "core"
+
+    /** The action a grounding narrowing is logged under (RV-42) — see the emit site above. */
+    const val GROUND_NARROW_ACTION: String = "ground-narrow"
+
+    /** A trigger-carrying mention, as the value layer needs to see it. */
+    private data class TriggerAnchor(
+        val mentionId: String,
+        val kind: String,
+    )
+
+    /**
+     * The trigger-carrying mention that GOVERNS a grounded span, via the dep parse.
+     *
+     * Syntax, not proximity: *"v roce 2025"* attaches `2025` to `roce`, and adjacency would just as
+     * happily attach it to whatever the next question puts next to it. Without a dep parse there is
+     * no government relation to read, and the honest answer is that nothing was narrowed.
+     */
+    private fun triggerAnchorOf(
+        universal: UniversalBinding,
+        parse: AnalyzeResponse,
+        triggerByHead: Map<Int, TriggerAnchor>,
+    ): TriggerAnchor? {
+        if (triggerByHead.isEmpty()) return null
+        val tokens = parse.tokensList
+        return tokens.indices
+            .asSequence()
+            .filter { tokens[it].charStart >= universal.start && tokens[it].charEnd <= universal.end }
+            .mapNotNull { triggerByHead[tokens[it].depHead - 1] }
+            .firstOrNull()
+    }
 
     /**
      * What the mention's target IS in the model. The binding's own ref answers it for a model

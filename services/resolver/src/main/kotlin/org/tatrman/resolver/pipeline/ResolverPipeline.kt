@@ -98,12 +98,21 @@ class ResolverPipeline(
 
         val universals = if (assessment.csNer) UniversalExtraction.extractUniversal(parse) else emptyList()
         val candidates = SpanProposal.proposeDomainSpans(parse, resolverRegistry.entityTypes)
+        // The mention layer is derived BEFORE the batch now (RV-P1.6.T6): a mention nothing in the
+        // model binds can still be a grounding trigger, and it can only be asked about in the one
+        // BatchMatch this pass makes. The gate reads slots [0, candidates), the trigger annotation
+        // reads the trailing ones — one round trip, two questions, kept apart.
+        val ungatedMentions = MentionLayer.propose(parse, candidates)
+        val triggerSpans = GroundingTriggers.spansOf(candidates, ungatedMentions)
         val batchReq =
-            GateSpans.buildBatchRequest(
-                candidates,
-                locale.ifBlank { null },
-                resolverRegistry.thresholds.maxOptions,
-            )
+            GateSpans
+                .buildBatchRequest(
+                    candidates,
+                    locale.ifBlank { null },
+                    resolverRegistry.thresholds.maxOptions,
+                ).toBuilder()
+                .addAllSpans(GroundingTriggers.queries(triggerSpans, resolverRegistry.thresholds.maxOptions))
+                .build()
         val batchResp = fuzzy.batchMatch(batchReq)
         val outcome =
             GateSpans.gate(
@@ -121,7 +130,7 @@ class ResolverPipeline(
             LatticeAssembler.assemble(
                 parse = parse,
                 gate = outcome,
-                ungatedMentions = MentionLayer.propose(parse, candidates),
+                ungatedMentions = ungatedMentions,
                 universals = universals,
                 entityTypes = resolverRegistry.entityTypes,
                 thresholds = resolverRegistry.thresholds,
@@ -130,6 +139,14 @@ class ResolverPipeline(
                 lang = assessment.language,
                 preps = preps,
                 degraded = assessment.degradedFloor,
+                triggers =
+                    GroundingTriggers.collect(
+                        triggerSpans,
+                        batchResp,
+                        offset = candidates.size,
+                        thresholds = resolverRegistry.thresholds,
+                        snapshotHash = resolverRegistry.snapshotHash,
+                    ),
             )
 
         val builder =
