@@ -249,6 +249,21 @@ conformance-verify-hashes:
         shasum -a 256 -c conformance/corpus-hashes.sha256
     fi
 
+# ── protos — the wire-compatibility baseline (RV-P2.1) ──────────────────────────
+#
+# `shared/proto/compat/wire-baseline.desc` is the record of every message, field
+# number, type and enum value that has already SHIPPED. ProtoCompatSpec diffs the
+# current protos against it on every `./gradlew build` and fails on anything that is
+# not purely additive (J-v2) — a removed field, a re-used tag, a renamed field (proto3
+# JSON is name-keyed), a moved enum value.
+#
+# Regenerating the baseline is how you ACCEPT a wire change, so it is a deliberate
+# commit and never automatic — the same discipline as `charts-golden`. Run this, read
+# the diff, and commit it together with the proto change it accepts.
+proto-baseline:
+    ./gradlew :shared:proto:refreshProtoBaseline
+    @echo "→ shared/proto/compat/wire-baseline.desc refreshed. REVIEW what it now accepts before committing."
+
 # ── charts — the SV-P4 umbrella (helm/tatrman-server) ───────────────────────────
 #
 # The product install: one umbrella chart subsuming the full service roster as
