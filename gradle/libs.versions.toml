@@ -3,8 +3,8 @@
 # https://docs.gradle.org/current/userguide/version_catalogs.html
 
 [versions]
-tatrman-grammar           = "0.11.1"
-tatrman-ttr-metadata      = "0.11.1"
+tatrman-grammar           = "0.12.0"
+tatrman-ttr-metadata      = "0.12.0"
 tatrman-ttr-translator    = "0.10.1"
 tatrman-ttr-plan-proto    = "0.10.1"
 # SV-P1 S4 — Maven Central publishing via the Central Portal.
