@@ -79,6 +79,16 @@ message EntityType {
   string ref = 1;                 // e.g. "md.measure.net", "er.entity.branch"
   repeated string categories = 2; // fuzzy categories to gate this type's spans
   repeated string anchors = 3;    // declared entity-type anchor words (Q-20 anchored gating)
+  // RV-P2.1 — what this ref IS in the model: `measure` | `dimension` | `attribute` |
+  // `entity` | `operator` (open vocabulary; unknown values are ignored, not rejected).
+  // Frame-role derivation is MODEL-driven before it is syntactic — "a measure IS the
+  // measure" is rule R2 of the Q-15 report, and it is the rule that keeps `podle tržby`
+  // an ORDER-BY instead of a GROUP-BY. Nothing in the RV rules reads the ref STRING
+  // (no `md.measure.*` matching), so the kind has to arrive as data.
+  // ⚠ Only the per-request override supplies it today: the snapshot channel's
+  // DeclaredVocabulary carries no object kind (it mirrors lex-matcher's source), and
+  // filling it needs the model-snapshot reader (RO-13). Empty ⇒ R2 does not fire.
+  string object_kind = 4;
 }
 
 // Gating thresholds — ported from the live ENTITIES_ONLY config (ResolverGraph).
@@ -100,6 +110,12 @@ message ResolveResponse {
   int64 elapsed_ms = 5;
   // RS-7 capability matrix echoed — what actually backed this resolve (F-T3 honesty).
   Capabilities capabilities = 6;
+  // RV-P2.1 (contracts §1) — the ANNOTATION LATTICE. Purely additive: `resolution` /
+  // `awaiting` above are unchanged and still decide the outcome, so every pre-RV client
+  // keeps working (ResolverCompatTest proves it). The lattice is what RV consumers read:
+  // it is the only surface that can express a mention that bound to NOTHING (G1), which
+  // is why RV-P3 cannot start before this field ships.
+  ResolutionState resolution_state = 7;
 }
 
 message Resolution {
@@ -184,6 +200,244 @@ message Option {
   // ambiguous span the flat option list would otherwise be unattributable
   // (RG-P6 review M); every option now names its span.
   Span span = 6;
+}
+
+// ============================================================================
+// RV-P2.1 — the annotation lattice (contracts §1, RV-9/RV-19/RV-21/RV-33)
+// ============================================================================
+//
+// Everything below is NEW. Nothing above changed meaning — J-v2 additive, and
+// `ResolverCompatTest` proves a pre-change client still parses a response that
+// carries a lattice.
+//
+// The lattice is the core's *annotation*, not its verdict: mentions carry 0..n
+// bindings (zero is a first-class unknown, P-3), values carry 0..n attributions,
+// and what could not be settled becomes a TYPED gap instead of a guess. The
+// Golem's RV-11 loop reads gaps, proposes hypotheses, and re-enters through the
+// gate (`resolve.gate:v1`, Q-13 = B) — it never binds anything itself (RV-7).
+
+message ResolutionState {
+  // The parse, carried INSIDE the lattice as well as at `ResolveResponse.parse`.
+  // Deliberate duplication: a lattice travels ALONE in the RV-26 delegation payload
+  // (`{resolution_state, intent, conversation_context, obo_token}` — never raw text),
+  // so a plugin that receives one must be able to read the dep graph, the lemmas and
+  // the S-1 engine identity (`used`) without the envelope it arrived in.
+  org.tatrman.nlp.v1.AnalyzeResponse parse = 1;
+  repeated Mention mentions = 2;      // in span order
+  repeated ValueFinding values = 3;   // in span order
+  repeated GapRecord gaps = 4;        // in span order
+  repeated RungLogEntry rung_log = 5; // round 0 = the core's own deterministic pass
+  LexiconVersions lexicon_versions = 6;
+}
+
+// The two-layer model (RV-2): a linguistic mention ⇄ 0..n candidate bindings.
+// A mention is a CONTENT NOMINAL PHRASE — what the question talks about. Literals
+// (codes, numbers, proper names, grounded spans) are the other layer, `ValueFinding`.
+message Mention {
+  string id = 1;                      // stable within one lattice: m1, m2, … in span order
+  Span span = 2;
+  string lemma = 3;                   // of the phrase's head token
+  // SUBJECT | MEASURE | FILTER | GROUPING (RV-21).
+  // ⚑ REPEATED, not singular, and this is the P0.2 spike's blocking finding: 32 of 137
+  // corpus mentions carry TWO roles at once — the measure-as-subject class ("tržby" in
+  // "Zobraz tržby podle prodejen" is what the question is ABOUT *and* the quantity
+  // aggregated), the most common shape in the corpus. Singular→repeated is additive only
+  // BEFORE the field ships, which is why it is done here and not later.
+  repeated FrameRole frame_roles = 4;
+  repeated Binding bindings = 5;      // 0..n; ZERO is a first-class unknown (P-3) ⇒ G1
+}
+
+// One candidate binding of a mention (or of a value, via `Attribution`). A binding is
+// evidence WITH a class, never a bare score: numeric score compares only WITHIN a class
+// (RV-14), which is what structurally kills the 0.667-on-a-six-digit-code garbage.
+message Binding {
+  // Uniform model-graph ref (RV-35/38): an `er.`/`db.`/`md.` object at any attribute
+  // depth, a member as `<attribute-ref>#<id>`, an `op:` skill trigger, or a `ground:` slice.
+  string ref = 1;
+  TargetClass target_class = 2;
+  EvidenceClass evidence_class = 3;
+  MatchMethod method = 4;             // RV-32; UNSPECIFIED = the row carried no authored method
+  // The three parameter slots are `optional` for the reason the P1.4 review found on the
+  // matcher: a proto3 default would MISREPORT them. `auto_bindable = false` means "do not
+  // auto-bind"; absent means "no uniqueness decision applies here", and those are different
+  // instructions to the caller.
+  optional int32 max_distance = 5;    // TYPOS(n) only
+  optional double uniqueness_margin = 6; // TOKENS only — how far this target beat the next one
+  optional bool auto_bindable = 7;    // TOKENS only — false ⇒ the caller MUST NOT auto-bind
+  SourceTag source = 8;               // which LAYER produced it (RV-39)
+  double in_class_score = 9;          // comparable only against the same evidence_class
+  // Producer + scoring method + snapshot identity (S-1/S-4). Reuses the existing
+  // `BindingProvenance` rather than minting a second provenance message: contracts §1
+  // sketches `Provenance producer`, and this is that field with the type this package
+  // already has. Per-binding `model_versions` are deliberately NOT repeated here — the
+  // S-1 engine identity rides `ResolutionState.parse.used`, once for the whole lattice.
+  BindingProvenance producer = 10;
+}
+
+// A literal in the question: a code, a number, a proper name, or a grounded span.
+// Values do not carry frame roles — the roles live on the mention layer (RV-21); a
+// value's structural position is its ANCHOR's.
+message ValueFinding {
+  string id = 1;                      // v1, v2, … in span order
+  Span span = 2;
+  ValueKind kind = 3;
+  repeated Attribution attributions = 4;  // 0..n; zero ⇒ G3/G4 unless the value grounds itself
+  Grounding grounding = 5;                // set iff kind = GROUNDED
+  // The BOUND mention whose categories scoped the lookup — "the user said *account*, so
+  // check 501001 against account.code first" (RV-33). Empty when nothing scoped it, and
+  // that emptiness is exactly what separates G3 (nothing to miss) from G4 (a known scope
+  // that missed). An unbound neighbour is not an anchor: it has no categories to lend.
+  string anchor_mention_id = 6;
+}
+
+// "This literal could be a value of THAT attribute."
+message Attribution {
+  string attribute_ref = 1;           // the attribute the literal is attributed to
+  Binding binding = 2;                // the member binding itself (ref = `<attribute_ref>#<id>`)
+}
+
+// What a grounding kernel (chrono | money | geo — RV-42) or the universal NER layer made
+// of a span. A DATE/MONEY/number grounding is complete in itself; a PERSON/LOCATION/ORG
+// one is only a hint until something attributes it to the model.
+message Grounding {
+  string kernel = 1;                  // "chrono" | "money" | "geo" | the NER engine that typed it
+  string kind = 2;                    // DATE | MONEY | LOCATION | PERSON | ORGANIZATION | MISC
+  string normalized_value = 3;
+  string ref = 4;                     // the `ground:` trigger ref when a slice anchored it (RV-42)
+  double confidence = 5;
+}
+
+// A typed gap (RV-19) — the honest record of what the core could not settle. The gap
+// KIND selects the policy (contracts §3: which rungs may run, and whether to ask).
+message GapRecord {
+  Span span = 1;
+  GapKind kind = 2;
+  // ⚑ REPEATED for the same reason `Mention.frame_roles` is: a gap on a measure-as-subject
+  // mention carries both, and RV-15's "ask on THE load-bearing gap" is decided by whether
+  // SUBJECT is among them. For a value gap these are the ANCHOR mention's roles — that is
+  // what makes a missed code load-bearing or not.
+  repeated FrameRole frame_roles = 3;
+  repeated Hypothesis hypotheses_tried = 4;  // filled by later rung activity; empty from the core
+  int32 asked_round = 5;
+  string user_answer = 6;
+  Disposition disposition = 7;
+  string mention_id = 8;              // set iff the gap sits on a mention
+  string value_id = 9;                // set iff the gap sits on a value
+}
+
+// A proposal from an LLM rung. It NEVER binds directly (RV-7): a hypothesis becomes a
+// binding only by surviving the same method-dispatch + evidence-class gate as any other
+// candidate, which is what `resolve.gate:v1` exists to enforce.
+message Hypothesis {
+  Span span = 1;                      // the span it is about
+  string ref = 2;                     // the ref it proposes, if any
+  string correction = 3;              // the corrected surface form it proposes, if any
+  string proposing_rung = 4;          // lookup | local | capable | emulated (contracts §3)
+}
+
+// One entry of the ladder's audit trail. The core writes round 0 for its own pass; the
+// lookup rounds (P2.3), the LLM rungs and the re-gate (P2.4) append to it.
+message RungLogEntry {
+  int32 round = 1;                    // 0 = the core's deterministic pass
+  string rung = 2;                    // "core" | lookup | local | capable | emulated
+  string action = 3;                  // e.g. "annotate", "lookup", "regate"
+  repeated string mention_ids = 4;    // what this round touched
+  repeated string value_ids = 5;
+  repeated Hypothesis hypotheses = 6; // what it PROPOSED (never what it bound)
+  int32 bindings_added = 7;
+  int32 gaps_open = 8;                // after this round
+  int64 elapsed_ms = 9;
+}
+
+// RV-39 — the layer tuple, echoed per S-1 so a lattice is reproducible: same tuple +
+// same question ⇒ same lattice. Mirrors `org.tatrman.fuzzy.v1.LayerVersions` field for
+// field (this package does not import the matcher's wire contract).
+message LexiconVersions {
+  string lexicon_artifact_hash = 1;              // "" when no compiled lexicon is loaded
+  map<string, string> member_index_versions = 2; // category → content-derived version
+  optional string overlay_version = 3;           // ABSENT until RV-P6 — absence is the contract
+}
+
+// RV-38 — what a binding's target IS. The *kind* derives from this; it is never stored.
+// Values are prefixed because proto3 enum values are siblings in the ENCLOSING scope:
+// an unprefixed MEMBER would collide with `SourceTag`'s and with `UniversalEntityType`.
+enum TargetClass {
+  TARGET_CLASS_UNSPECIFIED = 0;
+  TARGET_CLASS_MODEL_OBJECT = 1;      // er./db./md. object, at any attribute depth
+  TARGET_CLASS_MEMBER = 2;            // a member of a model object — a value, not a structure
+  TARGET_CLASS_OPERATOR = 3;          // an `op:` skill trigger (RV-35)
+  TARGET_CLASS_GROUNDING_TRIGGER = 4; // a `ground:` slice — chrono | money | geo (RV-42)
+}
+
+// RV-14 — the ordered evidence classes. Confidence is the CLASS; the numeric score
+// compares only within one. Ranked by field number, strongest first, so a comparison is
+// `a < b`. UNSPECIFIED is 0 and therefore sorts ABOVE EXACT numerically — it must be
+// treated as WEAKER than everything, never as the best; `EvidenceClasses.rank()` does.
+enum EvidenceClass {
+  EVIDENCE_CLASS_UNSPECIFIED = 0;
+  EVIDENCE_CLASS_EXACT = 1;
+  EVIDENCE_CLASS_DECLARED_ALIAS = 2;
+  EVIDENCE_CLASS_LEARNED_ALIAS = 3;
+  EVIDENCE_CLASS_ANCHORED_FUZZY_STRONG = 4;
+  EVIDENCE_CLASS_UNANCHORED_FUZZY_STRONG = 5;
+  EVIDENCE_CLASS_WEAK = 6;            // NEVER binds, whatever its score (RV-14)
+}
+
+// RV-32 — the authored match method. The parameter rides `Binding.max_distance` /
+// `uniqueness_margin`: `TYPOS(1)` is (TYPOS, 1). lex-matcher carries the same vocabulary
+// as the string "EXACT" | "TOKENS" | "TYPOS(n)"; the two are pinned equal by test.
+enum MatchMethod {
+  MATCH_METHOD_UNSPECIFIED = 0;       // no method was authored for this row (member values)
+  MATCH_METHOD_EXACT = 1;
+  MATCH_METHOD_TYPOS = 2;
+  MATCH_METHOD_TOKENS = 3;
+}
+
+// Which LAYER produced a binding (RV-39). VOCABULARY is the pre-RV conflation of
+// DECLARED and METADATA and stays expressible: until an estate ships a compiled lexicon
+// (`p1-7`…`p1-9`), the matcher genuinely cannot tell the two apart, and reporting that
+// honestly beats guessing DECLARED.
+enum SourceTag {
+  SOURCE_TAG_UNSPECIFIED = 0;
+  SOURCE_TAG_DECLARED = 1;            // authored in the lexicon/ area or as TTR-M sugar
+  SOURCE_TAG_METADATA = 2;            // harvested from model labels
+  SOURCE_TAG_DATA = 3;                // a data value from the member index
+  SOURCE_TAG_LEARNED = 4;             // the RV-P6 estate overlay
+  SOURCE_TAG_VOCABULARY = 5;          // legacy: declared|metadata, undifferentiated
+}
+
+// RV-21. A mention may carry more than one — see `Mention.frame_roles`.
+enum FrameRole {
+  FRAME_ROLE_UNSPECIFIED = 0;
+  FRAME_ROLE_SUBJECT = 1;             // what the question is ABOUT; at most one per question
+  FRAME_ROLE_MEASURE = 2;             // the quantity aggregated
+  FRAME_ROLE_FILTER = 3;              // restricts the result set
+  FRAME_ROLE_GROUPING = 4;            // the by-axis
+}
+
+// The gap taxonomy (contracts §1/§3). Each kind selects a rung policy and an ask policy.
+enum GapKind {
+  GAP_KIND_UNSPECIFIED = 0;
+  GAP_KIND_G1_UNBOUND = 1;            // a mention bound to nothing
+  GAP_KIND_G2_AMBIGUOUS = 2;          // several distinct candidates, none dominant
+  GAP_KIND_G3_UNATTRIBUTED = 3;       // a value nothing attributed, with no scope to blame
+  GAP_KIND_G4_METHOD_MISS = 4;        // a KNOWN scope was searched and missed
+  GAP_KIND_G5_NLP_DARK = 5;           // the capability matrix forced the degraded floor
+  GAP_KIND_G6_INCOHERENT = 6;         // the question does not cohere; the capable rung's call
+}
+
+enum Disposition {
+  DISPOSITION_UNSPECIFIED = 0;
+  DISPOSITION_UNRESOLVED = 1;         // still open — the core's own verdict
+  DISPOSITION_IGNORED = 2;
+  DISPOSITION_DEGRADED = 3;           // answered anyway, with the honesty banner
+  DISPOSITION_USER_CONFIRMED_UNKNOWN = 4;
+}
+
+enum ValueKind {
+  VALUE_KIND_UNSPECIFIED = 0;
+  VALUE_KIND_LITERAL = 1;             // a code/number/name to be attributed to an attribute
+  VALUE_KIND_GROUNDED = 2;            // a kernel or the universal NER layer typed it
 }
 
 // RS-7 matrix echo — what backed this resolve. `degraded_reasons` carries the
