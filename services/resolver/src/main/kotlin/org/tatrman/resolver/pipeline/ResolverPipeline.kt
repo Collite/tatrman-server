@@ -52,6 +52,10 @@ class ResolverPipeline(
     private val registry: SnapshotRegistry,
     private val siblings: SiblingCatalog,
     private val tokenCodec: ResumeTokenCodec,
+    // The per-language preposition tables the frame-role rules dispatch on (RV-P2.1.T5).
+    // Defaulted to the shipped ones so a caller that has no opinion gets working roles;
+    // the service passes the estate's, which may replace them (see FrameRolePreps).
+    private val preps: FrameRolePreps = FrameRolePreps.shipped(),
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -119,9 +123,12 @@ class ResolverPipeline(
                 gate = outcome,
                 ungatedMentions = MentionLayer.propose(parse, candidates),
                 universals = universals,
+                entityTypes = resolverRegistry.entityTypes,
                 thresholds = resolverRegistry.thresholds,
                 snapshotHash = resolverRegistry.snapshotHash,
                 batch = batchResp,
+                lang = assessment.language,
+                preps = preps,
             )
 
         val builder =

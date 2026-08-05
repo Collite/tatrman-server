@@ -1,0 +1,147 @@
+{
+ "tokens": [
+  {
+   "text": "Jaká",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "jaký",
+   "upos": "DET",
+   "xpos": "P4FS1----------",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Sing",
+    "PronType": "Int,Rel"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "je",
+   "charStart": 5,
+   "charEnd": 7,
+   "lemma": "být",
+   "upos": "AUX",
+   "xpos": "VB-S---3P-AAI--",
+   "feats": {
+    "Aspect": "Imp",
+    "Mood": "Ind",
+    "Number": "Sing",
+    "Person": "3",
+    "Polarity": "Pos",
+    "Tense": "Pres",
+    "VerbForm": "Fin",
+    "Voice": "Act"
+   },
+   "depHead": 1,
+   "depRelation": "cop",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "naše",
+   "charStart": 8,
+   "charEnd": 12,
+   "lemma": "náš",
+   "upos": "DET",
+   "xpos": "PSHS1-P1-------",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem,Neut",
+    "Number": "Sing",
+    "Number[psor]": "Plur",
+    "Person": "1",
+    "Poss": "Yes",
+    "PronType": "Prs"
+   },
+   "depHead": 4,
+   "depRelation": "det",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "míra",
+   "charStart": 13,
+   "charEnd": 17,
+   "lemma": "míra",
+   "upos": "NOUN",
+   "xpos": "NNFS1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "nsubj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "vrácení",
+   "charStart": 18,
+   "charEnd": 25,
+   "lemma": "vrácení",
+   "upos": "NOUN",
+   "xpos": "NNNS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Neut",
+    "Number": "Sing",
+    "VerbForm": "Vnoun"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "podle",
+   "charStart": 26,
+   "charEnd": 31,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 7,
+   "depRelation": "case",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "kanálu",
+   "charStart": 32,
+   "charEnd": 38,
+   "lemma": "kanál",
+   "upos": "NOUN",
+   "xpos": "NNIS2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "?",
+   "charStart": 38,
+   "charEnd": 39,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 1,
+   "depRelation": "punct",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 39
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

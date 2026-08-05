@@ -1,0 +1,93 @@
+{
+ "tokens": [
+  {
+   "text": "Zobraz",
+   "charStart": 0,
+   "charEnd": 6,
+   "lemma": "zobraz",
+   "upos": "NOUN",
+   "xpos": "NNFS1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "amod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "tržby",
+   "charStart": 7,
+   "charEnd": 12,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "podle",
+   "charStart": 13,
+   "charEnd": 18,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 4,
+   "depRelation": "case",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "státu",
+   "charStart": 19,
+   "charEnd": 24,
+   "lemma": "stát",
+   "upos": "NOUN",
+   "xpos": "NNIS2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "zákazníka",
+   "charStart": 25,
+   "charEnd": 34,
+   "lemma": "zákazník",
+   "upos": "NOUN",
+   "xpos": "NNMS2-----A----",
+   "feats": {
+    "Animacy": "Anim",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 34
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

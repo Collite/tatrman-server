@@ -1,0 +1,146 @@
+{
+ "tokens": [
+  {
+   "text": "Které",
+   "charStart": 0,
+   "charEnd": 5,
+   "lemma": "který",
+   "upos": "DET",
+   "xpos": "P4FP1----------",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur",
+    "PronType": "Int,Rel"
+   },
+   "depHead": 2,
+   "depRelation": "det",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "značky",
+   "charStart": 6,
+   "charEnd": 12,
+   "lemma": "značka",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 3,
+   "depRelation": "nsubj",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "měly",
+   "charStart": 13,
+   "charEnd": 17,
+   "lemma": "mít",
+   "upos": "VERB",
+   "xpos": "VpTP----R-AAI--",
+   "feats": {
+    "Animacy": "Inan",
+    "Aspect": "Imp",
+    "Gender": "Fem,Masc",
+    "Number": "Plur",
+    "Polarity": "Pos",
+    "Tense": "Past",
+    "VerbForm": "Part",
+    "Voice": "Act"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "nejvyšší",
+   "charStart": 18,
+   "charEnd": 26,
+   "lemma": "vysoký",
+   "upos": "ADJ",
+   "xpos": "AAIP4----3A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Acc",
+    "Degree": "Sup",
+    "Gender": "Masc",
+    "Number": "Plur",
+    "Polarity": "Pos"
+   },
+   "depHead": 5,
+   "depRelation": "amod",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "vratky",
+   "charStart": 27,
+   "charEnd": 33,
+   "lemma": "vratek",
+   "upos": "NOUN",
+   "xpos": "NNIP4-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Acc",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 3,
+   "depRelation": "obj",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "v",
+   "charStart": 34,
+   "charEnd": 35,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 7,
+   "depRelation": "case",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "prosinci",
+   "charStart": 36,
+   "charEnd": 44,
+   "lemma": "prosinec",
+   "upos": "NOUN",
+   "xpos": "NNIS6-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Loc",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 3,
+   "depRelation": "obl",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "?",
+   "charStart": 44,
+   "charEnd": 45,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 3,
+   "depRelation": "punct",
+   "depHeadIdx": 2
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 45
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

@@ -1,0 +1,177 @@
+{
+ "tokens": [
+  {
+   "text": "Kolik",
+   "charStart": 0,
+   "charEnd": 5,
+   "lemma": "kolik",
+   "upos": "DET",
+   "xpos": "Ca--4----------",
+   "feats": {
+    "Case": "Acc",
+    "NumType": "Card",
+    "PronType": "Dem,Ind"
+   },
+   "depHead": 2,
+   "depRelation": "det:numgov",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "objednávek",
+   "charStart": 6,
+   "charEnd": 16,
+   "lemma": "objednávka",
+   "upos": "NOUN",
+   "xpos": "NNFP2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 4,
+   "depRelation": "obj",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "jsme",
+   "charStart": 17,
+   "charEnd": 21,
+   "lemma": "být",
+   "upos": "AUX",
+   "xpos": "VB-P---1P-AAI--",
+   "feats": {
+    "Aspect": "Imp",
+    "Mood": "Ind",
+    "Number": "Plur",
+    "Person": "1",
+    "Polarity": "Pos",
+    "Tense": "Pres",
+    "VerbForm": "Fin",
+    "Voice": "Act"
+   },
+   "depHead": 4,
+   "depRelation": "aux",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "měli",
+   "charStart": 22,
+   "charEnd": 26,
+   "lemma": "mít",
+   "upos": "VERB",
+   "xpos": "VpMP----R-AAI--",
+   "feats": {
+    "Animacy": "Anim",
+    "Aspect": "Imp",
+    "Gender": "Masc",
+    "Number": "Plur",
+    "Polarity": "Pos",
+    "Tense": "Past",
+    "VerbForm": "Part",
+    "Voice": "Act"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "v",
+   "charStart": 27,
+   "charEnd": 28,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "roce",
+   "charStart": 29,
+   "charEnd": 33,
+   "lemma": "rok",
+   "upos": "NOUN",
+   "xpos": "NNIS6-----A---1",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Loc",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "obl",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "2025",
+   "charStart": 34,
+   "charEnd": 38,
+   "lemma": "2025",
+   "upos": "NUM",
+   "xpos": "C=-------------",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 6,
+   "depRelation": "nummod",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "podle",
+   "charStart": 39,
+   "charEnd": 44,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 9,
+   "depRelation": "case",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "měsíce",
+   "charStart": 45,
+   "charEnd": 51,
+   "lemma": "měsíc",
+   "upos": "NOUN",
+   "xpos": "NNIS2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "obl",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "?",
+   "charStart": 51,
+   "charEnd": 52,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 4,
+   "depRelation": "punct",
+   "depHeadIdx": 3
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 52
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

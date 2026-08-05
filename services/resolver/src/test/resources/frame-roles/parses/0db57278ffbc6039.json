@@ -1,0 +1,175 @@
+{
+ "tokens": [
+  {
+   "text": "Jaká",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "jaký",
+   "upos": "DET",
+   "xpos": "P4FS1----------",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Sing",
+    "PronType": "Int,Rel"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "byla",
+   "charStart": 5,
+   "charEnd": 9,
+   "lemma": "být",
+   "upos": "AUX",
+   "xpos": "VpQW----R-AAI--",
+   "feats": {
+    "Aspect": "Imp",
+    "Gender": "Fem,Neut",
+    "Number": "Plur,Sing",
+    "Polarity": "Pos",
+    "Tense": "Past",
+    "VerbForm": "Part",
+    "Voice": "Act"
+   },
+   "depHead": 1,
+   "depRelation": "cop",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "dostupnost",
+   "charStart": 10,
+   "charEnd": 20,
+   "lemma": "dostupnost",
+   "upos": "NOUN",
+   "xpos": "NNFS1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "nsubj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "zboží",
+   "charStart": 21,
+   "charEnd": 26,
+   "lemma": "zboží",
+   "upos": "NOUN",
+   "xpos": "NNNS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Neut",
+    "Number": "Sing"
+   },
+   "depHead": 3,
+   "depRelation": "nmod",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "v",
+   "charStart": 27,
+   "charEnd": 28,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "Ostrava",
+   "charStart": 29,
+   "charEnd": 36,
+   "lemma": "Ostrava",
+   "upos": "PROPN",
+   "xpos": "NNFS6-----A----",
+   "feats": {
+    "Case": "Loc",
+    "Gender": "Fem",
+    "NameType": "Geo",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "DC",
+   "charStart": 37,
+   "charEnd": 39,
+   "lemma": "DC",
+   "upos": "NOUN",
+   "xpos": "BNXXX-----A----",
+   "feats": {
+    "Abbr": "Yes"
+   },
+   "depHead": 6,
+   "depRelation": "nmod",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "minulý",
+   "charStart": 40,
+   "charEnd": 46,
+   "lemma": "minulý",
+   "upos": "ADJ",
+   "xpos": "AAIS4----1A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Acc",
+    "Degree": "Pos",
+    "Gender": "Masc",
+    "Number": "Sing",
+    "Polarity": "Pos"
+   },
+   "depHead": 9,
+   "depRelation": "amod",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "týden",
+   "charStart": 47,
+   "charEnd": 52,
+   "lemma": "týden",
+   "upos": "NOUN",
+   "xpos": "NNIS4-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Acc",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "?",
+   "charStart": 52,
+   "charEnd": 53,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 1,
+   "depRelation": "punct",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 53
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

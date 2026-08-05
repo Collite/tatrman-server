@@ -107,6 +107,10 @@ dependencies {
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
     testImplementation(libs.grpc.inprocess)
+    // RV-P2.1.T5 — the Q-15 frame-role fixture corpus is authored YAML and is re-run
+    // in-process against the ported rules (FrameRolesFixtureTest). Test-only.
+    testImplementation(libs.jackson.dataformat.yaml)
+    testImplementation(libs.jackson.databind)
 }
 
 // RG-P5 — structural ZERO-LLM guard (RS-23). Fail the build if the resolver's

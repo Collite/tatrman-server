@@ -1,0 +1,71 @@
+{
+ "tokens": [
+  {
+   "text": "náklady",
+   "charStart": 0,
+   "charEnd": 7,
+   "lemma": "náklad",
+   "upos": "NOUN",
+   "xpos": "NNIP1-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Nom",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "501001",
+   "charStart": 8,
+   "charEnd": 14,
+   "lemma": "501001",
+   "upos": "NUM",
+   "xpos": "C=-------------",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 1,
+   "depRelation": "dep",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "2025",
+   "charStart": 15,
+   "charEnd": 19,
+   "lemma": "2025",
+   "upos": "NUM",
+   "xpos": "C=-------------",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 1,
+   "depRelation": "dep",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "?",
+   "charStart": 19,
+   "charEnd": 20,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 1,
+   "depRelation": "punct",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 20
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

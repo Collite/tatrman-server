@@ -1,0 +1,95 @@
+{
+  "fixtures_file": "holdout.yaml",
+  "corpus": {
+    "cs": 5,
+    "en": 3
+  },
+  "fixtures": 8,
+  "scored_mentions": 29,
+  "roles": {
+    "SUBJECT": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 8,
+      "fp": 0,
+      "fn": 0
+    },
+    "MEASURE": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 8,
+      "fp": 0,
+      "fn": 0
+    },
+    "FILTER": {
+      "precision": 1.0,
+      "recall": 0.9,
+      "f1": 0.9474,
+      "tp": 9,
+      "fp": 0,
+      "fn": 1
+    },
+    "GROUPING": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0
+    }
+  },
+  "confusion": {
+    "SUBJECT": {
+      "SUBJECT": 8,
+      "MEASURE": 6,
+      "FILTER": 0,
+      "GROUPING": 0,
+      "NONE": 0
+    },
+    "MEASURE": {
+      "SUBJECT": 6,
+      "MEASURE": 8,
+      "FILTER": 0,
+      "GROUPING": 0,
+      "NONE": 0
+    },
+    "FILTER": {
+      "SUBJECT": 0,
+      "MEASURE": 0,
+      "FILTER": 9,
+      "GROUPING": 0,
+      "NONE": 1
+    },
+    "GROUPING": {
+      "SUBJECT": 0,
+      "MEASURE": 0,
+      "FILTER": 0,
+      "GROUPING": 4,
+      "NONE": 0
+    },
+    "NONE": {
+      "SUBJECT": 0,
+      "MEASURE": 0,
+      "FILTER": 0,
+      "GROUPING": 0,
+      "NONE": 5
+    }
+  },
+  "mismatches": [
+    {
+      "mention": "ho-verb-measure-cs#2",
+      "span": "loni",
+      "gold": [
+        "FILTER"
+      ],
+      "predicted": []
+    }
+  ],
+  "gate": {
+    "subject_precision_target": 0.85,
+    "other_recall_target": 0.7,
+    "passed": true
+  }
+}

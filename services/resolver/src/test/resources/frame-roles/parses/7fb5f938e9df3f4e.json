@@ -1,0 +1,109 @@
+{
+ "tokens": [
+  {
+   "text": "Zobraz",
+   "charStart": 0,
+   "charEnd": 6,
+   "lemma": "zobraz",
+   "upos": "NOUN",
+   "xpos": "NNIS1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "prvních",
+   "charStart": 7,
+   "charEnd": 14,
+   "lemma": "první",
+   "upos": "ADJ",
+   "xpos": "CrIP2----------",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "NumType": "Ord",
+    "Number": "Plur"
+   },
+   "depHead": 4,
+   "depRelation": "amod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "10",
+   "charStart": 15,
+   "charEnd": 17,
+   "lemma": "10",
+   "upos": "NUM",
+   "xpos": "C=-------------",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 4,
+   "depRelation": "nummod:gov",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "produktů",
+   "charStart": 18,
+   "charEnd": 26,
+   "lemma": "produkt",
+   "upos": "NOUN",
+   "xpos": "NNIP2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "nmod",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "podle",
+   "charStart": 27,
+   "charEnd": 32,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "tržby",
+   "charStart": 33,
+   "charEnd": 38,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "dep",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 38
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

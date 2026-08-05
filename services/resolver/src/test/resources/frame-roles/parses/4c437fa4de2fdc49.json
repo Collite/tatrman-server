@@ -1,0 +1,177 @@
+{
+ "tokens": [
+  {
+   "text": "Kolik",
+   "charStart": 0,
+   "charEnd": 5,
+   "lemma": "kolik",
+   "upos": "DET",
+   "xpos": "Ca--4----------",
+   "feats": {
+    "Case": "Acc",
+    "NumType": "Card",
+    "PronType": "Dem,Ind"
+   },
+   "depHead": 2,
+   "depRelation": "det:numgov",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "kusů",
+   "charStart": 6,
+   "charEnd": 10,
+   "lemma": "kus",
+   "upos": "NOUN",
+   "xpos": "NNIP2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 4,
+   "depRelation": "obj",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "jsme",
+   "charStart": 11,
+   "charEnd": 15,
+   "lemma": "být",
+   "upos": "AUX",
+   "xpos": "VB-P---1P-AAI--",
+   "feats": {
+    "Aspect": "Imp",
+    "Mood": "Ind",
+    "Number": "Plur",
+    "Person": "1",
+    "Polarity": "Pos",
+    "Tense": "Pres",
+    "VerbForm": "Fin",
+    "Voice": "Act"
+   },
+   "depHead": 4,
+   "depRelation": "aux",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "prodali",
+   "charStart": 16,
+   "charEnd": 23,
+   "lemma": "prodat",
+   "upos": "VERB",
+   "xpos": "VpMP----R-AAP--",
+   "feats": {
+    "Animacy": "Anim",
+    "Aspect": "Perf",
+    "Gender": "Masc",
+    "Number": "Plur",
+    "Polarity": "Pos",
+    "Tense": "Past",
+    "VerbForm": "Part",
+    "Voice": "Act"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "v",
+   "charStart": 24,
+   "charEnd": 25,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "Praha",
+   "charStart": 26,
+   "charEnd": 31,
+   "lemma": "Praha",
+   "upos": "PROPN",
+   "xpos": "NNFS1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "NameType": "Geo",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "obl",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "DC",
+   "charStart": 32,
+   "charEnd": 34,
+   "lemma": "DC",
+   "upos": "NOUN",
+   "xpos": "BNXXX-----A----",
+   "feats": {
+    "Abbr": "Yes"
+   },
+   "depHead": 6,
+   "depRelation": "nmod",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "v",
+   "charStart": 35,
+   "charEnd": 36,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 9,
+   "depRelation": "case",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "prosinci",
+   "charStart": 37,
+   "charEnd": 45,
+   "lemma": "prosinec",
+   "upos": "NOUN",
+   "xpos": "NNIS6-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Loc",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "obl",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "?",
+   "charStart": 45,
+   "charEnd": 46,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 4,
+   "depRelation": "punct",
+   "depHeadIdx": 3
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 46
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

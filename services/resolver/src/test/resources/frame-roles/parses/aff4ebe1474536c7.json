@@ -1,0 +1,195 @@
+{
+ "tokens": [
+  {
+   "text": "Porovnej",
+   "charStart": 0,
+   "charEnd": 8,
+   "lemma": "porovnat",
+   "upos": "VERB",
+   "xpos": "Vi-S---2--A-P--",
+   "feats": {
+    "Aspect": "Perf",
+    "Mood": "Imp",
+    "Number": "Sing",
+    "Person": "2",
+    "Polarity": "Pos",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "tržby",
+   "charStart": 9,
+   "charEnd": 14,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "z",
+   "charStart": 15,
+   "charEnd": 16,
+   "lemma": "z",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "e",
+   "charStart": 17,
+   "charEnd": 18,
+   "lemma": "e",
+   "upos": "NOUN",
+   "xpos": "Q3-------------",
+   "feats": {
+    "Abbr": "Yes"
+   },
+   "depHead": 6,
+   "depRelation": "nmod",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "-",
+   "charStart": 18,
+   "charEnd": 19,
+   "lemma": "-",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 4,
+   "depRelation": "punct",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "shopu",
+   "charStart": 19,
+   "charEnd": 24,
+   "lemma": "shopa",
+   "upos": "NOUN",
+   "xpos": "NNIS2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "a",
+   "charStart": 25,
+   "charEnd": 26,
+   "lemma": "a",
+   "upos": "CCONJ",
+   "xpos": "J^-------------",
+   "feats": {},
+   "depHead": 9,
+   "depRelation": "cc",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "z",
+   "charStart": 27,
+   "charEnd": 28,
+   "lemma": "z",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 9,
+   "depRelation": "case",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "prodejen",
+   "charStart": 29,
+   "charEnd": 37,
+   "lemma": "prodejna",
+   "upos": "NOUN",
+   "xpos": "NNFP2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 6,
+   "depRelation": "conj",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "za",
+   "charStart": 38,
+   "charEnd": 40,
+   "lemma": "za",
+   "upos": "ADP",
+   "xpos": "RR--4----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Acc"
+   },
+   "depHead": 11,
+   "depRelation": "case",
+   "depHeadIdx": 10
+  },
+  {
+   "text": "rok",
+   "charStart": 41,
+   "charEnd": 44,
+   "lemma": "rok",
+   "upos": "NOUN",
+   "xpos": "NNIS4-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Acc",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 9,
+   "depRelation": "nmod",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "2025",
+   "charStart": 45,
+   "charEnd": 49,
+   "lemma": "2025",
+   "upos": "NUM",
+   "xpos": "C=-------------",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 11,
+   "depRelation": "nummod",
+   "depHeadIdx": 10
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 49
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

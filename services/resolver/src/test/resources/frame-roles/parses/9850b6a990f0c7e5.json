@@ -1,0 +1,142 @@
+{
+ "tokens": [
+  {
+   "text": "Jaké",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "jaký",
+   "upos": "DET",
+   "xpos": "P4FP1----------",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur",
+    "PronType": "Int,Rel"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "byly",
+   "charStart": 5,
+   "charEnd": 9,
+   "lemma": "být",
+   "upos": "AUX",
+   "xpos": "VpTP----R-AAI--",
+   "feats": {
+    "Animacy": "Inan",
+    "Aspect": "Imp",
+    "Gender": "Fem,Masc",
+    "Number": "Plur",
+    "Polarity": "Pos",
+    "Tense": "Past",
+    "VerbForm": "Part",
+    "Voice": "Act"
+   },
+   "depHead": 1,
+   "depRelation": "cop",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "tržby",
+   "charStart": 10,
+   "charEnd": 15,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "nsubj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "elektroniky",
+   "charStart": 16,
+   "charEnd": 27,
+   "lemma": "elektronika",
+   "upos": "NOUN",
+   "xpos": "NNFS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 3,
+   "depRelation": "nmod",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "ve",
+   "charStart": 28,
+   "charEnd": 30,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RV--6----------",
+   "feats": {
+    "AdpType": "Voc",
+    "Case": "Loc"
+   },
+   "depHead": 7,
+   "depRelation": "case",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "druhém",
+   "charStart": 31,
+   "charEnd": 37,
+   "lemma": "druhý",
+   "upos": "ADJ",
+   "xpos": "CrNS6----------",
+   "feats": {
+    "Case": "Loc",
+    "Gender": "Neut",
+    "NumType": "Ord",
+    "Number": "Sing"
+   },
+   "depHead": 7,
+   "depRelation": "amod",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "čtvrtletí",
+   "charStart": 38,
+   "charEnd": 47,
+   "lemma": "čtvrtletí",
+   "upos": "NOUN",
+   "xpos": "NNNS6-----A----",
+   "feats": {
+    "Case": "Loc",
+    "Gender": "Neut",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "?",
+   "charStart": 47,
+   "charEnd": 48,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 1,
+   "depRelation": "punct",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 48
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

@@ -1,0 +1,110 @@
+{
+ "tokens": [
+  {
+   "text": "Zobraz",
+   "charStart": 0,
+   "charEnd": 6,
+   "lemma": "zobraz",
+   "upos": "NOUN",
+   "xpos": "NNFS1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "amod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "tržby",
+   "charStart": 7,
+   "charEnd": 12,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "podle",
+   "charStart": 13,
+   "charEnd": 18,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 4,
+   "depRelation": "case",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "roku",
+   "charStart": 19,
+   "charEnd": 23,
+   "lemma": "rok",
+   "upos": "NOUN",
+   "xpos": "NNIS2-----A---1",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "narození",
+   "charStart": 24,
+   "charEnd": 32,
+   "lemma": "narození",
+   "upos": "NOUN",
+   "xpos": "NNNS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Neut",
+    "Number": "Sing",
+    "VerbForm": "Vnoun"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "zákazníků",
+   "charStart": 33,
+   "charEnd": 42,
+   "lemma": "zákazník",
+   "upos": "NOUN",
+   "xpos": "NNMP2-----A----",
+   "feats": {
+    "Animacy": "Anim",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 5,
+   "depRelation": "nmod",
+   "depHeadIdx": 4
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 42
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

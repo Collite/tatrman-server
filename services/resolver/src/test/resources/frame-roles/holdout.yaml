@@ -1,0 +1,190 @@
+# RV-P0.2 · Q-15 — HELD-OUT fixtures
+#
+# Authored 2026-08-02 AFTER the rule set in `deriver.py` was frozen at 136/137 on
+# `fixtures.yaml`, and run exactly once. The task list does not ask for this; the
+# result does. The v1 rules were iterated against the same 39 fixtures they were
+# scored on (T4 is literally "run harness; fix rule gaps"), so the headline numbers
+# are a FIT, not a generalisation estimate. This file is the generalisation estimate.
+#
+# Rule for reading it: the score here is the one to quote when deciding whether P2
+# can ship rules alone. If it drops far below the main corpus, the rules memorised
+# their fixtures.
+#
+# Constructions deliberately NOT present in fixtures.yaml:
+#   * a measure named by a VERB form ("utržili"), not a noun
+#   * a relative-clause subject ("Které značky MĚLY...")
+#   * an adverbial time word with no noun at all ("loni")
+#   * a hyphenated English multiword measure ("on-hand quantity")
+#   * "with the highest X" as an English order-by
+#   * coordinated MEMBERS (not entities) under one filter
+#   * an English question that is a bare noun phrase with two prepositions
+
+schema: rv-frame-roles-fixtures/v1
+authored: 2026-08-02
+spike: RV-P0.2 (Q-15) — held-out set
+targets:
+  subject_precision: 0.85
+  other_roles_recall: 0.70
+
+fixtures:
+
+  - id: ho-verb-measure-cs
+    lang: cs
+    world: hartland
+    source: held-out
+    text: "Kolik jsme utržili v Plzeň DC loni?"
+    hard_classes: [verb-form-measure, member-value, bare-adverbial-time]
+    note: '"utržit" is a declared revenue synonym — here in a finite verb form, not a noun.'
+    mentions:
+      - span: "utržili"
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        roles: [SUBJECT, MEASURE]
+      - span: "Plzeň DC"
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        roles: [FILTER]
+      - span: "loni"
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [FILTER]
+
+  - id: ho-possessive-cs
+    lang: cs
+    world: hartland
+    source: held-out
+    text: "Vypiš objednávky zákazníků ze státu CA za rok 2025"
+    hard_classes: [operator-roleless, measure-as-subject, possessive-genitive, anchored-value]
+    mentions:
+      - span: "Vypiš"
+        binding: {ref: "op:show", target_class: OPERATOR}
+        roles: []
+      - span: "objednávky"
+        binding: {ref: "md.measure.orderCount", target_class: MODEL_OBJECT, object_kind: measure}
+        roles: [SUBJECT, MEASURE]
+      - span: "zákazníků"
+        binding: {ref: "md.dimension.Customer", target_class: MODEL_OBJECT, object_kind: dimension}
+        roles: []
+      - span: "státu"
+        binding: {ref: "md.dimension.Customer.state", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [FILTER]
+      - span: "rok"
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [FILTER]
+    values:
+      - {span: "CA", anchor: "státu"}
+      - {span: "2025", anchor: "rok"}
+
+  - id: ho-relative-subject-cs
+    lang: cs
+    world: hartland
+    source: held-out
+    text: "Které značky měly nejvyšší vratky v prosinci?"
+    hard_classes: [dimension-as-subject, relative-clause, filter-only-mention]
+    mentions:
+      - span: "značky"
+        binding: {ref: "md.dimension.Product.brandCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [SUBJECT]
+      - span: "vratky"
+        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT, object_kind: measure}
+        roles: [MEASURE]
+      - span: "prosinci"
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [FILTER]
+
+  - id: ho-member-filter-grouping-cs
+    lang: cs
+    world: hartland
+    source: held-out
+    text: "Ukaž mi tržby za obuv podle čtvrtletí"
+    hard_classes: [operator-roleless, measure-as-subject, member-value, grouping-podle]
+    mentions:
+      - span: "Ukaž"
+        binding: {ref: "op:show", target_class: OPERATOR}
+        roles: []
+      - span: "tržby"
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        roles: [SUBJECT, MEASURE]
+      - span: "obuv"
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER, object_kind: member}
+        roles: [FILTER]
+      - span: "čtvrtletí"
+        binding: {ref: "md.dimension.Calendar.quarter", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [GROUPING]
+
+  - id: ho-coordinated-members-cs
+    lang: cs
+    world: hartland
+    source: held-out
+    text: "Porovnej tržby Elektroniky a Knih podle měsíce"
+    hard_classes: [operator-roleless, measure-as-subject, coordination, member-value, grouping-podle]
+    note: "Coordinated MEMBERS under one filter — fixtures.yaml only coordinates entities and groupings."
+    mentions:
+      - span: "Porovnej"
+        binding: {ref: "op:compare", target_class: OPERATOR}
+        roles: []
+      - span: "tržby"
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        roles: [SUBJECT, MEASURE]
+      - span: "Elektroniky"
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER, object_kind: member}
+        roles: [FILTER]
+      - span: "Knih"
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER, object_kind: member}
+        roles: [FILTER]
+      - span: "měsíce"
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [GROUPING]
+
+  - id: ho-hyphenated-measure-en
+    lang: en
+    world: hartland
+    source: held-out
+    text: "What is the on-hand quantity for Reno DC by week?"
+    hard_classes: [measure-as-subject, hyphenated-measure, member-value, grouping-by]
+    mentions:
+      - span: "on-hand quantity"
+        binding: {ref: "md.measure.onHandQty", target_class: MODEL_OBJECT, object_kind: measure}
+        roles: [SUBJECT, MEASURE]
+      - span: "Reno DC"
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        roles: [FILTER]
+      - span: "week"
+        binding: {ref: "md.dimension.Calendar.week", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [GROUPING]
+
+  - id: ho-highest-orderby-en
+    lang: en
+    world: hartland
+    source: held-out
+    text: "List the products with the highest returns in 2025"
+    hard_classes: [operator-roleless, dimension-as-subject, with-is-order-by]
+    note: '"with the highest X" is an order-by, not a filter — the English cousin of "podle tržby".'
+    mentions:
+      - span: "List"
+        binding: {ref: "op:show", target_class: OPERATOR}
+        roles: []
+      - span: "products"
+        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT, object_kind: dimension}
+        roles: [SUBJECT]
+      - span: "returns"
+        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT, object_kind: measure}
+        roles: [MEASURE]
+    values:
+      - {span: "2025", anchor: null}
+
+  - id: ho-bare-np-en
+    lang: en
+    world: hartland
+    source: held-out
+    text: "revenue by manufacturer for the Books category"
+    hard_classes: [imperative-less, no-verb, measure-as-subject, grouping-by, anchored-value]
+    mentions:
+      - span: "revenue"
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        roles: [SUBJECT, MEASURE]
+      - span: "manufacturer"
+        binding: {ref: "md.dimension.Product.manufacturerCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [GROUPING]
+      - span: "category"
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        roles: [FILTER]
+    values:
+      - {span: "Books", anchor: "category"}

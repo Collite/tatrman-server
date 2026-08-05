@@ -12,6 +12,7 @@ import org.tatrman.resolver.v1.Mention
 import org.tatrman.resolver.v1.ResolutionState
 import org.tatrman.resolver.v1.RungLogEntry
 import org.tatrman.resolver.v1.Span
+import org.tatrman.resolver.v1.TargetClass
 import org.tatrman.resolver.v1.ValueFinding
 import org.tatrman.resolver.v1.ValueKind
 
@@ -35,9 +36,12 @@ object LatticeAssembler {
         gate: GateOutcome,
         ungatedMentions: List<DomainSpanCandidate>,
         universals: List<UniversalBinding>,
+        entityTypes: List<ResolverEntityType>,
         thresholds: ResolverThresholds,
         snapshotHash: String,
         batch: BatchMatchResponse,
+        lang: String,
+        preps: FrameRolePreps,
     ): ResolutionState {
         val gatedByLayer = gate.gated.groupBy { layerOf(it) }
         val mentionSpans =
@@ -45,7 +49,7 @@ object LatticeAssembler {
                 .sortedWith(compareBy({ it.candidate.start }, { it.candidate.end }))
         val valueSpans = gatedByLayer[Layer.VALUE].orEmpty().sortedWith(compareBy({ it.candidate.start }))
 
-        val mentions =
+        val mentionBuilders =
             mentionSpans.mapIndexed { i, span ->
                 val builder =
                     Mention
@@ -56,7 +60,7 @@ object LatticeAssembler {
                 for (match in span.contenders) {
                     builder.addBindings(Bindings.of(match, span.candidate, thresholds, snapshotHash))
                 }
-                builder.build()
+                builder
             }
         // Which mention a literal's scope came from — resolvable only now that ids exist. An
         // UNBOUND mention is not an anchor: it has no categories to lend, and that distinction
@@ -104,6 +108,34 @@ object LatticeAssembler {
                 .sortedWith(compareBy({ it.span.start }, { it.span.end }))
                 .mapIndexed { i, builder -> builder.setId("v${i + 1}").build() }
 
+        // Frame roles are a post-binding, pre-emit stage (RV-21): they read the parse AND the
+        // bindings, and the anchor relation between a value and its mention is one of their
+        // inputs (rule R8), so they cannot run before both layers have ids.
+        val anchoring = values.mapNotNull { it.anchorMentionId.ifBlank { null } }.toSet()
+        val objectKinds = entityTypes.associate { it.ref to it.objectKind }
+        val roles =
+            FrameRoles.derive(
+                mentionSpans.zip(mentionBuilders).map { (span, mention) ->
+                    FrameRoles.Input(
+                        id = mention.id,
+                        charStart = span.candidate.start,
+                        headToken = span.candidate.headToken,
+                        // The top contender speaks for the mention: a lattice may hold several
+                        // candidates, but a role is a structural fact about the span, and the
+                        // strongest candidate is the one the ask/compose path will act on.
+                        targetClass =
+                            mention.bindingsList.firstOrNull()?.targetClass
+                                ?: TargetClass.TARGET_CLASS_UNSPECIFIED,
+                        objectKind = objectKindOf(span, mention, objectKinds),
+                        anchorsValue = mention.id in anchoring,
+                    )
+                },
+                parse,
+                lang,
+                preps,
+            )
+        val mentions = mentionBuilders.map { it.addAllFrameRoles(roles[it.id].orEmpty()).build() }
+
         val builder =
             ResolutionState
                 .newBuilder()
@@ -123,6 +155,22 @@ object LatticeAssembler {
 
     /** The rung name the core writes for its own deterministic pass (contracts §3 vocabulary). */
     const val CORE_RUNG: String = "core"
+
+    /**
+     * What the mention's target IS in the model. The binding's own ref answers it for a model
+     * object; a member ref (`<attribute>#<id>`) is not an entity ref, so the span's gated entity
+     * — the type its lookup was scoped to — answers for it. No ref STRING is interpreted either
+     * way: both are lookups into what the registry declared.
+     */
+    private fun objectKindOf(
+        span: GatedSpan,
+        mention: Mention.Builder,
+        objectKinds: Map<String, String>,
+    ): String =
+        mention.bindingsList
+            .firstNotNullOfOrNull { objectKinds[it.ref]?.ifBlank { null } }
+            ?: span.candidate.gatedEntityRefs.firstNotNullOfOrNull { objectKinds[it]?.ifBlank { null } }
+            ?: ""
 
     private enum class Layer { MENTION, VALUE, DROPPED }
 

@@ -1,0 +1,127 @@
+{
+ "tokens": [
+  {
+   "text": "Ukaž",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "ukázat",
+   "upos": "VERB",
+   "xpos": "Vi-S---2--A-P--",
+   "feats": {
+    "Aspect": "Perf",
+    "Mood": "Imp",
+    "Number": "Sing",
+    "Person": "2",
+    "Polarity": "Pos",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "mi",
+   "charStart": 5,
+   "charEnd": 7,
+   "lemma": "já",
+   "upos": "PRON",
+   "xpos": "PH-S3--1-------",
+   "feats": {
+    "Case": "Dat",
+    "Number": "Sing",
+    "Person": "1",
+    "PronType": "Prs",
+    "Variant": "Short"
+   },
+   "depHead": 1,
+   "depRelation": "obl:arg",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "tržby",
+   "charStart": 8,
+   "charEnd": 13,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "za",
+   "charStart": 14,
+   "charEnd": 16,
+   "lemma": "za",
+   "upos": "ADP",
+   "xpos": "RR--4----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Acc"
+   },
+   "depHead": 5,
+   "depRelation": "case",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "obuv",
+   "charStart": 17,
+   "charEnd": 21,
+   "lemma": "obuv",
+   "upos": "NOUN",
+   "xpos": "NNFS4-----A----",
+   "feats": {
+    "Case": "Acc",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 3,
+   "depRelation": "nmod",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "podle",
+   "charStart": 22,
+   "charEnd": 27,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 7,
+   "depRelation": "case",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "čtvrtletí",
+   "charStart": 28,
+   "charEnd": 37,
+   "lemma": "čtvrtletí",
+   "upos": "NOUN",
+   "xpos": "NNNS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Neut",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 37
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

@@ -1,0 +1,124 @@
+{
+ "tokens": [
+  {
+   "text": "Rozepiš",
+   "charStart": 0,
+   "charEnd": 7,
+   "lemma": "Rozepiš",
+   "upos": "PROPN",
+   "xpos": "NNMS1-----A----",
+   "feats": {
+    "Animacy": "Anim",
+    "Case": "Nom",
+    "Gender": "Masc",
+    "NameType": "Giv",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "amod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "tržby",
+   "charStart": 8,
+   "charEnd": 13,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "v",
+   "charStart": 14,
+   "charEnd": 15,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 4,
+   "depRelation": "case",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "kategorii",
+   "charStart": 16,
+   "charEnd": 25,
+   "lemma": "kategorie",
+   "upos": "NOUN",
+   "xpos": "NNFS6-----A----",
+   "feats": {
+    "Case": "Loc",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "Elektronika",
+   "charStart": 26,
+   "charEnd": 37,
+   "lemma": "elektronika",
+   "upos": "NOUN",
+   "xpos": "NNFS1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "podle",
+   "charStart": 38,
+   "charEnd": 43,
+   "lemma": "podle",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 7,
+   "depRelation": "case",
+   "depHeadIdx": 6
+  },
+  {
+   "text": "značky",
+   "charStart": 44,
+   "charEnd": 50,
+   "lemma": "značka",
+   "upos": "NOUN",
+   "xpos": "NNFS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Fem",
+    "Number": "Sing"
+   },
+   "depHead": 2,
+   "depRelation": "dep",
+   "depHeadIdx": 1
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 50
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

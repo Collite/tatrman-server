@@ -1,0 +1,140 @@
+{
+ "tokens": [
+  {
+   "text": "Kolik",
+   "charStart": 0,
+   "charEnd": 5,
+   "lemma": "kolik",
+   "upos": "DET",
+   "xpos": "Ca--4----------",
+   "feats": {
+    "Case": "Acc",
+    "NumType": "Card",
+    "PronType": "Dem,Ind"
+   },
+   "depHead": 3,
+   "depRelation": "obj",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "jsme",
+   "charStart": 6,
+   "charEnd": 10,
+   "lemma": "být",
+   "upos": "AUX",
+   "xpos": "VB-P---1P-AAI--",
+   "feats": {
+    "Aspect": "Imp",
+    "Mood": "Ind",
+    "Number": "Plur",
+    "Person": "1",
+    "Polarity": "Pos",
+    "Tense": "Pres",
+    "VerbForm": "Fin",
+    "Voice": "Act"
+   },
+   "depHead": 3,
+   "depRelation": "aux",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "utržili",
+   "charStart": 11,
+   "charEnd": 18,
+   "lemma": "utržit",
+   "upos": "VERB",
+   "xpos": "VpMP----R-AAP--",
+   "feats": {
+    "Animacy": "Anim",
+    "Aspect": "Perf",
+    "Gender": "Masc",
+    "Number": "Plur",
+    "Polarity": "Pos",
+    "Tense": "Past",
+    "VerbForm": "Part",
+    "Voice": "Act"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "v",
+   "charStart": 19,
+   "charEnd": 20,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 5,
+   "depRelation": "case",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "Plzeň",
+   "charStart": 21,
+   "charEnd": 26,
+   "lemma": "Plzeň",
+   "upos": "PROPN",
+   "xpos": "NNFS6-----A----",
+   "feats": {
+    "Case": "Acc",
+    "Gender": "Fem",
+    "NameType": "Geo",
+    "Number": "Sing"
+   },
+   "depHead": 3,
+   "depRelation": "obl",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "DC",
+   "charStart": 27,
+   "charEnd": 29,
+   "lemma": "DC",
+   "upos": "NOUN",
+   "xpos": "BNXXX-----A----",
+   "feats": {
+    "Abbr": "Yes"
+   },
+   "depHead": 5,
+   "depRelation": "nmod",
+   "depHeadIdx": 4
+  },
+  {
+   "text": "loni",
+   "charStart": 30,
+   "charEnd": 34,
+   "lemma": "loni",
+   "upos": "ADV",
+   "xpos": "Db-------------",
+   "feats": {},
+   "depHead": 3,
+   "depRelation": "advmod",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "?",
+   "charStart": 34,
+   "charEnd": 35,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 3,
+   "depRelation": "punct",
+   "depHeadIdx": 2
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 35
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

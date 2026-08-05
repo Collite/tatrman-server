@@ -1,0 +1,238 @@
+{
+ "tokens": [
+  {
+   "text": "Ukaž",
+   "charStart": 0,
+   "charEnd": 4,
+   "lemma": "ukázat",
+   "upos": "VERB",
+   "xpos": "Vi-S---2--A-P--",
+   "feats": {
+    "Aspect": "Perf",
+    "Mood": "Imp",
+    "Number": "Sing",
+    "Person": "2",
+    "Polarity": "Pos",
+    "VerbForm": "Fin"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "vývoj",
+   "charStart": 5,
+   "charEnd": 10,
+   "lemma": "vývoj",
+   "upos": "NOUN",
+   "xpos": "NNIS4-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Acc",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 1,
+   "depRelation": "obj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "nákladů",
+   "charStart": 11,
+   "charEnd": 18,
+   "lemma": "náklad",
+   "upos": "NOUN",
+   "xpos": "NNIP2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 2,
+   "depRelation": "nmod",
+   "depHeadIdx": 1
+  },
+  {
+   "text": "střediska",
+   "charStart": 19,
+   "charEnd": 28,
+   "lemma": "středisko",
+   "upos": "NOUN",
+   "xpos": "NNNS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Neut",
+    "Number": "Sing"
+   },
+   "depHead": 3,
+   "depRelation": "nmod",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "220",
+   "charStart": 29,
+   "charEnd": 32,
+   "lemma": "220",
+   "upos": "NUM",
+   "xpos": "C=-------------",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 4,
+   "depRelation": "nummod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "za",
+   "charStart": 33,
+   "charEnd": 35,
+   "lemma": "za",
+   "upos": "ADP",
+   "xpos": "RR--4----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Acc"
+   },
+   "depHead": 9,
+   "depRelation": "case",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "posledních",
+   "charStart": 36,
+   "charEnd": 46,
+   "lemma": "poslední",
+   "upos": "ADJ",
+   "xpos": "AAIP2----1A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Degree": "Pos",
+    "Gender": "Masc",
+    "Number": "Plur",
+    "Polarity": "Pos"
+   },
+   "depHead": 9,
+   "depRelation": "amod",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "12",
+   "charStart": 47,
+   "charEnd": 49,
+   "lemma": "12",
+   "upos": "NUM",
+   "xpos": "C=-------------",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 9,
+   "depRelation": "nummod:gov",
+   "depHeadIdx": 8
+  },
+  {
+   "text": "měsíců",
+   "charStart": 50,
+   "charEnd": 56,
+   "lemma": "měsíc",
+   "upos": "NOUN",
+   "xpos": "NNIP2-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Gen",
+    "Gender": "Masc",
+    "Number": "Plur"
+   },
+   "depHead": 1,
+   "depRelation": "obl",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "a",
+   "charStart": 57,
+   "charEnd": 58,
+   "lemma": "a",
+   "upos": "CCONJ",
+   "xpos": "J^-------------",
+   "feats": {},
+   "depHead": 11,
+   "depRelation": "cc",
+   "depHeadIdx": 10
+  },
+  {
+   "text": "porovnej",
+   "charStart": 59,
+   "charEnd": 67,
+   "lemma": "porovnat",
+   "upos": "VERB",
+   "xpos": "Vi-S---3--A-P--",
+   "feats": {
+    "Aspect": "Perf",
+    "Mood": "Ind",
+    "Number": "Sing",
+    "Person": "1",
+    "Polarity": "Pos",
+    "Tense": "Pres",
+    "VerbForm": "Fin"
+   },
+   "depHead": 1,
+   "depRelation": "conj",
+   "depHeadIdx": 0
+  },
+  {
+   "text": "s",
+   "charStart": 68,
+   "charEnd": 69,
+   "lemma": "s",
+   "upos": "ADP",
+   "xpos": "RR--7----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Ins"
+   },
+   "depHead": 13,
+   "depRelation": "case",
+   "depHeadIdx": 12
+  },
+  {
+   "text": "plánem",
+   "charStart": 70,
+   "charEnd": 76,
+   "lemma": "plán",
+   "upos": "NOUN",
+   "xpos": "NNIS7-----A----",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Ins",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 11,
+   "depRelation": "obl:arg",
+   "depHeadIdx": 10
+  },
+  {
+   "text": ".",
+   "charStart": 76,
+   "charEnd": 77,
+   "lemma": ".",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 1,
+   "depRelation": "punct",
+   "depHeadIdx": 0
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 77
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

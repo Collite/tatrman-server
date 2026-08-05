@@ -1,0 +1,170 @@
+{
+ "tokens": [
+  {
+   "text": "Jak",
+   "charStart": 0,
+   "charEnd": 3,
+   "lemma": "jak",
+   "upos": "ADV",
+   "xpos": "Db-------------",
+   "feats": {
+    "PronType": "Int,Rel"
+   },
+   "depHead": 3,
+   "depRelation": "advmod",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "se",
+   "charStart": 4,
+   "charEnd": 6,
+   "lemma": "se",
+   "upos": "PRON",
+   "xpos": "P7-X4----------",
+   "feats": {
+    "Case": "Acc",
+    "PronType": "Prs",
+    "Reflex": "Yes",
+    "Variant": "Short"
+   },
+   "depHead": 3,
+   "depRelation": "expl:pv",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "vyvíjely",
+   "charStart": 7,
+   "charEnd": 15,
+   "lemma": "vyvíjet",
+   "upos": "VERB",
+   "xpos": "VpTP----R-AAI--",
+   "feats": {
+    "Animacy": "Inan",
+    "Aspect": "Imp",
+    "Gender": "Fem,Masc",
+    "Number": "Plur",
+    "Polarity": "Pos",
+    "Tense": "Past",
+    "VerbForm": "Part",
+    "Voice": "Act"
+   },
+   "depHead": 0,
+   "depRelation": "root",
+   "depHeadIdx": -1
+  },
+  {
+   "text": "tržby",
+   "charStart": 16,
+   "charEnd": 21,
+   "lemma": "tržba",
+   "upos": "NOUN",
+   "xpos": "NNFP1-----A----",
+   "feats": {
+    "Case": "Nom",
+    "Gender": "Fem",
+    "Number": "Plur"
+   },
+   "depHead": 3,
+   "depRelation": "nsubj",
+   "depHeadIdx": 2
+  },
+  {
+   "text": "z",
+   "charStart": 22,
+   "charEnd": 23,
+   "lemma": "z",
+   "upos": "ADP",
+   "xpos": "RR--2----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Gen"
+   },
+   "depHead": 6,
+   "depRelation": "case",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "tržiště",
+   "charStart": 24,
+   "charEnd": 31,
+   "lemma": "tržiště",
+   "upos": "NOUN",
+   "xpos": "NNNS2-----A----",
+   "feats": {
+    "Case": "Gen",
+    "Gender": "Neut",
+    "Number": "Sing"
+   },
+   "depHead": 4,
+   "depRelation": "nmod",
+   "depHeadIdx": 3
+  },
+  {
+   "text": "v",
+   "charStart": 32,
+   "charEnd": 33,
+   "lemma": "v",
+   "upos": "ADP",
+   "xpos": "RR--6----------",
+   "feats": {
+    "AdpType": "Prep",
+    "Case": "Loc"
+   },
+   "depHead": 8,
+   "depRelation": "case",
+   "depHeadIdx": 7
+  },
+  {
+   "text": "roce",
+   "charStart": 34,
+   "charEnd": 38,
+   "lemma": "rok",
+   "upos": "NOUN",
+   "xpos": "NNIS6-----A---1",
+   "feats": {
+    "Animacy": "Inan",
+    "Case": "Loc",
+    "Gender": "Masc",
+    "Number": "Sing"
+   },
+   "depHead": 6,
+   "depRelation": "nmod",
+   "depHeadIdx": 5
+  },
+  {
+   "text": "2025",
+   "charStart": 39,
+   "charEnd": 43,
+   "lemma": "2025",
+   "upos": "NUM",
+   "xpos": "C=-------------",
+   "feats": {
+    "NumForm": "Digit",
+    "NumType": "Card"
+   },
+   "depHead": 8,
+   "depRelation": "nummod",
+   "depHeadIdx": 7
+  },
+  {
+   "text": "?",
+   "charStart": 43,
+   "charEnd": 44,
+   "lemma": "?",
+   "upos": "PUNCT",
+   "xpos": "Z:-------------",
+   "feats": {},
+   "depHead": 3,
+   "depRelation": "punct",
+   "depHeadIdx": 2
+  }
+ ],
+ "entities": [],
+ "sentences": [
+  {
+   "charStart": 0,
+   "charEnd": 44
+  }
+ ],
+ "modelVersion": "stanza-1.13.0"
+}

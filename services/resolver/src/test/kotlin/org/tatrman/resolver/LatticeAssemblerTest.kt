@@ -18,6 +18,7 @@ import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.pipeline.Bindings
 import org.tatrman.resolver.pipeline.Bound
 import org.tatrman.resolver.pipeline.DomainSpanCandidate
+import org.tatrman.resolver.pipeline.FrameRolePreps
 import org.tatrman.resolver.pipeline.GatedSpan
 import org.tatrman.resolver.pipeline.LatticeAssembler
 import org.tatrman.resolver.pipeline.UniversalBinding
@@ -191,7 +192,10 @@ class LatticeAssemblerTest :
                     ungatedMentions = listOf(mention("položky", 30, 37, head = 5)),
                     universals = emptyList(),
                     thresholds = thresholds,
+                    entityTypes = emptyList(),
                     snapshotHash = "snap-1",
+                    lang = "cs",
+                    preps = FrameRolePreps.shipped(),
                     batch = BatchMatchResponse.getDefaultInstance(),
                 )
 
@@ -225,7 +229,10 @@ class LatticeAssemblerTest :
                     ungatedMentions = emptyList(),
                     universals = emptyList(),
                     thresholds = thresholds,
+                    entityTypes = emptyList(),
                     snapshotHash = "snap-1",
+                    lang = "cs",
+                    preps = FrameRolePreps.shipped(),
                     batch = BatchMatchResponse.getDefaultInstance(),
                 )
             state.valuesList.single().anchorMentionId shouldBe ""
@@ -253,7 +260,10 @@ class LatticeAssemblerTest :
                     ungatedMentions = emptyList(),
                     universals = emptyList(),
                     thresholds = thresholds,
+                    entityTypes = emptyList(),
                     snapshotHash = "snap-1",
+                    lang = "cs",
+                    preps = FrameRolePreps.shipped(),
                     batch = BatchMatchResponse.getDefaultInstance(),
                 )
             state.mentionsList
@@ -282,7 +292,10 @@ class LatticeAssemblerTest :
                             ),
                         ),
                     thresholds = thresholds,
+                    entityTypes = emptyList(),
                     snapshotHash = "snap-1",
+                    lang = "cs",
+                    preps = FrameRolePreps.shipped(),
                     batch = BatchMatchResponse.getDefaultInstance(),
                 )
             val value = state.valuesList.single()
@@ -312,7 +325,10 @@ class LatticeAssemblerTest :
                     ungatedMentions = emptyList(),
                     universals = emptyList(),
                     thresholds = thresholds,
+                    entityTypes = emptyList(),
                     snapshotHash = "snap-1",
+                    lang = "cs",
+                    preps = FrameRolePreps.shipped(),
                     batch = batch,
                 )
             state.lexiconVersions.lexiconArtifactHash shouldBe "sha256:abc"
