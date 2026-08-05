@@ -4,7 +4,6 @@ package org.tatrman.resolver.pipeline
 import org.tatrman.fuzzy.v1.BatchMatchResponse
 import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.resolver.model.ResolverEntityType
-import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.v1.Attribution
 import org.tatrman.resolver.v1.Binding
 import org.tatrman.resolver.v1.Grounding
@@ -39,7 +38,6 @@ object LatticeAssembler {
         ungatedMentions: List<DomainSpanCandidate>,
         universals: List<UniversalBinding>,
         entityTypes: List<ResolverEntityType>,
-        thresholds: ResolverThresholds,
         snapshotHash: String,
         batch: BatchMatchResponse,
         lang: String,
@@ -66,7 +64,7 @@ object LatticeAssembler {
                         .setSpan(span(span.candidate.start, span.candidate.end, span.candidate.text))
                         .setLemma(span.candidate.lemma)
                 for (match in span.contenders) {
-                    builder.addBindings(Bindings.of(match, span.candidate, thresholds, snapshotHash))
+                    builder.addBindings(Bindings.of(match, snapshotHash))
                 }
                 // LAST, deliberately (RV-42): a grounding trigger is evidence about which KERNEL
                 // owns the span, not about which model object the mention is, and the top binding
@@ -95,8 +93,8 @@ object LatticeAssembler {
                     builder.addAttributions(
                         Attribution
                             .newBuilder()
-                            .setAttributeRef(Bindings.attributeRefOf(match))
-                            .setBinding(Bindings.of(match, span.candidate, thresholds, snapshotHash)),
+                            .setAttributeRef(Bindings.attributeRefOf(match.match))
+                            .setBinding(Bindings.of(match, snapshotHash)),
                     )
                 }
                 builder

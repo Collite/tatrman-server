@@ -77,6 +77,7 @@ fun Application.module(config: Config) {
             ambiguityGap = config.getDouble("resolver.threshold-ambiguity-gap"),
             exact = config.getDouble("resolver.threshold-exact"),
             maxOptions = config.getInt("resolver.max-options"),
+            strong = config.getDouble("resolver.threshold-strong"),
         )
     // Snapshot-fed registry over the one-channel seam (RS-24). Startup uses the
     // E3-β step-one live-metadata adapter; a per-request `Registry` override wins.

@@ -38,15 +38,53 @@ data class ResolverEntityType(
 
 /**
  * Gating thresholds — ported from the live ENTITIES_ONLY config
- * (`ResolverGraph.kt:38-48`). Provenance for the numbers is that file.
+ * (`ResolverGraph.kt:38-48`). Provenance for the numbers is that file, except [strong],
+ * which RV-P2.2 adds and whose provenance is recorded on the property.
+ *
+ * The three the RV-P2.2 gate reads, and what each one decides:
+ *
+ *  - [bind] — the MATCHER's floor. Below it a row is not evidence of anything and never
+ *    enters the gate. Unchanged from RG.
+ *  - [strong] — the CLASS floor (RV-14). Above it an unvouched similarity is
+ *    `*_FUZZY_STRONG`; below it, WEAK — and WEAK never binds. See the property.
+ *  - [ambiguityGap] — the TIE BAND, now applied *within* one evidence class rather than
+ *    across the whole contender field. Two identities inside it are a G2 the gate refuses
+ *    to guess between; outside it the scores are comparable and the higher one wins,
+ *    because same-class scores are the one comparison RV-14 permits.
  */
 data class ResolverThresholds(
     val bind: Double,
     val ambiguityGap: Double,
     val exact: Double,
     val maxOptions: Int,
+    /**
+     * The RV-14 class floor: how similar an **unvouched** hit must be to count as evidence.
+     *
+     * Unvouched means the data layer — a member row matched by surface similarity alone, with no
+     * authored method behind it. Where the estate DID author a method, the method is the vouching
+     * and this floor is not applied ([EvidenceClasses] documents why; short Czech anchor words are
+     * where applying it would bite).
+     *
+     * ⚑ **Not ruled by RV-14 — the only default in the gate without a decision behind it.** RV-14
+     * ordains the classes and that WEAK never binds; it names no number, and the effort has no
+     * calibration corpus (RV-14 rejected weighted sums for exactly that reason). 0.70 is the
+     * tightest value consistent with the two observations on record, and both are greppable:
+     *
+     *  - `issues.md` §1, the garbage this list exists to kill — `501001` reaching *středisko*
+     *    rows at **0.667** and **0.500**. Both must land in WEAK.
+     *  - `GateSpansTest`'s member-ambiguity fixture — `DF` reaching `DF ADNAK` **0.72** and
+     *    `DF BELUS` **0.70**, a real partial-token pair that must stay a clarification.
+     *
+     * The gap between 0.667 and 0.70 is what the number is fitted to, and fitting a threshold to
+     * two fixtures is worth saying out loud rather than dressing up as a ruling. An estate raises
+     * it via `resolver.threshold-strong`; a calibrated value is the RV-14 γ "named future".
+     */
+    val strong: Double = LIVE_STRONG,
 ) {
     companion object {
+        /** See [ResolverThresholds.strong] — fitted, not ruled. */
+        const val LIVE_STRONG: Double = 0.70
+
         /** The live ENTITIES_ONLY defaults (also mirrored in `application.conf`). */
         val LIVE = ResolverThresholds(bind = 0.5, ambiguityGap = 0.05, exact = 0.9999, maxOptions = 20)
     }

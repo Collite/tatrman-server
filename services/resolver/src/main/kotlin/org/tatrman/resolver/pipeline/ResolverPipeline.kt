@@ -133,7 +133,6 @@ class ResolverPipeline(
                 ungatedMentions = ungatedMentions,
                 universals = universals,
                 entityTypes = resolverRegistry.entityTypes,
-                thresholds = resolverRegistry.thresholds,
                 snapshotHash = resolverRegistry.snapshotHash,
                 batch = batchResp,
                 lang = assessment.language,
@@ -445,6 +444,14 @@ class ResolverPipeline(
                     // refuse-over-guess hole where a per-request `bind = 0.1` lowered the
                     // 0.5 floor and let near-junk matches bind (RG-P6 review E). `max_options`
                     // is a display cap, not a safety floor, so it takes any positive value.
+                    //
+                    // ⚑ RV-P2.2 — `strong` is a safety floor by the same argument and would
+                    // belong in this clamp, but it has NO wire field to clamp: `Thresholds` is
+                    // the caller-facing proto and adding one is a contract change this list
+                    // does not own. It therefore always takes the estate's configured value,
+                    // which is the conservative outcome (a caller cannot lower the class floor
+                    // because a caller cannot reach it at all). Worth an explicit ruling if a
+                    // per-request class floor is ever wanted.
                     val t = reg.thresholds
                     ResolverThresholds(
                         bind = if (t.bind > 0) maxOf(t.bind, fallback.bind) else fallback.bind,
@@ -458,6 +465,7 @@ class ResolverPipeline(
                             },
                         exact = if (t.exact > 0) maxOf(t.exact, fallback.exact) else fallback.exact,
                         maxOptions = if (t.maxOptions > 0) t.maxOptions else fallback.maxOptions,
+                        strong = fallback.strong,
                     )
                 } else {
                     fallback

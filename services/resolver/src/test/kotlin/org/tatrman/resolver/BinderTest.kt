@@ -68,7 +68,9 @@ class BinderTest :
                     ),
                     thresholds,
                 )
-            verdict.shouldBeInstanceOf<Binder.Bind>().winner.match.candidateId shouldBe "df-adnak"
+            verdict
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.candidateId shouldBe "df-adnak"
         }
 
         "(c) a higher class beats a higher score in a lower class — 0.99 UNANCHORED loses to 0.62 DECLARED" {
@@ -80,7 +82,9 @@ class BinderTest :
                     ),
                     thresholds,
                 )
-            verdict.shouldBeInstanceOf<Binder.Bind>().winner.match.candidateId shouldBe "declared"
+            verdict
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.candidateId shouldBe "declared"
         }
 
         "(d) WEAK never binds, whatever its score — even alone, even at 1.0" {
@@ -115,7 +119,9 @@ class BinderTest :
                     ),
                     thresholds,
                 )
-            verdict.shouldBeInstanceOf<Binder.Bind>().winner.match.candidateId shouldBe "declared"
+            verdict
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.candidateId shouldBe "declared"
         }
 
         "(f) an empty candidate set is a NoBind — the gate reports nothing, the gap layer types it" {
@@ -158,7 +164,9 @@ class BinderTest :
                     ),
                     thresholds,
                 )
-            verdict.shouldBeInstanceOf<Binder.Bind>().winner.match.candidateId shouldBe "anchored"
+            verdict
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.candidateId shouldBe "anchored"
         }
     }) {
     private companion object {

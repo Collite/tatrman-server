@@ -5,6 +5,7 @@ import org.tatrman.fuzzy.v1.BatchMatchResponse
 import org.tatrman.fuzzy.v1.SpanQuery
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.v1.Binding
+import org.tatrman.resolver.v1.EvidenceClass
 import org.tatrman.resolver.v1.TargetClass
 import org.tatrman.resolver.v1.UniversalEntityType
 import org.tatrman.ttr.lexicon.LexiconValidator
@@ -113,9 +114,17 @@ object GroundingTriggers {
             val bindings =
                 result.matchesList
                     .asSequence()
-                    .filter { it.score >= thresholds.bind }
-                    .sortedByDescending { it.score }
-                    .map { Bindings.of(it, span, thresholds, snapshotHash) }
+                    // Classified but NOT gated, and RV-P2.2 is where that distinction has to be
+                    // stated rather than implied. A trigger is evidence about which kernel owns a
+                    // span; it competes with nothing, so there is no winner to pick and running it
+                    // through [Binder] would make one — the model binding and the trigger on the
+                    // same span would become rivals in one class order, and the stronger would
+                    // suppress the other. The class still comes from [EvidenceClasses], so a
+                    // trigger reports its evidence as honestly as any binding does.
+                    .map { Binder.ClassedMatch(it, EvidenceClasses.of(it, span.anchored, thresholds)) }
+                    .filter { it.evidenceClass != EvidenceClass.EVIDENCE_CLASS_WEAK }
+                    .sortedByDescending { it.match.score }
+                    .map { Bindings.of(it, snapshotHash) }
                     .filter { it.targetClass == TargetClass.TARGET_CLASS_GROUNDING_TRIGGER }
                     .distinctBy { it.ref }
                     .toList()

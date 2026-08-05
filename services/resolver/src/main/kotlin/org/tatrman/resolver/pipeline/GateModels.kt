@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.resolver.pipeline
 
-import org.tatrman.fuzzy.v1.FuzzyMatch
-
 /**
  * The outcome of gating the proposed spans against the vocabulary (RG-P5.S1.T4).
  * A resolve is EITHER fully bound OR awaiting clarification (the proto `outcome`
@@ -33,14 +31,21 @@ data class Clarify(
 ) : GateOutcome
 
 /**
- * One proposed span and every candidate that survived the gate's thresholds, in score
- * order. [ambiguous] is the refuse-over-guess verdict for THIS span: two or more distinct
- * identities in the contender band, which the door renders as a clarification and the
- * lattice as a mention with several bindings plus a G2 gap.
+ * One proposed span and every candidate the gate ADMITTED, in score order, each carrying the
+ * RV-14 evidence class the gate derived for it. [ambiguous] is the refuse-over-guess verdict for
+ * THIS span: two or more distinct identities in the top class inside the tie band, which the door
+ * renders as a clarification and the lattice as a mention with several bindings plus a G2 gap.
+ *
+ * RV-P2.2 changed both halves of [contenders]: it is no longer "everything above the bind floor"
+ * but "everything in the winning class", and it carries the class rather than leaving the lattice
+ * to re-derive one. WEAK candidates are therefore absent by construction — which is what lets a
+ * span that matched only garbage still be a G1/G3 rather than a mention with bindings nobody
+ * trusts. What the gate refused is not lost: it rides [Binder.Verdict.rejected] into the round's
+ * log (P2.3.T5).
  */
 data class GatedSpan(
     val candidate: DomainSpanCandidate,
-    val contenders: List<FuzzyMatch>,
+    val contenders: List<Binder.ClassedMatch>,
     val ambiguous: Boolean,
 )
 

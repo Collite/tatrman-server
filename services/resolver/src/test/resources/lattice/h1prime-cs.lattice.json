@@ -11,7 +11,7 @@
         {
           "ref": "op:show",
           "targetClass": "TARGET_CLASS_OPERATOR",
-          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
           "method": "MATCH_METHOD_EXACT",
           "source": "SOURCE_TAG_DECLARED",
           "inClassScore": 1.0,
@@ -40,7 +40,7 @@
         {
           "ref": "md.measure.cost",
           "targetClass": "TARGET_CLASS_MODEL_OBJECT",
-          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
           "method": "MATCH_METHOD_EXACT",
           "source": "SOURCE_TAG_DECLARED",
           "inClassScore": 1.0,
@@ -68,7 +68,7 @@
         {
           "ref": "md.dimension.Account",
           "targetClass": "TARGET_CLASS_MODEL_OBJECT",
-          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
           "method": "MATCH_METHOD_EXACT",
           "source": "SOURCE_TAG_DECLARED",
           "inClassScore": 1.0,
@@ -96,7 +96,7 @@
         {
           "ref": "md.dimension.Calendar.year",
           "targetClass": "TARGET_CLASS_MODEL_OBJECT",
-          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
           "method": "MATCH_METHOD_EXACT",
           "source": "SOURCE_TAG_METADATA",
           "inClassScore": 1.0,
@@ -139,7 +139,7 @@
         {
           "ref": "md.dimension.Calendar.month",
           "targetClass": "TARGET_CLASS_MODEL_OBJECT",
-          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
           "method": "MATCH_METHOD_EXACT",
           "source": "SOURCE_TAG_DECLARED",
           "inClassScore": 1.0,

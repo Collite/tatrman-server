@@ -14,19 +14,20 @@ import org.tatrman.resolver.model.ResolverThresholds
  * `BatchMatch` (never per-span RPCs — B-T1's point); the response comes back
  * positional to the request; this turns it into bindings or a clarification.
  *
- * Determinism rules, ported from the live ENTITIES_ONLY config:
- *  - a match binds only at score ≥ [ResolverThresholds.bind] (0.5);
- *  - an exact match (≥ [ResolverThresholds.exact], 0.9999) dominates the
- *    sub-exact field — a near name below `exact` is dropped, which is how a short
- *    exact code (`FAP`) separates from a near name; but two DISTINCT exact matches
- *    are a genuine tie and still clarify (refuse over guess);
- *  - otherwise contenders within [ResolverThresholds.ambiguityGap] (0.05) of the
- *    top are compared by IDENTITY (MEMBER → resolved_id, VOCABULARY → target_ref):
- *    one identity ⇒ bind; multiple ⇒ instance ambiguity ⇒ clarify (refuse over
- *    guess, RS-26), capped at [ResolverThresholds.maxOptions] (20);
+ * **RV-P2.2 moved the selection rule out of this file.** What used to live here — a bind floor, an
+ * exact-dominance special case, a tie band over the whole contender field — is now [Binder], and
+ * the three of them turned out to be one rule badly separated: RV-14's class order. This object
+ * kept everything that is genuinely about *spans* (build one batch, read it positionally, expand
+ * siblings, dedupe across spans, render options) and delegates the one question "which of these
+ * candidates, if any" to the binder, which is the same call the P2.3 lookup rounds and the P2.4
+ * re-gate make. There is deliberately no second selection rule in this service.
+ *
+ * What remains here, unchanged from RG:
  *  - the same resolved id reached via two spans dedupes to one binding;
  *  - a MEMBER value on a KOD/NAZEV column also points at its sibling column
- *    (Q-20 sibling-column expansion — a catalog lookup).
+ *    (Q-20 sibling-column expansion — a catalog lookup);
+ *  - a span's clarification options are capped at [ResolverThresholds.maxOptions] (20)
+ *    independently, so a second ambiguous span can never be dropped by a global truncation.
  */
 object GateSpans {
     /** Build the single `BatchMatch` request: one `SpanQuery` per candidate, positional. */
@@ -66,43 +67,30 @@ object GateSpans {
         val gated = mutableListOf<GatedSpan>()
 
         candidates.forEachIndexed { i, cand ->
-            val result = response.resultsList.getOrNull(i)
-            val matches =
-                result
-                    ?.matchesList
-                    .orEmpty()
-                    .filter { it.score >= thresholds.bind }
-                    .sortedByDescending { it.score }
-            if (matches.isEmpty()) {
-                gated += GatedSpan(cand, emptyList(), ambiguous = false)
-                return@forEachIndexed
-            }
-
-            val top = matches.first()
-            val contenders =
-                if (top.score >= thresholds.exact) {
-                    // Exact dominance: a near-name below `exact` is excluded (that's how a
-                    // short exact code separates from a similar name). But two DISTINCT
-                    // exact matches are a genuine tie — keep them both so the identity
-                    // check below can surface it as a clarification, not a silent guess.
-                    matches.filter { it.score >= thresholds.exact }
-                } else {
-                    matches.filter { top.score - it.score <= thresholds.ambiguityGap }
-                }
-
-            val identities = contenders.map { identityKey(it) }.distinct()
-            gated += GatedSpan(cand, contenders.distinctBy { identityKey(it) }, ambiguous = identities.size > 1)
-            if (identities.size > 1) {
-                // instance ambiguity — offer the distinct contenders, don't bind. Each
-                // option is attributed to THIS span and this span's options are capped
-                // independently, so a second ambiguous span can never be silently dropped
-                // by a global truncation (RG-P6 review M).
-                contenders
-                    .distinctBy { identityKey(it) }
-                    .take(thresholds.maxOptions)
-                    .forEach { options += toOption(it, cand, entityTypes) }
-            } else {
-                bindings += toBinding(cand, top, entityTypes, siblings, snapshotHash)
+            // The ONE decision, made in the one place that makes it (RV-P2.2). Note what is NOT
+            // filtered before the call: the bind floor is the binder's too, because a candidate
+            // the gate refused is still something the rung log should be able to name.
+            val verdict =
+                Binder.gate(
+                    response.resultsList
+                        .getOrNull(i)
+                        ?.matchesList
+                        .orEmpty(),
+                    cand,
+                    thresholds,
+                )
+            gated += GatedSpan(cand, verdict.admitted, ambiguous = verdict is Binder.Ambiguous)
+            when (verdict) {
+                is Binder.NoBind -> Unit
+                is Binder.Ambiguous ->
+                    // instance ambiguity — offer the distinct contenders, don't bind. Each option
+                    // is attributed to THIS span and this span's options are capped independently
+                    // (RG-P6 review M).
+                    verdict.admitted
+                        .take(thresholds.maxOptions)
+                        .forEach { options += toOption(it.match, cand, entityTypes) }
+                is Binder.Bind ->
+                    bindings += toBinding(cand, verdict.winner.match, entityTypes, siblings, snapshotHash)
             }
         }
 
@@ -117,9 +105,6 @@ object GateSpans {
     }
 
     // --- helpers ------------------------------------------------------------
-
-    private fun identityKey(m: FuzzyMatch): String =
-        if (m.source == SourceTag.MEMBER) "M:${m.candidateId}" else "V:${m.targetRef}"
 
     /** The declared entity type owning a match's fuzzy category, or the category itself. */
     private fun entityRefOf(
@@ -158,7 +143,7 @@ object GateSpans {
     ): ClarificationOption {
         val isMember = m.source == SourceTag.MEMBER
         return ClarificationOption(
-            id = identityKey(m),
+            id = Binder.identityKey(m),
             label = m.candidate,
             resolvedId = if (isMember) m.candidateId else null,
             targetRef = if (!isMember && m.targetRef.isNotBlank()) m.targetRef else null,

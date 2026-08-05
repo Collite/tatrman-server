@@ -15,9 +15,11 @@ import org.tatrman.fuzzy.v1.SourceTag
 import org.tatrman.fuzzy.v1.TargetClass
 import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.pipeline.Binder
 import org.tatrman.resolver.pipeline.Bindings
 import org.tatrman.resolver.pipeline.Bound
 import org.tatrman.resolver.pipeline.DomainSpanCandidate
+import org.tatrman.resolver.pipeline.EvidenceClasses
 import org.tatrman.resolver.pipeline.FrameRolePreps
 import org.tatrman.resolver.pipeline.GatedSpan
 import org.tatrman.resolver.pipeline.LatticeAssembler
@@ -41,10 +43,9 @@ class LatticeAssemblerTest :
 
         "Binding: a member row becomes an addressable ref, and the layer names its class" {
             val binding =
-                Bindings.of(
+                mapped(
                     member("501001", "md.dimension.Account.code", 1.0),
                     literal("501001", 20, 26, anchorHead = 2),
-                    thresholds,
                     "snap-1",
                 )
 
@@ -59,10 +60,9 @@ class LatticeAssemblerTest :
 
         "Binding: a declared row keeps its own ref and class" {
             val binding =
-                Bindings.of(
+                mapped(
                     declared("op:show", "op:show", TargetClass.TARGET_CLASS_OPERATOR, 1.0),
                     mention("Zobraz", 0, 6),
-                    thresholds,
                     "snap-1",
                 )
             binding.ref shouldBe "op:show"
@@ -83,26 +83,24 @@ class LatticeAssemblerTest :
 
         "Binding: the RV-32 method parameter survives the enum, and an unknown method is not guessed" {
             val typos =
-                Bindings.of(
+                mapped(
                     declared("md.measure.cost", "md.measure.cost", TargetClass.TARGET_CLASS_MODEL_OBJECT, 0.8)
                         .toBuilder()
                         .setMatchMethod("TYPOS(2)")
                         .build(),
                     mention("naklady", 0, 7),
-                    thresholds,
                     "snap-1",
                 )
             typos.method shouldBe MatchMethod.MATCH_METHOD_TYPOS
             typos.maxDistance shouldBe 2
 
             val unknown =
-                Bindings.of(
+                mapped(
                     declared("md.measure.cost", "md.measure.cost", TargetClass.TARGET_CLASS_MODEL_OBJECT, 0.8)
                         .toBuilder()
                         .setMatchMethod("PHONETIC(3)")
                         .build(),
                     mention("naklady", 0, 7),
-                    thresholds,
                     "snap-1",
                 )
             unknown.method shouldBe MatchMethod.MATCH_METHOD_UNSPECIFIED
@@ -110,7 +108,7 @@ class LatticeAssemblerTest :
 
         "Binding: TOKENS keeps the uniqueness decision distinguishable from 'no decision'" {
             val decided =
-                Bindings.of(
+                mapped(
                     declared("md.measure.cost", "md.measure.cost", TargetClass.TARGET_CLASS_MODEL_OBJECT, 0.9)
                         .toBuilder()
                         .setMatchMethod("TOKENS")
@@ -118,7 +116,6 @@ class LatticeAssemblerTest :
                         .setAutoBindable(false)
                         .build(),
                     mention("naklady", 0, 7),
-                    thresholds,
                     "snap-1",
                 )
             decided.hasAutoBindable().shouldBeTrue()
@@ -126,10 +123,9 @@ class LatticeAssemblerTest :
             decided.uniquenessMargin shouldBe 0.4
 
             val undecided =
-                Bindings.of(
+                mapped(
                     declared("md.measure.cost", "md.measure.cost", TargetClass.TARGET_CLASS_MODEL_OBJECT, 0.9),
                     mention("naklady", 0, 7),
-                    thresholds,
                     "snap-1",
                 )
             undecided.hasAutoBindable().shouldBeFalse()
@@ -137,7 +133,7 @@ class LatticeAssemblerTest :
 
         "Binding: a sub-exact hit is fuzzy-strong, and anchoring is what separates the two classes" {
             val anchored =
-                Bindings.of(
+                mapped(
                     member("df-adnak", "er.qstred_df.nazev", 0.72),
                     DomainSpanCandidate(
                         "DF ADNAK",
@@ -148,11 +144,10 @@ class LatticeAssemblerTest :
                         anchored = true,
                         origin = DomainSpanCandidate.Origin.GOVERNED_VALUE,
                     ),
-                    thresholds,
                     "snap-1",
                 )
             val unanchored =
-                Bindings.of(
+                mapped(
                     member("df-adnak", "er.qstred_df.nazev", 0.72),
                     DomainSpanCandidate(
                         "DF ADNAK",
@@ -163,7 +158,6 @@ class LatticeAssemblerTest :
                         anchored = false,
                         origin = DomainSpanCandidate.Origin.PROPER_NOUN,
                     ),
-                    thresholds,
                     "snap-1",
                 )
             anchored.evidenceClass shouldBe EvidenceClass.EVIDENCE_CLASS_ANCHORED_FUZZY_STRONG
@@ -171,10 +165,10 @@ class LatticeAssemblerTest :
         }
 
         "EvidenceClass rank: UNSPECIFIED is the WEAKEST, not the strongest (proto3 zero-value trap)" {
-            Bindings.rank(EvidenceClass.EVIDENCE_CLASS_EXACT) shouldBe 1
+            EvidenceClasses.rank(EvidenceClass.EVIDENCE_CLASS_EXACT) shouldBe 1
             (
-                Bindings.rank(EvidenceClass.EVIDENCE_CLASS_UNSPECIFIED) >
-                    Bindings.rank(EvidenceClass.EVIDENCE_CLASS_WEAK)
+                EvidenceClasses.rank(EvidenceClass.EVIDENCE_CLASS_UNSPECIFIED) >
+                    EvidenceClasses.rank(EvidenceClass.EVIDENCE_CLASS_WEAK)
             ).shouldBeTrue()
         }
 
@@ -187,12 +181,12 @@ class LatticeAssemblerTest :
                             emptyList(),
                             0.0,
                             listOf(
-                                GatedSpan(
+                                gatedSpan(
                                     mention("účtu", 15, 19, head = 2),
                                     listOf(declared("md.dimension.Account", "md.dimension.Account")),
                                     ambiguous = false,
                                 ),
-                                GatedSpan(
+                                gatedSpan(
                                     literal("501001", 20, 26, anchorHead = 2),
                                     listOf(member("501001", "md.dimension.Account.code", 1.0)),
                                     ambiguous = false,
@@ -201,7 +195,6 @@ class LatticeAssemblerTest :
                         ),
                     ungatedMentions = listOf(mention("položky", 30, 37, head = 5)),
                     universals = emptyList(),
-                    thresholds = thresholds,
                     entityTypes = emptyList(),
                     snapshotHash = "snap-1",
                     lang = "cs",
@@ -232,13 +225,12 @@ class LatticeAssemblerTest :
                             emptyList(),
                             0.0,
                             listOf(
-                                GatedSpan(mention("stanic", 0, 6, head = 0), emptyList(), ambiguous = false),
-                                GatedSpan(literal("10", 8, 10, anchorHead = 0), emptyList(), ambiguous = false),
+                                gatedSpan(mention("stanic", 0, 6, head = 0), emptyList(), ambiguous = false),
+                                gatedSpan(literal("10", 8, 10, anchorHead = 0), emptyList(), ambiguous = false),
                             ),
                         ),
                     ungatedMentions = emptyList(),
                     universals = emptyList(),
-                    thresholds = thresholds,
                     entityTypes = emptyList(),
                     snapshotHash = "snap-1",
                     lang = "cs",
@@ -257,7 +249,7 @@ class LatticeAssemblerTest :
                             emptyList(),
                             0.0,
                             listOf(
-                                GatedSpan(
+                                gatedSpan(
                                     mention("středisko", 0, 9, head = 0),
                                     listOf(
                                         declared("er.qstred_df", "er.qstred_df", score = 0.88),
@@ -269,7 +261,6 @@ class LatticeAssemblerTest :
                         ),
                     ungatedMentions = emptyList(),
                     universals = emptyList(),
-                    thresholds = thresholds,
                     entityTypes = emptyList(),
                     snapshotHash = "snap-1",
                     lang = "cs",
@@ -301,7 +292,6 @@ class LatticeAssemblerTest :
                                 sourceEngine = "nametag3",
                             ),
                         ),
-                    thresholds = thresholds,
                     entityTypes = emptyList(),
                     snapshotHash = "snap-1",
                     lang = "cs",
@@ -334,7 +324,6 @@ class LatticeAssemblerTest :
                     gate = Bound(emptyList(), 0.0, emptyList()),
                     ungatedMentions = emptyList(),
                     universals = emptyList(),
-                    thresholds = thresholds,
                     entityTypes = emptyList(),
                     snapshotHash = "snap-1",
                     lang = "cs",
@@ -348,6 +337,29 @@ class LatticeAssemblerTest :
         }
     }) {
     companion object {
+        /**
+         * RV-P2.2 — a matcher row as the GATE now hands it on: with the class the gate derived.
+         * These helpers run the real [EvidenceClasses] derivation rather than asserting a class
+         * into place, so a change to the derivation is visible in every mapping test too.
+         */
+        private fun classedBy(
+            match: FuzzyMatch,
+            span: DomainSpanCandidate,
+        ): Binder.ClassedMatch =
+            Binder.ClassedMatch(match, EvidenceClasses.of(match, span.anchored, ResolverThresholds.LIVE))
+
+        private fun gatedSpan(
+            span: DomainSpanCandidate,
+            matches: List<FuzzyMatch>,
+            ambiguous: Boolean,
+        ): GatedSpan = GatedSpan(span, matches.map { classedBy(it, span) }, ambiguous)
+
+        private fun mapped(
+            match: FuzzyMatch,
+            span: DomainSpanCandidate,
+            snapshotHash: String,
+        ) = Bindings.of(classedBy(match, span), snapshotHash)
+
         /** Name → number, minus the generated `UNRECOGNIZED` sentinel (its `number` throws). */
         private fun numbersOf(values: Array<out Enum<*>>): Map<String, Int> =
             values
