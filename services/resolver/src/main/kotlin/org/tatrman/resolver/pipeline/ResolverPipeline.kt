@@ -129,6 +129,7 @@ class ResolverPipeline(
                 batch = batchResp,
                 lang = assessment.language,
                 preps = preps,
+                degraded = assessment.degradedFloor,
             )
 
         val builder =

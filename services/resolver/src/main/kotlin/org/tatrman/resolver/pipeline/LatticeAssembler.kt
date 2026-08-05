@@ -42,6 +42,7 @@ object LatticeAssembler {
         batch: BatchMatchResponse,
         lang: String,
         preps: FrameRolePreps,
+        degraded: Boolean = false,
     ): ResolutionState {
         val gatedByLayer = gate.gated.groupBy { layerOf(it) }
         val mentionSpans =
@@ -136,19 +137,36 @@ object LatticeAssembler {
             )
         val mentions = mentionBuilders.map { it.addAllFrameRoles(roles[it.id].orEmpty()).build() }
 
+        // Gaps are computed last, from the finished annotation: what a gap IS depends on the
+        // roles (is it load-bearing?) and on the anchor (was there a scope to miss?).
+        val gaps =
+            Gaps.assess(
+                mentions = mentions,
+                values = values,
+                ambiguousSpans =
+                    gate.gated
+                        .filter { it.ambiguous }
+                        .map { it.candidate.start to it.candidate.end }
+                        .toSet(),
+                parse = parse,
+                degraded = degraded,
+            )
+
         val builder =
             ResolutionState
                 .newBuilder()
                 .setParse(parse)
                 .addAllMentions(mentions)
                 .addAllValues(values)
+                .addAllGaps(gaps)
                 .setLexiconVersions(lexiconVersions(batch))
         builder.addRungLog(
             RungLogEntry
                 .newBuilder()
                 .setRung(CORE_RUNG)
                 .setAction("annotate")
-                .setBindingsAdded(mentions.sumOf { it.bindingsCount } + values.sumOf { it.attributionsCount }),
+                .setBindingsAdded(mentions.sumOf { it.bindingsCount } + values.sumOf { it.attributionsCount })
+                .setGapsOpen(gaps.size),
         )
         return builder.build()
     }
