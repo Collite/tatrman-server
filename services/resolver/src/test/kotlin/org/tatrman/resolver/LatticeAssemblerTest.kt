@@ -71,6 +71,16 @@ class LatticeAssemblerTest :
             binding.evidenceClass shouldBe EvidenceClass.EVIDENCE_CLASS_DECLARED_ALIAS
         }
 
+        "Binding: the two TargetClass vocabularies are pinned equal — the mapping goes by NUMBER" {
+            // `Bindings.targetClassOf` translates `fuzzy.v1.TargetClass` to `resolver.v1.TargetClass`
+            // through `forNumber`, so these are two independent protos held together by an
+            // assumption. A value added to one out of order would silently re-label every binding,
+            // and the wire gate cannot see it — an ADDED enum value is legal in both files
+            // (p2-1 review). This is the seam RV-P1.6.T6 closed for GROUNDING_KINDS by reading the
+            // producer's vocabulary; here the wire shape forbids that, so it is pinned instead.
+            numbersOf(TargetClass.values()) shouldBe numbersOf(LatticeTargetClass.values())
+        }
+
         "Binding: the RV-32 method parameter survives the enum, and an unknown method is not guessed" {
             val typos =
                 Bindings.of(
@@ -338,6 +348,12 @@ class LatticeAssemblerTest :
         }
     }) {
     companion object {
+        /** Name → number, minus the generated `UNRECOGNIZED` sentinel (its `number` throws). */
+        private fun numbersOf(values: Array<out Enum<*>>): Map<String, Int> =
+            values
+                .filter { it.name != "UNRECOGNIZED" }
+                .associate { it.name to (it as com.google.protobuf.ProtocolMessageEnum).number }
+
         private fun mention(
             text: String,
             start: Int,

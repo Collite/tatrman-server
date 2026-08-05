@@ -14,7 +14,10 @@ import java.io.File
  * routing table (RV-40), not in Kotlin source — the next language is a data change".
  *
  * Shipped defaults live in `frame-roles.conf`; an estate replaces them wholesale with
- * `resolver.frame-roles.config-path` (env `RESOLVER_FRAME_ROLES_PATH`). An unreadable or
+ * `resolver.frame-roles.config-path`, declared in `application.conf` and bound to
+ * `RESOLVER_FRAME_ROLES_PATH` there — a reader whose key no `application.conf` declares is a
+ * reader no estate can reach, which is what this override was until the p2-1 review. An
+ * unreadable or
  * malformed override falls back to the shipped tables with a warning rather than failing
  * the boot — the same posture the lexicon readers take (P1.4/P1.6): losing a language's
  * prepositions degrades role derivation, it does not make the core wrong.
@@ -66,9 +69,11 @@ class FrameRolePreps(
             FrameRolePreps(
                 groupingPreps = tables(config, "frame-roles.grouping-preps"),
                 filterPreps = tables(config, "frame-roles.filter-preps"),
+                // Lowercased like the table keys themselves: an override that writes
+                // `default-lang = "EN"` must not silently resolve to no table at all.
                 defaultLang =
                     if (config.hasPath("frame-roles.default-lang")) {
-                        config.getString("frame-roles.default-lang")
+                        config.getString("frame-roles.default-lang").lowercase()
                     } else {
                         "en"
                     },

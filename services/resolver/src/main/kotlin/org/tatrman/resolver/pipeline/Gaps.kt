@@ -63,12 +63,25 @@ object Gaps {
         }
 
         for (value in values) {
-            if (value.attributionsCount > 0) continue
-            if (value.anchorMentionId in operators) continue // the operator's own argument, not a gap
-            if (selfGrounding(value)) continue
+            // Ambiguity outranks every exemption below, and that is the point: if the gate is
+            // asking the user about this span, the lattice may not report it settled. A literal
+            // that reached two members (one code, two accounts) HAS attributions — it is not
+            // unattributed, it is over-attributed — so the three "not a gap" rules would have
+            // dropped it, and the ladder driving off gaps would see nothing to resolve on the
+            // one span the door is refusing to guess (p2-1 review).
+            val ambiguous = (value.span.start to value.span.end) in ambiguousSpans
+            if (!ambiguous) {
+                if (value.attributionsCount > 0) continue
+                if (value.anchorMentionId in operators) continue // the operator's own argument, not a gap
+                if (selfGrounding(value)) continue
+            }
             val anchored = value.anchorMentionId.isNotBlank()
             val kind =
                 when {
+                    // Several distinct identities in the contender band — the same fact the door
+                    // renders as a clarification, typed here so it can be re-entered through the
+                    // gate (contracts §1: a gap sits on a mention OR on a value, `value_id`).
+                    ambiguous -> GapKind.GAP_KIND_G2_AMBIGUOUS
                     // The scope WAS known — the user named the axis and the lookup in it missed.
                     // That is a method miss, and it is what a widening round (P2.2/P2.3) acts on.
                     anchored -> GapKind.GAP_KIND_G4_METHOD_MISS

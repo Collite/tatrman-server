@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.nlp.v1.Token
 import org.tatrman.resolver.pipeline.Gaps
+import org.tatrman.resolver.v1.Attribution
 import org.tatrman.resolver.v1.Binding
 import org.tatrman.resolver.v1.Disposition
 import org.tatrman.resolver.v1.FrameRole
@@ -157,6 +158,52 @@ class GapsTest :
             everything.none { it.kind == GapKind.GAP_KIND_G6_INCOHERENT } shouldBe true
         }
 
+        "G2_AMBIGUOUS on a VALUE — the door is asking about it, so the lattice may not call it settled" {
+            // One code, two accounts. It is not UNattributed — it is OVER-attributed, so every
+            // "not a gap" rule below would have dropped it and the ladder would have seen a
+            // clarification on the wire with nothing in the lattice to re-enter (p2-1 review).
+            val overAttributed =
+                literal("v1", 20, 26, "501001")
+                    .toBuilder()
+                    .setAnchorMentionId("m1")
+                    .addAttributions(attribution("md.dimension.Account.code#501001-a"))
+                    .addAttributions(attribution("md.dimension.Account.code#501001-b"))
+                    .build()
+            val gaps =
+                Gaps.assess(
+                    mentions = listOf(mention("m1", 15, 19, "účtu", FrameRole.FRAME_ROLE_FILTER, bound = true)),
+                    values = listOf(overAttributed),
+                    ambiguousSpans = setOf(20 to 26),
+                    parse = AnalyzeResponse.getDefaultInstance(),
+                    degraded = false,
+                )
+            val gap = gaps.single()
+            gap.kind shouldBe GapKind.GAP_KIND_G2_AMBIGUOUS
+            gap.valueId shouldBe "v1"
+            gap.mentionId shouldBe ""
+            // and it is NOT reported as a method miss just because a mention scoped it: the
+            // lookup did not miss, it found two.
+            gap.frameRolesList shouldContainExactly listOf(FrameRole.FRAME_ROLE_FILTER)
+            // the candidates survive — refusing to choose is not refusing to report
+            overAttributed.attributionsCount shouldBe 2
+        }
+
+        "an unambiguous value with an attribution is still not a gap — the control" {
+            val bound =
+                literal("v1", 20, 26, "501001")
+                    .toBuilder()
+                    .setAnchorMentionId("m1")
+                    .addAttributions(attribution("md.dimension.Account.code#501001"))
+                    .build()
+            Gaps.assess(
+                mentions = listOf(mention("m1", 15, 19, "účtu", bound = true)),
+                values = listOf(bound),
+                ambiguousSpans = emptySet(),
+                parse = AnalyzeResponse.getDefaultInstance(),
+                degraded = false,
+            ) shouldBe emptyList()
+        }
+
         "a literal an OPERATOR scoped is that operator's argument, not an unattributed value" {
             val operator =
                 mention("m1", 7, 14, "prvních")
@@ -236,6 +283,13 @@ class GapsTest :
                 .newBuilder()
                 .setRef(ref)
                 .setTargetClass(targetClass)
+                .build()
+
+        private fun attribution(ref: String): Attribution =
+            Attribution
+                .newBuilder()
+                .setAttributeRef(ref.substringBefore('#'))
+                .setBinding(binding(ref, TargetClass.TARGET_CLASS_MEMBER))
                 .build()
 
         private fun literal(
