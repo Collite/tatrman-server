@@ -49,6 +49,11 @@ import java.io.File
  *    **G1_UNBOUND** mention with zero bindings instead of a forced binding, and the
  *    unattributable LOCATION hint is a **G3_UNATTRIBUTED** value.
  *
+ * RV-P1.6.T6 extends the first two with the **grounding-trigger annotation** (RV-42): *roce* and
+ * *období* each carry a `ground:chrono` binding beside their model binding — the overlap is the
+ * lattice's normal state, not a competition — and the trigger on *roce* is what anchors the chrono
+ * call on `2025`. h2 is the negative: its estate ships no `ground:` rows and nothing is annotated.
+ *
  * Everything upstream is a fake: `nlp` replays a REAL cached Stanza parse (see
  * `lattice/PROVENANCE.md`) and `lex-matcher` answers per query text from the case file, so a
  * change in span-proposal order cannot silently re-shuffle a positional fixture.
@@ -137,6 +142,12 @@ class LatticeGoldenTest :
      * lex-matcher, answering **by query text** rather than by slot index: the fixture states
      * what the vocabulary knows, and stays valid when span proposal changes what it asks for.
      * An unknown query answers with zero candidates — which is what a real miss looks like.
+     *
+     * A row is returned only when the slot ASKED for its category (RV-P1.6.T6). The real matcher
+     * is category-scoped per slot — an explicit-but-unknown category contributes nothing, it does
+     * not fall back to the global index — and the core now asks two different questions about one
+     * span ("which model object is this?" and "is this span a grounding kernel's?"), in two slots
+     * with different categories. A fake that ignored `categories` would answer both with both.
      */
     private class FakeFuzzy(
         case: JsonObject,
@@ -154,10 +165,13 @@ class LatticeGoldenTest :
         override suspend fun batchMatch(request: BatchMatchRequest): BatchMatchResponse {
             val builder = BatchMatchResponse.newBuilder()
             for (span in request.spansList) {
+                val scoped = span.categoriesList.toSet()
                 builder.addResults(
                     FuzzyMatchResponse
                         .newBuilder()
-                        .addAllMatches(byQuery[span.query].orEmpty())
+                        .addAllMatches(
+                            byQuery[span.query].orEmpty().filter { scoped.isEmpty() || it.category in scoped },
+                        )
                         .setMatchedAlgorithm("TATRMAN")
                         .setVocabularyVersion(vocabularyVersion)
                         .setLayerVersions(layerVersions),

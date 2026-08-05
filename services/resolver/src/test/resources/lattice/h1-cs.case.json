@@ -1,7 +1,7 @@
 {
   "id": "h1-cs",
   "source": "design.md H1 (the 0-LLM proof) + issues.md §Looking in wrong entity (2026-07-28)",
-  "expect": "gap-free lattice: five mentions (incl. the op:show OPERATOR binding), the account code attributed to md.dimension.Account.code, the year grounded, ZERO gaps",
+  "expect": "gap-free lattice: five mentions (incl. the op:show OPERATOR binding), the account code attributed to md.dimension.Account.code, the year grounded, ZERO gaps. RV-P1.6.T6: `roce` and `období` each carry a ground:chrono GROUNDING_TRIGGER annotation ALONGSIDE their model binding, and the trigger on `roce` anchors the chrono call on `2025` (Grounding.ref + a `ground-narrow` rung-log entry).",
   "text": "Zobraz náklady účtu 501001 v roce 2025 podle období",
   "locale": "cs",
   "parseFile": "h1-cs.parse.json",
@@ -91,6 +91,17 @@
           "targetClass": "TARGET_CLASS_MODEL_OBJECT",
           "matchMethod": "EXACT",
           "provenance": { "producer": "lex-matcher", "method": "TATRMAN", "rawScore": 1.0 }
+        },
+        {
+          "candidateId": "lex:ground:chrono:roce",
+          "candidate": "roce",
+          "score": 1.0,
+          "category": "ground:chrono",
+          "source": "DECLARED",
+          "targetRef": "ground:chrono",
+          "targetClass": "TARGET_CLASS_GROUNDING_TRIGGER",
+          "matchMethod": "TYPOS(1)",
+          "provenance": { "producer": "lex-matcher", "method": "TATRMAN", "rawScore": 1.0 }
         }
       ],
       "období": [
@@ -103,6 +114,17 @@
           "targetRef": "md.dimension.Calendar.month",
           "targetClass": "TARGET_CLASS_MODEL_OBJECT",
           "matchMethod": "EXACT",
+          "provenance": { "producer": "lex-matcher", "method": "TATRMAN", "rawScore": 1.0 }
+        },
+        {
+          "candidateId": "lex:ground:chrono:obdobi",
+          "candidate": "období",
+          "score": 1.0,
+          "category": "ground:chrono",
+          "source": "DECLARED",
+          "targetRef": "ground:chrono",
+          "targetClass": "TARGET_CLASS_GROUNDING_TRIGGER",
+          "matchMethod": "TYPOS(1)",
           "provenance": { "producer": "lex-matcher", "method": "TATRMAN", "rawScore": 1.0 }
         }
       ],

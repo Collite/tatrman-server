@@ -1,7 +1,7 @@
 {
   "id": "h1prime-cs",
   "source": "design.md H1' (the typo variant — `5010O1`, letter O for zero)",
-  "expect": "same five mentions and the same frame roles as H1 (role derivation is structural and must not wobble because a lookup missed); the value is anchored to md.dimension.Account but unattributed => ONE G4_METHOD_MISS gap, disposition UNRESOLVED",
+  "expect": "same five mentions and the same frame roles as H1 (role derivation is structural and must not wobble because a lookup missed); the value is anchored to md.dimension.Account but unattributed => ONE G4_METHOD_MISS gap, disposition UNRESOLVED. The chrono trigger annotations are identical to H1's — a grounding trigger is lexical, so a typo'd ACCOUNT CODE cannot move it.",
   "text": "Zobraz náklady účtu 5010O1 v roce 2025 podle období",
   "locale": "cs",
   "parseFile": "h1prime-cs.parse.json",
@@ -141,6 +141,21 @@
             "method": "TATRMAN",
             "rawScore": 1.0
           }
+        },
+        {
+          "candidateId": "lex:ground:chrono:roce",
+          "candidate": "roce",
+          "score": 1.0,
+          "category": "ground:chrono",
+          "source": "DECLARED",
+          "targetRef": "ground:chrono",
+          "targetClass": "TARGET_CLASS_GROUNDING_TRIGGER",
+          "matchMethod": "TYPOS(1)",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
         }
       ],
       "období": [
@@ -153,6 +168,21 @@
           "targetRef": "md.dimension.Calendar.month",
           "targetClass": "TARGET_CLASS_MODEL_OBJECT",
           "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        },
+        {
+          "candidateId": "lex:ground:chrono:obdobi",
+          "candidate": "období",
+          "score": 1.0,
+          "category": "ground:chrono",
+          "source": "DECLARED",
+          "targetRef": "ground:chrono",
+          "targetClass": "TARGET_CLASS_GROUNDING_TRIGGER",
+          "matchMethod": "TYPOS(1)",
           "provenance": {
             "producer": "lex-matcher",
             "method": "TATRMAN",
