@@ -53,3 +53,41 @@ entries:
       - { text: "zákazník", method: TYPOS(1) }
       - { text: "odběratel", method: TYPOS(1) }
     target: er.entity.customer
+
+  # ── RV-44 (RV-P3.0): declared matching profiles ─────────────────────────────────────────
+  # Added at p3-0 T7. The three cases the addendum's behaviour actually turns on, authored the
+  # way an estate would author them — beside the `method:` rows above, not instead of them,
+  # because both spellings have to keep working in one corpus.
+
+  # (1) A profile-carrying alias. The FOLDED stratum is the point: `stredisko` finding
+  # `středisko` becomes an authored fact with its own score, where today it is reachable only
+  # by the accident that two dropped diacritics happen to cost two edits (and so refuses under
+  # TYPOS(1), as the `zakaznik` case above records).
+  # `příjemka` carries TWO diacritics, deliberately: stripping them costs two edits, so the
+  # canonical stratum's TYPOS(1) cannot reach the folded query and the folded rule is the only
+  # thing that can. A one-diacritic word would have scored 0.95 by typos and proved nothing.
+  - terms:
+      - text: "příjemka"
+        match:
+          - { norm: canonical, exact: 1.00, typos: { distance: 1, penalty: 0.05 } }
+          - { norm: folded,    exact: 0.90 }
+    target: er.entity.goodsReceipt
+
+  # (2) The ⚑M-4 short-term guard, as an estate trips it: a two-letter code with fuzz declared
+  # on it anyway. The build WARNS (RG-LEX-101, asserted in the harness) and the matcher never
+  # fuzz-fires it — while the code itself still matches itself.
+  - terms:
+      - { text: "PJ", method: TYPOS(1) }
+    target: md.Store
+
+  # (3) Sugar equivalence. `pobočka` is written as `method:` sugar and `smlouva` as the profile
+  # that sugar MEANS (M-T6). One edit against either must score the same number, or the sugar
+  # table is decorative.
+  - terms:
+      - { text: "pobočka", method: TYPOS(1) }
+    target: md.Branch
+
+  - terms:
+      - text: "smlouva"
+        match: [ { norm: canonical, exact: 1.00, typos: { distance: 1, penalty: 0.05 } } ]
+    target: er.entity.contract

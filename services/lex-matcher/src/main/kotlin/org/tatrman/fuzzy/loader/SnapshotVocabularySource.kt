@@ -2,6 +2,7 @@
 package org.tatrman.fuzzy.loader
 
 import org.tatrman.fuzzy.core.Candidate
+import org.tatrman.fuzzy.core.MatchProfile
 import org.tatrman.fuzzy.core.SourceTag
 import org.tatrman.fuzzy.core.TargetClass
 
@@ -21,6 +22,11 @@ data class DeclaredValue(
     val matchMethod: String? = null,
     /** RV-38 — what the target IS, for T5's class-scoped lookup. Null when the source has none. */
     val targetClass: TargetClass? = null,
+    /**
+     * RV-44 — the resolved matching profile, when the source carries one. Only the compiled-artifact
+     * reader does; the fixture stub does not, and a row without one keeps engine scores (⚑M-2).
+     */
+    val matchProfile: MatchProfile? = null,
 )
 
 /**
@@ -77,6 +83,7 @@ object DeclaredVocabularyLoader {
                         it.source,
                         it.matchMethod,
                         it.targetClass,
+                        it.matchProfile,
                     )
                 }
         }

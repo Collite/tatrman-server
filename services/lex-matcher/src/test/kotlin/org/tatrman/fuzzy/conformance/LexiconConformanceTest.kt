@@ -3,15 +3,18 @@ package org.tatrman.fuzzy.conformance
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import org.tatrman.fuzzy.config.AppConfig
@@ -29,6 +32,7 @@ import org.tatrman.ttr.lexicon.LexiconArea
 import org.tatrman.ttr.lexicon.LexiconDataFile
 import org.tatrman.ttr.lexicon.LexiconLoad
 import org.tatrman.ttr.lexicon.LexiconValidator
+import org.tatrman.ttr.lexicon.LexiconWarnings
 import org.tatrman.ttr.lexicon.SkillDef
 import org.tatrman.ttr.lexicon.TargetClass
 import org.tatrman.ttr.lexicon.compile.LexiconCompiler
@@ -114,37 +118,40 @@ class LexiconConformanceTest :
                 metadata = MetadataConfig(),
             )
 
-        /** Compiles + packs the corpus's authored files exactly as the RV-P1.2 estate build does. */
-        fun packArchive(dir: Path): Path {
-            val aliases =
-                LexiconValidator
-                    .loadDataFile(resource("$root/aliases.lex.yaml"), "aliases.lex.yaml")
-                    .shouldBeInstanceOf<LexiconLoad.Ok<LexiconDataFile>>()
-                    .value
+        /** The authored alias file, loaded — kept so its WARNINGS are assertable, not just its rows. */
+        val aliasLoad =
+            LexiconValidator
+                .loadDataFile(resource("$root/aliases.lex.yaml"), "aliases.lex.yaml")
+                .shouldBeInstanceOf<LexiconLoad.Ok<LexiconDataFile>>()
+
+        /** Compiles the corpus's authored files exactly as the RV-P1.2 estate build does. */
+        val compiled by lazy {
             val trend =
                 LexiconValidator
                     .loadSkillFile(resource("$root/skills/trend.md"), "skills/trend.md")
                     .shouldBeInstanceOf<LexiconLoad.Ok<SkillDef>>()
                     .value
 
-            val result =
-                LexiconCompiler.compile(
-                    LexiconSources(area = LexiconArea(listOf(aliases), listOf(trend))),
+            LexiconCompiler
+                .compile(
+                    LexiconSources(area = LexiconArea(listOf(aliasLoad.value), listOf(trend))),
                     // Only the refs the corpus declares. `op:` never reaches here — it resolves by
                     // prefix — which is itself the assertion that an operator cannot dangle.
                     ModelRefIndex { ref -> if (ref in modelRefs) TargetClass.MODEL_OBJECT else null },
                     modelHash,
                     "2026-08-03T00:00:00Z",
-                )
-            // RV-20: a dangling ref is dropped with a warning. The corpus must not rely on that
-            // path — every ref it authors has to resolve, or the cases below assert on a lexicon
-            // quietly smaller than the one on disk.
-            result.warnings.shouldBe(emptyList())
-
-            return dir.resolve("hartland-cz.tar.zst").also {
-                it.writeBytes(LexiconPacker.pack(result, modelHash, "conformance").bytes)
-            }
+                ).also {
+                    // RV-20: a dangling ref is dropped with a warning. The corpus must not rely on
+                    // that path — every ref it authors has to resolve, or the cases below assert on
+                    // a lexicon quietly smaller than the one on disk.
+                    it.warnings.shouldBe(emptyList())
+                }
         }
+
+        fun packArchive(dir: Path): Path =
+            dir.resolve("hartland-cz.tar.zst").also {
+                it.writeBytes(LexiconPacker.pack(compiled, modelHash, "conformance").bytes)
+            }
 
         fun estate(withLexicon: Boolean): StringRepository {
             val source =
@@ -199,6 +206,17 @@ class LexiconConformanceTest :
                             case["expect_auto_bindable"]?.let {
                                 top.autoBindable shouldBe it.jsonPrimitive.boolean
                             }
+                            // RV-44 — the declared score and the (norm, algorithm) that earned it.
+                            // Asserting the triple and not just the number is what keeps a case
+                            // honest: two different strata can reach the same score by accident,
+                            // and only one of them is the behaviour the fixture is about.
+                            case["expect_score"]?.let {
+                                top.score shouldBe (it.jsonPrimitive.double plusOrMinus 1e-9)
+                            }
+                            case["expect_norm"]?.let { top.provenance.norm shouldBe it.jsonPrimitive.content }
+                            case["expect_algorithm"]?.let {
+                                top.provenance.algorithm shouldBe it.jsonPrimitive.content
+                            }
                             if (expected == null) {
                                 // The member path carries none of the declared layer's annotations.
                                 top.targetClass.shouldBeNull()
@@ -211,6 +229,27 @@ class LexiconConformanceTest :
                     repo.close()
                 }
             }
+        }
+
+        // ---- RV-44: what the BUILD says about this corpus ----------------------------------------
+
+        "⚑M-4 — the estate's short code warns at build time, and the warning names the guard" {
+            // The other half of the `PX` case above: a fixture that only proved the matcher does
+            // not fire would leave "and the author was told why" untested.
+            aliasLoad.warnings.map { it.code } shouldBe listOf(LexiconWarnings.SHORT_TERM_TYPOS_GUARD)
+            aliasLoad.warnings
+                .single()
+                .message shouldContain "PJ"
+        }
+
+        "⚑M-2 — every compiled DECLARED row carries a resolved profile, however it was spelled" {
+            // The reach rule, on real authored content rather than a unit fixture. Only two terms
+            // in this corpus write `match:` by hand; every other row gets its profile from the
+            // compiler expanding `method:`, because carrying one is a property of the LAYER.
+            aliasLoad.value.entries
+                .flatMap { it.terms }
+                .count { it.matchProfile != null } shouldBe 2
+            compiled.lexicon.entries.all { it.matchProfile != null } shouldBe true
         }
 
         // ---- the RV-39 layer tuple (asserted per run, not per case) -----------------------------

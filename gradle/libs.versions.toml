@@ -3,8 +3,15 @@
 # https://docs.gradle.org/current/userguide/version_catalogs.html
 
 [versions]
-tatrman-grammar           = "0.12.0"
-tatrman-ttr-metadata      = "0.12.0"
+# RV-P3.0 (RV-44): 0.13.0 adds `match:` profiles to `ttr-lexicon/v1` and the resolved
+# `matchProfile` to every DECLARED artifact row. ⚑ NOT CUT YET — the tatrman half of `p3-0`
+# rides the next `just publish bundle grammar` cut (T8). Until Bora tags `grammar/v0.13.0`,
+# this branch resolves it from Maven Local; CI cannot be green before the tag.
+tatrman-grammar           = "0.13.0"
+# Moves WITH the grammar ref, always: they are one `api` closure (ttr-snapshot api's
+# ttr-metadata, ttr-lexicon-compile's POM names it exactly), and the `bundle grammar` lane
+# publishes them at one version. Two versions here is the 0.10.3/0.10.4 failure.
+tatrman-ttr-metadata      = "0.13.0"
 tatrman-ttr-translator    = "0.10.1"
 tatrman-ttr-plan-proto    = "0.10.1"
 # SV-P1 S4 — Maven Central publishing via the Central Portal.

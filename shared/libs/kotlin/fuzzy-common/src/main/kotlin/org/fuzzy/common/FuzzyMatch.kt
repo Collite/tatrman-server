@@ -9,6 +9,12 @@ data class Provenance(
     val producer: String = "fuzzy",
     val method: String = "TATRMAN",
     val rawScore: Double = 0.0,
+    // RV-44 (RV-P3.0): the winning (norm, algorithm, distance) when a declared matching profile
+    // scored the row. Null everywhere else — the REST surface answers the same question the gRPC
+    // one does, or a caller reading a declared score here has no way to ask why it is that number.
+    val norm: String? = null,
+    val algorithm: String? = null,
+    val distance: Int? = null,
 )
 
 @Serializable

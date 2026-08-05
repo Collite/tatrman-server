@@ -116,6 +116,9 @@ fun Application.configureRoutes(
                                             producer = it.provenance.producer,
                                             method = it.provenance.method,
                                             rawScore = it.provenance.rawScore,
+                                            norm = it.provenance.norm,
+                                            algorithm = it.provenance.algorithm,
+                                            distance = it.provenance.distance,
                                         ),
                                 )
                             }

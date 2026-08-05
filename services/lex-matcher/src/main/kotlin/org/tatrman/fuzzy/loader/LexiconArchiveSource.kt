@@ -3,7 +3,11 @@ package org.tatrman.fuzzy.loader
 
 import org.slf4j.LoggerFactory
 import org.tatrman.fuzzy.core.MatchMethod
+import org.tatrman.fuzzy.core.MatchProfile
+import org.tatrman.fuzzy.core.Norm
+import org.tatrman.fuzzy.core.NormRule
 import org.tatrman.fuzzy.core.SourceTag
+import org.tatrman.fuzzy.core.TyposRule
 import org.tatrman.fuzzy.core.TargetClass
 import org.tatrman.ttr.lexicon.CompiledEntry
 import org.tatrman.ttr.lexicon.CompiledLexicon
@@ -14,6 +18,7 @@ import org.tatrman.ttr.snapshot.SnapshotReader
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
+import org.tatrman.ttr.lexicon.MatchProfile as ArtifactMatchProfile
 import org.tatrman.ttr.lexicon.SourceTag as ArtifactSourceTag
 import org.tatrman.ttr.lexicon.TargetClass as ArtifactTargetClass
 
@@ -161,7 +166,30 @@ class LexiconArchiveSource(
                     ArtifactTargetClass.OPERATOR -> TargetClass.OPERATOR
                     ArtifactTargetClass.GROUNDING_TRIGGER -> TargetClass.GROUNDING_TRIGGER
                 },
+            // RV-44 — carried, never re-derived. The compiler already expanded `method:` sugar into
+            // this profile; expanding it again here would be a second implementation of M-T6, and
+            // the two would eventually disagree about a number nobody would think to check.
+            matchProfile = matchProfile?.toCore(),
         )
+
+    /**
+     * Artifact profile → the engine's own mirror. An unknown `norm` from a newer toolchain drops
+     * that ONE rule rather than the row: the rest of the profile is still the author's statement,
+     * and a rule this engine cannot evaluate is a rule that would never have fired anyway.
+     */
+    private fun ArtifactMatchProfile.toCore(): MatchProfile? {
+        val rules =
+            rules.mapNotNull { rule ->
+                val norm = Norm.ofWire(rule.norm.wire) ?: return@mapNotNull null
+                NormRule(
+                    norm = norm,
+                    exact = rule.exact,
+                    typos = rule.typos?.let { TyposRule(it.distance, it.penalty) },
+                    tokens = rule.tokens,
+                )
+            }
+        return if (rules.isEmpty()) null else MatchProfile(rules)
+    }
 
     /**
      * Reads and parses, reusing the cache when the bytes hash to what is already loaded.

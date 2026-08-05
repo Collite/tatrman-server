@@ -116,6 +116,13 @@ message Provenance {
   string producer = 1;  // e.g. "fuzzy"
   string method = 2;    // the algorithm that scored it, e.g. "TATRMAN"
   double raw_score = 3;
+  // RV-44 (RV-P3.0): the winning (norm, algorithm, distance) when a DECLARED matching profile
+  // scored this row. Additive, and ABSENT on every other row — "no norm fired" and "the canonical
+  // one fired" must not read alike. `raw_score` above stays the ENGINE's number even when the
+  // declared score replaces `FuzzyMatch.score`, so the retrieval rating is never lost.
+  optional string norm = 4;       // canonical | folded | lemma
+  optional string algorithm = 5;  // exact | typos | tokens
+  optional int32 distance = 6;    // set iff algorithm == "typos"
 }
 
 message FuzzyMatch {

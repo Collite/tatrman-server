@@ -318,7 +318,17 @@ class FuzzyMatcher(
         // through (match / matchCascade / batchMatch / lookup), so no caller can route around it.
         // Inside the cascade rather than after it on purpose: a candidate the author's method
         // rejects must not be allowed to satisfy a cascade step's min-score and stop the fallback.
-        return methodDispatcher.dispatch(query, scored, methodOverride)
+        // RV-44 — the query's lemma form, for a profile's `lemma` norm. Computed here because
+        // this is where the lemmatiser lives; with the no-op one it equals the folded form and the
+        // lemma axis collapses, exactly as it does on the token path.
+        return methodDispatcher.dispatch(query, scored, methodOverride, lemmaQuery(query))
+    }
+
+    /** Folded lemmas of the query, joined — the shape [Candidate.lemmaValue] holds candidate-side. */
+    private suspend fun lemmaQuery(query: String): String {
+        val raw = Candidate.tokenizeRaw(query)
+        val lemmas = lemmatizer.lemmatize(raw)
+        return raw.joinToString(" ") { lemmas[it] ?: TextNormalizer.fold(it) }
     }
 
     /**
@@ -498,4 +508,7 @@ private fun Candidate.toResult(
         // would otherwise re-derive them here for every scored row on every query.
         authoredMethod = authoredMethod,
         canonicalCandidate = canonicalValue,
+        // RV-44 — both precomputed at load, for the same reason as the two above.
+        matchProfile = matchProfile,
+        lemmaCandidate = lemmaValue,
     )

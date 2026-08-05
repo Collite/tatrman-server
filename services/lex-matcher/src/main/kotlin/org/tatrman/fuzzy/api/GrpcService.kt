@@ -247,7 +247,13 @@ class GrpcService(
                         .setProducer(provenance.producer)
                         .setMethod(provenance.method)
                         .setRawScore(provenance.rawScore)
-                        .build(),
+                        // RV-44 — the winning (norm, algorithm, distance), all three left UNSET
+                        // unless a declared profile scored the row.
+                        .also { pb ->
+                            provenance.norm?.let { pb.setNorm(it) }
+                            provenance.algorithm?.let { pb.setAlgorithm(it) }
+                            provenance.distance?.let { pb.setDistance(it) }
+                        }.build(),
                 )
         targetRef?.let { b.setTargetRef(it) }
         matchMethod?.let { b.setMatchMethod(it) }
