@@ -104,6 +104,11 @@ tasks.named<Test>("test") {
             .asFile.path,
     )
     systemProperty("tatrman.proto.baseline", file("compat/wire-baseline.desc").path)
+    // A FROZEN copy of the resolver contract as it was before the RV-P2.1 lattice, for the
+    // old-client proof. Deliberately a second file: `wire-baseline.desc` moves whenever a wire
+    // change is deliberately accepted, and a proof about a specific historical shape must not
+    // quietly become a proof about the current one.
+    systemProperty("tatrman.proto.preLattice", file("compat/resolver-v1-pre-lattice.desc").path)
 }
 
 // RV-P2.1.T7 — refresh the wire baseline. Deliberately NOT wired into any build: the

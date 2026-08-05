@@ -29,10 +29,13 @@ import java.io.File
  * `org.tatrman.resolver.v1` parses a response that carries the lattice, reads every field it
  * knew, and hands the response on unharmed.
  *
- * The "pre-change generated stub" is not a copy of the old Kotlin classes: it is the baseline
- * descriptor set (`compat/wire-baseline.desc`, the protos exactly as they were before this
- * change) driving a [DynamicMessage]. That is a stricter test than keeping stale generated
- * sources around, because the descriptor cannot drift from what actually shipped.
+ * The "pre-change generated stub" is not a copy of the old Kotlin classes: it is a frozen
+ * descriptor set (`compat/resolver-v1-pre-lattice.desc`, the protos exactly as they were before
+ * this change) driving a [DynamicMessage]. That is a stricter test than keeping stale generated
+ * sources around, because a descriptor cannot drift from what actually shipped — and it is a
+ * SEPARATE file from the moving `wire-baseline.desc` on purpose: a proof about a specific
+ * historical shape must not quietly become a proof about the current one the day someone
+ * deliberately accepts a wire change.
  *
  * Three claims, and the third is the one that usually breaks in practice: an intermediary that
  * parses and re-emits a message must not silently DROP the field it did not understand. Proto3
@@ -142,7 +145,7 @@ private fun baselineDescriptor(
     file: String,
     message: String,
 ): Descriptors.Descriptor {
-    val path = System.getProperty("tatrman.proto.baseline")
+    val path = System.getProperty("tatrman.proto.preLattice")
     val protos =
         FileDescriptorSet
             .parseFrom(File(path).readBytes())
