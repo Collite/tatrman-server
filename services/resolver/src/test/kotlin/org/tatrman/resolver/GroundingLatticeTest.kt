@@ -134,6 +134,38 @@ class GroundingLatticeTest :
                 .shouldBeEmpty()
         }
 
+        "a FLOOR guess whose only hit is a trigger reaches the lattice — asking is not enough" {
+            // GroundingTriggers.MENTION_ORIGINS includes NGRAM_FLOOR deliberately: in the
+            // parse-less path every span is a floor guess, and a trigger hit there is a lexicon
+            // fact rather than a syntactic one. But the assembler split the layers BEFORE merging
+            // triggers, so a floor span with no MODEL contender was dropped and its trigger went
+            // with it — the query went out, the answer came back, and the annotation was thrown
+            // away for exactly the degraded estates the inclusion exists to help. Nothing failed,
+            // because the trigger tests stopped at "was the span asked about?" (p1-6 review).
+            val floor =
+                mention("roce", 29, 33, head = 1)
+                    .copy(origin = DomainSpanCandidate.Origin.NGRAM_FLOOR, anchored = false)
+            val state =
+                assemble(
+                    gated = listOf(GatedSpan(floor, emptyList(), ambiguous = false)),
+                    triggers = mapOf(ROCE_SPAN to listOf(chronoTrigger())),
+                )
+
+            state.mentionsList
+                .single()
+                .bindingsList
+                .map { it.ref } shouldContainExactly listOf("ground:chrono")
+            // and the narrowing is recorded, which is the whole point of keeping the span
+            state.rungLogList.map { it.action } shouldContainExactly
+                listOf("annotate", LatticeAssembler.GROUND_NARROW_ACTION)
+
+            // the control, unchanged: a floor guess that hit NOTHING is still noise, and the
+            // honest record of that situation is the G5 degrade gap, not an empty mention
+            assemble(gated = listOf(GatedSpan(floor, emptyList(), ambiguous = false)))
+                .mentionsList
+                .shouldBeEmpty()
+        }
+
         "an estate with no grounding vocabulary emits exactly what P2.1 emitted" {
             val state = assemble()
 

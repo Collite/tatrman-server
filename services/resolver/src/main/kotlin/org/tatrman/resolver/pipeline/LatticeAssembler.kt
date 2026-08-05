@@ -50,7 +50,8 @@ object LatticeAssembler {
         // delivery chain lands, and the lattice is then exactly what P2.1 emitted.
         triggers: Map<Pair<Int, Int>, List<Binding>> = emptyMap(),
     ): ResolutionState {
-        val gatedByLayer = gate.gated.groupBy { layerOf(it) }
+        val gatedByLayer =
+            gate.gated.groupBy { layerOf(it, hasTrigger = (it.candidate.start to it.candidate.end) in triggers) }
         val mentionSpans =
             (gatedByLayer[Layer.MENTION].orEmpty() + ungatedMentions.map { GatedSpan(it, emptyList(), false) })
                 .sortedWith(compareBy({ it.candidate.start }, { it.candidate.end }))
@@ -283,7 +284,10 @@ object LatticeAssembler {
 
     private enum class Layer { MENTION, VALUE, DROPPED }
 
-    private fun layerOf(span: GatedSpan): Layer =
+    private fun layerOf(
+        span: GatedSpan,
+        hasTrigger: Boolean,
+    ): Layer =
         when (span.candidate.origin) {
             DomainSpanCandidate.Origin.ANCHOR_PHRASE -> Layer.MENTION
             DomainSpanCandidate.Origin.GOVERNED_VALUE,
@@ -294,8 +298,16 @@ object LatticeAssembler {
             // The parse-less n-gram floor guesses spans; a floor guess that matched is worth
             // reporting, one that did not is noise, and the honest record of the whole situation
             // is the G5 degrade gap rather than a mention layer built on no syntax.
+            //
+            // A TRIGGER counts as having matched, and the p1-6 review is why this reads
+            // `contenders OR trigger` rather than `contenders`: [GroundingTriggers.MENTION_ORIGINS]
+            // includes the floor deliberately — a trigger hit is a lexicon fact, not a syntactic
+            // guess — but triggers are merged in below, AFTER this split, so the query went out,
+            // the answer came back, and the span was dropped before it could carry it. Grounding
+            // narrowing was switched off for exactly the degraded estates the inclusion exists to
+            // help, and nothing failed, because the trigger tests stopped at "was it asked?".
             DomainSpanCandidate.Origin.NGRAM_FLOOR ->
-                if (span.contenders.isEmpty()) Layer.DROPPED else Layer.MENTION
+                if (span.contenders.isEmpty() && !hasTrigger) Layer.DROPPED else Layer.MENTION
         }
 
     private fun lexiconVersions(batch: BatchMatchResponse): LexiconVersions {
