@@ -20,7 +20,7 @@ FIXTURES="$CHART/fixtures"
 GOLDEN="$CHART/golden"
 RELEASE="tatrman-server"
 NAMESPACE="ttr-server"
-FIXTURE_NAMES=(minimal full dark-geo)
+FIXTURE_NAMES=(minimal full dark-geo lexicon)
 
 MODE="regen"
 [ "${1:-}" = "--check" ] && MODE="check"
