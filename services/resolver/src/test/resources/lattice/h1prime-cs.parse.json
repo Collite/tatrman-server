@@ -1,0 +1,179 @@
+{
+  "language": "cs",
+  "detectedLanguage": "cs",
+  "traceId": "trace-h1prime-cs",
+  "tokens": [
+    {
+      "text": "Zobraz",
+      "charStart": 0,
+      "charEnd": 6,
+      "lemma": "zobraz",
+      "upos": "NOUN",
+      "xpos": "NNFP1-----A----",
+      "depHead": 2,
+      "depRelation": "amod",
+      "feats": {
+        "Case": "Nom",
+        "Gender": "Masc",
+        "Number": "Plur"
+      }
+    },
+    {
+      "text": "náklady",
+      "charStart": 7,
+      "charEnd": 14,
+      "lemma": "náklad",
+      "upos": "NOUN",
+      "xpos": "NNIP1-----A----",
+      "depHead": 0,
+      "depRelation": "root",
+      "feats": {
+        "Animacy": "Inan",
+        "Case": "Nom",
+        "Gender": "Masc",
+        "Number": "Plur"
+      }
+    },
+    {
+      "text": "účtu",
+      "charStart": 15,
+      "charEnd": 19,
+      "lemma": "účet",
+      "upos": "NOUN",
+      "xpos": "NNIS2-----A----",
+      "depHead": 2,
+      "depRelation": "nmod",
+      "feats": {
+        "Animacy": "Inan",
+        "Case": "Gen",
+        "Gender": "Masc",
+        "Number": "Sing"
+      }
+    },
+    {
+      "text": "5010O",
+      "charStart": 20,
+      "charEnd": 25,
+      "lemma": "5010O",
+      "upos": "NUM",
+      "xpos": "C=-------------",
+      "depHead": 3,
+      "depRelation": "nummod",
+      "feats": {
+        "NumForm": "Digit",
+        "NumType": "Card"
+      }
+    },
+    {
+      "text": "1",
+      "charStart": 25,
+      "charEnd": 26,
+      "lemma": "1",
+      "upos": "NUM",
+      "xpos": "C=-------------",
+      "depHead": 4,
+      "depRelation": "compound",
+      "feats": {
+        "NumForm": "Digit",
+        "NumType": "Card"
+      }
+    },
+    {
+      "text": "v",
+      "charStart": 27,
+      "charEnd": 28,
+      "lemma": "v",
+      "upos": "ADP",
+      "xpos": "RR--6----------",
+      "depHead": 7,
+      "depRelation": "case",
+      "feats": {
+        "AdpType": "Prep",
+        "Case": "Loc"
+      }
+    },
+    {
+      "text": "roce",
+      "charStart": 29,
+      "charEnd": 33,
+      "lemma": "rok",
+      "upos": "NOUN",
+      "xpos": "NNIS6-----A---1",
+      "depHead": 2,
+      "depRelation": "nmod",
+      "feats": {
+        "Animacy": "Inan",
+        "Case": "Loc",
+        "Gender": "Masc",
+        "Number": "Sing"
+      }
+    },
+    {
+      "text": "2025",
+      "charStart": 34,
+      "charEnd": 38,
+      "lemma": "2025",
+      "upos": "NUM",
+      "xpos": "C=-------------",
+      "depHead": 7,
+      "depRelation": "nummod",
+      "feats": {
+        "NumForm": "Digit",
+        "NumType": "Card"
+      }
+    },
+    {
+      "text": "podle",
+      "charStart": 39,
+      "charEnd": 44,
+      "lemma": "podle",
+      "upos": "ADP",
+      "xpos": "RR--2----------",
+      "depHead": 10,
+      "depRelation": "case",
+      "feats": {
+        "AdpType": "Prep",
+        "Case": "Gen"
+      }
+    },
+    {
+      "text": "období",
+      "charStart": 45,
+      "charEnd": 51,
+      "lemma": "období",
+      "upos": "NOUN",
+      "xpos": "NNNS2-----A----",
+      "depHead": 2,
+      "depRelation": "dep",
+      "feats": {
+        "Case": "Gen",
+        "Gender": "Neut",
+        "Number": "Sing"
+      }
+    }
+  ],
+  "entities": [
+    {
+      "text": "2025",
+      "label": "DATE",
+      "charStart": 34,
+      "charEnd": 38,
+      "normalizedValue": "2025",
+      "sourceEngine": "nametag3"
+    }
+  ],
+  "used": [
+    {
+      "op": "DEP_PARSE",
+      "engine": "stanza",
+      "model": "cs",
+      "modelVersion": "stanza-1.13.0"
+    },
+    {
+      "op": "NER",
+      "engine": "nametag3",
+      "model": "cnec2.0",
+      "modelVersion": "240830"
+    }
+  ]
+}

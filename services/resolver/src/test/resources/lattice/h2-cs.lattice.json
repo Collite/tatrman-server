@@ -1,0 +1,169 @@
+{
+  "mentions": [
+    {
+      "id": "m1",
+      "span": {
+        "end": 6,
+        "text": "Zobraz"
+      },
+      "lemma": "zobraz",
+      "bindings": [
+        {
+          "ref": "op:show",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "span": {
+        "start": 7,
+        "end": 14,
+        "text": "prvních"
+      },
+      "lemma": "první",
+      "bindings": [
+        {
+          "ref": "op:top-n",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m3",
+      "span": {
+        "start": 18,
+        "end": 34,
+        "text": "čerpacích stanic"
+      },
+      "lemma": "stanice",
+      "frameRoles": [
+        "FRAME_ROLE_SUBJECT"
+      ]
+    },
+    {
+      "id": "m4",
+      "span": {
+        "start": 49,
+        "end": 54,
+        "text": "tržby"
+      },
+      "lemma": "tržba",
+      "frameRoles": [
+        "FRAME_ROLE_MEASURE"
+      ],
+      "bindings": [
+        {
+          "ref": "md.measure.revenue",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h2"
+          }
+        }
+      ]
+    }
+  ],
+  "values": [
+    {
+      "id": "v1",
+      "span": {
+        "start": 15,
+        "end": 17,
+        "text": "10"
+      },
+      "kind": "VALUE_KIND_LITERAL",
+      "anchorMentionId": "m2"
+    },
+    {
+      "id": "v2",
+      "span": {
+        "start": 37,
+        "end": 42,
+        "text": "Praze"
+      },
+      "kind": "VALUE_KIND_GROUNDED",
+      "grounding": {
+        "kernel": "nametag3",
+        "kind": "LOCATION",
+        "normalizedValue": "cnec:gu"
+      }
+    },
+    {
+      "id": "v3",
+      "span": {
+        "start": 58,
+        "end": 67,
+        "text": "12 měsíců"
+      },
+      "kind": "VALUE_KIND_GROUNDED",
+      "grounding": {
+        "kernel": "nametag3",
+        "kind": "DATE",
+        "normalizedValue": "P12M"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "span": {
+        "start": 18,
+        "end": 34,
+        "text": "čerpacích stanic"
+      },
+      "kind": "GAP_KIND_G1_UNBOUND",
+      "frameRoles": [
+        "FRAME_ROLE_SUBJECT"
+      ],
+      "mentionId": "m3",
+      "disposition": "DISPOSITION_UNRESOLVED"
+    },
+    {
+      "span": {
+        "start": 37,
+        "end": 42,
+        "text": "Praze"
+      },
+      "kind": "GAP_KIND_G3_UNATTRIBUTED",
+      "valueId": "v2",
+      "disposition": "DISPOSITION_UNRESOLVED"
+    }
+  ],
+  "rungLog": [
+    {
+      "rung": "core",
+      "action": "annotate",
+      "bindingsAdded": 3,
+      "gapsOpen": 2
+    }
+  ],
+  "lexiconVersions": {
+    "lexiconArtifactHash": "sha256:h2-lexicon"
+  }
+}

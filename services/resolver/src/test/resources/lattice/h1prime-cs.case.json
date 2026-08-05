@@ -1,0 +1,165 @@
+{
+  "id": "h1prime-cs",
+  "source": "design.md H1' (the typo variant — `5010O1`, letter O for zero)",
+  "expect": "same five mentions and the same frame roles as H1 (role derivation is structural and must not wobble because a lookup missed); the value is anchored to md.dimension.Account but unattributed => ONE G4_METHOD_MISS gap, disposition UNRESOLVED",
+  "text": "Zobraz náklady účtu 5010O1 v roce 2025 podle období",
+  "locale": "cs",
+  "parseFile": "h1prime-cs.parse.json",
+  "registry": {
+    "entityTypes": [
+      {
+        "ref": "op:show",
+        "categories": [
+          "op:show"
+        ],
+        "anchors": [
+          "zobraz"
+        ],
+        "objectKind": "operator"
+      },
+      {
+        "ref": "md.measure.cost",
+        "categories": [
+          "md.measure.cost"
+        ],
+        "anchors": [
+          "náklad"
+        ],
+        "objectKind": "measure"
+      },
+      {
+        "ref": "md.dimension.Account",
+        "categories": [
+          "md.dimension.Account",
+          "md.dimension.Account.code",
+          "md.dimension.Account.name"
+        ],
+        "anchors": [
+          "účet"
+        ],
+        "objectKind": "dimension"
+      },
+      {
+        "ref": "md.dimension.Calendar.year",
+        "categories": [
+          "md.dimension.Calendar.year"
+        ],
+        "anchors": [
+          "rok"
+        ],
+        "objectKind": "attribute"
+      },
+      {
+        "ref": "md.dimension.Calendar.month",
+        "categories": [
+          "md.dimension.Calendar.month"
+        ],
+        "anchors": [
+          "období"
+        ],
+        "objectKind": "attribute"
+      }
+    ],
+    "locales": [
+      "cs"
+    ],
+    "snapshotHash": "snap-h1"
+  },
+  "matcher": {
+    "vocabularyVersion": "lex-h1-vocab",
+    "layerVersions": {
+      "lexiconArtifactHash": "sha256:h1-lexicon",
+      "memberIndexVersions": {
+        "md.dimension.Account.code": "v3",
+        "md.dimension.Account.name": "v3"
+      }
+    },
+    "byQuery": {
+      "Zobraz": [
+        {
+          "candidateId": "lex:op:show:zobraz",
+          "candidate": "zobraz",
+          "score": 1.0,
+          "category": "op:show",
+          "source": "DECLARED",
+          "targetRef": "op:show",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "náklady": [
+        {
+          "candidateId": "lex:md.measure.cost:naklady",
+          "candidate": "náklady",
+          "score": 1.0,
+          "category": "md.measure.cost",
+          "source": "DECLARED",
+          "targetRef": "md.measure.cost",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "účtu": [
+        {
+          "candidateId": "lex:md.dimension.Account:ucet",
+          "candidate": "účet",
+          "score": 1.0,
+          "category": "md.dimension.Account",
+          "source": "DECLARED",
+          "targetRef": "md.dimension.Account",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "roce": [
+        {
+          "candidateId": "lex:md.dimension.Calendar.year:rok",
+          "candidate": "rok",
+          "score": 1.0,
+          "category": "md.dimension.Calendar.year",
+          "source": "METADATA",
+          "targetRef": "md.dimension.Calendar.year",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "období": [
+        {
+          "candidateId": "lex:md.dimension.Calendar.month:obdobi",
+          "candidate": "období",
+          "score": 1.0,
+          "category": "md.dimension.Calendar.month",
+          "source": "DECLARED",
+          "targetRef": "md.dimension.Calendar.month",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ]
+    }
+  }
+}

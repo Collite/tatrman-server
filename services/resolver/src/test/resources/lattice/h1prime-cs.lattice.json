@@ -1,0 +1,197 @@
+{
+  "mentions": [
+    {
+      "id": "m1",
+      "span": {
+        "end": 6,
+        "text": "Zobraz"
+      },
+      "lemma": "zobraz",
+      "bindings": [
+        {
+          "ref": "op:show",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "span": {
+        "start": 7,
+        "end": 14,
+        "text": "náklady"
+      },
+      "lemma": "náklad",
+      "frameRoles": [
+        "FRAME_ROLE_SUBJECT",
+        "FRAME_ROLE_MEASURE"
+      ],
+      "bindings": [
+        {
+          "ref": "md.measure.cost",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m3",
+      "span": {
+        "start": 15,
+        "end": 19,
+        "text": "účtu"
+      },
+      "lemma": "účet",
+      "frameRoles": [
+        "FRAME_ROLE_FILTER"
+      ],
+      "bindings": [
+        {
+          "ref": "md.dimension.Account",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m4",
+      "span": {
+        "start": 29,
+        "end": 33,
+        "text": "roce"
+      },
+      "lemma": "rok",
+      "frameRoles": [
+        "FRAME_ROLE_FILTER"
+      ],
+      "bindings": [
+        {
+          "ref": "md.dimension.Calendar.year",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_METADATA",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "METADATA",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m5",
+      "span": {
+        "start": 45,
+        "end": 51,
+        "text": "období"
+      },
+      "lemma": "období",
+      "frameRoles": [
+        "FRAME_ROLE_GROUPING"
+      ],
+      "bindings": [
+        {
+          "ref": "md.dimension.Calendar.month",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "evidenceClass": "EVIDENCE_CLASS_DECLARED_ALIAS",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h1"
+          }
+        }
+      ]
+    }
+  ],
+  "values": [
+    {
+      "id": "v1",
+      "span": {
+        "start": 20,
+        "end": 26,
+        "text": "5010O1"
+      },
+      "kind": "VALUE_KIND_LITERAL",
+      "anchorMentionId": "m3"
+    },
+    {
+      "id": "v2",
+      "span": {
+        "start": 34,
+        "end": 38,
+        "text": "2025"
+      },
+      "kind": "VALUE_KIND_GROUNDED",
+      "grounding": {
+        "kernel": "nametag3",
+        "kind": "DATE",
+        "normalizedValue": "2025"
+      }
+    }
+  ],
+  "rungLog": [
+    {
+      "rung": "core",
+      "action": "annotate",
+      "bindingsAdded": 5,
+      "gapsOpen": 1
+    }
+  ],
+  "lexiconVersions": {
+    "lexiconArtifactHash": "sha256:h1-lexicon",
+    "memberIndexVersions": {
+      "md.dimension.Account.code": "v3",
+      "md.dimension.Account.name": "v3"
+    }
+  },
+  "gaps": [
+    {
+      "span": {
+        "start": 20,
+        "end": 26,
+        "text": "5010O1"
+      },
+      "kind": "GAP_KIND_G4_METHOD_MISS",
+      "frameRoles": [
+        "FRAME_ROLE_FILTER"
+      ],
+      "valueId": "v1",
+      "disposition": "DISPOSITION_UNRESOLVED"
+    }
+  ]
+}
