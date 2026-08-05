@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.geo.parse
 
+import org.tatrman.grounding.lexicon.GroundingSlice
 import org.tatrman.text.Normalization
 
 /** What the span asks for geographically. */
@@ -44,7 +45,18 @@ class GeoSpanParser {
     // "here" words as WHOLE words — else "somewhere"/"there" would false-match on the substring.
     private val hereRe = Regex("""\b(?:here|tady|zde|odsud|pobliz)\b""")
 
-    fun parse(span: String): GeoQuery? {
+    /**
+     * @param triggers RV-P1.6 T5 (RV-42) — the `ground:geo` slice: **category words only**
+     *   ("město", "kraj", "region", "city"). The place-name gazetteer stays geo-side and is
+     *   PARKED, so nothing here resolves a place differently because of a slice: a category word
+     *   is used only to strip the noun off the front of an anchor ("v kraji Vysočina" → the place
+     *   is "Vysočina", not "kraji Vysočina"), and a category word with no place behind it is not
+     *   a query at all. With an empty slice the parser is byte-for-byte what it was.
+     */
+    fun parse(
+        span: String,
+        triggers: GroundingSlice = GroundingSlice.empty(GEO_KIND),
+    ): GeoQuery? {
         val trimmed = span.trim()
         if (trimmed.isEmpty()) return null
         val n = Normalization.fold(trimmed)
@@ -55,7 +67,7 @@ class GeoSpanParser {
                 .find(trimmed)
                 ?.groupValues
                 ?.get(1)
-                ?.let(::cleanPlace)
+                ?.let { cleanPlace(it, triggers) }
 
         return when {
             radius != null && (place != null || here) -> GeoQuery.Distance(place, here, radius, 0.9)
@@ -67,18 +79,21 @@ class GeoSpanParser {
                     radiusMeters = 0.0,
                     confidence = 0.6,
                 )
-            radius == null && place == null -> containment(trimmed)
+            radius == null && place == null -> containment(trimmed, triggers)
             else -> null
         }
     }
 
-    private fun containment(span: String): GeoQuery? {
+    private fun containment(
+        span: String,
+        triggers: GroundingSlice,
+    ): GeoQuery? {
         val place =
             inPlaceRe
                 .find(span)
                 ?.groupValues
                 ?.get(1)
-                ?.let(::cleanPlace) ?: return null
+                ?.let { cleanPlace(it, triggers) } ?: return null
         return GeoQuery.Containment(place, 0.85)
     }
 
@@ -96,12 +111,27 @@ class GeoSpanParser {
      * connectors u/nad/pod/od (so "Újezd u Brna", "Ústí nad Labem" survive); it is a heuristic bound,
      * not a full place-name grammar — a stray trailing clause is dropped, a place name is not.
      */
-    private fun cleanPlace(raw: String): String? {
+    private fun cleanPlace(
+        raw: String,
+        triggers: GroundingSlice = GroundingSlice.empty(GEO_KIND),
+    ): String? {
         val kept = mutableListOf<String>()
         for (word in raw.trim().split(Regex("\\s+"))) {
             val cleaned = word.trim('.', ',', '?', '!', ';', ':')
             if (cleaned.isEmpty()) continue
             if (Normalization.fold(cleaned) in PLACE_STOP_WORDS) break
+            // RV-42 T5: a declared CATEGORY word in front of the place is not part of the name —
+            // "v kraji Vysočina" asks about Vysočina, not about a place called "kraji Vysočina".
+            //
+            // Two guards, because a leading category word CAN be part of the name: **Město
+            // Albrechtice**, **Město Touškov** and **Městec Králové** are real municipalities.
+            //  1. only a LOWERCASE occurrence is dropped — Czech writes the common noun in
+            //     lowercase ("v kraji Vysočina") and capitalises it when it belongs to the name
+            //     ("v Městě Albrechticích"); and
+            //  2. only a LEADING one, so a category word deeper in the name survives regardless.
+            // A capitalised leading category word therefore falls back to the pre-RV reading,
+            // which is the safe direction: the gazetteer gets the whole name, as it always did.
+            if (kept.isEmpty() && cleaned.first().isLowerCase() && triggers.matches(cleaned)) continue
             kept += cleaned
             if (kept.size >= MAX_PLACE_WORDS) break
         }
@@ -109,6 +139,8 @@ class GeoSpanParser {
     }
 
     private companion object {
+        const val GEO_KIND = "geo"
+
         private const val MAX_PLACE_WORDS = 5
 
         /**

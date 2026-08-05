@@ -20,6 +20,7 @@ import org.tatrman.money.discover.MoneyDiscovery
 import org.tatrman.money.obs.MoneyMetrics
 import org.tatrman.money.recipe.MoneyRecipe
 import org.tatrman.money.recipe.MoneyRecipeBuilder
+import org.tatrman.grounding.lexicon.GroundingSliceSource
 import org.tatrman.money.recognize.AmountRecognizer
 
 /**
@@ -39,6 +40,11 @@ class MoneyGroundingService(
     private val defaultLocale: String = "cs-CZ",
     private val defaultTolerancePct: Double = 10.0,
     private val metrics: MoneyMetrics = MoneyMetrics.noop(),
+    /**
+     * RV-P1.6 T4 (RV-42) — the `ground:money` trigger slice. Optional by construction: the default
+     * source never loads anything, which is the pre-RV service.
+     */
+    private val triggers: GroundingSliceSource = GroundingSliceSource.disabled("money"),
 ) : GroundingServiceGrpcKt.GroundingServiceCoroutineImplBase() {
     private val logger = LoggerFactory.getLogger(MoneyGroundingService::class.java)
     private val recognizer = AmountRecognizer()
@@ -70,7 +76,8 @@ class MoneyGroundingService(
         // way defaultCurrency is defaulted, so a CZK-first deployment stays on cs separator rules.
         val locale = ctx.locale.ifEmpty { defaultLocale }
         val amount =
-            recognizer.recognize(request.spanText, locale)
+            // RV-P1.6: the slice is narrowed to the same locale the magnitude grammar uses.
+            recognizer.recognize(request.spanText, locale, triggers.current().forLang(locale))
                 ?: return fallback(request, "could not recognize a monetary amount in '${request.spanText}'")
         if (amount.confidence < confidenceThreshold) {
             return fallback(request, "recognition confidence ${amount.confidence} below threshold $confidenceThreshold")
@@ -112,7 +119,16 @@ class MoneyGroundingService(
             .setService("money")
             .putCapabilities("metadata", if (metadataOk) "ok" else "down")
             .putCapabilities("llm_fallback", (llmFallback != null).toString())
-            .build()
+            // RV-39/S-1: which vocabulary answered. The capability map is the existing echo
+            // channel, so this is additive with no wire change (J-v2).
+            .putCapabilities("lexicon_slice", triggers.current().version)
+            .putCapabilities(
+                "lexicon_slice_terms",
+                triggers
+                    .current()
+                    .terms.size
+                    .toString(),
+            ).build()
     }
 
     // ----- clarification (which amount column) -----

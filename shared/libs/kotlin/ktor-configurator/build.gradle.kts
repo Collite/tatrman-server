@@ -44,4 +44,8 @@ dependencies {
     // `ktor-server-netty` is already an `implementation` dep above, which `testImplementation`
     // extends.
     testImplementation(libs.ktor.client.cio)
+
+    // RV-P1.6 — the S-3 admin gate is a route-level decision, so it is tested through a real
+    // routing tree rather than only through its pure predicate.
+    testImplementation(libs.ktor.server.test.host)
 }
