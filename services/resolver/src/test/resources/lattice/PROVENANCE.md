@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # `lattice/` — where these fixtures come from
 
-RV-P2.1.T2. Three cases, each a triple: a **case file** (what the estate knows), a **parse file**
+RV-P2.1.T2, extended by RV-P2.5.T4. Four cases, each a triple: a **case file** (what the estate knows), a **parse file**
 (what nlp returned), and a **golden** (the whole `ResolutionState` the core must emit).
 
 | id | question | pins |
@@ -9,6 +9,7 @@ RV-P2.1.T2. Three cases, each a triple: a **case file** (what the estate knows),
 | `h1-cs` | *Zobraz náklady účtu 501001 v roce 2025 podle období* | the 0-LLM hero — gap-free, `op:show` bound, the code attributed to the **account** because the user said *účtu* |
 | `h1prime-cs` | …*účtu 5010O1*… | identical mentions + identical frame roles, one `G4_METHOD_MISS` |
 | `h2-cs` | *Zobraz prvních 10 čerpacích stanic v Praze podle tržby za 12 měsíců.* | `G1_UNBOUND` on the unknown **SUBJECT**, `G3_UNATTRIBUTED` on the LOCATION hint |
+| `h5-cs` | *Ukaž vývoj nákladů střediska 220 za posledních 12 měsíců a porovnej s plánem.* | the operator layer — **three** `op:` bindings in one question, via the ordinary path; `plánem` an honest `G1_UNBOUND` |
 
 ## The parses are real; the NER layer is authored
 
@@ -26,6 +27,9 @@ renderings assume:
 - `h1-cs` / `h1prime-cs` — `2025` as `DATE`. design.md H1: *"`2025` → chrono grounding"*.
 - `h2-cs` — `Praze` as `LOC` (CNEC `gu`) and `12 měsíců` as `DATE`. 02-B §H2: *"`Praze` → value-like
   span, no anchor ⇒ **G3** (universal LOCATION hint from NER)"*.
+- `h5-cs` — `posledních 12 měsíců` as `DATE`. The **whole** phrase, not the bare `12 měsíců`:
+  *posledních* is what makes it the relative window design.md H5 asks for. `220` is deliberately
+  NOT tagged, for the same reason `501001` is not — it must reach the member index.
 
 Nothing else was invented: no entity is added that would remove a span from the domain path and
 thereby manufacture a pass. `501001` is deliberately **not** NER-tagged — it must reach the

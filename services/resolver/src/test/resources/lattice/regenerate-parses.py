@@ -20,6 +20,7 @@ HERE = pathlib.Path(__file__).parent
 H1 = "Zobraz náklady účtu 501001 v roce 2025 podle období"
 H1P = "Zobraz náklady účtu 5010O1 v roce 2025 podle období"
 H2 = "Zobraz prvních 10 čerpacích stanic v Praze podle tržby za 12 měsíců."
+H5 = "Ukaž vývoj nákladů střediska 220 za posledních 12 měsíců a porovnej s plánem."
 
 
 def span(text: str, needle: str) -> tuple[int, int]:
@@ -44,6 +45,13 @@ CASES = {
     "h1-cs": (H1, [ner(H1, "2025", "DATE", "2025")]),
     "h1prime-cs": (H1P, [ner(H1P, "2025", "DATE", "2025")]),
     "h2-cs": (H2, [ner(H2, "Praze", "LOC", "cnec:gu"), ner(H2, "12 měsíců", "DATE", "P12M")]),
+    # RV-P2.5.T4 — the H5 core slice. Same discipline: the parse is the spike's real Stanza
+    # output, only the NER layer is authored, and only where a cs NER front genuinely fires.
+    # `posledních 12 měsíců` is the chrono WINDOW the design's H5 asks for — the whole phrase,
+    # not the bare `12 měsíců`, because "posledních" is what makes it relative.
+    # `220` is deliberately NOT tagged: it must reach the member index as střediska's value,
+    # exactly as `501001` must in H1.
+    "h5-cs": (H5, [ner(H5, "posledních 12 měsíců", "DATE", "P12M")]),
 }
 
 

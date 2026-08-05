@@ -6,6 +6,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -66,7 +67,7 @@ import java.io.File
 class LatticeGoldenTest :
     StringSpec({
 
-        listOf("h1-cs", "h1prime-cs", "h2-cs").forEach { id ->
+        listOf("h1-cs", "h1prime-cs", "h2-cs", "h5-cs").forEach { id ->
             "$id: the emitted ResolutionState matches its golden file" {
                 val case = loadJson("/lattice/$id.case.json")
                 val parse = parseOf(case)
@@ -104,7 +105,7 @@ class LatticeGoldenTest :
                 // with a detached lattice). Asserted here, excluded from the golden.
                 lattice["parse"] shouldBe printed["parse"]
 
-                val actual = JsonObject(lattice - "parse")
+                val actual = JsonObject(withoutDurations(lattice) - "parse")
                 val expected = loadJson("/lattice/$id.lattice.json")
                 if (actual != expected) dumpActual(id, actual)
                 actual shouldBe expected
@@ -216,6 +217,24 @@ class LatticeGoldenTest :
 
         private fun registryOf(case: JsonObject): Registry =
             merge(case["registry"]!!.jsonObject, Registry.newBuilder()).build()
+
+        /**
+         * Strip `elapsedMs` from every rung-log entry (RV-P2.5.T6).
+         *
+         * A golden asserts the ANNOTATION, and how long a round took is not part of it — the same
+         * reason `parse` is excluded above. This was found the honest way: the P2.3 rounds write a
+         * real duration, the h1′ golden was promoted on a run where it rounded to 0, and the first
+         * slower run put a `2` there and failed. A wall-clock number inside a byte-compared fixture
+         * is a flake with a delay fuse, so it comes out here rather than being rounded, zeroed, or
+         * left to fail one CI run in ten.
+         */
+        private fun withoutDurations(lattice: JsonObject): JsonObject =
+            JsonObject(
+                lattice.toMutableMap().also { map ->
+                    val log = lattice["rungLog"]?.jsonArray ?: return@also
+                    map["rungLog"] = JsonArray(log.map { JsonObject(it.jsonObject - "elapsedMs") })
+                },
+            )
 
         /** On a mismatch, write what the core actually emitted — a diffable file beats a stack trace. */
         private fun dumpActual(

@@ -12,7 +12,7 @@ demonstrated" gate; the other two tiers seed the fuller E2E coverage that SV-P4 
 
 ## The gating service-level tier — `just conformance-service-level`
 
-Runs four **hermetic** service-level corpora (zero live services, zero DFP):
+Runs five **hermetic** service-level corpora (zero live services, zero DFP):
 
 1. **ENTITIES_ONLY** (resolver) — `Q20ParityTest` over
    `services/resolver/src/test/resources/q20/ucetnictvi_entities_only.jsonl` (12 cases).
@@ -36,7 +36,19 @@ Runs four **hermetic** service-level corpora (zero live services, zero DFP):
    no-behaviour-change-without-the-artifact promise.
    Provenance: hand-authored 2026-08-03 against the hartland BM-arc Czech world and hartland's real
    `md`/`er` refs.
-4. **Grounding hermetic** — `eval/grounding/tests/` (`test_corpus_valid.py` + `test_report.py`,
+4. **RV-P2 core lattice** (resolver — RV-P2.5 T6, the **P2 phase gate**) — three specs, all
+   hermetic (faked nlp/fuzzy, in-process gRPC; no live service, no LLM):
+   `LatticeGoldenTest` over `services/resolver/src/test/resources/lattice/` — four hero cases
+   (`h1-cs` the 0-LLM proof · `h1prime-cs` the G4 · `h2-cs` the two honest gaps · `h5-cs` the
+   three-operator slice), each asserting the **whole** emitted `ResolutionState`;
+   `GateConformanceTest` over `conformance/calls/gate-h1prime-correction.json` — the H1′
+   re-gate pair (`resolve.bind:v1` → G4, then `resolve.gate:v1` with the correction → EXACT
+   binding, gap closed) driven over a real gRPC channel; and `IssuesRegressionTest` — the two
+   2026-07-28 `issues.md` failures as the named cases `issues-260728-1` / `-2`, each asserting
+   **both** directions (the right binding present AND the wrong one absent).
+   Provenance: the parses are the RV-P0.2 spike's real cached Stanza output; only the NER layer
+   is authored, and `lattice/PROVENANCE.md` names every entity it adds and why.
+5. **Grounding hermetic** — `eval/grounding/tests/` (`test_corpus_valid.py` + `test_report.py`,
    18 checks): corpus-validity of the 109-case bulk + 21-case e2e corpora, and the pure `report.py`
    scoring logic. The **live** run (`run_eval.py` → grounding-mcp + Golem) is the extended tier, NOT here.
 

@@ -2,10 +2,8 @@
 package org.tatrman.resolver.pipeline
 
 import org.tatrman.fuzzy.v1.FuzzyMatch
-import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.v1.Binding
 import org.tatrman.resolver.v1.BindingProvenance
-import org.tatrman.resolver.v1.EvidenceClass
 import org.tatrman.resolver.v1.MatchMethod
 import org.tatrman.resolver.v1.SourceTag
 import org.tatrman.resolver.v1.TargetClass
@@ -17,7 +15,7 @@ import org.tatrman.fuzzy.v1.TargetClass as FuzzyTargetClass
  * lex-matcher → resolver translation, in one place, so the two vocabularies can be
  * compared side by side instead of being reconciled ad hoc at three call sites.
  *
- * Three things are DERIVED here rather than copied, each for a reason:
+ * Two things are DERIVED here rather than copied, each for a reason:
  *
  *  - **the uniform ref.** A declared row carries `target_ref`; a member row carries a data
  *    PK and no ref at all, because "a data value points at nothing but itself". The lattice
@@ -26,30 +24,29 @@ import org.tatrman.fuzzy.v1.TargetClass as FuzzyTargetClass
  *  - **the target class of a member.** lex-matcher leaves it UNSPECIFIED on member rows for
  *    its own good reason; the resolver knows the row came out of the member index, so it
  *    says MEMBER. Nothing is invented — the layer IS the evidence.
- *  - **the evidence class** (RV-14). A first mapping, and deliberately a coarse one: it reads
- *    the layer and the score against the estate's exact threshold. ⚑ **RV-P2.2 replaces it**
- *    — "EXACT/TYPOS/TOKENS dispatch + evidence-class gate" is that list's title, and only
- *    once the core dispatches methods itself can it tell "matched the object's own name"
- *    from "matched a declared alias". Until then the two share DECLARED_ALIAS, which is the
- *    safe direction: it under-claims trust, never over-claims it.
+ * The **evidence class** is the one thing this mapper no longer derives. P2.1 computed it here
+ * from the layer and the score and left a ⚑ saying RV-P2.2 would replace it; the replacement is
+ * [EvidenceClasses], and the shape of the fix is that [of] now *takes* a [Binder.ClassedMatch]
+ * rather than a bare row. A mapper cannot mint a class it was not handed, and the only things
+ * that produce one are the gate and the trigger-annotation path — which is what makes "the gate
+ * is the only binder" a property of the types instead of a rule someone has to remember.
  */
 object Bindings {
     /** `TYPOS(2)` → distance 2. The matcher carries the method as this string form (RV-32). */
     private val TYPOS = Regex("""^TYPOS\((\d+)\)$""", RegexOption.IGNORE_CASE)
 
     fun of(
-        match: FuzzyMatch,
-        candidate: DomainSpanCandidate,
-        thresholds: ResolverThresholds,
+        classed: Binder.ClassedMatch,
         snapshotHash: String,
     ): Binding {
+        val match = classed.match
         val isMember = match.source == FuzzySourceTag.MEMBER
         val builder =
             Binding
                 .newBuilder()
                 .setRef(refOf(match, isMember))
                 .setTargetClass(targetClassOf(match, isMember))
-                .setEvidenceClass(evidenceClassOf(match, candidate, thresholds, isMember))
+                .setEvidenceClass(classed.evidenceClass)
                 .setSource(sourceOf(match.source))
                 .setInClassScore(match.score)
                 .setProducer(
@@ -113,29 +110,4 @@ object Bindings {
             FuzzySourceTag.VOCABULARY -> SourceTag.SOURCE_TAG_VOCABULARY
             else -> SourceTag.SOURCE_TAG_UNSPECIFIED
         }
-
-    private fun evidenceClassOf(
-        match: FuzzyMatch,
-        candidate: DomainSpanCandidate,
-        thresholds: ResolverThresholds,
-        isMember: Boolean,
-    ): EvidenceClass {
-        val exact = match.score >= thresholds.exact
-        return when {
-            match.score < thresholds.bind -> EvidenceClass.EVIDENCE_CLASS_WEAK
-            exact && isMember -> EvidenceClass.EVIDENCE_CLASS_EXACT
-            exact && match.source == FuzzySourceTag.LEARNED -> EvidenceClass.EVIDENCE_CLASS_LEARNED_ALIAS
-            exact -> EvidenceClass.EVIDENCE_CLASS_DECLARED_ALIAS
-            candidate.anchored -> EvidenceClass.EVIDENCE_CLASS_ANCHORED_FUZZY_STRONG
-            else -> EvidenceClass.EVIDENCE_CLASS_UNANCHORED_FUZZY_STRONG
-        }
-    }
-
-    /**
-     * The RV-14 rank: 1 is strongest, and UNSPECIFIED sorts LAST rather than first. Proto3
-     * gives the zero value to UNSPECIFIED, so a naive comparison on `number` would rank
-     * "we don't know" above EXACT — the one ordering that must never happen.
-     */
-    fun rank(evidenceClass: EvidenceClass): Int =
-        if (evidenceClass == EvidenceClass.EVIDENCE_CLASS_UNSPECIFIED) Int.MAX_VALUE else evidenceClass.number
 }

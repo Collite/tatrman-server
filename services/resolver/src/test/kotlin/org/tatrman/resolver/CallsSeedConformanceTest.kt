@@ -31,8 +31,10 @@ class CallsSeedConformanceTest :
                 "hero-e2e.json",
                 "clarification-roundtrip.json",
                 "geo-dark-degrade.json",
+                "gate-h1prime-correction.json",
             )
         val validOutcomes = setOf("clarification", "resolution", "empty", "error")
+        val validTools = setOf("resolve.bind:v1", "resolve.gate:v1")
         val json = Json { ignoreUnknownKeys = true }
 
         fun load(name: String): JsonObject =
@@ -51,11 +53,20 @@ class CallsSeedConformanceTest :
                 turns.isEmpty() shouldBe false
                 for (turnEl in turns) {
                     val turn = turnEl.jsonObject
-                    turn["tool"]!!.jsonPrimitive.content shouldBe "resolve.bind:v1"
-                    turn["args"]!!
-                        .jsonObject["conversation_id"]!!
-                        .jsonPrimitive.content
-                        .isNotBlank() shouldBe true
+                    val tool = turn["tool"]!!.jsonPrimitive.content
+                    validTools shouldContain tool
+                    // RV-P2.4 — a `resolve.gate:v1` turn carries `hypotheses` instead of `args`:
+                    // it gates a lattice the PRIOR turn produced, so it has no question of its own
+                    // and no conversation to name. Everything else about a turn is unchanged, which
+                    // is the point of adding a tool rather than a second fixture format.
+                    if (tool == "resolve.gate:v1") {
+                        turn["hypotheses"]!!.jsonArray.isEmpty() shouldBe false
+                    } else {
+                        turn["args"]!!
+                            .jsonObject["conversation_id"]!!
+                            .jsonPrimitive.content
+                            .isNotBlank() shouldBe true
+                    }
                     val expect = turn["expect"]!!.jsonObject
                     validOutcomes shouldContain expect["outcome"]!!.jsonPrimitive.content
                     // The refusal-over-guess invariant is asserted by every seed.

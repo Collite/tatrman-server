@@ -13,9 +13,11 @@ import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.nlp.v1.Token
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.pipeline.Binder
 import org.tatrman.resolver.pipeline.Bindings
 import org.tatrman.resolver.pipeline.Bound
 import org.tatrman.resolver.pipeline.DomainSpanCandidate
+import org.tatrman.resolver.pipeline.EvidenceClasses
 import org.tatrman.resolver.pipeline.FrameRolePreps
 import org.tatrman.resolver.pipeline.GatedSpan
 import org.tatrman.resolver.pipeline.LatticeAssembler
@@ -177,6 +179,29 @@ class GroundingLatticeTest :
         }
     }) {
     companion object {
+        /**
+         * RV-P2.2 — a matcher row as the GATE now hands it on: with the class the gate derived.
+         * These helpers run the real [EvidenceClasses] derivation rather than asserting a class
+         * into place, so a change to the derivation is visible in every mapping test too.
+         */
+        private fun classedBy(
+            match: FuzzyMatch,
+            span: DomainSpanCandidate,
+        ): Binder.ClassedMatch =
+            Binder.ClassedMatch(match, EvidenceClasses.of(match, span.anchored, ResolverThresholds.LIVE))
+
+        private fun gatedSpan(
+            span: DomainSpanCandidate,
+            matches: List<FuzzyMatch>,
+            ambiguous: Boolean,
+        ): GatedSpan = GatedSpan(span, matches.map { classedBy(it, span) }, ambiguous)
+
+        private fun mapped(
+            match: FuzzyMatch,
+            span: DomainSpanCandidate,
+            snapshotHash: String,
+        ) = Bindings.of(classedBy(match, span), snapshotHash)
+
         private val ROCE_SPAN = 29 to 33
 
         /**
@@ -216,7 +241,7 @@ class GroundingLatticeTest :
             parse: AnalyzeResponse = PARSE,
             gated: List<GatedSpan> =
                 listOf(
-                    GatedSpan(
+                    gatedSpan(
                         mention("roce", 29, 33, head = 1),
                         listOf(declaredYear()),
                         ambiguous = false,
@@ -249,7 +274,6 @@ class GroundingLatticeTest :
                             "attribute",
                         ),
                     ),
-                thresholds = ResolverThresholds.LIVE,
                 snapshotHash = "snap-1",
                 batch = BatchMatchResponse.getDefaultInstance(),
                 lang = "cs",
@@ -299,7 +323,7 @@ class GroundingLatticeTest :
                 .build()
 
         private fun chronoTrigger(ref: String = "ground:chrono"): Binding =
-            Bindings.of(
+            mapped(
                 FuzzyMatch
                     .newBuilder()
                     .setCandidateId("lex:$ref")
@@ -313,7 +337,6 @@ class GroundingLatticeTest :
                     .setProvenance(Provenance.newBuilder().setProducer("lex-matcher").setMethod("TATRMAN"))
                     .build(),
                 mention("roce", 29, 33, head = 1),
-                ResolverThresholds.LIVE,
                 "snap-1",
             )
     }

@@ -22,6 +22,8 @@ import org.tatrman.resolver.v1.BindingProvenance
 import org.tatrman.resolver.v1.Candidate
 import org.tatrman.resolver.v1.Capabilities
 import org.tatrman.resolver.v1.Domain
+import org.tatrman.resolver.v1.GateRequest
+import org.tatrman.resolver.v1.GateResponse
 import org.tatrman.resolver.v1.EntityBinding
 import org.tatrman.resolver.v1.Option
 import org.tatrman.resolver.v1.Registry
@@ -56,11 +58,43 @@ class ResolverPipeline(
     // Defaulted to the shipped ones so a caller that has no opinion gets working roles;
     // the service passes the estate's, which may replace them (see FrameRolePreps).
     private val preps: FrameRolePreps = FrameRolePreps.shipped(),
+    // RV-P2.3 — the `lookup` rung. Injected so a caller can hand it a clock (the budget is
+    // wall-clock, and a test that races a real one is a test that flakes) or switch the rung off
+    // entirely, which is what an estate with no lexicon to narrow against effectively has.
+    private val lookupRounds: LookupRounds = LookupRounds(fuzzy),
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     private val analyzeOps =
         listOf(NlpOp.TOKENIZE, NlpOp.LEMMATIZE, NlpOp.POS_TAG, NlpOp.DEP_PARSE, NlpOp.NER, NlpOp.DETECT_LANGUAGE)
+
+    /**
+     * RV-P2.4 — `resolve.gate:v1`. The re-gate sibling: hypotheses in, gated bindings out.
+     *
+     * Deliberately NOT a branch of [resolve]: `resolve.bind` stays single-purpose (text → lattice)
+     * per Q-13's ruling, and the two share no state because there is none to share — the caller
+     * carries the lattice. The estate's declared vocabulary comes from the snapshot registry.
+     *
+     * ⚑ A per-request `Registry` override is expressible on `Resolve` and NOT on `Gate`: contracts
+     * §1 gives `GateRequest` two fields and this list does not own that shape. A caller resolving
+     * against an overridden registry and then re-gating gets the estate's snapshot for the second
+     * call, which is the conservative direction but worth a ruling if overrides go into real use.
+     */
+    suspend fun gate(request: GateRequest): GateResponse {
+        val current = registry.current()
+        return ReGate.run(
+            request = request,
+            fuzzy = fuzzy,
+            entityTypes = current.entityTypes,
+            thresholds = current.thresholds,
+            snapshotHash = current.snapshotHash,
+            maxCandidates = lookupRounds.config.maxCandidates,
+            // `hypotheses` is unbounded on the wire, so the fan-out is bounded here — by the same
+            // per-round cap the lookup rung gives itself, for the same reason this call already
+            // borrows its `maxCandidates`.
+            maxConcurrentLookups = lookupRounds.config.maxQueriesPerRound,
+        )
+    }
 
     suspend fun resolve(request: ResolveRequest): ResolveResponse =
         when {
@@ -114,7 +148,7 @@ class ResolverPipeline(
                 .addAllSpans(GroundingTriggers.queries(triggerSpans, resolverRegistry.thresholds.maxOptions))
                 .build()
         val batchResp = fuzzy.batchMatch(batchReq)
-        val outcome =
+        val broadPass =
             GateSpans.gate(
                 candidates,
                 batchResp,
@@ -123,31 +157,70 @@ class ResolverPipeline(
                 siblings,
                 resolverRegistry.snapshotHash,
             )
+        val triggers =
+            GroundingTriggers.collect(
+                triggerSpans,
+                batchResp,
+                offset = candidates.size,
+                thresholds = resolverRegistry.thresholds,
+                snapshotHash = resolverRegistry.snapshotHash,
+            )
         // The lattice (RV-P2.1) is annotation, not outcome: it is emitted the same way whether
         // the gate bound everything or is asking a question, because what the core UNDERSTOOD
         // does not change with what it decided.
-        val lattice =
+        val assemble = { gated: List<GatedSpan>, ungated: List<GatedSpan> ->
             LatticeAssembler.assemble(
                 parse = parse,
-                gate = outcome,
-                ungatedMentions = ungatedMentions,
+                gate =
+                    GateSpans.outcomeOf(
+                        gated,
+                        resolverRegistry.entityTypes,
+                        resolverRegistry.thresholds,
+                        siblings,
+                        resolverRegistry.snapshotHash,
+                    ),
+                ungatedMentions = ungated,
                 universals = universals,
                 entityTypes = resolverRegistry.entityTypes,
-                thresholds = resolverRegistry.thresholds,
                 snapshotHash = resolverRegistry.snapshotHash,
                 batch = batchResp,
                 lang = assessment.language,
                 preps = preps,
                 degraded = assessment.degradedFloor,
-                triggers =
-                    GroundingTriggers.collect(
-                        triggerSpans,
-                        batchResp,
-                        offset = candidates.size,
-                        thresholds = resolverRegistry.thresholds,
-                        snapshotHash = resolverRegistry.snapshotHash,
-                    ),
+                triggers = triggers,
             )
+        }
+
+        // RV-P2.3 — the narrowing loop, between the broad pass and emit. It re-enters through the
+        // same gate and re-assembles from the same internal model, so an emitted lattice is the
+        // same KIND of object whether zero rounds ran or five did. Everything after this line is
+        // written against the loop's result and cannot tell the difference.
+        val ungatedSpans = ungatedMentions.map { GatedSpan(it, emptyList(), ambiguous = false) }
+        val rounds =
+            lookupRounds.run(
+                lattice = assemble(broadPass.gated, ungatedSpans),
+                gated = broadPass.gated,
+                ungated = ungatedSpans,
+                entityTypes = resolverRegistry.entityTypes,
+                thresholds = resolverRegistry.thresholds,
+                reassemble = assemble,
+            )
+        // The door moves with the lattice: a round that bound a span the broad pass missed changes
+        // BOTH what the core understood and what it decided, and a caller reading `Resolution` is
+        // entitled to the same story as one reading the lattice.
+        val outcome =
+            GateSpans.outcomeOf(
+                rounds.gated,
+                resolverRegistry.entityTypes,
+                resolverRegistry.thresholds,
+                siblings,
+                resolverRegistry.snapshotHash,
+            )
+        val lattice =
+            rounds.lattice
+                .toBuilder()
+                .addAllRungLog(rounds.log)
+                .build()
 
         val builder =
             ResolveResponse
@@ -445,6 +518,14 @@ class ResolverPipeline(
                     // refuse-over-guess hole where a per-request `bind = 0.1` lowered the
                     // 0.5 floor and let near-junk matches bind (RG-P6 review E). `max_options`
                     // is a display cap, not a safety floor, so it takes any positive value.
+                    //
+                    // ⚑ RV-P2.2 — `strong` is a safety floor by the same argument and would
+                    // belong in this clamp, but it has NO wire field to clamp: `Thresholds` is
+                    // the caller-facing proto and adding one is a contract change this list
+                    // does not own. It therefore always takes the estate's configured value,
+                    // which is the conservative outcome (a caller cannot lower the class floor
+                    // because a caller cannot reach it at all). Worth an explicit ruling if a
+                    // per-request class floor is ever wanted.
                     val t = reg.thresholds
                     ResolverThresholds(
                         bind = if (t.bind > 0) maxOf(t.bind, fallback.bind) else fallback.bind,
@@ -458,6 +539,7 @@ class ResolverPipeline(
                             },
                         exact = if (t.exact > 0) maxOf(t.exact, fallback.exact) else fallback.exact,
                         maxOptions = if (t.maxOptions > 0) t.maxOptions else fallback.maxOptions,
+                        strong = fallback.strong,
                     )
                 } else {
                     fallback

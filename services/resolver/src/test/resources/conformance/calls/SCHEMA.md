@@ -33,6 +33,44 @@ here from day one and are extended into the full E2E core tier by SV-P4 (with th
 }
 ```
 
+## `resolve.gate:v1` turns (RV-P2.4)
+
+A turn may name the **re-gate sibling** instead of the door. Such a turn gates the lattice the
+PRIOR turn produced, so it carries `hypotheses` rather than `args` — it has no question of its own
+and no conversation to name — plus the `lookups` the matcher should answer with when the core turns
+those hypotheses into lexicon questions.
+
+```jsonc
+{
+  "surface": "grpc",                     // fixture-level. The gate rpc has no MCP door (P2.4 built
+                                         //   the rpc; a lattice-shaped MCP arg surface is its own
+                                         //   design work), so these turns drive gRPC directly.
+  "turns": [
+    { "tool": "resolve.bind:v1", "args": { … }, "fixture": "h1prime-cs", "expect": { … } },
+    {
+      "tool": "resolve.gate:v1",
+      "hypotheses": [                     // `org.tatrman.resolver.v1.Hypothesis`, verbatim
+        { "span": { "start": 20, "end": 26, "text": "5010O1" },
+          "correction": "501001", "ref": "md.dimension.Account.code", "proposing_rung": "local" }
+      ],
+      "lookups": { "501001": [ /* FuzzyMatch rows, verbatim */ ] },
+      "expect": {
+        "outcome": "resolution",
+        "no_binding_below_threshold": true,
+        "gated_refs": ["md.dimension.Account.code#501001"],   // what SURVIVED the gate
+        "evidence_classes": ["EVIDENCE_CLASS_EXACT"],         // the gate's evidence, per binding
+        "proposing_rung": "local",                            // provenance: who proposed it
+        "gap_kinds": []                                       // recomputed after gating
+      }
+    }
+  ]
+}
+```
+
+The invariant a gate turn adds to the suite's refusal-over-guess vocabulary: **a hypothesis is not
+evidence.** `gated_refs` may only list bindings that came out of the same evidence-class gate as
+any other candidate; a rung's confidence buys nothing (RV-7).
+
 ## Outcomes
 - **`clarification`** — `AwaitingClarification`: options + an opaque `resumeToken`. The door offers a
   choice; it does **not** bind. (Instance ambiguity → refuse over guess.)

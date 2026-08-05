@@ -19,6 +19,51 @@ import "org/tatrman/nlp/v1/nlp.proto";
 
 service ResolverService {
   rpc Resolve (ResolveRequest) returns (ResolveResponse) {}
+  // RV-P2.4 (Q-13 RULED = B, ⚑RV-1) — the re-gate SIBLING. An LLM rung's hypotheses come back
+  // through the core here, and only what survives the same evidence-class gate as any other
+  // candidate becomes a binding (RV-7 proposer-not-binder, structurally enforced). `Resolve`
+  // stays single-purpose: text -> lattice. Additive (J-v2): a new rpc, no message touched.
+  rpc Gate (GateRequest) returns (GateResponse) {}
+}
+
+// RV-P2.4 — the re-gate call. STATELESS: the caller carries the lattice, exactly as `Resolve`
+// carries the text, so the service holds no session and a retry is a fresh call with the same
+// inputs. That is what makes the Golem loop's retry semantics safe (idempotency, T4).
+message GateRequest {
+  ResolutionState lattice = 1;
+  repeated Hypothesis hypotheses = 2;
+}
+
+message GateResponse {
+  // What SURVIVED the gate. A hypothesis never appears here on its own authority: it appears
+  // because a real lexicon candidate was found for it and out-ranked the field (RV-14).
+  repeated Binding gated_bindings = 1;
+  // The gaps recomputed after gating — the caller's next input, not a delta to apply.
+  repeated GapRecord updated_gaps = 2;
+  // One entry per escalate->gate pair (RV-11); this is what the Golems append to their loop log.
+  RungLogEntry rung_log_entry = 3;
+  // Per-hypothesis outcomes. Contracts §1 sketches the three fields above; this one is added
+  // because the list asks for "partial success, per-hypothesis outcomes" and neither a binding
+  // list nor a rung-log entry can say WHY a particular hypothesis was refused. A proposer that
+  // cannot learn which of its guesses were wrong will keep making them.
+  repeated HypothesisOutcome outcomes = 4;
+}
+
+message HypothesisOutcome {
+  Hypothesis hypothesis = 1;
+  bool accepted = 2;
+  // The binding it produced, when accepted. Same message as any other binding — a re-gated
+  // hypothesis is not a second-class citizen once it has survived the gate.
+  Binding binding = 3;
+  // Why not, when not. A short machine-readable reason, not a sentence: NO_CANDIDATE (the
+  // vocabulary has no such term — the H2 pre-learning case), WEAK (found, refused by the class
+  // floor), AMBIGUOUS (several identities, refuse over guess), NO_SPAN (the hypothesis names a
+  // span the lattice does not have), REF_MISMATCH (something bound, but not the ref proposed —
+  // contradicted, not confirmed), LOOKUP_FAILED (the matcher could not be ASKED).
+  // The last one is not a verdict about the hypothesis and a rung must not treat it as one:
+  // reporting an infrastructure failure as NO_CANDIDATE would teach a proposer that a correct
+  // guess does not exist. Retrying a LOOKUP_FAILED batch is safe — `Gate` is idempotent.
+  string reason = 4;
 }
 
 message ResolveRequest {
@@ -170,6 +215,12 @@ message BindingProvenance {
   string tier = 4;              // reserved embedding-tier label (RS-14)
   string snapshot_hash = 5;      // registry/vocab snapshot (one channel)
   repeated org.tatrman.nlp.v1.EngineVersion model_versions = 6; // S-1
+  // RV-P2.4 — which rung PROPOSED this binding, when one did (`lookup` | `local` | `capable` |
+  // `emulated`, contracts §3). Empty for the core's own deterministic pass, which proposes to
+  // nobody. The other half of "provenance {proposing_rung, gate_evidence}" is already on the
+  // binding: `evidence_class` IS the gate's evidence, and a re-gated hypothesis carries the same
+  // class as any other candidate precisely because it went through the same gate.
+  string proposing_rung = 7;
 }
 
 enum UniversalEntityType {
