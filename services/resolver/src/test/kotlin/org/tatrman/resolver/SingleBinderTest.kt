@@ -39,9 +39,26 @@ class SingleBinderTest :
                 listOf("Bindings.kt")
         }
 
-        "only the gate and the trigger annotation may reach that constructor" {
+        "only the gate, the re-gate tool and the trigger annotation may reach that constructor" {
+            // `ReGate` was added by RV-P2.4 and this assertion is how it announced itself — the
+            // guard failed the moment a third file could build a `Binding`, which is the whole
+            // point of writing it down rather than trusting review. It is admitted because it is
+            // the p2-4 DONE criterion in person: "the only write-path into bindings from outside
+            // the core loop is this tool, and it goes through the P2.2 gate". It does — every
+            // binding it emits came out of a `Binder.Bind` verdict, never from a hypothesis'
+            // say-so. A FOURTH entry here should be argued, not added.
             filesMatching(Regex("""Bindings\.of\(""")) shouldContainExactlyInAnyOrder
-                listOf("GroundingTriggers.kt", "LatticeAssembler.kt")
+                listOf("GroundingTriggers.kt", "LatticeAssembler.kt", "ReGate.kt")
+        }
+
+        "the re-gate tool cannot bind on a hypothesis' authority — it only forwards gate verdicts" {
+            val reGate = sources.single { it.name == "ReGate.kt" }.readText()
+            // Every `Bindings.of` in the tool takes a winner the binder chose. If this ever reads
+            // otherwise, a proposer has become a binder (RV-7) and the p2-4 DONE criterion is void.
+            Regex("""Bindings\.of\(([^,)]+)""")
+                .findAll(reGate)
+                .map { it.groupValues[1].trim() }
+                .toList() shouldContainExactlyInAnyOrder listOf("verdict.winner")
         }
 
         "an evidence class is derived in one place, and asked for in two" {

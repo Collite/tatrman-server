@@ -67,7 +67,9 @@ data class LookupRoundConfig(
  */
 class LookupRounds(
     private val fuzzy: FuzzyClient,
-    private val config: LookupRoundConfig = LookupRoundConfig.DEFAULT,
+    // Public so the re-gate tool can borrow the rung's own candidate cap: a hypothesis is one more
+    // bounded question about one span, and it should not be able to ask for more than a round can.
+    val config: LookupRoundConfig = LookupRoundConfig.DEFAULT,
     private val nanoTime: () -> Long = System::nanoTime,
 ) {
     /** The rung name a round writes into the log (contracts §3 vocabulary). */

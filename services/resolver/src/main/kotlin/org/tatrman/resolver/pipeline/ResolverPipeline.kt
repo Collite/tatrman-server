@@ -22,6 +22,8 @@ import org.tatrman.resolver.v1.BindingProvenance
 import org.tatrman.resolver.v1.Candidate
 import org.tatrman.resolver.v1.Capabilities
 import org.tatrman.resolver.v1.Domain
+import org.tatrman.resolver.v1.GateRequest
+import org.tatrman.resolver.v1.GateResponse
 import org.tatrman.resolver.v1.EntityBinding
 import org.tatrman.resolver.v1.Option
 import org.tatrman.resolver.v1.Registry
@@ -65,6 +67,30 @@ class ResolverPipeline(
 
     private val analyzeOps =
         listOf(NlpOp.TOKENIZE, NlpOp.LEMMATIZE, NlpOp.POS_TAG, NlpOp.DEP_PARSE, NlpOp.NER, NlpOp.DETECT_LANGUAGE)
+
+    /**
+     * RV-P2.4 — `resolve.gate:v1`. The re-gate sibling: hypotheses in, gated bindings out.
+     *
+     * Deliberately NOT a branch of [resolve]: `resolve.bind` stays single-purpose (text → lattice)
+     * per Q-13's ruling, and the two share no state because there is none to share — the caller
+     * carries the lattice. The estate's declared vocabulary comes from the snapshot registry.
+     *
+     * ⚑ A per-request `Registry` override is expressible on `Resolve` and NOT on `Gate`: contracts
+     * §1 gives `GateRequest` two fields and this list does not own that shape. A caller resolving
+     * against an overridden registry and then re-gating gets the estate's snapshot for the second
+     * call, which is the conservative direction but worth a ruling if overrides go into real use.
+     */
+    suspend fun gate(request: GateRequest): GateResponse {
+        val current = registry.current()
+        return ReGate.run(
+            request = request,
+            fuzzy = fuzzy,
+            entityTypes = current.entityTypes,
+            thresholds = current.thresholds,
+            snapshotHash = current.snapshotHash,
+            maxCandidates = lookupRounds.config.maxCandidates,
+        )
+    }
 
     suspend fun resolve(request: ResolveRequest): ResolveResponse =
         when {
