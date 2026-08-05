@@ -21,6 +21,7 @@ import org.tatrman.geo.discover.GeoDiscovery
 import org.tatrman.geo.obs.GeoMetrics
 import org.tatrman.geo.parse.GeoQuery
 import org.tatrman.geo.parse.GeoSpanParser
+import org.tatrman.grounding.lexicon.GroundingSliceSource
 import org.tatrman.geo.recipe.GeoRecipeBuilder
 import org.tatrman.geo.resolve.PlaceResolution
 import org.tatrman.geo.resolve.PlaceResolver
@@ -44,6 +45,11 @@ class GeoGroundingService(
     // dark geocoder makes LOCATION grounding fail loud (UNAVAILABLE), never a false "place not found".
     private val nominatimConfigured: Boolean = true,
     private val postgisAvailable: Boolean = false,
+    /**
+     * RV-P1.6 T5 (RV-42) — the `ground:geo` CATEGORY-word slice. It never resolves a place: the
+     * gazetteer stays geo-side and parked. Default = disabled = the pre-RV parser.
+     */
+    private val triggers: GroundingSliceSource = GroundingSliceSource.disabled("geo"),
 ) : org.tatrman.grounding.v1.GroundingServiceGrpcKt.GroundingServiceCoroutineImplBase() {
     private val logger = LoggerFactory.getLogger(GeoGroundingService::class.java)
     private val parser = GeoSpanParser()
@@ -80,7 +86,8 @@ class GeoGroundingService(
     }
 
     private suspend fun groundInternal(request: GroundRequest): GroundResponse =
-        when (val query = parser.parse(request.spanText)) {
+        // RV-P1.6: category words are narrowed to the request's language (blank ⇒ all).
+        when (val query = parser.parse(request.spanText, triggers.current().forLang(request.context.locale))) {
             is GeoQuery.Distance -> handleDistance(query, request)
             is GeoQuery.Containment -> handleContainment(query, request)
             null -> fallback(request, "could not recognize a location expression in '${request.spanText}'")
@@ -196,6 +203,15 @@ class GeoGroundingService(
                 // RS-19 / D-T2 — report the geocoding + PostGIS capabilities truthfully.
                 .putCapabilities("nominatim", if (nominatimConfigured) "ok" else "dark")
                 .putCapabilities("postgis", if (postgisAvailable) "ok" else "absent")
+                // RV-39/S-1 — which trigger vocabulary is serving (category words only).
+                .putCapabilities("lexicon_slice", triggers.current().version)
+                .putCapabilities(
+                    "lexicon_slice_terms",
+                    triggers
+                        .current()
+                        .terms.size
+                        .toString(),
+                )
         if (!nominatimConfigured) {
             // RG-GND-001: the geo capability is dark. LOCATION grounding for administrative places
             // returns UNAVAILABLE (fail loud), never a false "place doesn't exist".

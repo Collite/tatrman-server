@@ -69,6 +69,8 @@ jib {
 dependencies {
     implementation(libs.tatrman.ttr.translator)
     implementation(project(":shared:libs:kotlin:grounding-core"))
+    // RV-P1.6 T4 (RV-42) — the `ground:money` trigger slice, read from the compiled lexicon.
+    implementation(project(":shared:libs:kotlin:grounding-lexicon"))
     implementation(project(":shared:libs:kotlin:ktor-configurator"))
     implementation(project(":shared:libs:kotlin:otel-config"))
     implementation(project(":shared:libs:kotlin:logging-config"))
