@@ -110,6 +110,19 @@ class ResolverPipeline(
                 siblings,
                 resolverRegistry.snapshotHash,
             )
+        // The lattice (RV-P2.1) is annotation, not outcome: it is emitted the same way whether
+        // the gate bound everything or is asking a question, because what the core UNDERSTOOD
+        // does not change with what it decided.
+        val lattice =
+            LatticeAssembler.assemble(
+                parse = parse,
+                gate = outcome,
+                ungatedMentions = MentionLayer.propose(parse, candidates),
+                universals = universals,
+                thresholds = resolverRegistry.thresholds,
+                snapshotHash = resolverRegistry.snapshotHash,
+                batch = batchResp,
+            )
 
         val builder =
             ResolveResponse
@@ -118,6 +131,7 @@ class ResolverPipeline(
                 .setTraceId(parse.traceId.ifBlank { request.conversationId })
                 .setElapsedMs(parse.elapsedMs)
                 .setCapabilities(capabilities(assessment))
+                .setResolutionState(lattice)
 
         when (outcome) {
             is Clarify ->
@@ -394,6 +408,7 @@ class ResolverPipeline(
                         it.ref,
                         it.categoriesList.toList(),
                         it.anchorsList.toList(),
+                        it.objectKind,
                     )
                 }
             val thresholds =

@@ -60,14 +60,23 @@ object GateSpans {
     ): GateOutcome {
         val bindings = mutableListOf<DomainBinding>()
         val options = mutableListOf<ClarificationOption>()
+        // Every candidate, matched or not — the lattice's raw material (RV-P2.1). A span with
+        // no surviving contender is recorded here as an empty one; it is a first-class unknown,
+        // not an absence.
+        val gated = mutableListOf<GatedSpan>()
 
         candidates.forEachIndexed { i, cand ->
-            val result = response.resultsList.getOrNull(i) ?: return@forEachIndexed
+            val result = response.resultsList.getOrNull(i)
             val matches =
-                result.matchesList
+                result
+                    ?.matchesList
+                    .orEmpty()
                     .filter { it.score >= thresholds.bind }
                     .sortedByDescending { it.score }
-            if (matches.isEmpty()) return@forEachIndexed
+            if (matches.isEmpty()) {
+                gated += GatedSpan(cand, emptyList(), ambiguous = false)
+                return@forEachIndexed
+            }
 
             val top = matches.first()
             val contenders =
@@ -82,6 +91,7 @@ object GateSpans {
                 }
 
             val identities = contenders.map { identityKey(it) }.distinct()
+            gated += GatedSpan(cand, contenders.distinctBy { identityKey(it) }, ambiguous = identities.size > 1)
             if (identities.size > 1) {
                 // instance ambiguity — offer the distinct contenders, don't bind. Each
                 // option is attributed to THIS span and this span's options are capped
@@ -100,10 +110,10 @@ object GateSpans {
         // at maxOptions above; a flat `options.take(maxOptions)` would drop later
         // spans wholesale (RG-P6 review M). Full multi-span RESUME (returning the
         // already-bound spans alongside a pin) remains a tracked design item.
-        if (options.isNotEmpty()) return Clarify(options)
+        if (options.isNotEmpty()) return Clarify(options, gated)
 
         val deduped = dedupeByIdentity(bindings)
-        return Bound(deduped, confidence = deduped.minOfOrNull { it.score } ?: 0.0)
+        return Bound(deduped, confidence = deduped.minOfOrNull { it.score } ?: 0.0, gated = gated)
     }
 
     // --- helpers ------------------------------------------------------------

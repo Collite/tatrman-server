@@ -32,8 +32,13 @@ class LatticeProtoTest :
                 Mention
                     .newBuilder()
                     .setId("m2")
-                    .setSpan(Span.newBuilder().setStart(7).setEnd(14).setText("náklady"))
-                    .setLemma("náklad")
+                    .setSpan(
+                        Span
+                            .newBuilder()
+                            .setStart(7)
+                            .setEnd(14)
+                            .setText("náklady"),
+                    ).setLemma("náklad")
                     .addFrameRoles(FrameRole.FRAME_ROLE_SUBJECT)
                     .addFrameRoles(FrameRole.FRAME_ROLE_MEASURE)
                     .build()
@@ -47,8 +52,13 @@ class LatticeProtoTest :
             val gap =
                 GapRecord
                     .newBuilder()
-                    .setSpan(Span.newBuilder().setStart(18).setEnd(34).setText("čerpacích stanic"))
-                    .setKind(GapKind.GAP_KIND_G1_UNBOUND)
+                    .setSpan(
+                        Span
+                            .newBuilder()
+                            .setStart(18)
+                            .setEnd(34)
+                            .setText("čerpacích stanic"),
+                    ).setKind(GapKind.GAP_KIND_G1_UNBOUND)
                     .addFrameRoles(FrameRole.FRAME_ROLE_SUBJECT)
                     .setMentionId("m3")
                     .setDisposition(Disposition.DISPOSITION_UNRESOLVED)
@@ -60,7 +70,12 @@ class LatticeProtoTest :
         }
 
         "zero bindings is expressible — the whole reason RV-P3 waited for this field" {
-            val mention = Mention.newBuilder().setId("m3").setLemma("stanice").build()
+            val mention =
+                Mention
+                    .newBuilder()
+                    .setId("m3")
+                    .setLemma("stanice")
+                    .build()
             mention.bindingsCount shouldBe 0
             // ...and it survives the wire, which a `Binding binding = 5` singular could not have
             // said at all: an unset singular and a bound-to-nothing mention would look identical.
@@ -71,7 +86,12 @@ class LatticeProtoTest :
             val undecided = Binding.newBuilder().setRef("md.measure.cost").build()
             undecided.hasAutoBindable().shouldBeFalse()
 
-            val refused = Binding.newBuilder().setRef("md.measure.cost").setAutoBindable(false).build()
+            val refused =
+                Binding
+                    .newBuilder()
+                    .setRef("md.measure.cost")
+                    .setAutoBindable(false)
+                    .build()
             val wire = Binding.parseFrom(refused.toByteArray())
             wire.hasAutoBindable().shouldBeTrue()
             wire.autoBindable.shouldBeFalse()
