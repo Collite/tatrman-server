@@ -1,0 +1,229 @@
+{
+  "mentions": [
+    {
+      "id": "m1",
+      "span": {
+        "end": 4,
+        "text": "Ukaž"
+      },
+      "lemma": "ukázat",
+      "bindings": [
+        {
+          "ref": "op:show",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h5"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "span": {
+        "start": 5,
+        "end": 10,
+        "text": "vývoj"
+      },
+      "lemma": "vývoj",
+      "bindings": [
+        {
+          "ref": "op:trend",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h5"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m3",
+      "span": {
+        "start": 11,
+        "end": 18,
+        "text": "nákladů"
+      },
+      "lemma": "náklad",
+      "frameRoles": [
+        "FRAME_ROLE_SUBJECT",
+        "FRAME_ROLE_MEASURE"
+      ],
+      "bindings": [
+        {
+          "ref": "md.measure.cost",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h5"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m4",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "text": "střediska"
+      },
+      "lemma": "středisko",
+      "frameRoles": [
+        "FRAME_ROLE_FILTER"
+      ],
+      "bindings": [
+        {
+          "ref": "er.CostCenter",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h5"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m5",
+      "span": {
+        "start": 59,
+        "end": 67,
+        "text": "porovnej"
+      },
+      "lemma": "porovnat",
+      "bindings": [
+        {
+          "ref": "op:compare",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "evidenceClass": "EVIDENCE_CLASS_EXACT",
+          "method": "MATCH_METHOD_EXACT",
+          "source": "SOURCE_TAG_DECLARED",
+          "inClassScore": 1.0,
+          "producer": {
+            "vocabularySource": "DECLARED",
+            "algorithm": "TATRMAN",
+            "score": 1.0,
+            "snapshotHash": "snap-h5"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m6",
+      "span": {
+        "start": 70,
+        "end": 76,
+        "text": "plánem"
+      },
+      "lemma": "plán",
+      "frameRoles": [
+        "FRAME_ROLE_FILTER"
+      ]
+    }
+  ],
+  "values": [
+    {
+      "id": "v1",
+      "span": {
+        "start": 29,
+        "end": 32,
+        "text": "220"
+      },
+      "kind": "VALUE_KIND_LITERAL",
+      "attributions": [
+        {
+          "attributeRef": "er.CostCenter.code",
+          "binding": {
+            "ref": "er.CostCenter.code#220",
+            "targetClass": "TARGET_CLASS_MEMBER",
+            "evidenceClass": "EVIDENCE_CLASS_EXACT",
+            "source": "SOURCE_TAG_DATA",
+            "inClassScore": 1.0,
+            "producer": {
+              "vocabularySource": "MEMBER",
+              "algorithm": "TATRMAN",
+              "score": 1.0,
+              "snapshotHash": "snap-h5"
+            }
+          }
+        }
+      ],
+      "anchorMentionId": "m4"
+    },
+    {
+      "id": "v2",
+      "span": {
+        "start": 36,
+        "end": 56,
+        "text": "posledních 12 měsíců"
+      },
+      "kind": "VALUE_KIND_GROUNDED",
+      "grounding": {
+        "kernel": "nametag3",
+        "kind": "DATE",
+        "normalizedValue": "P12M"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "span": {
+        "start": 70,
+        "end": 76,
+        "text": "plánem"
+      },
+      "kind": "GAP_KIND_G1_UNBOUND",
+      "frameRoles": [
+        "FRAME_ROLE_FILTER"
+      ],
+      "disposition": "DISPOSITION_UNRESOLVED",
+      "mentionId": "m6"
+    }
+  ],
+  "rungLog": [
+    {
+      "rung": "core",
+      "action": "annotate",
+      "bindingsAdded": 6,
+      "gapsOpen": 1
+    },
+    {
+      "round": 1,
+      "rung": "lookup",
+      "action": "lookup",
+      "mentionIds": [
+        "m6"
+      ],
+      "gapsOpen": 1
+    }
+  ],
+  "lexiconVersions": {
+    "lexiconArtifactHash": "sha256:h5-lexicon",
+    "memberIndexVersions": {
+      "er.CostCenter.code": "v2"
+    }
+  }
+}

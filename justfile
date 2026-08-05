@@ -233,6 +233,12 @@ conformance-service-level:
     ./gradlew :services:resolver:test --tests '*Q20ParityTest*'
     ./gradlew :services:resolver:test --tests '*CallsSeedConformanceTest*'
     ./gradlew :services:resolver:test --tests '*RefusalOverGuessConformanceTest*'
+    # RV-P2.5.T6 — the P2 phase gate joins the gating tier. Hermetic (in-process gRPC, faked
+    # nlp/fuzzy), so it belongs here rather than in the SV-P4 live tier: the H1' re-gate pair
+    # over the wire, the four hero lattices, and the two named issues.md regressions.
+    ./gradlew :services:resolver:test --tests '*GateConformanceTest*'
+    ./gradlew :services:resolver:test --tests '*LatticeGoldenTest*'
+    ./gradlew :services:resolver:test --tests '*IssuesRegressionTest*'
     ./gradlew :services:lex-matcher:test --tests '*MatchQualityCorpusTest*'
     ./gradlew :services:lex-matcher:test --tests '*LexiconConformanceTest*'
     just eval-grounding-test

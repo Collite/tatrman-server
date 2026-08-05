@@ -1,0 +1,178 @@
+{
+  "id": "h5-cs",
+  "source": "design.md H5 (S15) — the operator-layer hero: three operators in one question",
+  "expect": "op:show + op:trend + op:compare OPERATOR bindings from the stdlib triggers via the ORDINARY path (no operator special case anywhere); `nákladů` SUBJECT+MEASURE; `střediska` bound to er.CostCenter with `220` attributed to its code column; `posledních 12 měsíců` the chrono window; and `plánem` an honest G1_UNBOUND — this estate has no plan measure, and saying so rather than forcing a binding is the point of the whole effort.",
+  "text": "Ukaž vývoj nákladů střediska 220 za posledních 12 měsíců a porovnej s plánem.",
+  "locale": "cs",
+  "parseFile": "h5-cs.parse.json",
+  "registry": {
+    "entityTypes": [
+      {
+        "ref": "op:show",
+        "categories": [
+          "op:show"
+        ],
+        "anchors": [
+          "ukázat"
+        ],
+        "objectKind": "operator"
+      },
+      {
+        "ref": "op:trend",
+        "categories": [
+          "op:trend"
+        ],
+        "anchors": [
+          "vývoj"
+        ],
+        "objectKind": "operator"
+      },
+      {
+        "ref": "op:compare",
+        "categories": [
+          "op:compare"
+        ],
+        "anchors": [
+          "porovnat"
+        ],
+        "objectKind": "operator"
+      },
+      {
+        "ref": "md.measure.cost",
+        "categories": [
+          "md.measure.cost"
+        ],
+        "anchors": [
+          "náklad"
+        ],
+        "objectKind": "measure"
+      },
+      {
+        "ref": "er.CostCenter",
+        "categories": [
+          "er.CostCenter",
+          "er.CostCenter.code",
+          "er.CostCenter.name"
+        ],
+        "anchors": [
+          "středisko"
+        ],
+        "objectKind": "dimension"
+      }
+    ],
+    "locales": [
+      "cs"
+    ],
+    "snapshotHash": "snap-h5"
+  },
+  "matcher": {
+    "vocabularyVersion": "lex-h5-vocab",
+    "layerVersions": {
+      "lexiconArtifactHash": "sha256:h5-lexicon",
+      "memberIndexVersions": {
+        "er.CostCenter.code": "v2"
+      }
+    },
+    "byQuery": {
+      "Ukaž": [
+        {
+          "candidateId": "lex:op:show:ukaz",
+          "candidate": "ukaž",
+          "score": 1.0,
+          "category": "op:show",
+          "source": "DECLARED",
+          "targetRef": "op:show",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "vývoj": [
+        {
+          "candidateId": "lex:op:trend:vyvoj",
+          "candidate": "vývoj",
+          "score": 1.0,
+          "category": "op:trend",
+          "source": "DECLARED",
+          "targetRef": "op:trend",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "porovnej": [
+        {
+          "candidateId": "lex:op:compare:porovnej",
+          "candidate": "porovnej",
+          "score": 1.0,
+          "category": "op:compare",
+          "source": "DECLARED",
+          "targetRef": "op:compare",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "nákladů": [
+        {
+          "candidateId": "lex:md.measure.cost:naklady",
+          "candidate": "náklady",
+          "score": 1.0,
+          "category": "md.measure.cost",
+          "source": "DECLARED",
+          "targetRef": "md.measure.cost",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "střediska": [
+        {
+          "candidateId": "lex:er.CostCenter:stredisko",
+          "candidate": "středisko",
+          "score": 1.0,
+          "category": "er.CostCenter",
+          "source": "DECLARED",
+          "targetRef": "er.CostCenter",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "matchMethod": "EXACT",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ],
+      "220": [
+        {
+          "candidateId": "220",
+          "candidate": "220",
+          "score": 1.0,
+          "category": "er.CostCenter.code",
+          "source": "MEMBER",
+          "provenance": {
+            "producer": "lex-matcher",
+            "method": "TATRMAN",
+            "rawScore": 1.0
+          }
+        }
+      ]
+    }
+  }
+}
