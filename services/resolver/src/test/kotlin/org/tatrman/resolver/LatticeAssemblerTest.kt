@@ -193,7 +193,10 @@ class LatticeAssemblerTest :
                                 ),
                             ),
                         ),
-                    ungatedMentions = listOf(mention("položky", 30, 37, head = 5)),
+                    ungatedMentions =
+                        listOf(
+                            gatedSpan(mention("položky", 30, 37, head = 5), emptyList(), ambiguous = false),
+                        ),
                     universals = emptyList(),
                     entityTypes = emptyList(),
                     snapshotHash = "snap-1",

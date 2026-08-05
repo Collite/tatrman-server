@@ -35,7 +35,7 @@ object LatticeAssembler {
     fun assemble(
         parse: AnalyzeResponse,
         gate: GateOutcome,
-        ungatedMentions: List<DomainSpanCandidate>,
+        ungatedMentions: List<GatedSpan>,
         universals: List<UniversalBinding>,
         entityTypes: List<ResolverEntityType>,
         snapshotHash: String,
@@ -51,7 +51,7 @@ object LatticeAssembler {
         val gatedByLayer =
             gate.gated.groupBy { layerOf(it, hasTrigger = (it.candidate.start to it.candidate.end) in triggers) }
         val mentionSpans =
-            (gatedByLayer[Layer.MENTION].orEmpty() + ungatedMentions.map { GatedSpan(it, emptyList(), false) })
+            (gatedByLayer[Layer.MENTION].orEmpty() + ungatedMentions)
                 .sortedWith(compareBy({ it.candidate.start }, { it.candidate.end }))
         val valueSpans = gatedByLayer[Layer.VALUE].orEmpty().sortedWith(compareBy({ it.candidate.start }))
 

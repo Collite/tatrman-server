@@ -8,6 +8,8 @@ import org.tatrman.fuzzy.v1.BatchMatchResponse
 import org.tatrman.fuzzy.v1.FuzzyServiceGrpcKt
 import org.tatrman.fuzzy.v1.FuzzyStatusRequest
 import org.tatrman.fuzzy.v1.FuzzyStatusResponse
+import org.tatrman.fuzzy.v1.LookupRequest
+import org.tatrman.fuzzy.v1.LookupResponse
 import org.tatrman.nlp.v1.AnalyzeRequest
 import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.nlp.v1.NlpServiceGrpcKt
@@ -31,6 +33,21 @@ interface NlpClient {
 interface FuzzyClient {
     /** The one BatchMatch per resolve (B-T1). */
     suspend fun batchMatch(request: BatchMatchRequest): BatchMatchResponse
+
+    /**
+     * RV-P2.3 — one narrowing question (contracts §1 addendum, FROZEN at P1.4 T5).
+     *
+     * Deliberately NOT a batch, and the difference from [batchMatch] is the whole point of the
+     * rung: `BatchMatch` asks the broad pass's question about every span at once and can express
+     * nothing but term+categories+limit, while a lookup round asks a narrow question the planner
+     * chose — scoped by target class, optionally overriding the authored method — about one span
+     * it decided was worth asking about again.
+     *
+     * Defaulted to "no vocabulary answered" so a test double that never exercises rounds does not
+     * have to implement it. [GrpcFuzzyClient] always overrides; a fake that returns this default
+     * simply makes the loop a no-op, which is exactly what an estate with nothing to narrow does.
+     */
+    suspend fun lookup(request: LookupRequest): LookupResponse = LookupResponse.getDefaultInstance()
 
     /** Category discovery + staleness (S2: registry snapshot echo). */
     suspend fun getStatus(): FuzzyStatusResponse
@@ -67,6 +84,9 @@ class GrpcFuzzyClient(
 
     override suspend fun batchMatch(request: BatchMatchRequest): BatchMatchResponse =
         stub.withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS).batchMatch(request)
+
+    override suspend fun lookup(request: LookupRequest): LookupResponse =
+        stub.withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS).lookup(request)
 
     override suspend fun getStatus(): FuzzyStatusResponse =
         stub.withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS).getStatus(FuzzyStatusRequest.getDefaultInstance())

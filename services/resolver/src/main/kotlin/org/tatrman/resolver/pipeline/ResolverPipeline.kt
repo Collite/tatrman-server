@@ -56,6 +56,10 @@ class ResolverPipeline(
     // Defaulted to the shipped ones so a caller that has no opinion gets working roles;
     // the service passes the estate's, which may replace them (see FrameRolePreps).
     private val preps: FrameRolePreps = FrameRolePreps.shipped(),
+    // RV-P2.3 — the `lookup` rung. Injected so a caller can hand it a clock (the budget is
+    // wall-clock, and a test that races a real one is a test that flakes) or switch the rung off
+    // entirely, which is what an estate with no lexicon to narrow against effectively has.
+    private val lookupRounds: LookupRounds = LookupRounds(fuzzy),
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -114,7 +118,7 @@ class ResolverPipeline(
                 .addAllSpans(GroundingTriggers.queries(triggerSpans, resolverRegistry.thresholds.maxOptions))
                 .build()
         val batchResp = fuzzy.batchMatch(batchReq)
-        val outcome =
+        val broadPass =
             GateSpans.gate(
                 candidates,
                 batchResp,
@@ -123,14 +127,29 @@ class ResolverPipeline(
                 siblings,
                 resolverRegistry.snapshotHash,
             )
+        val triggers =
+            GroundingTriggers.collect(
+                triggerSpans,
+                batchResp,
+                offset = candidates.size,
+                thresholds = resolverRegistry.thresholds,
+                snapshotHash = resolverRegistry.snapshotHash,
+            )
         // The lattice (RV-P2.1) is annotation, not outcome: it is emitted the same way whether
         // the gate bound everything or is asking a question, because what the core UNDERSTOOD
         // does not change with what it decided.
-        val lattice =
+        val assemble = { gated: List<GatedSpan>, ungated: List<GatedSpan> ->
             LatticeAssembler.assemble(
                 parse = parse,
-                gate = outcome,
-                ungatedMentions = ungatedMentions,
+                gate =
+                    GateSpans.outcomeOf(
+                        gated,
+                        resolverRegistry.entityTypes,
+                        resolverRegistry.thresholds,
+                        siblings,
+                        resolverRegistry.snapshotHash,
+                    ),
+                ungatedMentions = ungated,
                 universals = universals,
                 entityTypes = resolverRegistry.entityTypes,
                 snapshotHash = resolverRegistry.snapshotHash,
@@ -138,15 +157,40 @@ class ResolverPipeline(
                 lang = assessment.language,
                 preps = preps,
                 degraded = assessment.degradedFloor,
-                triggers =
-                    GroundingTriggers.collect(
-                        triggerSpans,
-                        batchResp,
-                        offset = candidates.size,
-                        thresholds = resolverRegistry.thresholds,
-                        snapshotHash = resolverRegistry.snapshotHash,
-                    ),
+                triggers = triggers,
             )
+        }
+
+        // RV-P2.3 — the narrowing loop, between the broad pass and emit. It re-enters through the
+        // same gate and re-assembles from the same internal model, so an emitted lattice is the
+        // same KIND of object whether zero rounds ran or five did. Everything after this line is
+        // written against the loop's result and cannot tell the difference.
+        val ungatedSpans = ungatedMentions.map { GatedSpan(it, emptyList(), ambiguous = false) }
+        val rounds =
+            lookupRounds.run(
+                lattice = assemble(broadPass.gated, ungatedSpans),
+                gated = broadPass.gated,
+                ungated = ungatedSpans,
+                entityTypes = resolverRegistry.entityTypes,
+                thresholds = resolverRegistry.thresholds,
+                reassemble = assemble,
+            )
+        // The door moves with the lattice: a round that bound a span the broad pass missed changes
+        // BOTH what the core understood and what it decided, and a caller reading `Resolution` is
+        // entitled to the same story as one reading the lattice.
+        val outcome =
+            GateSpans.outcomeOf(
+                rounds.gated,
+                resolverRegistry.entityTypes,
+                resolverRegistry.thresholds,
+                siblings,
+                resolverRegistry.snapshotHash,
+            )
+        val lattice =
+            rounds.lattice
+                .toBuilder()
+                .addAllRungLog(rounds.log)
+                .build()
 
         val builder =
             ResolveResponse

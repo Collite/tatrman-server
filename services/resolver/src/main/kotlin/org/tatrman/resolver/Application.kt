@@ -31,6 +31,8 @@ import org.tatrman.resolver.mcp.ResolveDoor
 import org.tatrman.resolver.mcp.ResolveDoorHandler
 import org.tatrman.resolver.mcp.installResolveDoor
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.pipeline.LookupRoundConfig
+import org.tatrman.resolver.pipeline.LookupRounds
 import org.tatrman.resolver.pipeline.FrameRolePreps
 import org.tatrman.resolver.pipeline.ResolverPipeline
 import org.tatrman.resolver.registry.LiveMetadataRegistryAdapter
@@ -79,6 +81,13 @@ fun Application.module(config: Config) {
             maxOptions = config.getInt("resolver.max-options"),
             strong = config.getDouble("resolver.threshold-strong"),
         )
+    val lookupRoundConfig =
+        LookupRoundConfig(
+            budgetMs = config.getLong("resolver.lookup-budget-ms"),
+            maxCandidates = config.getInt("resolver.lookup-max-candidates"),
+            broadMaxCandidates = config.getInt("resolver.lookup-broad-max-candidates"),
+            maxQueriesPerRound = config.getInt("resolver.lookup-max-queries-per-round"),
+        )
     // Snapshot-fed registry over the one-channel seam (RS-24). Startup uses the
     // E3-β step-one live-metadata adapter; a per-request `Registry` override wins.
     val registry = SnapshotRegistry(LiveMetadataRegistryAdapter(), defaultThresholds)
@@ -96,6 +105,7 @@ fun Application.module(config: Config) {
             siblings = emptyMap(),
             tokenCodec = tokenCodec,
             preps = FrameRolePreps.load(config),
+            lookupRounds = LookupRounds(fuzzyClient, lookupRoundConfig),
         )
     val resolverService = ResolverGrpcService(pipeline)
 

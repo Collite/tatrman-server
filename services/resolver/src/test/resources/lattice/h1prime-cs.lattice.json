@@ -218,6 +218,15 @@
       "mentionIds": [
         "m5"
       ]
+    },
+    {
+      "round": 1,
+      "rung": "lookup",
+      "action": "lookup",
+      "valueIds": [
+        "v1"
+      ],
+      "gapsOpen": 1
     }
   ],
   "lexiconVersions": {

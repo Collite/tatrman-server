@@ -161,6 +161,24 @@
       "action": "annotate",
       "bindingsAdded": 3,
       "gapsOpen": 2
+    },
+    {
+      "round": 1,
+      "rung": "lookup",
+      "action": "lookup",
+      "mentionIds": [
+        "m3"
+      ],
+      "gapsOpen": 2
+    },
+    {
+      "round": 2,
+      "rung": "lookup",
+      "action": "lookup",
+      "valueIds": [
+        "v2"
+      ],
+      "gapsOpen": 2
     }
   ],
   "lexiconVersions": {

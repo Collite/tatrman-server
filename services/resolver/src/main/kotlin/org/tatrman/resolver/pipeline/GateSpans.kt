@@ -58,39 +58,60 @@ object GateSpans {
         thresholds: ResolverThresholds,
         siblings: SiblingCatalog,
         snapshotHash: String,
+    ): GateOutcome =
+        outcomeOf(
+            candidates.mapIndexed { i, cand ->
+                // The ONE decision, made in the one place that makes it (RV-P2.2). Note what is NOT
+                // filtered before the call: the bind floor is the binder's too, because a candidate
+                // the gate refused is still something the rung log should be able to name.
+                val verdict =
+                    Binder.gate(
+                        response.resultsList
+                            .getOrNull(i)
+                            ?.matchesList
+                            .orEmpty(),
+                        cand,
+                        thresholds,
+                    )
+                GatedSpan(cand, verdict.admitted, ambiguous = verdict is Binder.Ambiguous)
+            },
+            entityTypes,
+            thresholds,
+            siblings,
+            snapshotHash,
+        )
+
+    /**
+     * The door's answer, derived from the gated spans alone (RV-P2.3).
+     *
+     * Split out of [gate] because a lookup round changes what the gated spans say and the DOOR has
+     * to move with them: a caller reading `Resolution.bindings` and a caller reading the lattice
+     * are entitled to the same story, and before this the outcome was welded to the one BatchMatch
+     * that happened to come first. Pure over its inputs, so the loop can re-derive it as often as
+     * it likes.
+     */
+    fun outcomeOf(
+        gated: List<GatedSpan>,
+        entityTypes: List<ResolverEntityType>,
+        thresholds: ResolverThresholds,
+        siblings: SiblingCatalog,
+        snapshotHash: String,
     ): GateOutcome {
         val bindings = mutableListOf<DomainBinding>()
         val options = mutableListOf<ClarificationOption>()
-        // Every candidate, matched or not — the lattice's raw material (RV-P2.1). A span with
-        // no surviving contender is recorded here as an empty one; it is a first-class unknown,
-        // not an absence.
-        val gated = mutableListOf<GatedSpan>()
 
-        candidates.forEachIndexed { i, cand ->
-            // The ONE decision, made in the one place that makes it (RV-P2.2). Note what is NOT
-            // filtered before the call: the bind floor is the binder's too, because a candidate
-            // the gate refused is still something the rung log should be able to name.
-            val verdict =
-                Binder.gate(
-                    response.resultsList
-                        .getOrNull(i)
-                        ?.matchesList
-                        .orEmpty(),
-                    cand,
-                    thresholds,
-                )
-            gated += GatedSpan(cand, verdict.admitted, ambiguous = verdict is Binder.Ambiguous)
-            when (verdict) {
-                is Binder.NoBind -> Unit
-                is Binder.Ambiguous ->
-                    // instance ambiguity — offer the distinct contenders, don't bind. Each option
-                    // is attributed to THIS span and this span's options are capped independently
-                    // (RG-P6 review M).
-                    verdict.admitted
-                        .take(thresholds.maxOptions)
-                        .forEach { options += toOption(it.match, cand, entityTypes) }
-                is Binder.Bind ->
-                    bindings += toBinding(cand, verdict.winner.match, entityTypes, siblings, snapshotHash)
+        for (span in gated) {
+            if (span.contenders.isEmpty()) continue
+            if (span.ambiguous) {
+                // instance ambiguity — offer the distinct contenders, don't bind. Each option is
+                // attributed to THIS span and this span's options are capped independently
+                // (RG-P6 review M).
+                span.contenders
+                    .take(thresholds.maxOptions)
+                    .forEach { options += toOption(it.match, span.candidate, entityTypes) }
+            } else {
+                bindings +=
+                    toBinding(span.candidate, span.contenders.first().match, entityTypes, siblings, snapshotHash)
             }
         }
 

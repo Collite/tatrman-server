@@ -51,9 +51,11 @@ class RoundPlannerTest :
 
         "a G4 whose anchor bound NOTHING is not planned — an unbound anchor lends no scope" {
             val lattice =
-                g4Lattice().toBuilder().apply {
-                    setMentions(0, getMentions(0).toBuilder().clearBindings())
-                }.build()
+                g4Lattice()
+                    .toBuilder()
+                    .apply {
+                        setMentions(0, getMentions(0).toBuilder().clearBindings())
+                    }.build()
             RoundPlanner.plan(lattice, listOf(account), emptySet(), config) shouldBe emptyList()
         }
 
@@ -144,7 +146,13 @@ class RoundPlannerTest :
             start: Int,
             end: Int,
             text: String,
-        ): Span = Span.newBuilder().setStart(start).setEnd(end).setText(text).build()
+        ): Span =
+            Span
+                .newBuilder()
+                .setStart(start)
+                .setEnd(end)
+                .setText(text)
+                .build()
 
         private fun gap(
             kind: GapKind,
@@ -173,7 +181,12 @@ class RoundPlannerTest :
             kind: ValueKind,
             anchor: String = "",
         ): ValueFinding {
-            val b = ValueFinding.newBuilder().setId(id).setSpan(span(start, end, text)).setKind(kind)
+            val b =
+                ValueFinding
+                    .newBuilder()
+                    .setId(id)
+                    .setSpan(span(start, end, text))
+                    .setKind(kind)
             if (anchor.isNotBlank()) b.anchorMentionId = anchor
             return b.build()
         }

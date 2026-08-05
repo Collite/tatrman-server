@@ -79,7 +79,9 @@ class LookupRoundsTest :
 
             // and it landed, through the P2.2 gate, as an EXACT member attribution
             val value = state.valuesList.single { it.span.text == "501001" }
-            value.attributionsList.single().binding.evidenceClass shouldBe EvidenceClass.EVIDENCE_CLASS_EXACT
+            value.attributionsList
+                .single()
+                .binding.evidenceClass shouldBe EvidenceClass.EVIDENCE_CLASS_EXACT
             state.gapsList.none { it.valueId == value.id }.shouldBeTrue()
         }
 
@@ -259,9 +261,19 @@ class LookupRoundsTest :
             StatusResponse
                 .newBuilder()
                 .setReady(true)
-                .addCapabilities(Capability.newBuilder().setOp(NlpOp.NER).setLanguage("cs").setEngine("nametag3"))
-                .addCapabilities(Capability.newBuilder().setOp(NlpOp.DEP_PARSE).setLanguage("cs").setEngine("stanza"))
-                .build()
+                .addCapabilities(
+                    Capability
+                        .newBuilder()
+                        .setOp(NlpOp.NER)
+                        .setLanguage("cs")
+                        .setEngine("nametag3"),
+                ).addCapabilities(
+                    Capability
+                        .newBuilder()
+                        .setOp(NlpOp.DEP_PARSE)
+                        .setLanguage("cs")
+                        .setEngine("stanza"),
+                ).build()
     }
 
     /**
