@@ -46,6 +46,17 @@ llmFallback:
 # Boots without a metadata client when true (smoke/test only). Production leaves false.
 useFixtureModel: false
 
+# Compiled lexicon archive (RV-P3.3). OFF by default: an empty `configMapName` renders no volume,
+# no volumeMount and no `CHRONO_LEXICON_ARCHIVE_PATH` — the same posture the service
+# code takes, where an unset archive path is the pre-RV path, not an error. The ConfigMap is
+# created by the DEPLOYING context (olymp, from the estate repo's `generated/lexicon.tar.zst` via
+# a kustomize configMapGenerator), never templated here: its content is one estate's vocabulary,
+# and it must move with the model ref the metadata service is serving, not with a chart release.
+lexicon:
+  configMapName: ""
+  key: lexicon.tar.zst
+  mountPath: /etc/tatrman/lexicon
+
 extraEnv: []
 
 readinessProbe:

@@ -4,6 +4,7 @@ package org.tatrman.fuzzy.config
 import com.typesafe.config.ConfigFactory
 import io.ktor.server.config.*
 import org.tatrman.fuzzy.core.MethodDispatcher
+import org.tatrman.fuzzy.core.ProfileScorer
 
 data class AppConfig(
     val serverPort: Int,
@@ -71,6 +72,16 @@ data class LexiconConfig(
      * `token-based` shapes how things score, this decides what a score is allowed to mean.
      */
     val uniquenessMarginFloor: Double = MethodDispatcher.DEFAULT_UNIQUENESS_FLOOR,
+    /**
+     * RV-44 ⚑M-5 — a global minimum on the DECLARED (within-class) score: below it a
+     * profile-scored candidate is dropped entirely.
+     *
+     * **Default 0 = off**, and deliberately so: RV-14's evidence classes, WEAK-never-binds and the
+     * uniqueness margin above already do the safety work here. The knob exists for an estate that
+     * wants a blunt cut and for nobody else. It is deliberately different from the legacy default,
+     * where no class system exists — recorded so nobody "harmonizes" the two later.
+     */
+    val minInClassScore: Double = ProfileScorer.DEFAULT_MIN_IN_CLASS_SCORE,
 )
 
 data class MetadataConfig(
@@ -228,6 +239,12 @@ object ConfigLoader {
                         lexicon.getDouble("uniqueness-margin-floor")
                     } else {
                         defaults.uniquenessMarginFloor
+                    },
+                minInClassScore =
+                    if (lexicon.hasPath("min-in-class-score")) {
+                        lexicon.getDouble("min-in-class-score")
+                    } else {
+                        defaults.minInClassScore
                     },
             )
         } catch (e: com.typesafe.config.ConfigException) {

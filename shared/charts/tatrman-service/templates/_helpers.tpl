@@ -52,12 +52,66 @@ falls straight through to appVersion — unchanged from before this fallback exi
 {{- end -}}
 
 {{/*
-Optional pod/container extension hooks. Empty by default; a module OVERRIDES the
-one it needs in its own templates/ (the consuming chart's define wins over the
-library's). Used for e.g. golem's mounted Shem bundle. The library includes them
-in the deployment; an empty override renders nothing (no stray whitespace).
+Pod/container volume composition.
+
+⚑ **Helm template names are GLOBAL across an umbrella render, and the last chart loaded
+wins.** So a per-chart override of a shared define is only safe while exactly ONE chart in
+the render overrides it. `tatrman-service.volumes` used to be an empty hook that charon
+overrode wholesale; the moment a second chart needed a volume, one of the two silently lost
+— which is precisely what happened when the lexicon mount (RV-P3.3) landed here: chrono,
+money, geo and lex-matcher rendered their `*_LEXICON_ARCHIVE_PATH` env var pointing at a
+path with **nothing mounted at it**, and the readers would have logged "archive missing"
+and served an empty vocabulary. The env var is not the mount, and only a fixture that turns
+both on catches the difference.
+
+So the library now OWNS the `volumes:` / `volumeMounts:` keys and composes two contributors:
+
+  1. the **compiled lexicon archive**, implemented here once rather than four times over,
+     because four services mount the same artifact under one values contract — OFF unless
+     `lexicon.configMapName` is set, so a chart that has never heard of a lexicon renders
+     byte-identically to before;
+  2. whatever a module adds through `tatrman-service.extraVolumes` /
+     `.extraVolumeMounts` — ITEM-level hooks (list entries only, never the parent key), so
+     two charts contributing in one render compose instead of one erasing the other.
+
+`initContainers` stays a whole-block hook: nothing here contributes one, so there is no
+composition to do and charon's plugin-dir override remains correct as written.
+
+Item indentation belongs to the hook (8 spaces for volumes, 12 for volumeMounts) — the
+library emits the key at the right depth and interpolates the items verbatim.
 */}}
-{{- define "tatrman-service.volumeMounts" -}}{{- end -}}
-{{- define "tatrman-service.volumes" -}}{{- end -}}
+{{- define "tatrman-service.extraVolumes" -}}{{- end -}}
+{{- define "tatrman-service.extraVolumeMounts" -}}{{- end -}}
+{{- define "tatrman-service.lexiconEnabled" -}}
+{{- if and .Values.lexicon .Values.lexicon.configMapName }}true{{- end -}}
+{{- end -}}
+{{/* The in-container path of the mounted archive — the value of every `*_LEXICON_ARCHIVE_PATH`. */}}
+{{- define "tatrman-service.lexiconPath" -}}
+{{- printf "%s/%s" (.Values.lexicon.mountPath | trimSuffix "/") .Values.lexicon.key -}}
+{{- end -}}
+{{- define "tatrman-service.volumeMounts" -}}
+{{- $extra := include "tatrman-service.extraVolumeMounts" . }}
+{{- if or (include "tatrman-service.lexiconEnabled" .) (trim $extra) }}
+          volumeMounts:
+{{- if include "tatrman-service.lexiconEnabled" . }}
+            - name: lexicon
+              mountPath: {{ .Values.lexicon.mountPath }}
+              readOnly: true
+{{- end }}
+{{- with $extra }}{{ . }}{{- end }}
+{{- end }}
+{{- end -}}
+{{- define "tatrman-service.volumes" -}}
+{{- $extra := include "tatrman-service.extraVolumes" . }}
+{{- if or (include "tatrman-service.lexiconEnabled" .) (trim $extra) }}
+      volumes:
+{{- if include "tatrman-service.lexiconEnabled" . }}
+        - name: lexicon
+          configMap:
+            name: {{ .Values.lexicon.configMapName }}
+{{- end }}
+{{- with $extra }}{{ . }}{{- end }}
+{{- end }}
+{{- end -}}
 {{/* Optional pod initContainers override (renders the whole `initContainers:` block, or nothing). */}}
 {{- define "tatrman-service.initContainers" -}}{{- end -}}

@@ -28,6 +28,12 @@ class MethodDispatcher(
      * suppress good matches on a decision the matcher is not the right layer to make.
      */
     private val uniquenessFloor: Double = DEFAULT_UNIQUENESS_FLOOR,
+    /**
+     * RV-44 — scoring for rows that carry a declared matching profile. A collaborator, not a
+     * subclass: dispatch stays a gate for everything else, and a row with no profile never touches
+     * this object at all.
+     */
+    private val profileScorer: ProfileScorer = ProfileScorer(),
 ) {
     private val levenshtein = Levenshtein()
 
@@ -35,16 +41,33 @@ class MethodDispatcher(
         query: String,
         results: List<FuzzyMatchResult>,
         override: MatchMethod? = null,
+        lemmaQuery: String? = null,
     ): List<FuzzyMatchResult> {
         // The override replaces the authored method on rows that HAVE one, and only those. It must
         // not impose a method on rows nobody authored: `method_override = EXACT` on a lookup round
         // would otherwise gate the entire data layer on exact equality and silently drop every
         // member candidate — a caller widening its own declared layer would narrow the estate's.
         val parsed = results.map { it to it.effectiveMethod(override) }
-        if (parsed.none { (_, method) -> method != null }) return results
+        // Nothing authored anywhere ⇒ the input list, same instances: the pre-RV service, and the
+        // reason a member-only estate pays nothing for either mechanism. RV-44 widened the question
+        // from "did anyone author a method?" to "did anyone author a matching rule at all?".
+        if (parsed.none { (result, method) -> method != null || result.matchProfile != null }) return results
 
         val canonicalQuery = TextNormalizer.canonical(query)
-        val admitted = parsed.filter { (result, method) -> admits(canonicalQuery, result, method) }
+        val forms = QueryForms.of(query, lemmaQuery)
+        val admitted =
+            parsed.mapNotNull { (result, method) ->
+                val profile = result.effectiveProfile(override)
+                if (profile != null) {
+                    // A profile answers "does it match" and "how strongly" in one pass, so it
+                    // replaces the gate for its own rows rather than running after it.
+                    profileScorer.score(forms, result, profile)?.let { it to method }
+                } else if (admits(canonicalQuery, result, method)) {
+                    result to method
+                } else {
+                    null
+                }
+            }
         return withUniquenessMargin(admitted)
     }
 
@@ -89,6 +112,32 @@ class MethodDispatcher(
         authoredMethod?.let { override ?: it }
 
     /**
+     * The profile this call actually scores by — and it obeys the same rule as [effectiveMethod]:
+     * an override REPLACES what the estate declared (with the sugar profile that override means)
+     * but never grants a profile to a row that has none. A rung widening its own declared layer
+     * must not start scoring the member index by somebody's declared numbers.
+     */
+    private fun FuzzyMatchResult.effectiveProfile(override: MatchMethod?): MatchProfile? =
+        matchProfile?.let { if (override == null) it else sugarProfile(override) }
+
+    /** The RV-44 M-T6 table, mirrored: `method_override` is sugar like any other method. */
+    private fun sugarProfile(method: MatchMethod): MatchProfile =
+        MatchProfile(
+            listOf(
+                when (method) {
+                    MatchMethod.Exact -> NormRule(Norm.CANONICAL, exact = SUGAR_EXACT_SCORE)
+                    MatchMethod.Tokens -> NormRule(Norm.CANONICAL, tokens = true)
+                    is MatchMethod.Typos ->
+                        NormRule(
+                            Norm.CANONICAL,
+                            exact = SUGAR_EXACT_SCORE,
+                            typos = TyposRule(method.maxDistance, SUGAR_TYPOS_PENALTY),
+                        )
+                },
+            ),
+        )
+
+    /**
      * `null` (unauthored) and [MatchMethod.Tokens] admit everything the engine scored — TOKENS *is*
      * the engine's own algorithm, so a second opinion here would only disagree with itself.
      * EXACT and TYPOS(n) are the author's narrowing, and both compare on the **authored** form
@@ -105,8 +154,16 @@ class MethodDispatcher(
             // Unbounded on purpose: debatty's bounded overload *returns the limit* when the true
             // distance exceeds it, so `distance(a, b, n) <= n` is vacuously true and would admit
             // everything. Terms are short; the cap is the author's `n`, applied here.
-            is MatchMethod.Typos ->
-                levenshtein.distance(canonicalQuery, result.canonical) <= method.maxDistance.toDouble()
+            // RV-44 ⚑M-4 — the short-term guard reaches this path too, so a row from a
+            // pre-profile archive is held to the same rule as one that carries a profile. One
+            // guard, one place it is decided, whatever built the artifact. It suppresses the
+            // FUZZ, never the term: distance 0 is the word itself, and a guard that refused that
+            // would make a short TYPOS row unmatchable rather than merely un-fuzzy.
+            is MatchMethod.Typos -> {
+                val d = levenshtein.distance(canonicalQuery, result.canonical)
+                d <= method.maxDistance.toDouble() &&
+                    (d == 0.0 || result.canonical.length > ProfileScorer.SHORT_TERM_MAX_CHARS)
+            }
         }
 
     /**
@@ -159,5 +216,11 @@ class MethodDispatcher(
 
     companion object {
         const val DEFAULT_UNIQUENESS_FLOOR: Double = 0.05
+
+        /** RV-44 M-T6 — what `EXACT`/`TYPOS(d)` sugar scores an equality hit at. */
+        const val SUGAR_EXACT_SCORE: Double = 1.00
+
+        /** RV-44 M-T6 — the per-edit penalty `TYPOS(d)` sugar carries. */
+        const val SUGAR_TYPOS_PENALTY: Double = 0.05
     }
 }

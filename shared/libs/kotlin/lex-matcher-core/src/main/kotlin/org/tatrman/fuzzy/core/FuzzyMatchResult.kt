@@ -39,11 +39,25 @@ enum class SourceTag {
     LEARNED,
 }
 
-/** S-4 confidence provenance: which producer + method yielded the score. */
+/**
+ * S-4 confidence provenance: which producer + method yielded the score.
+ *
+ * RV-44 adds the winning `(norm, algorithm, distance)` for a row scored by a declared matching
+ * profile — additive, and null on every other row, because "no norm fired" and "the canonical one
+ * fired" must not read alike. [rawScore] stays the ENGINE's number even when [ProfileScorer]
+ * replaces the reported score with the author's: losing it would make "how did retrieval actually
+ * rate this?" unanswerable.
+ */
 data class Provenance(
     val producer: String,
     val method: String,
     val rawScore: Double,
+    /** [Norm.wire] — `canonical` · `folded` · `lemma`. Null unless a profile scored the row. */
+    val norm: String? = null,
+    /** [MatchAlgorithm] — `exact` · `typos` · `tokens`. Null unless a profile scored the row. */
+    val algorithm: String? = null,
+    /** The winning edit distance. Null unless the winning algorithm was `typos`. */
+    val distance: Int? = null,
 )
 
 /**
@@ -139,4 +153,16 @@ data class FuzzyMatchResult(
      * normalising on the spot for a row that arrived without it.
      */
     val canonicalCandidate: String? = null,
+    /**
+     * RV-44 — the row's resolved matching profile, threaded through from [Candidate.matchProfile].
+     * Null for every row the author never wrote a rule for (⚑M-2), which is what makes their
+     * scoring byte-identical to the pre-RV-44 service.
+     */
+    val matchProfile: MatchProfile? = null,
+    /**
+     * RV-44 — [candidate] in its lemma form, from [Candidate.lemmaValue]. Only a profile's `lemma`
+     * norm reads it; absent, the scorer falls back to the folded surface, which is where the
+     * lemma axis collapses anyway with no lemmatiser installed.
+     */
+    val lemmaCandidate: String? = null,
 )

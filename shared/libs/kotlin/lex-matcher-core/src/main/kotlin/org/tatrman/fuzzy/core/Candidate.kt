@@ -30,6 +30,13 @@ data class Candidate(
      * for any source that does not carry one.
      */
     val targetClass: TargetClass? = null,
+    /**
+     * RV-44 — the resolved matching profile from the compiled lexicon, when the row has one.
+     *
+     * Null for every member value and every harvested model label (⚑M-2), which is exactly what
+     * keeps their scoring untouched: [ProfileScorer] only ever sees a row that carries one.
+     */
+    val matchProfile: MatchProfile? = null,
 ) {
     /** Surface tokens ∪ lemma tokens — used to seed the candidate set for a query. */
     val allTokenSet: Set<String> get() = tokenSet + lemmaTokenSet
@@ -60,7 +67,17 @@ data class Candidate(
      * member path pays no NFC normalisation at load. Nothing reads it for those rows: dispatch
      * admits an unauthored candidate without ever looking at its canonical form.
      */
-    val canonicalValue: String? = if (authoredMethod == null) null else TextNormalizer.canonical(value)
+    val canonicalValue: String? =
+        if (authoredMethod == null && matchProfile == null) null else TextNormalizer.canonical(value)
+
+    /**
+     * RV-44 — the candidate's lemma form, for a profile's `lemma` norm. Joined from [lemmaTokens],
+     * so it is whatever the repository's lemmatiser produced (folded) and collapses onto the folded
+     * surface when none is installed.
+     *
+     * A body `val`, so it stays out of the generated equals/hashCode/copy like [foldedValue].
+     */
+    val lemmaValue: String = lemmaTokens.joinToString(" ")
 
     companion object {
         val WHITESPACE_REGEX = Regex("\\s+")
@@ -94,6 +111,7 @@ data class Candidate(
             source: SourceTag = SourceTag.VOCABULARY,
             matchMethod: String? = null,
             targetClass: TargetClass? = null,
+            matchProfile: MatchProfile? = null,
         ): Candidate {
             val tokens = tokenize(value)
             val set = tokens.toSet()
@@ -108,6 +126,7 @@ data class Candidate(
                 targetRef = targetRef,
                 matchMethod = matchMethod,
                 targetClass = targetClass,
+                matchProfile = matchProfile,
             )
         }
 
@@ -122,6 +141,7 @@ data class Candidate(
             targetRef: String? = null,
             matchMethod: String? = null,
             targetClass: TargetClass? = null,
+            matchProfile: MatchProfile? = null,
         ): Candidate =
             Candidate(
                 id = id,
@@ -134,6 +154,7 @@ data class Candidate(
                 targetRef = targetRef,
                 matchMethod = matchMethod,
                 targetClass = targetClass,
+                matchProfile = matchProfile,
             )
 
         /** Tokens used for matching: lower-cased, NFD-folded, whitespace-split. */

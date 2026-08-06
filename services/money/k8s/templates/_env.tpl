@@ -24,6 +24,10 @@
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: {{ .Values.telemetry.endpoint | quote }}
 {{- end }}
+{{- if include "tatrman-service.lexiconEnabled" . }}
+- name: MONEY_LEXICON_ARCHIVE_PATH
+  value: {{ include "tatrman-service.lexiconPath" . | quote }}
+{{- end }}
 {{- with .Values.extraEnv }}
 {{- toYaml . | nindent 0 }}
 {{- end }}

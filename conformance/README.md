@@ -23,19 +23,25 @@ Runs five **hermetic** service-level corpora (zero live services, zero DFP):
    `services/lex-matcher/src/test/resources/match-quality-corpus.jsonl` (40 cases: diacritics /
    inflection / multi-word-order / typos), lemma axis ON, asserting the expected top id per case.
 3. **hartland_cz declared layer** (fuzzy — RV-P1.4 T7) — `LexiconConformanceTest` over
-   `services/lex-matcher/src/test/resources/conformance/hartland-cz/` (16 cases + 4 per-run
+   `services/lex-matcher/src/test/resources/conformance/hartland-cz/` (23 cases + 6 per-run
    assertions). The fixture is the **authored source**, not an artifact: `aliases.lex.yaml` +
    `skills/trend.md` are compiled and packed by the real RV-P1.2 toolchain
    (`LexiconValidator` → `LexiconCompiler` → `LexiconPacker`) and read back through
    `LexiconArchiveSource`, so a red case means the *chain* broke rather than that a fixture
    drifted. Classes: `declared` · `operator` (an `op:` trigger from skill **frontmatter**; the body
    must never become a candidate, RV-35) · `method` (EXACT/TYPOS(n) admission, RV-32) ·
-   `tokens-margin` (an ambiguous term is returned but never auto-bindable) · `member`.
+   `tokens-margin` (an ambiguous term is returned but never auto-bindable) · `member` ·
+   **`profile` / `profile-guard` / `profile-sugar`** (RV-44, added at RV-P3.0 T7: a declared
+   matching profile scoring on the canonical, folded and typos strata; the ⚑M-4 short-term guard
+   refusing to fuzz a two-letter code while the code still matches itself; and a `method: TYPOS(1)`
+   row scoring identically to the profile that sugar expands to).
    Also asserts the **RV-39 layer tuple** (artifact hash, per-category member versions, overlay
    absent) and that **with no archive present the member path is byte-identical** — the
    no-behaviour-change-without-the-artifact promise.
    Provenance: hand-authored 2026-08-03 against the hartland BM-arc Czech world and hartland's real
-   `md`/`er` refs.
+   `md`/`er` refs; extended 2026-08-06 (RV-P3.0 T7) with the RV-44 profile cases, authored beside
+   the `method:` rows rather than replacing them — both spellings have to keep working in one
+   corpus, and the `zakaznik`/`prijemka` pair is exactly that contrast.
 4. **RV-P2 core lattice** (resolver — RV-P2.5 T6, the **P2 phase gate**) — three specs, all
    hermetic (faked nlp/fuzzy, in-process gRPC; no live service, no LLM):
    `LatticeGoldenTest` over `services/resolver/src/test/resources/lattice/` — four hero cases
@@ -61,9 +67,9 @@ ucetnictvi_entities_only.jsonl  d0e8b17fa6e989ff9e17bd4a035825946e2b551802d1edd3
 match-quality-corpus.jsonl      4f4daa416dff6c40227887ff9573903ca489ee8c5fb0e0a5387a52134f1310e2
 grounding-cases.json            a54491aa20ee4eac37b68c9b12a74658ed9b88e03051533289ce506e63590100
 e2e-cases.json                  0034ed387f31c1dca8ba1a56b22b72f968193ee5f1aacb0f20aa7336facf77f7
-hartland-cz/aliases.lex.yaml    68a368558013f6fb22fa4d7ab30038d81aaa450e145a254416c27c3bda406df2
+hartland-cz/aliases.lex.yaml    78577f1f142fdb6b9bca261e559b69335885358bcd4ba9ed6fb2bd75d45b2208
 hartland-cz/skills/trend.md     3db553d63ab7dcbecd021326dbb13f9cab72b71ee9d7d571c663f65349208bc2
-hartland-cz/cases.jsonl         ae5643b88678deb282c15b5b1f7412c845b260e3f8189a73290cdc4a076dd232
+hartland-cz/cases.jsonl         1a0754ddac81c219a11c074d427c52c36ded5eab4304feeaa28c0c30c2f54de9
 ```
 
 The hartland_cz leg pins **three** files, not one: the corpus is authored source compiled at test

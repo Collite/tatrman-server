@@ -1,7 +1,13 @@
 {{/*
-Charon overrides the tatrman-service volume hooks (the consuming chart's define wins over
-the library's empty default). Two independent, off-by-default features share these
-hooks, so the `volumeMounts:`/`volumes:` keys are emitted once when EITHER is on:
+Charon's contributions to the tatrman-service volume hooks. ⚑ These are the ITEM-level
+hooks (`extraVolumes` / `extraVolumeMounts`): the library owns the `volumes:` /
+`volumeMounts:` keys and composes every contributor under them, because a define name is
+global to an umbrella render and a whole-block override silently erased the other chart's
+volumes the moment a second chart needed one (RV-P3.3). Emit list items at the library's
+indent — 8 spaces for volumes, 12 for volumeMounts — and nothing else.
+
+Two independent, off-by-default features share these hooks, so the items are emitted when
+EITHER is on:
 
   1. connections — the named-connection registry ConfigMap mounted read-only at
      connections.mountPath, gated on connections.configMapName. The ConfigMap is created
@@ -33,11 +39,10 @@ hooks, so the `volumeMounts:`/`volumes:` keys are emitted once when EITHER is on
 {{- end }}
 {{- end }}
 {{- end -}}
-{{- define "tatrman-service.volumeMounts" -}}
+{{- define "tatrman-service.extraVolumeMounts" -}}
 {{- $conn := and .Values.connections .Values.connections.configMapName }}
 {{- $plugin := and .Values.pluginDir .Values.pluginDir.image }}
 {{- if or $conn $plugin }}
-          volumeMounts:
 {{- if $conn }}
             - name: connections
               mountPath: {{ .Values.connections.mountPath }}
@@ -62,11 +67,10 @@ hooks, so the `volumeMounts:`/`volumes:` keys are emitted once when EITHER is on
 {{- end }}
 {{- end }}
 {{- end -}}
-{{- define "tatrman-service.volumes" -}}
+{{- define "tatrman-service.extraVolumes" -}}
 {{- $conn := and .Values.connections .Values.connections.configMapName }}
 {{- $plugin := and .Values.pluginDir .Values.pluginDir.image }}
 {{- if or $conn $plugin }}
-      volumes:
 {{- if $conn }}
         - name: connections
           configMap:

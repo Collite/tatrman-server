@@ -22,6 +22,7 @@ import org.tatrman.fuzzy.core.Candidate
 import org.tatrman.fuzzy.core.FuzzyMatcher
 import org.tatrman.fuzzy.core.Lemmatizer
 import org.tatrman.fuzzy.core.MethodDispatcher
+import org.tatrman.fuzzy.core.ProfileScorer
 import org.tatrman.fuzzy.core.NoopLemmatizer
 import org.tatrman.fuzzy.core.StringRepository
 import org.tatrman.fuzzy.db.DatabaseFactory
@@ -172,9 +173,20 @@ fun Application.module(serverConfig: KtorServerConfig) {
             lemmatizer,
             idfEnabled = config.tokenBasedConfig.idfEnabled,
             retrievalMode = config.tokenBasedConfig.retrieval,
-            methodDispatcher = MethodDispatcher(config.lexicon.uniquenessMarginFloor),
+            methodDispatcher =
+                MethodDispatcher(
+                    config.lexicon.uniquenessMarginFloor,
+                    ProfileScorer(config.lexicon.minInClassScore),
+                ),
         )
     log.info("Fuzzy retrieval mode: ${config.tokenBasedConfig.retrieval}")
+    // RV-44 ⚑M-5 — the EFFECTIVE value, logged at startup. A floor that silently drops candidates
+    // is exactly the setting an operator needs to see confirmed rather than assume.
+    log.info(
+        "Lexicon matching profiles: min-in-class-score={} ({})",
+        config.lexicon.minInClassScore,
+        if (config.lexicon.minInClassScore > 0.0) "ON" else "off — classes do the safety work",
+    )
     val grpcService = GrpcService(fuzzyMatcher, repository, telemetry)
 
     // Tolerate clients' keepalive (30s pings, incl. idle) instead of GOAWAY too_many_pings.

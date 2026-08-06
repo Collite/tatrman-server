@@ -61,6 +61,16 @@ object EvidenceClasses {
 
         val method = if (match.hasMatchMethod()) match.matchMethod.trim() else ""
         val isMember = match.source == SourceTag.MEMBER
+
+        // 0 — RV-44. When a DECLARED matching profile scored this row, the class follows the
+        // (norm, algorithm) that actually fired rather than the authored method, because with
+        // profiles the method is only a projection: a row whose profile says
+        // `[{canonical, exact}, {folded, exact 0.9}]` projects to EXACT but may have matched on
+        // the FOLDED stratum, and calling that an exact hit would overclaim by a whole class.
+        // The mapping is fixed by the contracts §2 addendum (M-T3-α) and RV-14 is untouched:
+        // classes still decide, the declared score only orders rows inside one.
+        profileClass(match, anchored)?.let { return it }
+
         return when {
             // 1 — the estate's own rule, matched exactly (RV-32: "EXACT hit → EXACT class").
             method.equals("EXACT", ignoreCase = true) -> EvidenceClass.EVIDENCE_CLASS_EXACT
@@ -80,6 +90,45 @@ object EvidenceClasses {
             else -> EvidenceClass.EVIDENCE_CLASS_UNANCHORED_FUZZY_STRONG
         }
     }
+
+    /**
+     * RV-44 (M-T3-α) — the `(norm, algorithm)` → [EvidenceClass] table, for rows a declared profile
+     * scored. Null when this row was not one of those, and the rest of [of] decides as before.
+     *
+     * Three cases, and each is the honest reading of what fired:
+     *  - **canonical + exact** — the estate said this term matches exactly and it did. Same class
+     *    an authored `EXACT` has had since P2.2.
+     *  - **tokens** — untouched. RV-44 generalizes the authoring surface; RV-32's TOKENS and its
+     *    uniqueness margin are explicitly out of scope, so a tokens firing keeps the class the
+     *    layer rule below gives it (`DECLARED_ALIAS` for the declared layer).
+     *  - **anything else** (`folded`/`lemma` equality, `typos` on any norm) — a fuzzy match, with
+     *    the RV-14 anchoring distinction unchanged. Note what this does NOT do: the class floor
+     *    (`thresholds.strong`) stays on the data layer only. A declared fuzzy row is the estate's
+     *    own rule enforced by the matcher, and a similarity floor there would overrule it —
+     *    hardest on short Czech words, where one edit costs proportionally far more score.
+     */
+    private fun profileClass(
+        match: FuzzyMatch,
+        anchored: Boolean,
+    ): EvidenceClass? {
+        if (!match.hasProvenance()) return null
+        val provenance = match.provenance
+        if (!provenance.hasNorm() || !provenance.hasAlgorithm()) return null
+
+        return when {
+            provenance.algorithm == PROFILE_TOKENS -> null
+            provenance.algorithm == PROFILE_EXACT && provenance.norm == NORM_CANONICAL ->
+                EvidenceClass.EVIDENCE_CLASS_EXACT
+
+            anchored -> EvidenceClass.EVIDENCE_CLASS_ANCHORED_FUZZY_STRONG
+            else -> EvidenceClass.EVIDENCE_CLASS_UNANCHORED_FUZZY_STRONG
+        }
+    }
+
+    /** The wire spellings lex-matcher stamps into provenance (`MatchAlgorithm` / `Norm.wire`). */
+    private const val PROFILE_EXACT = "exact"
+    private const val PROFILE_TOKENS = "tokens"
+    private const val NORM_CANONICAL = "canonical"
 
     /**
      * The RV-14 rank: 1 is strongest, and UNSPECIFIED sorts LAST rather than first. Proto3 gives

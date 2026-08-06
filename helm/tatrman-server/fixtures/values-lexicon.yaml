@@ -1,0 +1,42 @@
+# Golden fixture: LEXICON MOUNTED (RV-P3.3 T3). The four readers of the compiled lexicon
+# archive — lex-matcher (`fuzzy`, RV-P1.4) and chrono/money/geo (RV-P1.6) — pointed at one
+# ConfigMap under ONE values contract. Everything else keeps its values.yaml default, so the
+# diff against `full.yaml` is exactly the delivery surface: per reader, one volume, one
+# read-only volumeMount, and one `*_LEXICON_ARCHIVE_PATH` env var carrying the same path.
+#
+# The other three fixtures deliberately set NO lexicon values — their goldens are the other
+# half of this test, and they must stay byte-identical to the pre-RV render. A chart that
+# mounts something by default would break every estate that has no lexicon.
+#
+# The ConfigMap itself is NOT rendered here and never is: olymp generates it from the estate
+# repo's `generated/lexicon.tar.zst` (kustomize configMapGenerator, ArgoCD multi-source at the
+# same ref veles serves the model from). The chart only consumes a name.
+fuzzy:
+  lexicon:
+    configMapName: hartland-lexicon
+chrono:
+  lexicon:
+    configMapName: hartland-lexicon
+money:
+  lexicon:
+    configMapName: hartland-lexicon
+geo:
+  lexicon:
+    configMapName: hartland-lexicon
+
+# ⚑ charon's volumes are ON in the SAME render, deliberately. Helm template names are global to
+# an umbrella render and the last chart loaded wins, so while `tatrman-service.volumes` was a
+# whole-block hook that charon overrode, adding a second volume contributor silently erased one
+# side — the lexicon readers rendered their env var with nothing mounted at the path, and no
+# fixture could see it because charon's mount had no golden coverage either. This fixture is the
+# regression test for that: charon's connections ConfigMap and plugin-dir initContainer must
+# appear in the same output as the four lexicon mounts.
+charon:
+  connections:
+    configMapName: hartland-connections
+  pluginDir:
+    image: ghcr.io/collite/transfer-secrets-adapter:0.1.0
+    secrets:
+      secretName: charon-secret-material
+    refs:
+      configMapName: charon-conn-refs
