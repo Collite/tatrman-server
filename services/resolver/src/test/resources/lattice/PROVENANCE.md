@@ -15,7 +15,7 @@ RV-P2.1.T2, extended by RV-P2.5.T4. Four cases, each a triple: a **case file** (
 
 `*.parse.json` is the **cached Stanza output** from the RV-P0.2 (Q-15) frame-role spike —
 `project/kantheon/features/resolving/implementation/spikes/frame-roles/parses/`, fetched from
-`services/nlp`'s Stanza backend (`ttr-nlp-stanza:dev`, stanza 1.13.0), the cs `DEP_PARSE` hot
+`services/nlp`'s Stanza backend (`nlp-stanza:dev`, stanza 1.13.0), the cs `DEP_PARSE` hot
 path. Tokens, lemmas, UPOS, `dep_head` and `dep_relation` are copied field-for-field; only the
 spike's derived `depHeadIdx` (a harness convenience, not a proto field) is dropped.
 
