@@ -1,0 +1,95 @@
+{
+  "id": "h2-ask-pin-resume",
+  "description": "H2, the two-turn shape: an unknown SUBJECT ('čerpacích stanic') the zero-rung ladder cannot help with becomes ONE question; the user's pin comes back through resolve.gate:v1 and the turn answers. The unanchored LOCATION hint ('Praze') is CARRIED as a gap note, never asked about — a value gap with no anchor has no structural position to be load-bearing in.",
+  "surface": "golem",
+  "corpus": "hartland_cz",
+  "invariants": [
+    "an ask is not an answer",
+    "a refusal is not an error",
+    "a hypothesis is not evidence — including the user's (RV-7): a pin becomes a binding only by surviving the gate",
+    "the resume token is the CORE's; the snapshot is OURS; they travel side by side and are never merged",
+    "the ask budget rides the snapshot, so a replayed resume cannot buy a second question"
+  ],
+  "turns": [
+    {
+      "tool": "golem.turn:v1",
+      "args": {
+        "conversation_id": "c-h2",
+        "turn_id": "t-1",
+        "text": "Zobraz prvních 10 čerpacích stanic v Praze podle tržby za 12 měsíců.",
+        "locale": "cs",
+        "caller_subject": "user-a",
+        "profile": "CHAT_QUICK"
+      },
+      "core": {
+        "lattice": "h2-cs",
+        "resume_token": "core-signed-h2",
+        "options": [
+          { "id": "opt-1", "label": "Zákazník / kategorie: čerpací stanice", "ref": "md.dimension.Customer.category" },
+          { "id": "opt-2", "label": "Distribuční centrum", "ref": "md.dimension.DistributionCentre" }
+        ]
+      },
+      "expect": {
+        "outcome": "ask",
+        "gap_kind": "GAP_KIND_G1_UNBOUND",
+        "asked_span": "čerpacích stanic",
+        "min_options": 2,
+        "escape_offered": true,
+        "llm_invocations": 0,
+        "snapshot_stored": true,
+        "no_binding_below_threshold": true
+      }
+    },
+    {
+      "tool": "golem.resume:v1",
+      "pin": { "option_id": "opt-1" },
+      "caller_subject": "user-a",
+      "gate": {
+        "outcomes": [
+          {
+            "hypothesis": {
+              "span": { "start": 18, "end": 34, "text": "čerpacích stanic" },
+              "ref": "md.dimension.Customer.category",
+              "proposing_rung": "user"
+            },
+            "accepted": true,
+            "binding": {
+              "ref": "md.dimension.Customer.category",
+              "target_class": "TARGET_CLASS_MODEL_OBJECT",
+              "evidence_class": "EVIDENCE_CLASS_DECLARED_ALIAS",
+              "source": "SOURCE_TAG_DECLARED",
+              "in_class_score": 0.95
+            }
+          }
+        ],
+        "updated_gaps": [
+          {
+            "span": { "start": 37, "end": 42, "text": "Praze" },
+            "kind": "GAP_KIND_G3_UNATTRIBUTED",
+            "value_id": "v2",
+            "disposition": "DISPOSITION_UNRESOLVED"
+          }
+        ],
+        "rung_log_entry": { "round": 1, "rung": "user", "action": "regate", "bindings_added": 1 }
+      },
+      "expect": {
+        "outcome": "answer",
+        "gated_refs": ["md.dimension.Customer.category"],
+        "proposing_rung": "user",
+        "core_calls_total": 1,
+        "asks": 1,
+        "llm_invocations": 0,
+        "gaps_carried": ["GAP_KIND_G3_UNATTRIBUTED"],
+        "no_binding_below_threshold": true
+      }
+    },
+    {
+      "tool": "golem.resume:v1",
+      "replay_of": 1,
+      "description": "The SAME resume delivered twice — at-least-once delivery is the norm.",
+      "pin": { "option_id": "opt-1" },
+      "caller_subject": "user-a",
+      "expect": { "outcome": "answer", "byte_identical_to_turn": 1 }
+    }
+  ]
+}

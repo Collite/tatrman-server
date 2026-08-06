@@ -122,6 +122,12 @@ jobs:
         with:
           python-version: '3.13'
 
+      # RV-P4.4: `just conformance-service-level` now also drives the conversation tier
+      # (`just test-py services/golem-py`), which is a uv project.
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - uses: extractions/setup-just@v2
 
       - name: conformance (service-level, gating)
@@ -129,6 +135,47 @@ jobs:
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # RV-P4.1 — the Python unit gate for golem-py (ruff + mypy --strict + pytest).
+  #
+  # ⚑ Recon finding, recorded rather than quietly fixed: until this job, the repo had
+  # NO Python tier in CI at all. `just lint-py` / `just test-py` existed and covered
+  # `services/nlp` and `workers/worker-polars`, and nothing ever called them — the same
+  # shape as the componentTest tier that was written, linted and dark until a job was
+  # added for it. This job is deliberately scoped to golem-py: extending it to the two
+  # older modules is a separate change with its own risk (their suites have never run
+  # here, so a first run is a discovery exercise, not a gate).
+  #
+  # The suite is hermetic — no network, no cluster, no docker. It reads the resolver's
+  # committed lattice goldens directly, which makes it a cross-language conformance
+  # check on one corpus (RV-28): if the Kotlin core changes what it emits, this fails
+  # the same day the Kotlin tier does.
+  golem-py:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: ruff
+        working-directory: services/golem-py
+        run: uv run ruff check .
+
+      - name: mypy --strict
+        working-directory: services/golem-py
+        run: uv run mypy
+
+      - name: pytest
+        working-directory: services/golem-py
+        run: uv run pytest -q
 
   # P2/RO-6 dependency rules (contracts §7). Passes trivially on the S1 skeleton;
   # its real bite is S4 once the spine services + protos have arrived.

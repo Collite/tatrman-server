@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: Apache-2.0
+# golem-ladder/v1 — the SHIPPED DEFAULT of the open Golem (RV-27: full SHAPE present,
+# ZERO rungs on). Normative shape: contracts.md §3; budgets: ⚑RV-3 (Q-14 RULED).
+#
+# What this file says, in one line: an out-of-the-box open estate PROPOSES NOTHING.
+# It resolves deterministically, asks once about a load-bearing gap if it has one, and
+# otherwise refuses honestly with the lattice attached. Turning a rung on is a
+# deliberate, per-estate act — `policy.<gap>.rungs: [lookup, local]` and nothing else.
+#
+# The shape is the documentation: every rung the ladder knows is DEFINED here even
+# though no policy row admits one, so an estate enabling a rung edits a list rather
+# than discovering that a code path does not exist.
+
+schema: golem-ladder/v1
+
+# The rung vocabulary is CLOSED at four (RV-33). Definitions, not instances.
+rungs:
+  # Deterministic, anchored, category-scoped (`org.tatrman.fuzzy.v1.Lookup`). NOT an
+  # LLM rung: bounded by `ladder_budget_ms` only, never counted against
+  # `max_llm_invocations`.
+  lookup: {}
+  local: { model_class: local, timeout_ms: 3000, temperature: 0 }
+  capable: { model_class: capable, timeout_ms: 10000, temperature: 0 }
+  emulated: { last_resort: true }
+
+# ONE gap-policy table (RV-10). The zero-rung floor is legal and is what ships:
+# `rungs: []` everywhere. The `ask:` column is NOT zeroed — asking is deterministic
+# behaviour, not escalation, and RV-15 governs it.
+policy:
+  G1_UNBOUND:      { rungs: [], ask: escalate-then-ask }
+  G2_AMBIGUOUS:    { rungs: [], ask: escalate-then-ask }
+  G3_UNATTRIBUTED: { rungs: [], ask: emit-unless-load-bearing }
+  G4_METHOD_MISS:  { rungs: [], ask: ask-if-load-bearing }
+  G5_NLP_DARK:     { rungs: [], ask: degrade-banner }
+  G6_INCOHERENT:   { rungs: [], ask: ask-immediately }
+
+# Q-14 RULED (⚑RV-3). Per-rung wall clocks; a rung's own `timeout_ms` wins when set.
+rung_timeouts_ms: { lookup: 250, local: 3000, capable: 10000, emulated: 15000 }
+
+profiles:
+  CHAT_QUICK:
+    rungs_allowed: [lookup, local]
+    max_llm_invocations: 2
+    ladder_budget_ms: 5000
+    hitl_rounds: 1
+    terminal: strict
+  INVESTIGATION_DEEP:
+    rungs_allowed: "*"
+    max_llm_invocations: 6
+    ladder_budget_ms: 30000
+    hitl_rounds: 3
+    terminal: strict
+
+# ⚑ P4.1·T4 ruling (recorded for Bora on the task list): contracts §3 gives the two
+# postures but never says which profile is which. A profile NAMES its posture, and the
+# default is `strict` — the open Golem's posture is refuse-over-guess (H4), so the
+# safe default is the one that refuses. `best-effort-with-gap-notes` is an estate
+# opting IN to answering over gap notes (RV-19 carries them either way).
+terminal:
+  strict: refusal-with-gaps
+  human_profiles: best-effort-with-gap-notes

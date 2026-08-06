@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "ttr-operator-library/v1",
+  "operators": {
+    "op:show": {
+      "body": "Show it plainly.\n\nRetrieval: no reshaping — return the measures over the requested grouping, nothing added.\n\nFormatting: table by default; the grouping column first.\n",
+      "version": 1,
+      "checksum": "sha256:c0446671f05aa06e2cb1ecf46a39b2766624c2932b6dc1f923a4d30f6d6c772c",
+      "source": {
+        "file": "lexicon-stdlib/skills/show.md",
+        "line": 1,
+        "layer": "STDLIB"
+      }
+    },
+    "op:trend": {
+      "body": "Change over time.\n\nRetrieval: group by the finest time grain the question requests, and no finer. Order chronologically; require at least two periods.\n\nFormatting: line chart by default, period column first.\n\nApplicability: `time-grain` — without a grain this operator has nothing to group by and should surface a gap rather than guess one.\n",
+      "version": 1,
+      "checksum": "sha256:6e53aebab5b63d46197885bd3da79991cd332f3dfb09d42a36dba73946ea74a9",
+      "source": {
+        "file": "lexicon-stdlib/skills/trend.md",
+        "line": 1,
+        "layer": "STDLIB"
+      }
+    },
+    "op:top-n": {
+      "body": "The leaders.\n\nRetrieval: order by the measure descending and cut at n; when n is unstated use 10 and SAY so.\n\nFormatting: rank column first.\n",
+      "version": 1,
+      "checksum": "sha256:f81925a6d613efec1043957df95f110ce01cd6f7aa88452c7418397849f67081",
+      "source": {
+        "file": "lexicon-stdlib/skills/top-n.md",
+        "line": 1,
+        "layer": "STDLIB"
+      }
+    },
+    "op:share-of": {
+      "body": "Part against whole.\n\nRetrieval: fetch the parts AND the whole in one result set; a share computed against a differently-filtered total is a wrong number that looks right.\n\nFormatting: percentage column beside the absolute one.\n",
+      "version": 1,
+      "checksum": "sha256:542caa691ea11df49cfd506bba6dbefb2f435700c4efcb1d0187700128e2fe5b",
+      "source": {
+        "file": "lexicon-stdlib/skills/share-of.md",
+        "line": 1,
+        "layer": "STDLIB"
+      }
+    },
+    "op:compare": {
+      "body": "Two things, side by side.\n\nRetrieval: fetch both comparanda in ONE result set.\n\nFormatting: side-by-side columns, then an absolute delta, then a percentage delta.\n\nApplicability: `two-series` — exactly two comparanda; three or more is a breakdown, not a comparison.\n",
+      "version": 1,
+      "checksum": "sha256:fab1c7853ddcbfbb9dac92e3d3e9536a3c24c13ffe4eeebc9b59a1159a8e2c68",
+      "source": {
+        "file": "lexicon-stdlib/skills/compare.md",
+        "line": 1,
+        "layer": "STDLIB"
+      }
+    }
+  }
+}

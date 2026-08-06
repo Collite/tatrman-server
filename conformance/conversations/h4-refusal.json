@@ -1,0 +1,38 @@
+{
+  "id": "h4-refusal",
+  "description": "H4 — 'Proč náklady účtu 501001 v roce 2025 vyskočily?' The question resolves EXACTLY as H1 does: same entities, same members, gap-free. The open Golem still refuses, with the lattice attached — 'I understood you completely; I cannot investigate causes.' The predicate is the lattice's own: the question names NO operator this Golem holds a body for, and skill entries are how an estate declares which actions its Golem can perform (RV-35). No intent classification is involved, and the OS Golem has none to involve.",
+  "surface": "golem",
+  "corpus": "hartland_cz",
+  "invariants": [
+    "a refusal is not an error — the lattice rides along and PROVES the understanding",
+    "the refusal names what it can still do (the composable residue), not an apology",
+    "no code path invents intent: the paygrade decision is made of what the lattice can say"
+  ],
+  "turns": [
+    {
+      "tool": "golem.turn:v1",
+      "args": {
+        "conversation_id": "c-h4",
+        "turn_id": "t-1",
+        "text": "Proč náklady účtu 501001 v roce 2025 vyskočily?",
+        "locale": "cs",
+        "caller_subject": "user-a",
+        "profile": "CHAT_QUICK"
+      },
+      "core": {
+        "lattice": "h1-cs",
+        "drop_bindings": ["op:show"]
+      },
+      "expect": {
+        "outcome": "refusal",
+        "refusal_reason": "NO_CAPABLE_PLUGIN",
+        "llm_invocations": 0,
+        "asks": 0,
+        "min_bindings": 4,
+        "gap_kinds": [],
+        "composable_residue": [],
+        "no_binding_below_threshold": true
+      }
+    }
+  ]
+}
