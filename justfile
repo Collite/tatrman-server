@@ -13,7 +13,7 @@ set shell := ["bash", "-uc"]
 
 # The 22 container-image modules release-image.yml builds (per-module `<module>/v*`
 # tag → ghcr.io/collite/<module>). Kept in lockstep with release-image.yml's map.
-image_modules := "veles query translate validate dispatch charon lex-matcher llm-gateway nlp chrono geo money grounding-mcp resolver meta-mcp query-mcp lex-matcher-mcp nlp-mcp worker-postgres worker-mssql worker-polars identity health"
+image_modules := "veles query translate validate dispatch charon lex-matcher llm-gateway nlp golem-py chrono geo money grounding-mcp resolver meta-mcp query-mcp lex-matcher-mcp nlp-mcp worker-postgres worker-mssql worker-polars identity health"
 
 # List available recipes
 default:
@@ -152,14 +152,14 @@ test-component:
     # first CI run stopped at translate and left the rest of the estate unknown.
     ./gradlew componentTest --continue
 
-# ── Python lane (uv + ruff + pytest) — services/nlp, workers/worker-polars ─
+# ── Python lane (uv + ruff + pytest) — services/nlp, services/golem-py, workers/worker-polars ─
 
 # ruff lint every Python module, or one: `just lint-py` / `just lint-py nlp`.
 lint-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp workers/worker-polars; do just lint-py "$d"; done
+        for d in services/nlp services/golem-py workers/worker-polars; do just lint-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -171,7 +171,7 @@ build-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp workers/worker-polars; do just build-py "$d"; done
+        for d in services/nlp services/golem-py workers/worker-polars; do just build-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -183,7 +183,7 @@ test-py module="" *args:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp workers/worker-polars; do just test-py "$d" {{args}}; done
+        for d in services/nlp services/golem-py workers/worker-polars; do just test-py "$d" {{args}}; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")

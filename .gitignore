@@ -66,3 +66,12 @@ helm/tatrman-server/Chart.lock
 # RG-P1.S1 — nlp Python proto stubs (regenerated from shared/proto via
 # services/nlp/scripts/gen_proto.py; canonical source is the .proto file).
 services/nlp/generated/
+
+# RV-P4.1 — golem-py Python proto stubs (same posture, same canonical source:
+# services/golem-py/scripts/gen_proto.py).
+services/golem-py/generated/
+
+# uv's per-module virtualenvs. Every Python module here is deps-only (`package =
+# false`), so `.venv/` is pure build output — it was simply never ignored, because
+# nothing had run `uv sync` in a tracked checkout before.
+**/.venv/

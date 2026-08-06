@@ -1,0 +1,92 @@
+[project]
+name = "golem-py"
+version = "0.1.0"
+description = "golem-py — the Python OS Golem: the RV-11 resolution loop over the deterministic core (reference implementation)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # ⚑ PINNED EXACTLY (RV-P4, from the P0-3 spike): pydantic-graph's builder API is
+    # young and the pin is load-bearing — a minor bump has already changed edge
+    # semantics once. Do not widen these without re-running the P4.1 T2 structural
+    # tests. Python floor is 3.12 (dev machines run 3.13; no 3.13-only API is used).
+    "pydantic-ai==2.22.0",
+    "pydantic-graph==2.22.0",
+    "pydantic==2.13.4",
+    # gRPC is how the door is reached. golem-py owns its generated
+    # `org.tatrman.{resolver,nlp,common,fuzzy,query}.v1` stubs under `generated/`,
+    # produced from the SHARED `.proto` source by grpcio-tools — the same posture nlp
+    # takes, and for the same reason (the `shared-proto` Python lane emits message
+    # types only, no service stubs). Generating from a shared contract is contract
+    # CONFORMANCE, not code reuse (PROVENANCE.md).
+    "grpcio==1.83.0",
+    "protobuf>=5.28.0",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "grpcio-tools==1.83.0",
+    "ruff>=0.9.4",
+    "mypy>=1.14.0",
+    "types-PyYAML>=6.0.12",
+    "types-protobuf>=5.28",
+]
+
+[tool.uv]
+# Not an installable package (no build-system); deps-only, like services/nlp and
+# workers/worker-polars. Tests import `golem_py` via the pytest `pythonpath` below.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# The conformance tier (P4.4) drives fixtures against a live-ish core and is opt-in,
+# so the unit suite needs no network: `just test-py services/golem-py -m conformance`.
+addopts = ["-m", "not conformance"]
+pythonpath = ["src", "generated"]
+markers = [
+    "conformance: the conformance-conversation tier (live-ish core; not the unit gate)",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+files = ["src", "tests"]
+# `generated/` is protoc output — it is not ours to type.
+exclude = "^generated/"
+
+[[tool.mypy.overrides]]
+module = ["org.*", "grpc.*", "yaml.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# pydantic_graph 2.22's builder API is heavily generic and its decorators erase the
+# step signatures; strict mode cannot follow them. Typed at our boundary instead —
+# every node's state/deps/output types are Pydantic models, which ARE checked.
+module = ["pydantic_graph.*"]
+ignore_missing_imports = true
+# `follow_imports = skip` is what makes strict mode usable against this dependency:
+# pydantic-graph declares `Graph`/`StepContext` with PEP-695 generics that this mypy
+# reads as non-generic, so every `StepContext[State, Deps, None]` in `graph.py` would
+# be a false "expects no type arguments". Skipping the import types the framework
+# surface as Any and leaves OUR boundary — the state, deps and output models, all
+# Pydantic — fully checked.
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+# `graph.py` is the ONLY module that touches the builder decorators, and a skipped
+# import makes them untyped by construction. The relaxation is scoped to that one
+# file rather than to the package, so every other module stays strict.
+module = ["golem_py.graph"]
+disallow_untyped_decorators = false
