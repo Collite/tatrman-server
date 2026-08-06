@@ -318,14 +318,30 @@ class FuzzyMatcher(
         // through (match / matchCascade / batchMatch / lookup), so no caller can route around it.
         // Inside the cascade rather than after it on purpose: a candidate the author's method
         // rejects must not be allowed to satisfy a cascade step's min-score and stop the fallback.
-        // RV-44 — the query's lemma form, for a profile's `lemma` norm. Computed here because
-        // this is where the lemmatiser lives; with the no-op one it equals the folded form and the
-        // lemma axis collapses, exactly as it does on the token path.
-        return methodDispatcher.dispatch(query, scored, methodOverride, lemmaQuery(query))
+        // RV-44 — the query's lemma form, for a profile's `lemma` norm.
+        //
+        // ⚑ Computed ONLY when some scored row actually declares a `lemma` rule. [lemmatizer] is
+        // `NlpLemmatizer` in production — one gRPC BatchLemmatize per call, uncached — and
+        // [matchWithTokenBased] has already made that call for the same tokens on the TATRMAN
+        // path. Computing it unconditionally here therefore doubled the NLP round-trips per
+        // category per query, added one to the standard-algorithm path that never had it, and
+        // charged both to estates that author no profiles at all — the cost `servesDeclaredLayer`
+        // above exists to keep a member-only estate from paying. `null` ⇒ [QueryForms.of] collapses
+        // the lemma axis onto the folded one, which is where it sits anyway with no lemmatiser.
+        return methodDispatcher.dispatch(query, scored, methodOverride, lemmaQuery(query, scored))
     }
 
-    /** Folded lemmas of the query, joined — the shape [Candidate.lemmaValue] holds candidate-side. */
-    private suspend fun lemmaQuery(query: String): String {
+    /**
+     * Folded lemmas of the query, joined — the shape [Candidate.lemmaValue] holds candidate-side.
+     * Null when nothing in [scored] compares on the lemma stratum, which is every estate that has
+     * not authored a `{ norm: lemma }` rule.
+     */
+    private suspend fun lemmaQuery(
+        query: String,
+        scored: List<FuzzyMatchResult>,
+    ): String? {
+        val wanted = scored.any { row -> row.matchProfile?.rules?.any { it.norm == Norm.LEMMA } == true }
+        if (!wanted) return null
         val raw = Candidate.tokenizeRaw(query)
         val lemmas = lemmatizer.lemmatize(raw)
         return raw.joinToString(" ") { lemmas[it] ?: TextNormalizer.fold(it) }

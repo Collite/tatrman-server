@@ -114,6 +114,21 @@ class ProfileScoringTest :
                 (0.85 plusOrMinus 1e-9)
         }
 
+        "a budget that outruns its anchor does not fire — a score at or below zero is a broken rule" {
+            // `RG-LEX-017` rejects this pair at authoring time; the engine still has to hold the
+            // line for an artifact built before that check existed. Reporting -0.10 would sort the
+            // row below candidates that matched nothing at all, and say nothing about why.
+            val exhausted = NormRule(Norm.CANONICAL, exact = 0.20, typos = TyposRule(4, 0.10))
+            dispatch("zákaznxxx", row("zákazník", MatchProfile(listOf(exhausted)))).shouldBeEmpty()
+        }
+
+        "…and the edits it CAN still afford fire normally" {
+            // The guard drops firings, never the rule: one edit off 0.20 at 0.10 is still 0.10.
+            val exhausted = NormRule(Norm.CANONICAL, exact = 0.20, typos = TyposRule(4, 0.10))
+            dispatch("zákazníx", row("zákazník", MatchProfile(listOf(exhausted)))).single().score shouldBe
+                (0.10 plusOrMinus 1e-9)
+        }
+
         // ---- (c) `folded` equality fires at ITS declared score ---------------------------------
 
         "the hero: `zakaznik` finds `zákazník` as an AUTHORED folded fact, at the folded score" {

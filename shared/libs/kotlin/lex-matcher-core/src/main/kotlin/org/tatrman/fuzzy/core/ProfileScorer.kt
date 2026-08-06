@@ -123,8 +123,14 @@ class ProfileScorer(
             // Unbounded on purpose: debatty's bounded overload RETURNS the limit when the true
             // distance exceeds it, so `distance(a, b, n) <= n` is vacuously true. Terms are short.
             val d = levenshtein.distance(queryForm, candidateForm).toInt()
-            if (d in 1..typos.distance) {
-                out += Firing(rule.norm, MatchAlgorithm.TYPOS, d, rule.exact - d * typos.penalty)
+            // A firing that scores at or below zero is not a weak match, it is a broken rule: the
+            // author's budget outran their anchor. `RG-LEX-017` rejects that pair at authoring
+            // time, so this only ever catches an artifact built by a toolchain that predates the
+            // check — but a negative score on the wire would sort below rows nothing matched at
+            // all, and silently. Dropping the firing is the honest reading of "it does not match".
+            val score = rule.exact - d * typos.penalty
+            if (d in 1..typos.distance && score > 0.0) {
+                out += Firing(rule.norm, MatchAlgorithm.TYPOS, d, score)
             }
         }
         return out

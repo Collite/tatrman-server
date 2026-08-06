@@ -190,7 +190,7 @@ class LexiconConformanceTest :
                             val expected = flagged.jsonArray.map { it.jsonPrimitive.content }
                             val seen = hits.filter { it.targetRef in expected }
                             // Distinct targets: a target legitimately contributes several aliases
-                            // (`tržby`, `obrat`, `tržby celkem` are all md.revenue), and they are
+                            // (`tržby`, `obrat`, `tržby celkem` are all md.measure.revenue), and they are
                             // not rivals — identity is the target ref (T4).
                             seen.map { it.targetRef }.distinct() shouldContainExactlyInAnyOrder expected
                             seen.forEach { it.autoBindable shouldBe false }

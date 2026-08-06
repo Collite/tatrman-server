@@ -19,34 +19,34 @@ entries:
       - { text: "obrat" }
       - { text: "výnosy", method: TYPOS(1) }
       - { text: "tržby celkem" }
-    target: md.revenue
+    target: md.measure.revenue
 
   - terms:
       - { text: "množství" }
       - { text: "počet kusů" }
-    target: md.quantity
+    target: md.measure.quantity
 
   - terms:
       - { text: "vratky" }
       - { text: "vratky celkem" }
-    target: md.returnAmount
+    target: md.measure.returnAmount
 
   # `zásoba` is EXACT on purpose: `zásobování` (supply) is a different word, and one edit away.
   - terms:
       - { text: "zásoba", method: EXACT }
       - { text: "stav zásob" }
-    target: md.onHandQty
+    target: md.measure.onHandQty
 
   # ── dimensions ──────────────────────────────────────────────────────────────────────────
   # "DC" EXACT: a two-letter code under TYPOS(1) would match most two-letter noise.
   - terms:
       - { text: "distribuční centrum" }
       - { text: "DC", method: EXACT }
-    target: md.DistributionCentre
+    target: md.dimension.DistributionCentre
 
   - terms:
       - { text: "prodejna", method: TYPOS(1) }
-    target: md.Store
+    target: md.dimension.Store
 
   # ── entities ────────────────────────────────────────────────────────────────────────────
   - terms:
@@ -78,14 +78,14 @@ entries:
   # fuzz-fires it — while the code itself still matches itself.
   - terms:
       - { text: "PJ", method: TYPOS(1) }
-    target: md.Store
+    target: md.dimension.Store
 
   # (3) Sugar equivalence. `pobočka` is written as `method:` sugar and `smlouva` as the profile
   # that sugar MEANS (M-T6). One edit against either must score the same number, or the sugar
   # table is decorative.
   - terms:
       - { text: "pobočka", method: TYPOS(1) }
-    target: md.Branch
+    target: md.dimension.Branch
 
   - terms:
       - text: "smlouva"

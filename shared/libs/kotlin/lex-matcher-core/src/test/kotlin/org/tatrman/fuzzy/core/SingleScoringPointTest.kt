@@ -136,6 +136,63 @@ class SingleScoringPointTest :
             }
         }
 
+        // ---- the lemma stratum is opt-in, and so is its COST -------------------------------------
+
+        /** Counts calls, and lemmatises to the folded surface exactly as [NoopLemmatizer] does. */
+        class CountingLemmatizer : Lemmatizer {
+            var calls: Int = 0
+
+            override suspend fun lemmatize(tokens: Collection<String>): Map<String, String> {
+                calls++
+                return tokens.associateWith { TextNormalizer.fold(it) }
+            }
+        }
+
+        "a profile with no `lemma` rule consults the lemmatiser ONCE — the token path's own call" {
+            // In production the lemmatiser is `NlpLemmatizer`: one uncached gRPC BatchLemmatize per
+            // call. Scoring used to ask for the query's lemma form unconditionally, which meant a
+            // SECOND round-trip with the same tokens on every category of every query — including
+            // on estates that author no profile at all, and for an axis nothing has authored yet.
+            // The count is the assertion; a behavioural test cannot see the difference.
+            val counting = CountingLemmatizer()
+            runBlocking {
+                FuzzyMatcher(repo, lemmatizer = counting).match(query, "er.receipt", AlgorithmType.TATRMAN, 5)
+            }
+            counting.calls shouldBe 1
+        }
+
+        "a profile that DOES declare `lemma` still gets its lemma form" {
+            // The other half: the saving must not have been bought by breaking the stratum.
+            val lemmaRow =
+                Candidate.vocabulary(
+                    id = "lex:er.receipt:cs:příjemka",
+                    value = "příjemka",
+                    targetRef = "er.receipt",
+                    source = SourceTag.DECLARED,
+                    matchProfile = MatchProfile(listOf(NormRule(Norm.LEMMA, exact = 0.80))),
+                )
+            val lemmaRepo =
+                object : MatchRepository by repo {
+                    private val all = listOf(lemmaRow)
+
+                    override fun getCandidates(category: String?) = all
+
+                    override fun getTokenIndex(category: String?) = TokenIndex(all)
+
+                    override fun getVocabulary(category: String?) = TokenVocabulary(all)
+                }
+
+            val counting = CountingLemmatizer()
+            runBlocking {
+                val top =
+                    FuzzyMatcher(lemmaRepo, lemmatizer = counting)
+                        .match(query, "er.receipt", AlgorithmType.TATRMAN, 5)
+                        .single()
+                top.score shouldBe 0.80
+                top.provenance.norm shouldBe "lemma"
+            }
+        }
+
         "the scorer is reachable from exactly ONE production file in this library" {
             // The grep half. A new entry point that scored rows itself would compile, pass every
             // behavioural test above, and quietly serve engine numbers for authored rows — so the
