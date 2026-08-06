@@ -31,9 +31,13 @@ name: Release Image (GHCR)
 #   Python (has pyproject.toml)                  -> Docker build with repo-root context (COPY shared/)
 #
 # Secrets:
-#   GITHUB_TOKEN           - provided automatically; GHCR push + reading Collite/tatrman TTR packages.
-#   TATRMAN_PKG_USER/TOKEN - optional; set if GITHUB_TOKEN cannot read the Collite/tatrman
-#                            GitHub Packages (org.tatrman:ttr-*, needed by Veles + Translate).
+#   GITHUB_TOKEN           - provided automatically; the FALLBACK for the GHCR push, and enough
+#                            only for packages this workflow created itself (see the ⚑ on the
+#                            GHCR login step — per-package Actions access is the whole story).
+#   TATRMAN_PKG_USER/TOKEN - the GHCR push credentials when set, and the Collite/tatrman
+#                            GitHub Packages reader (org.tatrman:ttr-*, needed by Veles +
+#                            Translate). Scopes: `read:packages` + `write:packages`.
+#                            Still optional — unset, both uses fall back to GITHUB_TOKEN.
 
 on:
   push:
@@ -158,12 +162,33 @@ jobs:
           echo "lane=$LANE" >> "$GITHUB_OUTPUT"
           echo "Module ${{ matrix.name }} ($P) -> $LANE @ ${{ matrix.version }}"
 
+      # ⚑ GHCR PUSH CREDENTIALS — read this before "simplifying" it back to GITHUB_TOKEN.
+      #
+      # `packages: write` above grants the job token the *ability* to write packages; GHCR
+      # then checks per-package access on top of that. A container package created by a
+      # repo's Actions run is auto-linked to that repo with Write. A package created any
+      # other way — a `docker tag`/`crane copy` from a laptop, say — is linked to NO
+      # repository, and GITHUB_TOKEN gets a flat 403 on it forever. Retrying cannot help.
+      #
+      # That is not hypothetical here: the P(-1) rename put the renamed images in place by
+      # copying them (so olymp could pin `ghcr.io/collite/lex-matcher` before this workflow
+      # had ever published under that name), which left SEVENTEEN packages unpushable from
+      # CI — every prefix-free name that has a `ttr-*` twin. It surfaced on 2026-08-06 when
+      # `lex-matcher/v0.10.0` and `v0.10.1` both failed at `jib`, while `charon` — created by
+      # this workflow, therefore linked — kept publishing fine.
+      #
+      # The PAT authenticates as a USER rather than as this repository, so per-package
+      # Actions access does not apply to it and every package the owner can write is
+      # reachable. GITHUB_TOKEN stays the fallback: it is enough for any package this
+      # workflow created itself, which keeps the workflow runnable in a fork or with no
+      # secrets configured. Same pair the Gradle step below already uses for Maven reads —
+      # the PAT needs `write:packages` on top of the `read:packages` that step needs.
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.TATRMAN_PKG_USER != '' && secrets.TATRMAN_PKG_USER || github.actor }}
+          password: ${{ secrets.TATRMAN_PKG_TOKEN != '' && secrets.TATRMAN_PKG_TOKEN || secrets.GITHUB_TOKEN }}
 
       # Both lanes need auth to the Collite/tatrman GitHub Packages repo (the TTR
       # toolchain org.tatrman:ttr-*; the Kotlin jib compile and the Python proto
@@ -187,10 +212,14 @@ jobs:
         run: |
           set -euo pipefail
           GRADLE_MODULE=":$(echo "${{ matrix.path }}" | sed 's#/#:#g')"
-          ./gradlew "${GRADLE_MODULE}:jib" --no-configuration-cache \
+          # --stacktrace: jib reports a registry refusal as a one-line "perhaps you should
+          # make sure you have permissions" and Gradle drops the cause without it, so a real
+          # 403 arrives indistinguishable from a transient. The push credentials are the ones
+          # the GHCR login step explains at length above.
+          ./gradlew "${GRADLE_MODULE}:jib" --no-configuration-cache --stacktrace \
             -Djib.to.image="${REGISTRY}/${IMAGE_ORG}/${{ matrix.name }}:${{ matrix.version }}" \
-            -Djib.to.auth.username="${{ github.actor }}" \
-            -Djib.to.auth.password="${{ secrets.GITHUB_TOKEN }}"
+            -Djib.to.auth.username="${{ secrets.TATRMAN_PKG_USER != '' && secrets.TATRMAN_PKG_USER || github.actor }}" \
+            -Djib.to.auth.password="${{ secrets.TATRMAN_PKG_TOKEN != '' && secrets.TATRMAN_PKG_TOKEN || secrets.GITHUB_TOKEN }}"
 
       # ---------- Python (Docker, repo-root context) ----------
       - uses: actions/setup-python@v6
