@@ -28,12 +28,14 @@ from typing import Literal
 from pydantic_graph import Graph, GraphBuilder, StepContext, TypeExpression
 
 from golem_py.budgets import Budgets
+from golem_py.compose import ComposeRefused, compose_structured_question, operator_refs
 from golem_py.deps import Deps
 from golem_py.errors import GateUnavailable, UnknownOption
 from golem_py.gate_client import apply_gate_result
 from golem_py.ladder import DETERMINISTIC_RUNGS
 from golem_py.observability import log_node, log_turn
 from golem_py.outputs import Answer, Ask, AskOption, RefusalWithGaps, TurnOutput
+from golem_py.query_client import build_envelope
 from golem_py.state import Disposition, GapKind, Hypothesis, ResolutionState, RungLogEntry
 from golem_py.verdicts import (
     askable_gaps,
@@ -335,33 +337,59 @@ def build_graph() -> Graph[ResolutionState, Deps, None, TurnOutput]:
         return out
 
     @g.step
-    async def emit(ctx: StepContext[ResolutionState, Deps, object]) -> Answer:
-        """A covered lattice (or one whose residue is carryable) becomes an answer.
+    async def emit(ctx: StepContext[ResolutionState, Deps, object]) -> Answer | RefusalWithGaps:
+        """A covered lattice becomes a structured question, and — if there is a door —
+        an answer (P4.3).
 
-        P4.1's answer is a STRUCTURAL summary, not a rendered one: compose, the query
-        door and the skill bodies are P4.3. Saying "N mentions bound" is the honest
-        thing to say before there is a retrieval path.
+        The FAST PATH is the only path here: the open Golem has no plugins, so self is
+        the only capability. What decides whether it fires is the T1 predicate, and it
+        is deliberately made of things the LATTICE can say, because the OS Golem has no
+        intent classifier (that is Themis machinery, platform side) and inventing one
+        here would be the single biggest thing this design says not to do.
         """
         if ctx.state.open_gaps():
             _record_ladder_noop(ctx.state, "emitted with carryable gaps and no rung climbed")
         carried = carryable_gaps(ctx.state, ctx.deps.ladder)
         for gap in carried:
-            if gap.kind == GapKind.G5_NLP_DARK:
-                gap.disposition = Disposition.DEGRADED
-            else:
-                gap.disposition = Disposition.IGNORED
-        bound = sum(1 for m in ctx.state.mentions if m.bindings)
+            gap.disposition = (
+                Disposition.DEGRADED if gap.kind == GapKind.G5_NLP_DARK else Disposition.IGNORED
+            )
+
+        try:
+            question = compose_structured_question(ctx.state, ctx.deps.skills)
+        except ComposeRefused as exc:
+            # Understood, but not doable. That is a REFUSAL, not an error and not a
+            # guess — and it carries the lattice so the caller can see how far the
+            # understanding got (H4's rendering).
+            log_node(ctx.state, "emit", refused=str(exc))
+            log_turn(ctx.state, "refuse")
+            return RefusalWithGaps(
+                reason="NO_CAPABLE_PLUGIN",
+                gaps=ctx.state.gaps,
+                lattice=ctx.state,
+                composable_residue=[
+                    op for op in operator_refs(ctx.state) if ctx.deps.skills.has(op)
+                ],
+                explanation=str(exc),
+            )
+
+        result = None
+        if ctx.deps.query is not None:
+            result = await ctx.deps.query.run(
+                question=question, caller_subject=ctx.state.caller_subject
+            )
+        envelope = build_envelope(
+            state=ctx.state, question=question, result=result, gaps_carried=carried
+        )
         out = Answer(
-            content=(
-                f"{bound}/{len(ctx.state.mentions)} mentions bound, "
-                f"{len(ctx.state.gaps)} gaps, {ctx.state.llm_invocations} LLM calls"
-            ),
+            content=envelope.content,
+            envelope=envelope,
             lattice=ctx.state,
             llm_invocations=ctx.state.llm_invocations,
             asks=ctx.state.hitl_rounds,
             gaps_carried=carried,
         )
-        log_node(ctx.state, "emit", bound=bound, carried=len(carried))
+        log_node(ctx.state, "emit", ops=",".join(question.operators), carried=len(carried))
         log_turn(ctx.state, "emit")
         return out
 
@@ -373,6 +401,7 @@ def build_graph() -> Graph[ResolutionState, Deps, None, TurnOutput]:
             reason="UNRESOLVED_GAPS",
             gaps=ctx.state.open_gaps(),
             lattice=ctx.state,
+            composable_residue=[op for op in operator_refs(ctx.state) if ctx.deps.skills.has(op)],
         )
         log_node(ctx.state, "refuse", gaps_open=len(ctx.state.open_gaps()))
         log_turn(ctx.state, "refuse")

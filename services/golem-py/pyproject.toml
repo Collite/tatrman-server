@@ -21,6 +21,7 @@ dependencies = [
     "grpcio==1.83.0",
     "protobuf>=5.28.0",
     "pyyaml>=6.0.3",
+    "zstandard>=0.23",
 ]
 
 [dependency-groups]

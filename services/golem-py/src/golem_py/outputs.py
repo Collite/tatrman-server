@@ -16,6 +16,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from golem_py.query_client import AnswerEnvelope
 from golem_py.state import GapKind, GapRecord, ResolutionState
 
 RefusalReason = Literal["NO_CAPABLE_PLUGIN", "UNRESOLVED_GAPS"]
@@ -48,7 +49,11 @@ class Ask(BaseModel):
 
 
 class Answer(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
     content: str
+    # contracts §6: {content, formatting_directives?, provenance, gaps_carried[]}.
+    envelope: AnswerEnvelope | None = None
     lattice: ResolutionState
     llm_invocations: int = 0
     asks: int = 0
@@ -60,9 +65,13 @@ class RefusalWithGaps(BaseModel):
     reason: RefusalReason
     gaps: list[GapRecord]
     lattice: ResolutionState
-    # What it CAN do, when it can do anything (P4.3 fills this from the composable
-    # residue). Structured, not apology prose.
+    # What it CAN do, when it can do anything: the operators it DOES hold bodies for.
+    # Structured, not apology prose — "I cannot investigate causes" is a capability
+    # statement, and an apology is not one.
     composable_residue: list[str] = Field(default_factory=list)
+    # Why compose refused, in the vocabulary of the predicate (an unknown `op:`, an
+    # unsatisfied `requires:`, nothing to select). A caller acts on these differently.
+    explanation: str = ""
 
 
 TurnOutput = Ask | Answer | RefusalWithGaps

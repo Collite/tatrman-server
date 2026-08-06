@@ -73,6 +73,17 @@ def test_a_g5_gap_never_blocks_and_never_asks() -> None:
     assert len(carryable_gaps(state, ladder)) == 1
 
 
+def test_an_unbindable_filter_is_carried_rather_than_sinking_the_answer() -> None:
+    """H5's shape: *"porovnej s plánem"* leaves an honest G1 in FILTER position. The
+    answer carries it as a note — refusing the whole question over one unbindable
+    filter would throw away four correct bindings to protect one."""
+    ladder = load_default()
+    state = _state(_gap(GapKind.G1_UNBOUND, FrameRole.FILTER))
+
+    assert assess(state, ladder, _budgets(state, ladder)) == Verdict.EMIT
+    assert len(carryable_gaps(state, ladder)) == 1
+
+
 def test_a_non_load_bearing_g3_is_carried_rather_than_asked_about() -> None:
     ladder = load_default()
     state = _state(_gap(GapKind.G3_UNATTRIBUTED, FrameRole.FILTER))
@@ -167,6 +178,8 @@ def test_the_best_effort_posture_answers_where_strict_refuses(tmp_path) -> None:
     path.write_text(yaml.safe_dump(raw), encoding="utf-8")
     ladder = LadderConfig.load(path)
 
-    state = _state(_gap(GapKind.G1_UNBOUND, FrameRole.FILTER))
+    # A LOAD-BEARING gap with the ask budget spent: strict refuses, best-effort answers
+    # over the gap note. A non-load-bearing gap is carried under either posture.
+    state = _state(_gap(GapKind.G1_UNBOUND, FrameRole.SUBJECT), hitl_rounds=1)
     assert assess(state, ladder, _budgets(state, ladder)) == Verdict.EMIT
     assert assess(state, load_default(), _budgets(state, load_default())) == Verdict.REFUSE

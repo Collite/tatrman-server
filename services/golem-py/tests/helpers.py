@@ -10,6 +10,7 @@ exist so the loop's control flow can be tested without one.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 
 from pydantic_graph import EndMarker
 
@@ -17,6 +18,7 @@ from golem_py.deps import Deps, GateResult
 from golem_py.graph import graph
 from golem_py.ladder import LadderConfig
 from golem_py.outputs import TurnOutput
+from golem_py.skills import LayeredSkillLibrary, SkillLibrary
 from golem_py.state import (
     Binding,
     EvidenceClass,
@@ -89,10 +91,42 @@ async def run_traced(state: ResolutionState, deps: Deps) -> tuple[TurnOutput, li
     return run.output, visited
 
 
-def deps(core: object, ladder: LadderConfig | None = None, gate: object | None = None) -> Deps:
+FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
+
+
+def fixture_library() -> LayeredSkillLibrary:
+    """The repo-owned operator library: five stdlib-shaped bodies, checksummed.
+
+    A FIXTURE, deliberately — hartland's real archive lives in a sibling repo CI cannot
+    see, so the suite owns a small library of its own and
+    `test_skills.py::test_the_real_hartland_archive_parses` pins the FORMAT against the
+    real 8 845-byte artifact whenever that repo is on disk.
+    """
+    return LayeredSkillLibrary(
+        [
+            SkillLibrary.from_json(
+                (FIXTURE_DIR / "lexicon" / "operator-library.json").read_text("utf-8")
+            )
+        ]
+    )
+
+
+def deps(
+    core: object,
+    ladder: LadderConfig | None = None,
+    gate: object | None = None,
+    skills: LayeredSkillLibrary | None = None,
+    query: object | None = None,
+) -> Deps:
     from golem_py.ladder import load_default
 
-    return Deps(core=core, gate=gate, ladder=ladder or load_default())  # type: ignore[arg-type]
+    return Deps(
+        core=core,  # type: ignore[arg-type]
+        gate=gate,  # type: ignore[arg-type]
+        ladder=ladder or load_default(),
+        skills=skills if skills is not None else fixture_library(),
+        query=query,  # type: ignore[arg-type]
+    )
 
 
 # ------------------------------------------------------------------ hero lattices
@@ -143,7 +177,33 @@ def g1_subject_gap() -> ResolutionState:
     """H2's turn 1 — an unknown word in SUBJECT position: the load-bearing G1 that
     makes the Golem ask instead of guessing."""
     return ResolutionState(
-        mentions=[Mention(id="m1", span=Span(start=18, end=34, text="čerpacích stanic"))],
+        mentions=[
+            # As `h2-cs` has it, the question still names an ACTION even while its
+            # subject is unknown — without the operator the composed question would have
+            # nothing this Golem is taught to do, and the answer after the pin would be a
+            # refusal for the wrong reason.
+            Mention(
+                id="m0",
+                span=Span(start=0, end=6, text="Zobraz"),
+                lemma="zobrazit",
+                bindings=[
+                    Binding(
+                        ref="op:show",
+                        target_class=TargetClass.OPERATOR,
+                        evidence_class=EvidenceClass.EXACT,
+                        source=SourceTag.DECLARED,
+                        in_class_score=1.0,
+                    )
+                ],
+            ),
+            Mention(
+                id="m1",
+                span=Span(start=18, end=34, text="čerpacích stanic"),
+                # As `h2-cs` has it: the mention carries the role even with no binding —
+                # the role is derived from the parse, not from what bound.
+                frame_roles=[FrameRole.SUBJECT],
+            ),
+        ],
         gaps=[
             GapRecord(
                 span=Span(start=18, end=34, text="čerpacích stanic"),

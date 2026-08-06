@@ -61,7 +61,7 @@ def test_an_accepted_hypothesis_becomes_a_binding_on_its_own_mention() -> None:
 
     apply_gate_result(state, result)
 
-    mention = state.mentions[0]
+    mention = next(m for m in state.mentions if m.span.text == "čerpacích stanic")
     assert [b.ref for b in mention.bindings] == ["md.dimension.Customer.category"]
     # The provenance says which rung proposed it — the other half of "gate evidence".
     assert mention.bindings[0].producer.proposing_rung == "local"
@@ -97,7 +97,8 @@ def test_a_binding_whose_span_matches_no_mention_is_dropped() -> None:
 
     apply_gate_result(state, result_from_proto(resp))
 
-    assert state.mentions[0].bindings == []
+    unbound = next(m for m in state.mentions if m.span.text == "čerpacích stanic")
+    assert unbound.bindings == []
 
 
 def test_a_refused_hypothesis_carries_its_reason_and_produces_no_binding() -> None:

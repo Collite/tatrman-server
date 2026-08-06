@@ -11,8 +11,11 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from golem_py.compose import StructuredQuestion
 from golem_py.ladder import LadderConfig, load_default
+from golem_py.query_client import QueryResult
 from golem_py.settings import GolemSettings
+from golem_py.skills import LayeredSkillLibrary
 from golem_py.snapshots import InMemorySnapshotStore, SnapshotStore
 from golem_py.state import Binding, GapRecord, Hypothesis, ResolutionState, RungLogEntry
 
@@ -67,6 +70,17 @@ class GatePort(Protocol):
     ) -> GateResult: ...
 
 
+@runtime_checkable
+class QueryPort(Protocol):
+    """The query door. Optional: with none configured the Golem still composes and
+    answers structurally — which is what the conformance tier drives, and what the
+    live drill will fill in when a door that takes a structured question exists."""
+
+    async def run(
+        self, *, question: StructuredQuestion, caller_subject: str = ""
+    ) -> QueryResult: ...
+
+
 @dataclass
 class Deps:
     """Injected per run.
@@ -81,4 +95,8 @@ class Deps:
     ladder: LadderConfig = field(default_factory=load_default)
     settings: GolemSettings = field(default_factory=GolemSettings)
     snapshots: SnapshotStore = field(default_factory=InMemorySnapshotStore)
+    # The operator bodies (RV-35). Empty is legal and honest: an estate with no
+    # compiled archive has no operators, so any question naming one refuses.
+    skills: LayeredSkillLibrary = field(default_factory=LayeredSkillLibrary)
+    query: QueryPort | None = None
     clock: Callable[[], float] = time.monotonic

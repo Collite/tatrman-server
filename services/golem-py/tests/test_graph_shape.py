@@ -14,6 +14,7 @@ from pydantic_graph import Decision, Fork
 
 from golem_py.graph import build_graph
 from golem_py.ladder import LadderConfig
+from golem_py.outputs import Answer
 from golem_py.state import (
     Disposition,
     FrameRole,
@@ -123,13 +124,38 @@ async def test_a_load_bearing_gap_reaches_ask_and_only_ask() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_non_load_bearing_blocking_gap_reaches_refuse_and_only_refuse() -> None:
+async def test_a_non_load_bearing_gap_is_carried_into_the_answer_not_asked_about() -> None:
     """RV-15 is a floor AND a ceiling: a gap that is not load-bearing must not generate
-    a question. With no rung able to help, the honest move is the refusal that carries
-    the lattice — not a guess, and not an ask nobody may spend."""
-    lattice = g1_subject_gap()
-    lattice.gaps[0].frame_roles = [FrameRole.FILTER]
-    _, visited = await run_traced(ResolutionState(question="q"), deps(RecordedCore(lattice)))
+    a question — and it must not sink the answer either. H5 is the case that settles it:
+    an unbindable FILTER (*plánem*) rides along as an honest gap note while the four
+    correct bindings still answer."""
+    # H5's shape: a composable lattice PLUS one unbindable FILTER.
+    lattice = h1_lattice()
+    lattice.mentions.append(
+        Mention(id="m9", span=Span(start=60, end=66, text="plánem"), frame_roles=[FrameRole.FILTER])
+    )
+    lattice.gaps = [
+        GapRecord(
+            span=Span(start=60, end=66, text="plánem"),
+            kind=GapKind.G1_UNBOUND,
+            frame_roles=[FrameRole.FILTER],
+            mention_id="m9",
+        )
+    ]
+    out, visited = await run_traced(ResolutionState(question="q"), deps(RecordedCore(lattice)))
+
+    assert "emit" in visited
+    assert "ask" not in visited and "refuse" not in visited
+    assert isinstance(out, Answer)
+    assert [g.kind for g in out.gaps_carried] == [GapKind.G1_UNBOUND]
+
+
+@pytest.mark.asyncio
+async def test_a_load_bearing_gap_with_the_ask_budget_spent_reaches_refuse() -> None:
+    """The refusal's real trigger: the question's SUBJECT is unknown, the ladder cannot
+    help, and the one question CHAT_QUICK allows has already been spent."""
+    state = ResolutionState(question="q", hitl_rounds=1)
+    _, visited = await run_traced(state, deps(RecordedCore(g1_subject_gap())))
 
     assert "refuse" in visited
     assert "ask" not in visited and "emit" not in visited

@@ -11,17 +11,25 @@ stating: the verdict is the only place the Golem decides anything, and a decisio
 also edits the lattice cannot be tested against a synthetic one. The graph node applies
 whatever the verdict implies; this module never does.
 
-Which gaps BLOCK an answer is the subtle half:
+Which gaps BLOCK an answer is the subtle half, and the line is **load-bearing** —
+the same line RV-15 draws for asking:
 
-* `degrade-banner` (G5_NLP_DARK) never blocks — the honest banner IS the answer
-  (RV-19 carries the gap note).
-* `emit-unless-load-bearing` blocks only when the gap is load-bearing.
-* everything else blocks while it is open. In particular `escalate-then-ask` on a
-  NON-load-bearing gap blocks and cannot be asked about — the ladder was its route and
-  the ladder is exhausted — so it lands on the terminal posture, which for the shipped
-  `strict` profile is a refusal carrying the lattice. That is deliberate: RV-15 is a
-  floor AND a ceiling, and inventing an answer for a gap we may not ask about is the
-  failure mode this whole design exists to prevent.
+* a **load-bearing** gap blocks. It is asked about while the HITL budget lasts, and
+  once that is spent it lands on the terminal posture (`strict` ⇒ a refusal carrying
+  the lattice). Answering over a gap in the question's SUBJECT would be the guess this
+  whole design exists to prevent.
+* every **other** open gap is CARRIED, not blocking — an honest gap note beside the
+  answer (RV-19). H5 is the case that settles it: *"porovnej s plánem"* leaves an
+  honest `G1_UNBOUND` on *plánem* in FILTER position, and the hero must ANSWER while
+  saying what it could not do. Refusing the whole question over an unbindable filter
+  would throw away four correct bindings to protect one.
+* `degrade-banner` (G5_NLP_DARK) never blocks even when load-bearing: no answer the
+  user can give would fix a capability the matrix does not have, so the honest banner
+  IS the answer.
+
+⚑ This corrects the P4.1 reading, which had every `escalate-then-ask` gap blocking
+whether or not it was load-bearing. That would have refused H5 — the phase gate's own
+acceptance case — so the hero spec is what settled it.
 """
 
 from __future__ import annotations
@@ -43,9 +51,7 @@ class Verdict(StrEnum):
 def _blocks(gap: GapRecord, policy: GapPolicy) -> bool:
     if policy.ask == AskPolicy.DEGRADE_BANNER:
         return False
-    if policy.ask == AskPolicy.EMIT_UNLESS_LOAD_BEARING:
-        return gap.is_load_bearing()
-    return True
+    return gap.is_load_bearing()
 
 
 def _askable(gap: GapRecord, policy: GapPolicy) -> bool:

@@ -33,7 +33,13 @@ from golem_py.state import (
     Span,
     TargetClass,
 )
-from tests.helpers import RecordedCore, RecordedGate, g1_subject_gap, run_traced
+from tests.helpers import (
+    RecordedCore,
+    RecordedGate,
+    fixture_library,
+    g1_subject_gap,
+    run_traced,
+)
 
 
 def _asking_lattice() -> ResolutionState:
@@ -83,6 +89,7 @@ def _deps(core: object, gate: object | None = None, **kwargs: object) -> Deps:
         gate=gate,  # type: ignore[arg-type]
         ladder=load_default(),
         snapshots=kwargs.pop("snapshots", InMemorySnapshotStore()),  # type: ignore[arg-type]
+        skills=fixture_library(),
         **kwargs,  # type: ignore[arg-type]
     )
 
@@ -153,7 +160,8 @@ async def test_a_pin_becomes_a_binding_only_through_the_gate() -> None:
     # ⚑ `user`, deliberately outside the four-rung vocabulary: this proposal did not
     # come from a rung, and logging it as one would make the ladder's numbers lie.
     assert gate.last_hypotheses[0].proposing_rung == "user"
-    assert out.lattice.mentions[0].bindings[0].ref == "md.dimension.Customer.category"
+    subject = next(m for m in out.lattice.mentions if m.span.text == "čerpacích stanic")
+    assert subject.bindings[0].ref == "md.dimension.Customer.category"
 
 
 @pytest.mark.asyncio
@@ -212,7 +220,8 @@ async def test_the_escape_settles_the_gap_without_pretending_anything_bound() ->
     assert isinstance(out, (Answer, RefusalWithGaps))
     lattice = out.lattice
     assert lattice.gaps[0].disposition == Disposition.USER_CONFIRMED_UNKNOWN
-    assert lattice.mentions[0].bindings == []  # nothing bound, and nothing pretended
+    subject = next(m for m in lattice.mentions if m.span.text == "čerpacích stanic")
+    assert subject.bindings == []  # nothing bound, and nothing pretended
 
 
 # ------------------------------------------------------------ idempotency (T1·c)

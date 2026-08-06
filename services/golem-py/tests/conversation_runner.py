@@ -40,7 +40,7 @@ from golem_py.state import (
     Span,
     TargetClass,
 )
-from tests.helpers import RecordedCore, RecordedGate
+from tests.helpers import RecordedCore, RecordedGate, fixture_library
 from tests.lattice_fixtures import lattice_golden
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "conversations"
@@ -156,6 +156,7 @@ class ConversationRun:
             gate=self.gate,
             ladder=load_default(),
             snapshots=InMemorySnapshotStore(),
+            skills=fixture_library(),
             clock=lambda: 1000.0,  # frozen: a byte-identical replay must not race a clock
         )
         args = turn["args"]
