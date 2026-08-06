@@ -77,7 +77,7 @@
         "gated_refs": ["md.dimension.Customer.category"],
         "proposing_rung": "user",
         "core_calls_total": 1,
-        "asks_total": 1,
+        "asks": 1,
         "llm_invocations": 0,
         "gaps_carried": ["GAP_KIND_G3_UNATTRIBUTED"],
         "no_binding_below_threshold": true

@@ -18,10 +18,11 @@ Two shapes deserve naming because they are where a naive compose goes wrong:
   lookup (RV-33). The filter is therefore `(attribute_ref, member_ref)`, and the
   anchoring is what makes it "the account 501001" rather than "some 501001 somewhere".
 
-Operator composition follows contracts §6's v1 rule: **retrieval directives MERGE**,
-**formatting is last-op-wins per directive key**. Ops are applied in the order they
-appear in the question, which is the only order the lattice gives us and the one the
-user chose.
+Operator composition follows contracts §6's v1 rule for retrieval — **directives MERGE** —
+and deviates, deliberately and recorded, on formatting: §6 says *last-op-wins per
+directive key* and a prose body has no key to win on, so formatting **accumulates in op
+order** instead (see `compose_operators`). Ops are applied in the order they appear in the
+question, which is the only order the lattice gives us and the one the user chose.
 
 ## ⚑ THE T1 RULING — what "over the paygrade" means without an intent classifier
 
@@ -59,6 +60,7 @@ the comparison is dropped with a note while the trend still answers.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from golem_py.skills import LayeredSkillLibrary, SkillBody, SkillError
@@ -189,7 +191,20 @@ def compose_operators(
     """Resolve every `op:` to a body and compose the directives (contracts §6).
 
     Retrieval MERGES — two operators both narrowing the retrieval are both honoured.
-    Formatting is LAST-OP-WINS per key — two operators cannot both choose the chart.
+
+    ⚠ **Formatting ACCUMULATES in op order — §6's "last-op-wins per directive key" is not
+    literally implementable yet, and pretending otherwise was the bug.** A body's
+    `Formatting:` section is undifferentiated prose (contracts §2: prose for the Golem),
+    so there is no directive KEY for a later op to win on. This returns a dict keyed by op
+    id, in question order, which is the honest shape: nothing is dropped, and the LAST
+    entry is the one a renderer should prefer when two conflict. H5 is the live case —
+    `op:show` says "table by default" and `op:trend` says "line chart by default", and
+    both reach the envelope.
+
+    ⚑ Bora: making §6 literal needs a KEYED formatting line in the body grammar (e.g.
+    `Formatting: chart=line`), which is a change to the artifact `tatrman`'s compiler
+    emits — the same `OperatorEntry` change `requires:` wants. Until then the contract's
+    wording is ahead of the artifact, and this docstring is the record of that.
     """
     bodies = [library.get(op) for op in ops]  # raises SkillError on an unknown op
     retrieval = [b.retrieval for b in bodies if b.retrieval]
@@ -200,19 +215,52 @@ def compose_operators(
     return bodies, retrieval, formatting
 
 
+# The requirement vocabulary the stdlib actually declares, each a predicate over what
+# RESOLVED. ⛑ Two of these were missing and the miss was silent: an unrecognised name fell
+# through the old if/elif chain and counted as SATISFIED, so `op:top-n` (`order-measure`)
+# and `op:drilldown` (`parent-context`) — two of the six stdlib operators — had their
+# applicability waved through. Unknown now REFUSES (below), which is the same direction
+# every other unhonourable operator takes.
+#
+# ⚑ The predicates are read off the bodies' own prose, because that is where `requires:`
+# survives: the compiler drops `SkillFile.requires` and neither `CompiledEntry` nor
+# `OperatorEntry` carries it (see `skills.py`, finding 1). The structural fix is one field
+# in `tatrman` — and it would let this table be checked against a declared vocabulary
+# instead of tracking it.
+_REQUIREMENT_CHECKS: dict[str, Callable[[StructuredQuestion], bool]] = {
+    # "without a grain … nothing to group by" (trend.md)
+    "time-grain": lambda q: q.time_grain is not None,
+    # "exactly two comparanda" (compare.md)
+    "two-series": lambda q: len(q.measures) >= 2,
+    # "a ranking needs something to rank by … when it names several, ask rather than
+    # choose" (top-n.md) — so exactly one measure satisfies it, and both 0 and ≥2 do not
+    "order-measure": lambda q: len(q.measures) == 1,
+    # "with no parent, there is no 'finer'" (drilldown.md)
+    "parent-context": lambda q: bool(q.groupings),
+}
+
+
 def check_applicability(bodies: list[SkillBody], question: StructuredQuestion) -> list[str]:
     """`requires:` is validated at COMPOSE, not at match (contracts §2).
 
     A trigger word matching is a fact about the question's surface; whether the
     operator can DO anything is a fact about what resolved. `op:trend` with no time
     grain has nothing to group by, and surfacing that beats inventing a grain.
+
+    An UNKNOWN requirement raises rather than passing: "this operator declares a
+    condition we cannot evaluate" is the same class of ignorance as an operator with no
+    body — we do not know whether it applies, so we do not pretend it does.
     """
     unsatisfied: list[str] = []
     for body in bodies:
         for requirement in body.requires:
-            if requirement == "time-grain" and question.time_grain is None:
-                unsatisfied.append(f"{body.op} requires {requirement}")
-            elif requirement == "two-series" and len(question.measures) < 2:
+            check = _REQUIREMENT_CHECKS.get(requirement)
+            if check is None:
+                raise ComposeRefused(
+                    f"{body.op} declares requirement {requirement!r}, which this Golem "
+                    f"cannot evaluate (known: {', '.join(sorted(_REQUIREMENT_CHECKS))})"
+                )
+            if not check(question):
                 unsatisfied.append(f"{body.op} requires {requirement}")
     return unsatisfied
 

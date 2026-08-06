@@ -40,8 +40,13 @@ def _generate() -> None:
 
     try:
         runpy.run_path(str(_SERVICE_DIR / "scripts" / "gen_proto.py"), run_name="__main__")
-    except SystemExit:  # protoc reports success AND failure this way
-        pass
+    except SystemExit as exc:  # protoc reports success AND failure this way
+        # ⛑ …so the CODE is the only thing that separates them, and swallowing it turned a
+        # protoc failure into `ModuleNotFoundError: No module named 'org'` — precisely the
+        # symptom this bootstrap already cost one red CI run to diagnose, arriving from a
+        # different cause. `gen_proto.main()` already prints why; let it through.
+        if exc.code:
+            raise
     finally:
         # See (1) and (2) above: this MUST run even though the call always raises.
         importlib.invalidate_caches()

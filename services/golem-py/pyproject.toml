@@ -43,13 +43,12 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-# The conformance tier (P4.4) drives fixtures against a live-ish core and is opt-in,
-# so the unit suite needs no network: `just test-py services/golem-py -m conformance`.
-addopts = ["-m", "not conformance"]
+# ⛑ There is no `conformance` marker and no `-m` filter, deliberately. Both existed and
+# neither did anything: P4.4·T3 ruled the conversation tier HERMETIC — recorded core, no
+# network, no images — so it is part of the ordinary suite, and `-m "not conformance"`
+# deselected nothing while reading as though a whole tier were opt-in. The next test that
+# legitimately wanted the marker would have been silently skipped and looked covered.
 pythonpath = ["src", "generated"]
-markers = [
-    "conformance: the conformance-conversation tier (live-ish core; not the unit gate)",
-]
 
 [tool.ruff]
 target-version = "py312"

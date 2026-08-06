@@ -7,6 +7,8 @@ actually emits rather than what a hand-authored fixture wishes it emitted.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from golem_py.compose import (
@@ -16,6 +18,7 @@ from golem_py.compose import (
     compose_structured_question,
     operator_refs,
 )
+from golem_py.skills import LayeredSkillLibrary, SkillLibrary
 from golem_py.state import FrameRole, Mention, ResolutionState, Span
 from tests.helpers import fixture_library
 from tests.lattice_fixtures import lattice_golden
@@ -70,14 +73,70 @@ def test_h5_composes_the_applicable_operators_and_notes_the_one_that_cannot_fire
     assert len(question.retrieval_directives) == 2  # retrieval MERGES over what applies
 
 
-def test_multi_op_formatting_is_last_op_wins_per_key() -> None:
-    """contracts §6's v1 rule. Two operators cannot both choose the chart; retrieval
-    directives can both narrow the query."""
+def test_multi_op_formatting_accumulates_in_op_order() -> None:
+    """⚠ Retrieval MERGES, per contracts §6. Formatting does NOT do what §6 says.
+
+    This test used to be called `..._is_last_op_wins_per_key` and asserted that BOTH
+    entries survived — reading as coverage of the rule while pinning its absence. The
+    rule cannot be honoured while a `Formatting:` section is undifferentiated prose:
+    there is no directive KEY for a later op to win on. What the code does, and what this
+    now says, is accumulate in op order and leave the conflict to the renderer — H5 ships
+    `op:show`'s "table by default" beside `op:trend`'s "line chart by default".
+
+    ⚑ Bora: making §6 literal needs a keyed formatting line in the body grammar, i.e. a
+    change to the artifact `tatrman`'s compiler emits.
+    """
     library = fixture_library()
     _, retrieval, formatting = compose_operators(["op:top-n", "op:share-of"], library)
 
     assert len(retrieval) == 2
-    assert set(formatting) == {"op:top-n", "op:share-of"}
+    assert list(formatting) == ["op:top-n", "op:share-of"]  # ORDER is the contract here
+
+
+def test_an_unknown_requirement_refuses_rather_than_counting_as_satisfied() -> None:
+    """⛑ `check_applicability` knew two requirement names and let every other one fall
+    through as SATISFIED. The real stdlib declares four — `op:top-n`'s `order-measure`
+    and `op:drilldown`'s `parent-context` were both waved through, i.e. two of the six
+    shipped operators had their applicability unchecked.
+
+    Unknown now refuses, which is the direction everything else unhonourable takes: an
+    operator whose condition we cannot evaluate is one we do not know how to apply, and
+    that is the "no body" case, not the "cannot apply" one.
+    """
+    library = LayeredSkillLibrary(
+        [
+            SkillLibrary.from_json(
+                json.dumps(
+                    {
+                        "schemaVersion": "ttr-operator-library/v1",
+                        "operators": {
+                            "op:show": {
+                                "body": "Show it.\n\nApplicability: `no-such-condition` — "
+                                "invented.\n",
+                                "version": 1,
+                            }
+                        },
+                    }
+                )
+            )
+        ]
+    )
+
+    with pytest.raises(ComposeRefused, match="no-such-condition"):
+        compose_structured_question(lattice_golden("h1-cs"), library)
+
+
+def test_the_four_stdlib_requirements_are_all_evaluated() -> None:
+    """The registry must cover what the stdlib actually declares; a name missing from it
+    is now a refusal, so a silent pass cannot come back."""
+    from golem_py.compose import _REQUIREMENT_CHECKS
+
+    assert set(_REQUIREMENT_CHECKS) == {
+        "time-grain",
+        "two-series",
+        "order-measure",
+        "parent-context",
+    }
 
 
 def test_an_unsatisfied_requires_refuses_at_compose_not_at_match() -> None:

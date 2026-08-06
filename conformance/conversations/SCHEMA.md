@@ -22,7 +22,7 @@ fixture already writes `"fixture": "h1prime-cs"`). What is added, and why:
 | `gate: {outcomes[], updated_gaps[], rung_log_entry}` | same reason, for `resolve.gate:v1` |
 | `pin: {option_id \| free_text \| escape}` | the door has no user; a conversation does |
 | `invariants[]` | stated in the file, per P2.4's rule, so a second shell inherits the WORDS and not only the assertions |
-| `replay_of: <n>` | at-least-once delivery is the norm; a suite that never redelivers cannot catch the bugs it causes |
+| `replay_of: <n>` | at-least-once delivery is the norm; a suite that never redelivers cannot catch the bugs it causes. `<n>` is **0-based over the non-gate turns** |
 
 **Location is the other half of the decision.** These live at the repo root under
 `conformance/`, beside `corpus-hashes.sha256`, rather than inside one service's test
@@ -63,6 +63,31 @@ resources — a corpus two shells must share cannot be owned by one of them.
   ]
 }
 ```
+
+## ⛑ Every `expect:` key, and the rule that keeps this list honest
+
+A runner **must reject a fixture that states a key it does not assert**. This is not a
+style rule: a review found five keys silently ignored across eleven occurrences here —
+including `no_binding_below_threshold`, which this file lists above as reused *verbatim*
+and which the Kotlin `calls:` tier does assert, and `byte_identical_to_turn`, which is
+the entire reason `h2-ask-pin-resume` has a third turn. None was a behaviour bug; each
+was a clause of the contract that nobody enforced. A shared corpus that asserts less than
+it says is worse than a smaller one, because the second shell reads the file and believes
+it. `test_no_fixture_states_an_expectation_the_runner_never_reads` is the guard; the
+Kotlin shell needs its own.
+
+| key | applies to | asserts |
+|---|---|---|
+| `outcome` | every turn | `answer` \| `ask` \| `refusal` |
+| `llm_invocations` | every turn | the turn's count, off the lattice — a **pause** may legitimately claim 0 |
+| `asks` | every turn | HITL rounds spent this turn, off the lattice. **Not `asks_total`** — one name, and this is it |
+| `no_binding_below_threshold` | every turn | no binding in the lattice sits below the evidence-class floor: WEAK never binds (RV-14), and UNSPECIFIED is weaker than WEAK |
+| `byte_identical_to_turn: <n>` | a replay turn | this turn's output equals turn `<n>`'s, byte for byte. **`<n>` is 0-based over the NON-GATE turns**, which is the same index `replay_of` uses |
+| `gap_kind` · `asked_span` · `min_options` · `escape_offered` · `snapshot_stored` | `ask` | the pause carries what a resume needs |
+| `refusal_reason` · `min_bindings` · `gap_kinds` · `composable_residue` | `refusal` | understanding proven, capability honestly absent |
+| `core_calls_total` · `measures` · `subjects` · `operators` · `inapplicable_operators` · `member_filters` · `gaps_carried` · `gaps_carried_spans` · `provenance_lexicon_artifact_hash` · `gated_refs` | `answer` | what compose selected, what it dropped and why, and the RV-39 tuple that bound it |
+| `proposing_rung` | `answer` after a pin, and every `resolve.gate:v1` turn | who PROPOSED — for a pin, `user`, deliberately outside the four-rung vocabulary so the ladder's health numbers cannot be made to lie by it |
+| `gated_refs` · `evidence_classes` · `gap_kinds` | `resolve.gate:v1` | what survived the gate, at what class |
 
 ## The invariant vocabulary
 

@@ -10,9 +10,18 @@ Two things travel out of an `ask`, and they are never merged (P0-3·T5):
   Pydantic JSON document, turn-local. The door has no business knowing it.
 
 **Immutable by construction.** `put` mints a NEW snapshot every time and `get` returns a
-deep copy; nothing updates in place. That single property is what makes an at-least-once
-resume safe: replaying the same delivery twice reads the same bytes and produces the
-same answer, because there is no mutated live state for the second delivery to land on.
+fresh object parsed from stored bytes; nothing updates in place. That single property is
+what makes an at-least-once resume safe: replaying the same delivery twice reads the same
+bytes and produces the same answer, because there is no mutated live state for the second
+delivery to land on.
+
+⛑ **The key is per PAUSE, not per turn** — `(conversation_id, turn_id, subject, round)` —
+and the round is what a review found missing. A turn may ask more than once
+(`INVESTIGATION_DEEP` ships `hitl_rounds: 3`), and with a turn-scoped key the second ask
+OVERWROTE the first ask's document. A redelivery of the first resume then read the state
+the first delivery had produced and answered differently — the exact failure "immutable by
+construction" is written to prevent, arriving through the key rather than through the
+value. `CHAT_QUICK`'s single round is why no test saw it.
 
 ⚑ Recorded per T2: the platform-grade implementation is a Postgres JSON column, per the
 kantheon persistence topology. It lands with a platform estate, not here — the OS Golem
@@ -36,16 +45,21 @@ from golem_py.state import ResolutionState
 Clock = Callable[[], float]
 
 
-def snapshot_id(conversation_id: str, turn_id: str, subject: str = "") -> str:
-    """Key = `(conversation_id, turn_id)`, with the SUBJECT folded in.
+def snapshot_id(conversation_id: str, turn_id: str, subject: str = "", round_: int = 0) -> str:
+    """Key = `(conversation_id, turn_id, round)`, with the SUBJECT folded in.
 
     Folding the subject into the id is defence in depth for T4: two conversations can
     share an id across tenants by accident, but they cannot share one under different
     subjects and still collide. The id is not a secret — the identity check is explicit
     in `resume.py` — but a derived key means a mistake there cannot silently read
     another principal's snapshot.
+
+    ⛑ `round_` is the HITL round the pause belongs to. Without it a turn's second ask
+    overwrites its first, and "never update in place" stops being true at the key while
+    still looking true at the value (see the module docstring).
     """
-    digest = hashlib.sha256(f"{conversation_id}\x00{turn_id}\x00{subject}".encode()).hexdigest()
+    raw = f"{conversation_id}\x00{turn_id}\x00{subject}\x00{round_}"
+    digest = hashlib.sha256(raw.encode()).hexdigest()
     return f"snap-{digest[:32]}"
 
 
@@ -64,7 +78,9 @@ class _Base:
         self.clock = clock
 
     def _key(self, state: ResolutionState) -> str:
-        return snapshot_id(state.conversation_id, state.turn_id, state.caller_subject)
+        return snapshot_id(
+            state.conversation_id, state.turn_id, state.caller_subject, state.hitl_rounds
+        )
 
 
 class InMemorySnapshotStore(_Base):

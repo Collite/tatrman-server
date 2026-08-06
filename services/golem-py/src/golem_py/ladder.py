@@ -23,6 +23,7 @@ define is a config error, not a fallback.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -187,16 +188,29 @@ class LadderConfig(BaseModel):
             return defined.timeout_ms
         return self.rung_timeouts_ms.get(rung, 0)
 
-    def eligible_rungs(self, kinds: set[GapKind], profile_name: str) -> list[str]:
-        """The rungs that MAY run for this set of open gap kinds, in policy order.
+    def eligible_rungs(self, kinds: Collection[GapKind], profile_name: str) -> list[str]:
+        """The rungs that MAY run for this set of open gap kinds, in **policy-table
+        order** — the order the config author wrote, which is the ladder's own semantics.
+
+        ⛑ This used to iterate the caller's `set` of gap kinds. `GapKind` is a `StrEnum`,
+        so a set of them iterates in string-hash order, which CPython randomises per
+        process: with two open kinds naming different rungs, the climb order flipped
+        between runs of the same question over the same lattice. Deterministic below the
+        LLM line is the whole thesis; an order that depends on `PYTHONHASHSEED` is not it.
+
+        A gap kind with no policy row contributes nothing (`gap_policy`'s conservative
+        default has no rungs), so walking the table rather than the kinds loses nothing.
 
         Zero-rung default ⇒ empty, and that emptiness is the point: the shape is
         present, nothing is on.
         """
         prof = self.profile(profile_name)
+        open_kinds = set(kinds)
         out: list[str] = []
-        for kind in kinds:
-            for rung in self.gap_policy(kind).rungs:
+        for kind, policy in self.policy.items():
+            if kind not in open_kinds:
+                continue
+            for rung in policy.rungs:
                 if rung not in out and prof.allows(rung):
                     out.append(rung)
         return out

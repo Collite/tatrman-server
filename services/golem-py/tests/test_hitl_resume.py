@@ -25,7 +25,11 @@ from golem_py.state import (
     Binding,
     Disposition,
     EvidenceClass,
+    FrameRole,
+    GapKind,
+    GapRecord,
     Hypothesis,
+    Mention,
     Pin,
     ResolutionState,
     SignedOption,
@@ -56,6 +60,36 @@ def _asking_lattice() -> ResolutionState:
         ),
     ]
     return lattice
+
+
+def _two_gap_lattice() -> ResolutionState:
+    """One turn, TWO load-bearing gaps, under the profile that budgets three questions —
+    the shape a turn-scoped snapshot key could not survive."""
+    return ResolutionState(
+        question="A B",
+        conversation_id="c-deep",
+        turn_id="t-1",
+        caller_subject="user-a",
+        profile="INVESTIGATION_DEEP",
+        mentions=[
+            Mention(id="m1", span=Span(start=0, end=1, text="A"), frame_roles=[FrameRole.SUBJECT]),
+            Mention(id="m2", span=Span(start=2, end=3, text="B"), frame_roles=[FrameRole.SUBJECT]),
+        ],
+        gaps=[
+            GapRecord(
+                span=Span(start=0, end=1, text="A"),
+                kind=GapKind.G1_UNBOUND,
+                frame_roles=[FrameRole.SUBJECT],
+                mention_id="m1",
+            ),
+            GapRecord(
+                span=Span(start=2, end=3, text="B"),
+                kind=GapKind.G1_UNBOUND,
+                frame_roles=[FrameRole.SUBJECT],
+                mention_id="m2",
+            ),
+        ],
+    )
 
 
 def _accepted_gate() -> RecordedGate:
@@ -240,6 +274,66 @@ async def test_the_same_resume_delivered_twice_is_byte_identical() -> None:
     second = await resume_turn(ask.snapshot_id, pin, caller_subject="user-a", deps=deps)
 
     assert first.model_dump_json() == second.model_dump_json()
+
+
+@pytest.mark.asyncio
+async def test_the_ask_offers_only_the_options_signed_for_the_span_it_asks_about() -> None:
+    """⛑ The ask used to offer EVERY option the core signed, whatever gap it had chosen.
+    `askable_gaps` orders load-bearing-first then by span, so the gap it picks need not be
+    the span the core clarified — and the user was asked about A while being offered
+    answers for B. Picking one then gated a hypothesis on B's span and recorded the user's
+    answer on A's gap: a spent question, an open gap, and an audit trail that disagreed
+    with both.
+
+    An option carrying no span is unscoped and stays offered (that is what the core's
+    older responses look like, and what every hero fixture relies on).
+    """
+    lattice = _two_gap_lattice()
+    lattice.signed_options = [
+        SignedOption(
+            id="opt-b",
+            label="an answer about B",
+            ref="md.dimension.DistributionCentre",
+            span=Span(start=2, end=3, text="B"),
+        ),
+        SignedOption(id="opt-any", label="unscoped", ref="md.dimension.Customer"),
+    ]
+
+    out = await run_turn(lattice, _deps(RecordedCore(lattice), RecordedGate()))
+
+    assert isinstance(out, Ask)
+    assert "A" in out.question  # the load-bearing gap the ask chose
+    assert [o.id for o in out.options] == ["opt-any"]
+
+
+@pytest.mark.asyncio
+async def test_a_turns_second_ask_does_not_overwrite_its_first_snapshot() -> None:
+    """⛑ THE regression. The snapshot key was `(conversation_id, turn_id, subject)` — per
+    TURN — and `INVESTIGATION_DEEP` ships `hitl_rounds: 3`, so a turn's second ask wrote
+    over the document its first had stored. The redelivery of the FIRST resume then read
+    the state the first delivery produced and answered differently, which is exactly the
+    failure "immutable by construction" is written to prevent, arriving through the key
+    rather than through the value.
+
+    Both idempotency tests above run under CHAT_QUICK, whose single round makes the second
+    ask unreachable — which is why nothing saw it.
+    """
+    deps = _deps(RecordedCore(_two_gap_lattice()), RecordedGate())
+    first = await run_turn(_two_gap_lattice(), deps)
+    assert isinstance(first, Ask) and "A" in first.question
+
+    second = await resume_turn(
+        first.snapshot_id, Pin(escape=True), caller_subject="user-a", deps=deps
+    )
+    assert isinstance(second, Ask) and "B" in second.question
+    assert second.snapshot_id != first.snapshot_id, "a second pause must mint its own"
+
+    # At-least-once delivery: the FIRST resume arrives again, against the snapshot it
+    # was issued for. It must reproduce the second ask byte for byte.
+    replay = await resume_turn(
+        first.snapshot_id, Pin(escape=True), caller_subject="user-a", deps=deps
+    )
+    assert replay.model_dump_json() == second.model_dump_json()
 
 
 @pytest.mark.asyncio

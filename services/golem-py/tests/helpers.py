@@ -9,7 +9,7 @@ exist so the loop's control flow can be tested without one.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from pydantic_graph import EndMarker
@@ -117,7 +117,13 @@ def deps(
     gate: object | None = None,
     skills: LayeredSkillLibrary | None = None,
     query: object | None = None,
+    clock: Callable[[], float] | None = None,
 ) -> Deps:
+    """`clock` is injectable because the ladder's WALL-CLOCK budget is otherwise only
+    observable by waiting, and a budget nobody can test is a budget that stops working
+    quietly (it did)."""
+    import time
+
     from golem_py.ladder import load_default
 
     return Deps(
@@ -126,6 +132,7 @@ def deps(
         ladder=ladder or load_default(),
         skills=skills if skills is not None else fixture_library(),
         query=query,  # type: ignore[arg-type]
+        clock=clock or time.monotonic,
     )
 
 

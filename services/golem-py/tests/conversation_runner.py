@@ -153,6 +153,11 @@ class ConversationRun:
         # at-least-once redelivery safe — so a cumulative count would read as a bug.
         self.gate_calls: list[int] = []
         self.gate_results: list[GateResult] = []
+        # The hypotheses the GOLEM sent, per non-gate turn, aligned with `outputs`. A
+        # fixture asserting `proposing_rung` on a resume is asserting RV-7 about the
+        # user's pin — which is a claim about what we PROPOSED, not about what the
+        # recorded gate happened to echo back.
+        self.turn_hypotheses: list[list[Hypothesis]] = []
 
     async def run(self) -> list[TurnOutput]:
         for index, turn in enumerate(self.fixture["turns"]):
@@ -188,9 +193,11 @@ class ConversationRun:
             profile=args.get("profile", "CHAT_QUICK"),
         )
         before = self.gate.calls
+        self.gate.last_hypotheses = []
         output = await run_turn(state, self.deps)
         self.outputs.append(output)
         self.gate_calls.append(self.gate.calls - before)
+        self.turn_hypotheses.append(list(self.gate.last_hypotheses))
         self.last_snapshot_id = getattr(output, "snapshot_id", "")
 
     async def _resume(self, turn: dict[str, Any], index: int) -> None:
@@ -206,6 +213,7 @@ class ConversationRun:
         )
         assert self.gate is not None
         before = self.gate.calls
+        self.gate.last_hypotheses = []
         output = await resume_turn(
             self.last_snapshot_id,
             pin,
@@ -214,6 +222,11 @@ class ConversationRun:
         )
         self.outputs.append(output)
         self.gate_calls.append(self.gate.calls - before)
+        self.turn_hypotheses.append(list(self.gate.last_hypotheses))
+        # A resume that pauses AGAIN mints its own snapshot (the key carries the HITL
+        # round), so the next resume must follow the new one. An answer or a refusal has
+        # no snapshot id and must not clear the one a replay turn still needs.
+        self.last_snapshot_id = getattr(output, "snapshot_id", "") or self.last_snapshot_id
 
 
     async def _gate(self, turn: dict[str, Any]) -> None:

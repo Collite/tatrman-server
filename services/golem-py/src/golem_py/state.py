@@ -339,6 +339,18 @@ class ResolutionState(BaseModel):
     caller_subject: str = ""  # OBO subject; re-checked by the core on resume
     llm_invocations: int = 0
     hitl_rounds: int = 0
+    # ⛑ The instant THIS RUN started, from the injected clock. The ladder's wall-clock
+    # budget is a property of the turn, so it cannot be re-read per node — a budget object
+    # built at each node measures the node and never expires (a review found exactly
+    # that). `start` re-anchors it on every run, fresh or resumed.
+    #
+    # `exclude=True` is load-bearing, not tidiness: this is the one field whose value is a
+    # LIVE CLOCK READING, and a live reading inside a serialised lattice would make two
+    # runs of the same turn differ in their bytes — destroying the byte-identical replay
+    # everything else here is built to guarantee. It is also meaningless across processes
+    # (monotonic clocks share no epoch), so there is nothing to carry: the snapshot omits
+    # it and `start` sets it again before anything reads it.
+    turn_started_at: float | None = Field(default=None, exclude=True)
     # Which rungs have already climbed THIS TURN. A rung runs at most once per turn:
     # that is the ladder's own semantics (each rung handles the residue the previous
     # one left) and it is also the loop's termination guarantee — without it a

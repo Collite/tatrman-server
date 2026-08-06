@@ -36,7 +36,15 @@ from golem_py.ladder import DETERMINISTIC_RUNGS
 from golem_py.observability import log_node, log_turn
 from golem_py.outputs import Answer, Ask, AskOption, RefusalWithGaps, TurnOutput
 from golem_py.query_client import build_envelope
-from golem_py.state import Disposition, GapKind, Hypothesis, ResolutionState, RungLogEntry
+from golem_py.state import (
+    Disposition,
+    GapKind,
+    Hypothesis,
+    ResolutionState,
+    RungLogEntry,
+    SignedOption,
+    Span,
+)
 from golem_py.verdicts import (
     askable_gaps,
     carryable_gaps,
@@ -51,6 +59,25 @@ def _budgets(ctx: StepContext[ResolutionState, Deps, object]) -> Budgets:
     accounting per node is safe — except for the wall clock, which is anchored to the
     turn's start instant carried on the deps' clock."""
     return Budgets.for_state(ctx.state, ctx.deps.ladder, ctx.deps.clock)
+
+
+def _options_for(state: ResolutionState, span: Span) -> list[SignedOption]:
+    """The signed options that belong to the span being ASKED about.
+
+    ⛑ The ask used to offer every option the core signed, whatever gap it had chosen.
+    `askable_gaps` orders load-bearing-first then by span, so the gap it picks need not be
+    the span the core clarified — and the user was then asked about A and offered answers
+    for B. An option carrying no span is unscoped and stays offered; an option naming a
+    different span is not an answer to this question.
+
+    An empty result is honest, and already handled: it means the core did not clarify this
+    span, so free text or the escape are the only answers available.
+    """
+    return [
+        o
+        for o in state.signed_options
+        if o.span is None or (o.span.start, o.span.end) == (span.start, span.end)
+    ]
 
 
 def _record_ladder_noop(state: ResolutionState, note: str) -> None:
@@ -89,7 +116,12 @@ def build_graph() -> Graph[ResolutionState, Deps, None, TurnOutput]:
           what we offered, they said something new. There is nothing to gate — the
           honest move is to resolve the amended question deterministically, which is
           the same thing that would happen if they had typed it in the first place.
+
+        It is also where the turn's clock starts. Every run passes through here — fresh
+        or resumed — so anchoring the wall-clock budget once, HERE, is what makes it a
+        budget for the turn rather than for whichever node last looked at it.
         """
+        ctx.state.turn_started_at = ctx.deps.clock()
         pin = ctx.state.pin
         if pin is None:
             verdict: StartVerdict = "fresh"
@@ -279,6 +311,23 @@ def build_graph() -> Graph[ResolutionState, Deps, None, TurnOutput]:
             return
 
         for rung in rungs:
+            # ⛑ Re-checked BEFORE each climb, not once at entry. `eligible_rungs` filters
+            # against the counters as they stand when the ladder is entered; climbing the
+            # whole list afterwards spends a budget of one on three rungs — including
+            # `emulated`, the most expensive in the vocabulary. A budget is a cap on
+            # spending, not a gate on starting.
+            if not budgets.can_run(rung, ctx.state):
+                ctx.state.rung_log.append(
+                    RungLogEntry(
+                        round=ctx.state.next_round(),
+                        rung="ladder",
+                        action="halt",
+                        gaps_open=len(ctx.state.open_gaps()),
+                        note=f"budget exhausted before {rung} "
+                        f"(llm={ctx.state.llm_invocations}, elapsed_ms={budgets.elapsed_ms()})",
+                    )
+                )
+                break
             t0 = ctx.deps.clock()
             ctx.state.rungs_run.append(rung)
             if rung not in DETERMINISTIC_RUNGS:
@@ -319,7 +368,8 @@ def build_graph() -> Graph[ResolutionState, Deps, None, TurnOutput]:
             question=f"What does {gap.span.text!r} refer to?",
             gap_kind=gap.kind,
             options=[
-                AskOption(id=o.id, label=o.label, ref=o.ref) for o in ctx.state.signed_options
+                AskOption(id=o.id, label=o.label, ref=o.ref)
+                for o in _options_for(ctx.state, gap.span)
             ],
             resume_token=ctx.state.resume_token,
             snapshot_id=snapshot_id,

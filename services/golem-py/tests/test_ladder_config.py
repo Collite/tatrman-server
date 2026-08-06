@@ -180,3 +180,35 @@ def test_an_unknown_top_level_key_is_refused(tmp_path) -> None:  # type: ignore[
 
     with pytest.raises(ConfigError):
         LadderConfig.load(_write(tmp_path, raw))
+
+
+def test_the_rung_order_is_the_policy_tables_and_not_the_gap_sets(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """⛑ `eligible_rungs` used to iterate the caller's `set` of open gap kinds. `GapKind`
+    is a `StrEnum`, so such a set iterates in string-hash order — randomised per process
+    by CPython — and with two open kinds naming different rungs the climb order flipped
+    between runs of the same question over the same lattice:
+
+        seed=0 -> ['lookup', 'local', 'capable']
+        seed=1 -> ['capable', 'lookup', 'local']
+
+    Combined with the invocation budget that decides WHICH rungs get spent. Deterministic
+    below the LLM line is the whole thesis; the order is now the config author's.
+    """
+    raw = _default_raw()
+    raw["policy"]["G1_UNBOUND"]["rungs"] = ["lookup", "local"]
+    raw["policy"]["G4_METHOD_MISS"]["rungs"] = ["capable"]
+    ladder = LadderConfig.load(_write(tmp_path, raw))
+
+    forwards = ladder.eligible_rungs(
+        [GapKind.G1_UNBOUND, GapKind.G4_METHOD_MISS], "INVESTIGATION_DEEP"
+    )
+    backwards = ladder.eligible_rungs(
+        [GapKind.G4_METHOD_MISS, GapKind.G1_UNBOUND], "INVESTIGATION_DEEP"
+    )
+
+    # G1_UNBOUND precedes G4_METHOD_MISS in the shipped `policy:` table, so it leads —
+    # whatever order the open gaps happened to arrive in, set or list.
+    assert forwards == ["lookup", "local", "capable"]
+    assert backwards == forwards
+    as_a_set = {GapKind.G4_METHOD_MISS, GapKind.G1_UNBOUND}
+    assert ladder.eligible_rungs(as_a_set, "INVESTIGATION_DEEP") == forwards

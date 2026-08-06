@@ -18,6 +18,7 @@ import json
 import pytest
 
 from golem_py.outputs import Answer, Ask, RefusalWithGaps
+from golem_py.state import EvidenceClass
 from tests.conversation_runner import FIXTURE_DIR, drive, fixture_ids, load_fixture
 
 EXPECTED_FIXTURES = [
@@ -27,6 +28,39 @@ EXPECTED_FIXTURES = [
     "h4-refusal",
     "h5-answer-with-gap",
 ]
+
+# ⛑ EVERY key a fixture may state, and the guard below asserts nothing outside it appears.
+# A review found five keys the runner silently ignored across eleven occurrences —
+# including `no_binding_below_threshold`, which SCHEMA.md names as reused VERBATIM from
+# the `calls:` vocabulary and which the Kotlin tier does assert, and
+# `byte_identical_to_turn`, which is the entire reason h2 has a third turn. None of them
+# was a behaviour bug; every one of them was a clause of the contract that nobody
+# enforced. A shared corpus that asserts less than it says is worse than a smaller one,
+# because the second shell reads the file and believes it.
+_TURN_KEYS = {
+    "outcome",
+    "llm_invocations",
+    "asks",
+    "no_binding_below_threshold",
+    "byte_identical_to_turn",
+}
+_ASK_KEYS = {"gap_kind", "asked_span", "min_options", "escape_offered", "snapshot_stored"}
+_ANSWER_KEYS = {
+    "core_calls_total",
+    "measures",
+    "subjects",
+    "operators",
+    "inapplicable_operators",
+    "member_filters",
+    "gaps_carried",
+    "gaps_carried_spans",
+    "provenance_lexicon_artifact_hash",
+    "gated_refs",
+    "proposing_rung",
+}
+_REFUSAL_KEYS = {"refusal_reason", "min_bindings", "gap_kinds", "composable_residue"}
+_GATE_KEYS = {"gated_refs", "evidence_classes", "proposing_rung", "gap_kinds"}
+KNOWN_TURN_KEYS = _TURN_KEYS | _ASK_KEYS | _ANSWER_KEYS | _REFUSAL_KEYS
 
 
 def test_the_corpus_holds_exactly_the_five_heroes() -> None:
@@ -44,6 +78,18 @@ def test_every_fixture_states_its_invariants_and_names_its_corpus(name: str) -> 
     assert fixture["corpus"] == "hartland_cz"
     assert fixture["invariants"], "a fixture with no stated invariant teaches nothing"
     assert fixture["turns"], "a fixture with no turns asserts nothing"
+
+
+@pytest.mark.parametrize("name", EXPECTED_FIXTURES)
+def test_no_fixture_states_an_expectation_the_runner_never_reads(name: str) -> None:
+    """The guard the corpus was missing. Every `expect:` key must be one this runner
+    actually asserts — otherwise a fixture can claim anything and stay green, which is
+    how a shared corpus quietly stops binding the shell it was written for."""
+    for position, turn in enumerate(load_fixture(name)["turns"], 1):
+        expect = turn.get("expect", {})
+        known = _GATE_KEYS if turn["tool"] == "resolve.gate:v1" else KNOWN_TURN_KEYS
+        unknown = sorted(set(expect) - known)
+        assert not unknown, f"{name} turn {position} states unread key(s): {unknown}"
 
 
 @pytest.mark.parametrize("name", EXPECTED_FIXTURES)
@@ -74,9 +120,71 @@ async def test_fixture(name: str) -> None:
         _assert_gate(turn.get("expect", {}), run, position)
 
 
+def _bindings(output: object) -> list[object]:
+    """Every binding in a turn's lattice — on mentions AND on value attributions."""
+    lattice = getattr(output, "lattice", None)
+    if lattice is None:
+        return []
+    found: list[object] = [b for m in lattice.mentions for b in m.bindings]
+    found += [
+        a.binding for v in lattice.values for a in v.attributions if a.binding is not None
+    ]
+    return found
+
+
+def _llm_invocations(output: object) -> int:
+    """An `Answer` reports its own count; an `Ask` or a refusal carries it on the lattice.
+    Stating `llm_invocations: 0` on a PAUSE is a legitimate claim — H2 makes it — so the
+    check cannot live inside the answer branch, which is where it used to sit."""
+    lattice = getattr(output, "lattice", None)
+    return int(lattice.llm_invocations) if lattice is not None else 0
+
+
+def _asks(output: object) -> int:
+    """HITL rounds spent this turn, off the lattice — see the `llm_invocations` note."""
+    lattice = getattr(output, "lattice", None)
+    return int(lattice.hitl_rounds) if lattice is not None else 0
+
+
 def _assert_turn(name: str, index: int, expect: dict, output: object, run: object) -> None:  # type: ignore[type-arg]
     where = f"{name} turn {index + 1}"
     outcome = expect.get("outcome")
+
+    # ---- outcome-independent, because the claims are (formerly unread, all six) ----
+    if "llm_invocations" in expect:
+        assert _llm_invocations(output) == expect["llm_invocations"], where
+
+    if "asks" in expect:
+        # H4 states `asks: 0` on a REFUSAL and h2 states `asks: 1` on an answer reached
+        # through a pause; the count is the turn's, not the outcome's, so it is read off
+        # the lattice rather than off `Answer.asks` (which agrees with it).
+        assert _asks(output) == expect["asks"], where
+
+    if expect.get("no_binding_below_threshold"):
+        # The refusal-over-guess invariant, in this corpus's terms: WEAK never binds
+        # (RV-14), and UNSPECIFIED is weaker than WEAK — `rank()` says so rather than
+        # leaving it to a comparison. Nothing below the floor may sit in the lattice a
+        # turn hands back, whatever that turn's outcome was.
+        for binding in _bindings(output):
+            evidence = binding.evidence_class  # type: ignore[attr-defined]
+            assert evidence.rank() < EvidenceClass.WEAK.rank(), (
+                f"{where}: {binding.ref!r} bound at {evidence.value}"  # type: ignore[attr-defined]
+            )
+
+    if "byte_identical_to_turn" in expect:
+        # At-least-once delivery is the norm, so a redelivery must produce the same bytes
+        # — the property P4.2·T1(c) exists for, stated in the fixture and, until now,
+        # asserted nowhere. The index is 0-based over the NON-GATE turns (== `outputs`).
+        other = run.outputs[expect["byte_identical_to_turn"]]  # type: ignore[attr-defined]
+        assert output.model_dump_json() == other.model_dump_json(), where  # type: ignore[attr-defined]
+
+    if "proposing_rung" in expect and outcome != "gate":
+        # RV-7 about the USER's pin: what matters is what we PROPOSED, not what the
+        # recorded gate echoed. A pin's rung is `user`, deliberately outside the four-rung
+        # vocabulary, so the ladder's health numbers cannot be made to lie by it.
+        sent = run.turn_hypotheses[index]  # type: ignore[attr-defined]
+        assert sent, f"{where}: expected a hypothesis carrying a proposing rung"
+        assert all(h.proposing_rung == expect["proposing_rung"] for h in sent), where
 
     if outcome == "ask":
         assert isinstance(output, Ask), where
@@ -110,10 +218,6 @@ def _assert_turn(name: str, index: int, expect: dict, output: object, run: objec
 
     assert outcome == "answer", where
     assert isinstance(output, Answer), where
-    if "llm_invocations" in expect:
-        assert output.llm_invocations == expect["llm_invocations"], where
-    if "asks" in expect:
-        assert output.asks == expect["asks"], where
     if "core_calls_total" in expect:
         assert run.core.calls == expect["core_calls_total"], where  # type: ignore[attr-defined]
     envelope = output.envelope

@@ -102,6 +102,83 @@ async def test_a_pinned_state_rejoins_at_assess_gaps_and_never_recalls_the_core(
     assert core.calls == 0
 
 
+# ------------------------------------------------------------------ budgets, assembled
+#
+# ⛑ Both of these are graph-level ON PURPOSE. The unit tests for the same machinery pass
+# and passed throughout: `Budgets` was proven correct by constructing one directly, and
+# rung eligibility was proven correct by calling `eligible_rungs`. What was wrong was the
+# ASSEMBLY — who builds the budget object, and how often the ladder consults it — and an
+# assembly bug is invisible to a test that assembles nothing.
+
+
+def _ladder_with(tmp_path, rungs: list[str], **profile: object):  # type: ignore[no-untyped-def]
+    import yaml
+
+    from golem_py.ladder import DEFAULT_CONFIG_PATH
+
+    raw = yaml.safe_load(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+    raw["policy"]["G1_UNBOUND"]["rungs"] = rungs
+    raw["profiles"]["INVESTIGATION_DEEP"].update(profile)
+    path = tmp_path / "ladder.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    return LadderConfig.load(path)
+
+
+class _SlowCore:
+    """A core that costs wall-clock time — the thing no recorded core could express."""
+
+    def __init__(self, lattice: ResolutionState, clock: list[float], cost_s: float):
+        self._lattice, self._clock, self._cost = lattice, clock, cost_s
+
+    async def resolve(self, **_: object) -> ResolutionState:
+        self._clock[0] += self._cost
+        return self._lattice.model_copy(deep=True)
+
+
+@pytest.mark.asyncio
+async def test_the_ladder_budget_is_spent_by_the_TURN_not_reset_at_every_node(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """⛑ `_budgets(ctx)` rebuilds `Budgets` per node, and `Budgets` anchored `started_at`
+    to NOW — so `ladder_budget_ms` measured the node it was built in and could never be
+    exceeded however long the turn ran. Sixty seconds into a turn budgeted at five, the
+    assessment still admitted an LLM rung.
+
+    The turn's start is anchored once, in `start`, and every run passes through it.
+    """
+    clock = [0.0]
+    ladder = _ladder_with(tmp_path, ["local"], ladder_budget_ms=5000)
+    state = g1_subject_gap()
+    state.profile = "INVESTIGATION_DEEP"
+    core = _SlowCore(g1_subject_gap(), clock, cost_s=60.0)
+
+    _, visited = await run_traced(
+        state, deps(core, ladder=ladder, gate=RecordedGate(), clock=lambda: clock[0])
+    )
+
+    assert "ladder_loop" not in visited, "the ladder ran on a wall clock that had expired"
+    assert "ask" in visited
+
+
+@pytest.mark.asyncio
+async def test_the_climb_stops_when_the_invocation_budget_runs_out_mid_ladder(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """⛑ `ladder_loop` filtered eligibility ONCE at entry and then climbed the whole
+    list, so a budget of one bought three invocations — including `emulated`, the most
+    expensive rung in the vocabulary. A budget is a cap on spending, not a gate on
+    starting."""
+    ladder = _ladder_with(tmp_path, ["local", "capable", "emulated"], max_llm_invocations=1)
+    state = g1_subject_gap()
+    state.profile = "INVESTIGATION_DEEP"
+
+    out, visited = await run_traced(
+        state, deps(RecordedCore(g1_subject_gap()), ladder=ladder, gate=RecordedGate())
+    )
+
+    assert "ladder_loop" in visited
+    assert out.lattice is not None
+    assert out.lattice.llm_invocations == 1
+    assert out.lattice.rungs_run == ["local"]
+    assert any(e.action == "halt" for e in out.lattice.rung_log), "the halt must be auditable"
+
+
 # ------------------------------------------------------- verdict → node routing (T2·d)
 
 
