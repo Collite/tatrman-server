@@ -143,10 +143,10 @@ def g1_subject_gap() -> ResolutionState:
     """H2's turn 1 — an unknown word in SUBJECT position: the load-bearing G1 that
     makes the Golem ask instead of guessing."""
     return ResolutionState(
-        mentions=[Mention(id="m1", span=Span(start=0, end=16, text="čerpací stanice"))],
+        mentions=[Mention(id="m1", span=Span(start=18, end=34, text="čerpacích stanic"))],
         gaps=[
             GapRecord(
-                span=Span(start=0, end=16, text="čerpací stanice"),
+                span=Span(start=18, end=34, text="čerpacích stanic"),
                 kind=GapKind.G1_UNBOUND,
                 frame_roles=[FrameRole.SUBJECT],
                 mention_id="m1",

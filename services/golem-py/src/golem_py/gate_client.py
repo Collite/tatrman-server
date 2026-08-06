@@ -195,7 +195,12 @@ def apply_gate_result(state: ResolutionState, result: GateResult) -> None:
         )
         if target is None:
             continue
-        target.bindings.append(outcome.binding)
-    state.gaps = result.updated_gaps
+        target.bindings.append(outcome.binding.model_copy(deep=True))
+    # ⛑ COPIES, not the response's own objects. Found by the replay test: a lattice that
+    # ALIASES a gate response shares mutable records with it, so the emit step's
+    # disposition writes (`IGNORED`/`DEGRADED`) leaked back into the response — and a
+    # second delivery of the same resume then read gaps that were already closed and
+    # carried nothing. Determinism under replay is only real if the fold copies.
+    state.gaps = [gap.model_copy(deep=True) for gap in result.updated_gaps]
     if result.rung_log_entry is not None:
-        state.rung_log.append(result.rung_log_entry)
+        state.rung_log.append(result.rung_log_entry.model_copy(deep=True))

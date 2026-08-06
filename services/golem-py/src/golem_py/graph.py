@@ -29,17 +29,19 @@ from pydantic_graph import Graph, GraphBuilder, StepContext, TypeExpression
 
 from golem_py.budgets import Budgets
 from golem_py.deps import Deps
+from golem_py.errors import GateUnavailable, UnknownOption
+from golem_py.gate_client import apply_gate_result
 from golem_py.ladder import DETERMINISTIC_RUNGS
 from golem_py.observability import log_node, log_turn
-from golem_py.outputs import Answer, Ask, RefusalWithGaps, TurnOutput
-from golem_py.state import Disposition, GapKind, ResolutionState, RungLogEntry
+from golem_py.outputs import Answer, Ask, AskOption, RefusalWithGaps, TurnOutput
+from golem_py.state import Disposition, GapKind, Hypothesis, ResolutionState, RungLogEntry
 from golem_py.verdicts import (
     askable_gaps,
     carryable_gaps,
     eligible_rungs,
 )
 
-StartVerdict = Literal["resume", "fresh"]
+StartVerdict = Literal["resume", "reresolve", "fresh"]
 
 
 def _budgets(ctx: StepContext[ResolutionState, Deps, object]) -> Budgets:
@@ -75,12 +77,120 @@ def build_graph() -> Graph[ResolutionState, Deps, None, TurnOutput]:
 
     @g.step
     async def start(ctx: StepContext[ResolutionState, Deps, None]) -> StartVerdict:
-        """THE resume fork. A pin means this run is the second half of a paused turn,
-        so the deterministic resolve already happened — rejoin at `assess_gaps` and do
-        not pay for it twice."""
-        verdict: StartVerdict = "resume" if ctx.state.pin is not None else "fresh"
+        """THE resume fork, three ways.
+
+        * no pin ⇒ **fresh**: the ordinary turn.
+        * a pin naming a signed OPTION (or the escape) ⇒ **resume**: the deterministic
+          resolve already happened, so rejoin the loop and do not pay for it twice —
+          nor risk a second lattice differing from the one the user was asked about.
+        * a pin carrying only FREE TEXT ⇒ **reresolve**: the user did not choose from
+          what we offered, they said something new. There is nothing to gate — the
+          honest move is to resolve the amended question deterministically, which is
+          the same thing that would happen if they had typed it in the first place.
+        """
+        pin = ctx.state.pin
+        if pin is None:
+            verdict: StartVerdict = "fresh"
+        elif pin.is_option() or pin.is_escape():
+            verdict = "resume"
+        else:
+            verdict = "reresolve"
         log_node(ctx.state, "start", verdict=verdict)
         return verdict
+
+    @g.step
+    async def amend_question(ctx: StepContext[ResolutionState, Deps, object]) -> None:
+        """Fold a free-text answer into the question, then fall through to `call_core`.
+
+        ⚑ RULED at P4.2·T1(e): the user was asked "what does X refer to", so their
+        answer REPLACES X in the question. If the asked span cannot be found in the
+        question text (a re-ask after an edit, say), the answer is APPENDED rather than
+        dropped — losing what the user typed is the one outcome that is never right.
+        """
+        pin = ctx.state.pin
+        assert pin is not None
+        answer = pin.free_text.strip()
+        span = ctx.state.asked_gap_span
+        if span is not None and span.text and span.text in ctx.state.question:
+            ctx.state.question = ctx.state.question.replace(span.text, answer, 1)
+        else:
+            ctx.state.question = f"{ctx.state.question} {answer}".strip()
+        for gap in ctx.state.gaps:
+            if span is not None and gap.span.start == span.start and gap.span.end == span.end:
+                gap.user_answer = answer
+        # The amended question gets a fresh lattice; the OLD one must not survive into
+        # it, or a stale gap would drive the loop over a question nobody asked.
+        ctx.state.pin = None
+        ctx.state.mentions = []
+        ctx.state.values = []
+        ctx.state.gaps = []
+        ctx.state.rungs_run = []
+        ctx.state.signed_options = []
+        log_node(ctx.state, "amend_question", question=ctx.state.question)
+
+    @g.step
+    async def apply_pin(ctx: StepContext[ResolutionState, Deps, object]) -> None:
+        """Turn the user's choice into a HYPOTHESIS and put it through the gate.
+
+        RV-7 with the user in the loop: a pin is a hypothesis with user provenance, and
+        it becomes a binding only by surviving the same evidence-class gate as any
+        other candidate. Binding it agent-side because "the user said so" would make the
+        user the one proposer who bypasses the rules — and the user is exactly the
+        proposer most likely to name something the vocabulary does not have.
+
+        The ESCAPE ("none of these") gates nothing: it proposes no ref. It closes the
+        gap as `USER_CONFIRMED_UNKNOWN`, which is an answer — the question was asked and
+        settled — without pretending anything bound.
+        """
+        pin = ctx.state.pin
+        assert pin is not None
+        ctx.state.pin = None
+        span = ctx.state.asked_gap_span
+        target = next(
+            (
+                g
+                for g in ctx.state.gaps
+                if span is not None and g.span.start == span.start and g.span.end == span.end
+            ),
+            None,
+        )
+
+        if pin.is_escape():
+            if target is not None:
+                target.disposition = Disposition.USER_CONFIRMED_UNKNOWN
+                target.user_answer = pin.free_text or "none of these"
+            log_node(ctx.state, "apply_pin", outcome="escape")
+            return
+
+        option = next((o for o in ctx.state.signed_options if o.id == pin.option_id), None)
+        if option is None:
+            # A pin naming an option the core never signed. Refusing to invent one is
+            # the whole point of storing the signed set rather than trusting the caller.
+            raise UnknownOption(pin.option_id)
+        if ctx.deps.gate is None:
+            raise GateUnavailable()
+
+        hypothesis = Hypothesis(
+            span=option.span or (target.span if target is not None else None),
+            ref=option.ref,
+            # ⚑ `user`, deliberately outside the four-rung vocabulary (contracts §3):
+            # this proposal did not come from a rung, and recording it as one would
+            # make the ladder's health numbers lie. Recorded for Bora — the proto's
+            # `proposing_rung` is a free string, so this is additive, not a violation.
+            proposing_rung="user",
+        )
+        result = await ctx.deps.gate.gate(lattice=ctx.state, hypotheses=[hypothesis])
+        apply_gate_result(ctx.state, result)
+        if target is not None:
+            for gap in ctx.state.gaps:
+                if gap.span.start == target.span.start and gap.span.end == target.span.end:
+                    gap.user_answer = option.label or option.ref
+        log_node(
+            ctx.state,
+            "apply_pin",
+            ref=option.ref,
+            accepted=sum(1 for o in result.outcomes if o.accepted),
+        )
 
     @g.step
     async def call_core(ctx: StepContext[ResolutionState, Deps, object]) -> None:
@@ -102,6 +212,10 @@ def build_graph() -> Graph[ResolutionState, Deps, None, TurnOutput]:
         ctx.state.trace_id = lattice.trace_id or ctx.state.trace_id
         if lattice.resume_token:
             ctx.state.resume_token = lattice.resume_token
+        # The option set the core signed into that token travels with it — a pin is
+        # honoured only against this list, so losing it here would make every option
+        # unhonourable at resume.
+        ctx.state.signed_options = lattice.signed_options
         # The core writes round 0 of the rung log for its own pass; if it did not (an
         # older door), record it here rather than leaving the trail starting at 1.
         ctx.state.rung_log.extend(lattice.rung_log)
@@ -186,20 +300,37 @@ def build_graph() -> Graph[ResolutionState, Deps, None, TurnOutput]:
 
     @g.step
     async def ask(ctx: StepContext[ResolutionState, Deps, object]) -> Ask:
-        """Pause. P4.2 gives this node the snapshot store and the option set; P4.1
-        emits the question and the core's token, which is what the graph can honestly
-        produce today."""
+        """Pause. The token is the core's, the snapshot is ours, and they travel side
+        by side (P0-3·T5).
+
+        The ask budget is spent HERE and the counter rides the snapshot, which is what
+        makes a replayed resume unable to buy a second question: the replay reads the
+        stored state, where the round is already counted.
+        """
         _record_ladder_noop(ctx.state, "ask reached with no rung climbed (zero-rung default)")
         gap = askable_gaps(ctx.state, ctx.deps.ladder)[0]
         ctx.state.hitl_rounds += 1
         gap.asked_round = ctx.state.hitl_rounds
+        ctx.state.asked_gap_span = gap.span
+        snapshot_id = ctx.deps.snapshots.put(ctx.state)
         out = Ask(
             question=f"What does {gap.span.text!r} refer to?",
             gap_kind=gap.kind,
+            options=[
+                AskOption(id=o.id, label=o.label, ref=o.ref) for o in ctx.state.signed_options
+            ],
             resume_token=ctx.state.resume_token,
+            snapshot_id=snapshot_id,
             lattice=ctx.state,
         )
-        log_node(ctx.state, "ask", gap_kind=gap.kind.value, round=ctx.state.hitl_rounds)
+        log_node(
+            ctx.state,
+            "ask",
+            gap_kind=gap.kind.value,
+            round=ctx.state.hitl_rounds,
+            snapshot=snapshot_id,
+            options=len(out.options),
+        )
         log_turn(ctx.state, "ask")
         return out
 
@@ -253,9 +384,15 @@ def build_graph() -> Graph[ResolutionState, Deps, None, TurnOutput]:
         # run BOTH targets, silently (P0-3's most expensive finding).
         g.edge_from(start).to(
             g.decision()
-            .branch(g.match(TypeExpression[Literal["resume"]]).to(assess_gaps))
+            .branch(g.match(TypeExpression[Literal["resume"]]).to(apply_pin))
+            .branch(g.match(TypeExpression[Literal["reresolve"]]).to(amend_question))
             .branch(g.match(TypeExpression[Literal["fresh"]]).to(call_core))
         ),
+        # A resume rejoins the loop at `assess_gaps` (RV-11) — `apply_pin` is on the way
+        # in, not a second door: it gates the user's choice and hands the recomputed
+        # lattice to the same assessment every other path reaches.
+        g.edge_from(apply_pin).to(assess_gaps),
+        g.edge_from(amend_question).to(call_core),
         g.edge_from(call_core).to(assess_gaps),
         g.edge_from(assess_gaps).to(
             g.decision()

@@ -34,9 +34,9 @@ def _accepted_response() -> resolver_pb2.GateResponse:
     outcome = resp.outcomes.add()
     outcome.hypothesis.ref = "md.dimension.Customer.category"
     outcome.hypothesis.proposing_rung = "local"
-    outcome.hypothesis.span.start = 0
-    outcome.hypothesis.span.end = 16
-    outcome.hypothesis.span.text = "čerpací stanice"
+    outcome.hypothesis.span.start = 18
+    outcome.hypothesis.span.end = 34
+    outcome.hypothesis.span.text = "čerpacích stanic"
     outcome.accepted = True
     outcome.binding.ref = "md.dimension.Customer.category"
     outcome.binding.target_class = resolver_pb2.TARGET_CLASS_MODEL_OBJECT

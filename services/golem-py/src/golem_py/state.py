@@ -224,14 +224,25 @@ class GapRecord(BaseModel):
     def is_load_bearing(self) -> bool:
         """RV-15: an ask fires on a load-bearing gap only.
 
-        SUBJECT is load-bearing. A gap carrying NO role at all is treated as
-        load-bearing too — not because it is known to be, but because nothing shows it
-        is safe to ignore, and the honest posture under uncertainty is to ask rather
-        than to drop silently.
+        SUBJECT is load-bearing, always. Beyond that the answer differs by WHICH layer
+        the gap sits on, and the difference is deliberate (⚑ ruled at P4.2·T6):
+
+        * a **mention** gap with no roles at all IS load-bearing. A content phrase the
+          core could not bind is the question's own vocabulary; nothing shows it is
+          safe to ignore, and under uncertainty the honest posture is to ask rather
+          than to drop silently.
+        * a **value** gap with no roles is NOT. A value's structural position is its
+          ANCHOR's (contracts §1), so an unanchored literal — H2's *Praze*, a LOCATION
+          hint nothing attributed — has no position to be load-bearing in. Asking about
+          it would spend the conversation's single question on a word the answer does
+          not depend on; carrying it as a gap note (RV-19) is what honesty looks like
+          here.
         """
-        return FrameRole.SUBJECT in self.frame_roles or not [
-            r for r in self.frame_roles if r != FrameRole.UNSPECIFIED
-        ]
+        if FrameRole.SUBJECT in self.frame_roles:
+            return True
+        if [r for r in self.frame_roles if r != FrameRole.UNSPECIFIED]:
+            return False
+        return not self.value_id
 
 
 class RungLogEntry(BaseModel):
@@ -265,6 +276,22 @@ class LexiconVersions(BaseModel):
     overlay_version: str | None = None  # ABSENT until RV-P7 — absence is the contract
 
 
+class SignedOption(BaseModel):
+    """One option from the core's `AwaitingClarification` — SIGNED INTO the resume
+    token. The `id` is what travels back; the ref is carried only so the ask can be
+    rendered and so a pin can be turned into a hypothesis about a real ref.
+
+    We do not invent options. An ask with an empty option set is honest: it means the
+    core did not clarify this span, so the only answer available is free text or the
+    escape."""
+
+    id: str = ""
+    label: str = ""
+    ref: str = ""
+    entity_type_ref: str = ""
+    span: Span | None = None
+
+
 class Pin(BaseModel):
     """The user's answer to an ask, carried into the resume turn.
 
@@ -276,9 +303,16 @@ class Pin(BaseModel):
 
     option_id: str = ""
     free_text: str = ""
+    # The escape hatch (RV-15): "none of these" is a legitimate ANSWER — it settles the
+    # gap as USER_CONFIRMED_UNKNOWN instead of leaving it open forever — and it must
+    # never be mistaken for a free-text amendment, which re-resolves.
+    escape: bool = False
 
     def is_option(self) -> bool:
         return bool(self.option_id)
+
+    def is_escape(self) -> bool:
+        return self.escape
 
 
 class ResolutionState(BaseModel):
@@ -312,6 +346,11 @@ class ResolutionState(BaseModel):
     rungs_run: list[str] = Field(default_factory=list)
     pin: Pin | None = None  # the user's answer, applied on resume
     resume_token: str = ""  # RS-26; signed by the CORE, opaque to us
+    # The option set the core signed into that token. Stored, never minted.
+    signed_options: list[SignedOption] = Field(default_factory=list)
+    # The gap the outstanding ask is about — so a resume knows what the user answered
+    # without re-deriving it from an ask order that may have changed.
+    asked_gap_span: Span | None = None
     trace_id: str = ""
 
     def open_gaps(self) -> list[GapRecord]:

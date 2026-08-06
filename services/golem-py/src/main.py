@@ -61,7 +61,13 @@ async def _run(args: argparse.Namespace) -> int:
         caller_subject=args.subject,
     )
     output = await run_turn(state, deps)
-    print(json.dumps({"type": type(output).__name__, **output.model_dump(mode="json")}, indent=2, ensure_ascii=False))
+    print(
+        json.dumps(
+            {"type": type(output).__name__, **output.model_dump(mode="json")},
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 

@@ -45,6 +45,7 @@ from golem_py.state import (  # noqa: E402
     Provenance,
     ResolutionState,
     RungLogEntry,
+    SignedOption,
     SourceTag,
     Span,
     TargetClass,
@@ -246,8 +247,19 @@ def response_to_state(resp: Any, *, question: str = "") -> ResolutionState:
     state.trace_id = resp.trace_id
     if resp.WhichOneof("outcome") == "awaiting":
         # The ONLY place a resume token exists. The core signs it; we store and return
-        # it, never mint it (RS-26 / P0-3 T5).
+        # it, never mint it (RS-26 / P0-3 T5). The option set is signed INTO that token,
+        # so it is stored beside it — a pin is honoured only against this list.
         state.resume_token = resp.awaiting.resume_token
+        state.signed_options = [
+            SignedOption(
+                id=o.id,
+                label=o.label,
+                ref=o.target_ref or o.resolved_id,
+                entity_type_ref=o.entity_type_ref,
+                span=_span(o.span) if o.HasField("span") else None,
+            )
+            for o in resp.awaiting.options
+        ]
     return state
 
 

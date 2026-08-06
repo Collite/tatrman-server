@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 from golem_py.ladder import LadderConfig, load_default
+from golem_py.settings import GolemSettings
+from golem_py.snapshots import InMemorySnapshotStore, SnapshotStore
 from golem_py.state import Binding, GapRecord, Hypothesis, ResolutionState, RungLogEntry
 
 
@@ -67,9 +69,16 @@ class GatePort(Protocol):
 
 @dataclass
 class Deps:
-    """Injected per run."""
+    """Injected per run.
+
+    `gate` is optional at construction but not at RESUME: a pin becomes a binding only
+    by surviving `resolve.gate:v1` (RV-7), so a resume without one raises rather than
+    honouring the pin locally.
+    """
 
     core: CorePort
     gate: GatePort | None = None
     ladder: LadderConfig = field(default_factory=load_default)
+    settings: GolemSettings = field(default_factory=GolemSettings)
+    snapshots: SnapshotStore = field(default_factory=InMemorySnapshotStore)
     clock: Callable[[], float] = time.monotonic

@@ -22,9 +22,17 @@ from golem_py.state import (
     Mention,
     Pin,
     ResolutionState,
+    SignedOption,
     Span,
 )
-from tests.helpers import RecordedCore, deps, g1_subject_gap, h1_lattice, run_traced
+from tests.helpers import (
+    RecordedCore,
+    RecordedGate,
+    deps,
+    g1_subject_gap,
+    h1_lattice,
+    run_traced,
+)
 
 # --------------------------------------------------------------- structural (T2·b)
 
@@ -73,16 +81,23 @@ async def test_fresh_turn_starts_at_call_core() -> None:
 async def test_a_pinned_state_rejoins_at_assess_gaps_and_never_recalls_the_core() -> None:
     """RV-11: a resume rejoins `assess_gaps`. Paying for a second deterministic resolve
     would be wrong twice over — the cost, and the risk that the second lattice differs
-    from the one the user was asked about."""
+    from the one the user was asked about.
+
+    `apply_pin` sits on the way IN (P4.2): the pin is gated before the assessment, not
+    bound beside it. The property this test guards is unchanged — the core is not
+    called again.
+    """
     core = RecordedCore(g1_subject_gap())
     state = g1_subject_gap()
     state.question = "..."
+    state.asked_gap_span = state.gaps[0].span
+    state.signed_options = [SignedOption(id="opt-1", label="Gas stations", ref="md.x")]
     state.pin = Pin(option_id="opt-1")
 
-    _, visited = await run_traced(state, deps(core))
+    _, visited = await run_traced(state, deps(core, gate=RecordedGate()))
 
     assert "call_core" not in visited
-    assert visited[:3] == ["start", "decision", "assess_gaps"]
+    assert visited[:4] == ["start", "decision", "apply_pin", "assess_gaps"]
     assert core.calls == 0
 
 
