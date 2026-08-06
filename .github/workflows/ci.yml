@@ -122,6 +122,12 @@ jobs:
         with:
           python-version: '3.13'
 
+      # RV-P4.4: `just conformance-service-level` now also drives the conversation tier
+      # (`just test-py services/golem-py`), which is a uv project.
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - uses: extractions/setup-just@v2
 
       - name: conformance (service-level, gating)

@@ -1,0 +1,38 @@
+{
+  "id": "h1-answer",
+  "description": "H1 — the 0-LLM proof, one turn. 'Zobraz náklady účtu 501001 v roce 2025 podle období' resolves gap-free below the door line, composes to a structured question over modeled entities, and answers with ZERO LLM invocations and ZERO asks. The numbers are the claim, so they are asserted numerically rather than described.",
+  "surface": "golem",
+  "corpus": "hartland_cz",
+  "invariants": [
+    "an ask is not an answer",
+    "zero LLM invocations is a NUMBER, not a posture — assert it",
+    "the answer names the vocabulary that bound it (the RV-39 layer tuple rides the envelope)"
+  ],
+  "turns": [
+    {
+      "tool": "golem.turn:v1",
+      "args": {
+        "conversation_id": "c-h1",
+        "turn_id": "t-1",
+        "text": "Zobraz náklady účtu 501001 v roce 2025 podle období",
+        "locale": "cs",
+        "caller_subject": "user-a",
+        "profile": "CHAT_QUICK"
+      },
+      "core": { "lattice": "h1-cs" },
+      "expect": {
+        "outcome": "answer",
+        "llm_invocations": 0,
+        "asks": 0,
+        "core_calls_total": 1,
+        "measures": ["md.measure.cost"],
+        "subjects": ["md.measure.cost"],
+        "operators": ["op:show"],
+        "gaps_carried": [],
+        "member_filters": ["md.dimension.Account.code#501001"],
+        "provenance_lexicon_artifact_hash": "sha256:h1-lexicon",
+        "no_binding_below_threshold": true
+      }
+    }
+  ]
+}

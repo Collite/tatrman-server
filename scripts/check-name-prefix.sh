@@ -38,7 +38,10 @@ cd "$(dirname "$0")/.."
 # container), taken at RV-P1.4 T3 alongside the already-listed `ttr-lexicon`, which
 # it carries. `ttr-lexicon-compile` needs no entry of its own: `lexicon` strips the
 # prefix and leaves `-compile`, which the left-hand guard no longer matches.
-ALLOW='ttr-(metadata-git|metadata-adoption|metadata|translator-extraction|translator|plan-proto|parser|writer|semantics|server-proto|snapshot|lexicon|skill|nlp-routing|server|umbrella-ci|umbrella|\*|\{)'
+# `ttr-operator-library` (RV-P4.4) is an RV SCHEMA ID, the same class as `ttr-lexicon`
+# and `ttr-skill`: it is the `schemaVersion` inside the compiled operator-library
+# artifact that `tatrman`'s compiler writes, so golem-py must spell it exactly.
+ALLOW='ttr-(metadata-git|metadata-adoption|metadata|translator-extraction|translator|plan-proto|parser|writer|semantics|server-proto|snapshot|lexicon|skill|operator-library|nlp-routing|server|umbrella-ci|umbrella|\*|\{)'
 
 hits="$(
   git grep -nI -P '(?<![A-Za-z0-9_])ttr-' -- . ':(exclude)scripts/check-name-prefix.sh' \

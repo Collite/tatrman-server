@@ -6,13 +6,14 @@ demonstrated" gate; the other two tiers seed the fuller E2E coverage that SV-P4 
 
 | Tier | Runnable | Gating? | What it asserts |
 |---|---|---|---|
-| **Service-level** | `just conformance-service-level` | **YES** (CI) | The four service-level corpora pass, hermetic + self-contained + **no DFP dependency**. |
+| **Service-level** | `just conformance-service-level` | **YES** (CI) | The service-level corpora + the RV-P4 conversation tier pass, hermetic + self-contained + **no DFP dependency**. |
 | **E2E core** (`calls:`) | `services/resolver/.../conformance/calls/` seeds (`CallsSeedConformanceTest`, `RefusalOverGuessConformanceTest`, gated) | drivable seeds run vs the REAL pipeline; full at SV-P4 | Multi-turn door conversations. The refusal-over-guess + clarification-round-trip seeds drive the actual `ResolverPipeline` (SpanProposal → GateSpans → HMAC codec) via hermetic nlp/fuzzy fakes; `seed_only` fixtures (hero, geo-dark) are shape-validated pending the live SV-P4 stack. |
 | **Extended** (pilot) | `just eval-grounding` (live) | **NO** (scored-not-gating) | Live grounding eval over the pilot corpus (arrives via RO-19 ask ③). Reports pass-rate; never fails CI. |
 
 ## The gating service-level tier — `just conformance-service-level`
 
-Runs five **hermetic** service-level corpora (zero live services, zero DFP):
+Runs six **hermetic** corpora (zero live services, zero DFP) — five service-level, plus
+the RV-P4 conversation tier that sits above them:
 
 1. **ENTITIES_ONLY** (resolver) — `Q20ParityTest` over
    `services/resolver/src/test/resources/q20/ucetnictvi_entities_only.jsonl` (12 cases).
@@ -54,7 +55,20 @@ Runs five **hermetic** service-level corpora (zero live services, zero DFP):
    **both** directions (the right binding present AND the wrong one absent).
    Provenance: the parses are the RV-P0.2 spike's real cached Stanza output; only the NER layer
    is authored, and `lattice/PROVENANCE.md` names every entity it adds and why.
-5. **Grounding hermetic** — `eval/grounding/tests/` (`test_corpus_valid.py` + `test_report.py`,
+5. **Conformance CONVERSATIONS** (golem-py — RV-P4.4 T2/T3, the **P4 phase gate**) —
+   the five hero conversations under [`conformance/conversations/`](conversations/)
+   (`h1-answer` · `h1prime-regate` · `h2-ask-pin-resume` · `h4-refusal` ·
+   `h5-answer-with-gap`), driven through the Python OS Golem by
+   `services/golem-py/tests/test_conformance_conversations.py`. Multi-turn, hermetic:
+   the core is RECORDED from the resolver's own lattice goldens, so a core change fails
+   this tier the same day it fails `LatticeGoldenTest`. Asserted numerically where the
+   claim is a number — H1 is `llm_invocations == 0 ∧ asks == 0`.
+   **These fixtures are SHARED**: RV-P5's Kotlin Golem must pass the same files
+   unchanged (RV-28 — one corpus, one core, N shells), which is why they live here
+   rather than inside one service's test resources. Schema + the invariant vocabulary:
+   [`conversations/SCHEMA.md`](conversations/SCHEMA.md). Hash-pinned like every other
+   corpus here.
+6. **Grounding hermetic** — `eval/grounding/tests/` (`test_corpus_valid.py` + `test_report.py`,
    18 checks): corpus-validity of the 109-case bulk + 21-case e2e corpora, and the pure `report.py`
    scoring logic. The **live** run (`run_eval.py` → grounding-mcp + Golem) is the extended tier, NOT here.
 

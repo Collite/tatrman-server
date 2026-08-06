@@ -242,6 +242,12 @@ conformance-service-level:
     ./gradlew :services:lex-matcher:test --tests '*MatchQualityCorpusTest*'
     ./gradlew :services:lex-matcher:test --tests '*LexiconConformanceTest*'
     just eval-grounding-test
+    # RV-P4.4.T3 — the conformance-CONVERSATION tier (the P4 phase gate). Hermetic: the
+    # five hero conversations in conformance/conversations/ driven through golem-py
+    # against the resolver's OWN lattice goldens, so a core change fails this the same
+    # day it fails the Kotlin tier. The SAME fixtures are what RV-P5's Kotlin Golem must
+    # pass (RV-28: one corpus, N shells).
+    just test-py services/golem-py
 
 # Pin the three-tier corpora by content hash (RG-P6 review I): the recorded provenance
 # in conformance/README.md is now ENFORCED — a silent corpus edit (even whitespace /

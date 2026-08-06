@@ -1,0 +1,74 @@
+{
+  "id": "h1prime-regate",
+  "description": "H1′ — the correction pair, in the Golem shell. Turn 1: 'Zobraz náklady účtu 5010O1 …' — the typo'd code is NOT bound (a G4_METHOD_MISS on a value in FILTER position), so the turn ANSWERS and carries the miss as an honest note rather than guessing an account. Turn 2 is the re-gate: a hypothesis correcting 5010O1 → 501001 comes back through resolve.gate:v1, survives the SAME evidence-class gate as any other candidate, and the gap closes.\n\n⚑ The fixture records what the shipped ladder can and cannot do: under the RV-27 zero-rung default the OS Golem PROPOSES NOTHING, so the correction in turn 2 arrives from outside — a rung an estate enabled, or a user. That is the default working as designed, not a gap in it, and the Kotlin shell (RV-P5, with rungs) must produce the same turn-2 outcome from its own local rung.",
+  "surface": "golem",
+  "corpus": "hartland_cz",
+  "invariants": [
+    "a hypothesis is not evidence — only what survives the gate becomes a binding (RV-7)",
+    "a gated binding carries its proposing rung; provenance survives the correction",
+    "under the zero-rung default nothing is proposed, and the turn still answers honestly"
+  ],
+  "turns": [
+    {
+      "tool": "golem.turn:v1",
+      "args": {
+        "conversation_id": "c-h1prime",
+        "turn_id": "t-1",
+        "text": "Zobraz náklady účtu 5010O1 v roce 2025 podle období",
+        "locale": "cs",
+        "caller_subject": "user-a",
+        "profile": "CHAT_QUICK"
+      },
+      "core": { "lattice": "h1prime-cs" },
+      "expect": {
+        "outcome": "answer",
+        "llm_invocations": 0,
+        "asks": 0,
+        "operators": ["op:show"],
+        "gaps_carried": ["GAP_KIND_G4_METHOD_MISS"],
+        "gaps_carried_spans": ["5010O1"],
+        "no_binding_below_threshold": true
+      }
+    },
+    {
+      "tool": "resolve.gate:v1",
+      "hypotheses": [
+        {
+          "span": { "start": 20, "end": 26, "text": "5010O1" },
+          "correction": "501001",
+          "ref": "md.dimension.Account.code",
+          "proposing_rung": "local"
+        }
+      ],
+      "gate": {
+        "outcomes": [
+          {
+            "hypothesis": {
+              "span": { "start": 20, "end": 26, "text": "5010O1" },
+              "correction": "501001",
+              "ref": "md.dimension.Account.code",
+              "proposing_rung": "local"
+            },
+            "accepted": true,
+            "binding": {
+              "ref": "md.dimension.Account.code#501001",
+              "target_class": "TARGET_CLASS_MEMBER",
+              "evidence_class": "EVIDENCE_CLASS_EXACT",
+              "source": "SOURCE_TAG_DATA",
+              "in_class_score": 1.0,
+              "proposing_rung": "local"
+            }
+          }
+        ],
+        "updated_gaps": [],
+        "rung_log_entry": { "round": 1, "rung": "local", "action": "regate", "bindings_added": 1 }
+      },
+      "expect": {
+        "gated_refs": ["md.dimension.Account.code#501001"],
+        "evidence_classes": ["EVIDENCE_CLASS_EXACT"],
+        "proposing_rung": "local",
+        "gap_kinds": []
+      }
+    }
+  ]
+}

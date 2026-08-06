@@ -1,0 +1,37 @@
+{
+  "id": "h5-answer-with-gap",
+  "description": "H5 — 'Ukaž vývoj nákladů střediska 220 za posledních 12 měsíců a porovnej s plánem.' The measure-as-subject hero AND the operator layer through the ordinary path: three op: bindings in one question. It ANSWERS while saying two honest things — plánem never bound (an unbindable FILTER, carried as a gap note), and op:compare therefore cannot fire (one series, not two), so the comparison drops with a note while the trend still answers. Refusing the whole question over one unbindable filter would throw away four correct bindings to protect one.",
+  "surface": "golem",
+  "corpus": "hartland_cz",
+  "invariants": [
+    "a gap that is not load-bearing is CARRIED, never asked about and never guessed",
+    "an operator with no body refuses; an operator that cannot APPLY is dropped with a note — they are different failures and a caller acts on them differently",
+    "a mention carries every frame role it has: measure-as-subject contributes to BOTH"
+  ],
+  "turns": [
+    {
+      "tool": "golem.turn:v1",
+      "args": {
+        "conversation_id": "c-h5",
+        "turn_id": "t-1",
+        "text": "Ukaž vývoj nákladů střediska 220 za posledních 12 měsíců a porovnej s plánem.",
+        "locale": "cs",
+        "caller_subject": "user-a",
+        "profile": "CHAT_QUICK"
+      },
+      "core": { "lattice": "h5-cs" },
+      "expect": {
+        "outcome": "answer",
+        "llm_invocations": 0,
+        "asks": 0,
+        "measures": ["md.measure.cost"],
+        "subjects": ["md.measure.cost"],
+        "operators": ["op:show", "op:trend"],
+        "inapplicable_operators": ["op:compare requires two-series"],
+        "gaps_carried": ["GAP_KIND_G1_UNBOUND"],
+        "gaps_carried_spans": ["plánem"],
+        "no_binding_below_threshold": true
+      }
+    }
+  ]
+}
