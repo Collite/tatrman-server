@@ -28,7 +28,10 @@ lookups:
     text: zákazníka
     features:
       kind: entity_alias
-      entity: zakaznik
+      # `zákazník` is an ALIAS; the model entity it resolves to is `subjekt`
+      # (design.md §2's hero rule matches on that). An entity_alias whose
+      # `entity` echoed the surface word would carry no information.
+      entity: subjekt
       source: dfp-entity-aliases
       matching: lemma
 

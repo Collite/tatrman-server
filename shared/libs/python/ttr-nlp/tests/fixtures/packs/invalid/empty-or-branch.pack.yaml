@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+# FAILS: an `or:` branch with no steps. An empty branch matches the empty string,
+# which would make the whole alternation vacuously true.
+pack: empty-or-branch
+version: 1
+phases:
+  - phase: p
+    input: [Lookup, ORGANIZATION]
+    control: appelt
+    rules:
+      - rule: R
+        lhs:
+          - group:
+              or:
+                - [ { ann: ORGANIZATION } ]
+                - []
+        rhs: [ { add: { type: X } } ]

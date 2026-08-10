@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The hero pack, VERBATIM from the effort's design.md §2 (NLS-P1.1.T1). This is
+# the schema's reference case: if the DSL cannot express the pack the design
+# published, the schema is wrong.
+#
+# Kept byte-faithful deliberately, which means it says `ORG` / `PER` — the
+# design's shorthand. The real cs lane emits the CNEC-mapped `ORGANIZATION`
+# (see tests/fixtures/hero/README.md), so the *acceptance* packs written at
+# NLS-P1.2.T7 use the engine's actual types. This file's job is schema validity,
+# not matching real annotations.
+pack: dfp-query-patterns          # S-2 header
+version: 1
+phases:
+  - phase: query-match
+    input: [Lookup, ORG, PER]     # JAPE `Input:` — unlisted types are INVISIBLE and
+    control: appelt               #   matched across (the gap-skipping device)
+    rules:                        # control: appelt | brill | all | first | once
+      - rule: FakturyZakaznika
+        priority: 100
+        lhs:
+          - { ann: Lookup, features: { kind: entity_alias, entity: faktura } }
+          - { ann: Lookup, features: { kind: entity_alias, entity: subjekt } }
+          - group:
+              or:
+                - [ { ann: ORG } ]
+                - [ { ann: PER } ]
+            bind: name
+        rhs:
+          - add:
+              type: QueryPattern
+              features:
+                query: faktury_zakaznika          # NL-18: opaque query id
+                nazev_zakaznika: { from: name, get: "@string" }

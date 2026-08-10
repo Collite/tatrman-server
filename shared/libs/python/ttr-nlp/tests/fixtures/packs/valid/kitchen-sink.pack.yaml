@@ -1,0 +1,112 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Every construct the DSL admits, in one pack (NLS-P1.1.T1). Its purpose is
+# coverage, not realism — nothing here has to be a sensible rule, but everything
+# the schema claims to accept has to appear at least once, so that a schema that
+# quietly stops accepting a construct fails a test instead of a user.
+pack: kitchen-sink
+version: 1
+phases:
+  # ── every step form, every modifier ────────────────────────────────────────
+  - phase: constructs
+    input: [Token, Lookup, ORGANIZATION, PERSON, Money]
+    control: appelt
+    rules:
+      - rule: EveryStepForm
+        priority: 10
+        lhs:
+          # token shorthands
+          - { text: "od" }
+          - { lemma: "faktura" }
+          # annotation + every constraint flavour
+          - ann: Token
+            features:
+              upos: NOUN                       # literal string
+              dep_head: 3                      # literal number
+              is_head: true                    # literal bool
+              lemma: { regex: "^fakt.*$" }     # regex
+              xpos: { in: ["NNFP4-----A----", "NNFS4-----A----"] }
+              length: { gte: 2, lt: 40 }       # numeric range, two bounds
+          # conjunction, with a negated member
+          - all:
+              - { ann: Lookup, features: { kind: entity_alias } }
+              - not: { ann: Lookup, features: { kind: value_alias } }
+          # containment, both directions, on an `ann` step
+          - { ann: Lookup, contains: { ann: Token, features: { upos: PROPN } } }
+          - { ann: Token, within: { ann: Money } }
+          # alternation
+          - group:
+              or:
+                - [ { ann: ORGANIZATION } ]
+                - [ { ann: PERSON }, { ann: Token, features: { upos: PUNCT } } ]
+            bind: subject
+          # nested sequence group, with a range repeat
+          - group:
+              seq:
+                - { ann: Token, features: { upos: ADJ } }
+                - { ann: Token, features: { upos: NOUN } }
+            repeat: { min: 1, max: 3 }
+            bind: modifiers
+          # repeat sugar, all three spellings
+          - { ann: Token, features: { upos: ADV }, repeat: "*" }
+          - { ann: Token, features: { upos: PART }, repeat: "+" }
+          - { ann: Token, features: { upos: PUNCT }, repeat: "?" }
+          # unbounded explicit repeat (max omitted)
+          - { ann: Token, features: { upos: CCONJ }, repeat: { min: 0 } }
+          # zero-width lookahead, both polarities
+          - { after: { ann: Token, features: { upos: VERB } } }
+          - { notafter: { ann: Token, features: { upos: SCONJ } } }
+        rhs:
+          # add with an explicit span, a target set, and every getter
+          - add:
+              type: QueryPattern
+              span: subject
+              set: patterns
+              features:
+                query: kitchen_sink            # literal
+                subject_text: { from: subject, get: "@string" }
+                subject_length: { from: subject, get: "@length" }
+                subject_kind: { from: subject, get: "kind" }
+                modifier_text: { from: modifiers, get: "@string" }
+          # add with no span (whole match) and no set (working set)
+          - add:
+              type: Marker
+          # update an existing binding's features
+          - update:
+              on: subject
+              features:
+                verified: company
+                confidence: 1
+
+  # ── the other four control styles, and a phase with a single bare rule ──────
+  - phase: brill-phase
+    input: [Lookup]
+    control: brill
+    rules:
+      - rule: Bare
+        lhs: [ { ann: Lookup } ]
+        rhs: [ { add: { type: Seen } } ]
+
+  - phase: all-phase
+    input: [Lookup]
+    control: all
+    rules:
+      - rule: Bare
+        lhs: [ { ann: Lookup } ]
+        rhs: [ { add: { type: Seen } } ]
+
+  - phase: first-phase
+    input: [Lookup]
+    control: first
+    rules:
+      - rule: Bare
+        lhs: [ { ann: Lookup } ]
+        rhs: [ { add: { type: Seen } } ]
+
+  - phase: once-phase
+    input: [Lookup]
+    control: once
+    rules:
+      - rule: Bare
+        lhs: [ { ann: Lookup } ]
+        rhs: [ { add: { type: Seen } } ]
