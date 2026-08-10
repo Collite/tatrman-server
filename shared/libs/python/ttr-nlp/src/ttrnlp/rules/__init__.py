@@ -10,11 +10,11 @@ Public surface (contracts §6)::
     load_pack(path_or_str) -> PackModel      parse + schema-validate ONE pack
     check_pack(pack)       -> PackModel      the cross-checks (NLS-PACK-002)
     normalize_pack(pack)   -> PackModel      sugar -> canonical form
-    compile_pack(pack)     -> CompiledPack   (NLS-P1.2)
-    run_phases(doc, packs) -> PhaseReport    (NLS-P1.2)
+    compile_pack(pack)     -> CompiledPack   PAMPAC parser trees
+    run_phases(doc, packs) -> PhaseReport    run phases over one Document
 
-The usual sequence is load -> check -> normalize; ``prepare_pack`` does the
-three in order, which is what every caller actually wants.
+The usual sequence is load -> check -> normalize -> compile; ``build_pack`` does
+all four, which is what every caller actually wants.
 """
 
 from __future__ import annotations
@@ -22,12 +22,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from ttrnlp.rules.checks import check_pack
+from ttrnlp.rules.compiler import CompiledPack, compile_pack
 from ttrnlp.rules.dsl import PackModel, load_pack, load_schema
+from ttrnlp.rules.executor import CONTROL_STYLES, Firing, run_rules
 from ttrnlp.rules.normalize import normalize_pack
+from ttrnlp.rules.pipeline import PhaseReport, PhaseTrace, run_phase, run_phases
 
 
 def prepare_pack(path_or_str: str | Path, *, source: str = "") -> PackModel:
-    """Load, cross-check and normalise a pack — the whole front end.
+    """Load, cross-check and normalise a pack — the front end, without compiling.
 
     Raises:
         PackError: ``NLS-PACK-001`` if it does not parse, ``NLS-PACK-002`` if it
@@ -38,11 +41,27 @@ def prepare_pack(path_or_str: str | Path, *, source: str = "") -> PackModel:
     return normalize_pack(pack)
 
 
+def build_pack(path_or_str: str | Path, *, source: str = "") -> CompiledPack:
+    """Load, check, normalise and compile a pack — everything, in order."""
+    prepared = prepare_pack(path_or_str, source=source)
+    return compile_pack(prepared, source=source, normalize=False)
+
+
 __all__ = [
+    "CONTROL_STYLES",
+    "CompiledPack",
+    "Firing",
     "PackModel",
+    "PhaseReport",
+    "PhaseTrace",
+    "build_pack",
     "check_pack",
+    "compile_pack",
     "load_pack",
     "load_schema",
     "normalize_pack",
     "prepare_pack",
+    "run_phase",
+    "run_phases",
+    "run_rules",
 ]

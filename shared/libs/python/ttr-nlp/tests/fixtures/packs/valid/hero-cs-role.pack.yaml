@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P1.2.T7 — the secondary hero. No NER anywhere in it, deliberately: the
+# parameter value is a multi-token *value alias* that only a gazetteer can find,
+# which is the case NER cannot serve. It therefore behaves identically in both
+# lanes and needs no fallback rule.
+pack: hero-cs-role
+version: 1
+phases:
+  - phase: query-match
+    input: [Lookup]
+    control: appelt
+    rules:
+      - rule: Role
+        priority: 100
+        lhs:
+          - { ann: Lookup, features: { kind: attribute_alias, attribute: role } }
+          - { ann: Lookup, features: { kind: value_alias, attribute: role }, bind: value }
+        rhs:
+          - add:
+              type: QueryPattern
+              features:
+                query: role
+                # `@string` — the span text, not the normalised value id
+                # (contracts §5: the typed-parameter rail reads span text).
+                nazev_role: { from: value, get: "@string" }
