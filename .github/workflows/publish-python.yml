@@ -46,6 +46,10 @@ jobs:
         with:
           python-version: '3.13'
 
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Derive version from the tag
         id: ver
         run: |
@@ -79,14 +83,21 @@ jobs:
 
       # Wheel only, `py3-none-any`. `--wheel` builds straight from the source
       # tree; there is no generation step and no sdist lane to keep working.
+      #
+      # `uv build`, not `pipx run build`: the `build` distribution's only console
+      # script is `pyproject-build`, so `pipx run build` depends on the runner's
+      # pipx guessing an app name that the package does not provide — which it
+      # stopped doing ("An executable named `build` is not provided by package
+      # `build`"). uv is the repo's Python toolchain everywhere else, needs no
+      # third-party build front-end, and writes to `<src>/dist/` exactly as before.
       - name: Build wheel
-        run: pipx run build --wheel shared/libs/python/ttr-nlp
+        run: uv build --wheel shared/libs/python/ttr-nlp
 
       - name: Verify the wheel
         run: |
           set -euo pipefail
           cd shared/libs/python/ttr-nlp
-          pipx run twine check dist/*
+          uvx twine check dist/*
 
           # The import package must actually be in there.
           unzip -l dist/*.whl | grep -qE 'ttrnlp/__init__\.py' \

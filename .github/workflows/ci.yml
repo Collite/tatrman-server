@@ -213,8 +213,11 @@ jobs:
         working-directory: shared/libs/python/ttr-nlp
         run: uv run pytest -q
 
+      # `uv build`, not `pipx run build` — see the note in publish-python.yml:
+      # the `build` distribution provides only `pyproject-build`, so the pipx form
+      # relied on the runner guessing an app name the package does not ship.
       - name: build the wheel
-        run: pipx run build --wheel shared/libs/python/ttr-nlp
+        run: uv build --wheel shared/libs/python/ttr-nlp
 
   # P2/RO-6 dependency rules (contracts §7). Passes trivially on the S1 skeleton;
   # its real bite is S4 once the spine services + protos have arrived.
