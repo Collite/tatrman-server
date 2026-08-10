@@ -1,0 +1,68 @@
+{
+  "pack": "dfp-query-patterns",
+  "version": 1,
+  "phases": [
+    {
+      "phase": "query-match",
+      "input": [
+        "Lookup",
+        "ORG",
+        "PER"
+      ],
+      "control": "appelt",
+      "rules": [
+        {
+          "rule": "FakturyZakaznika",
+          "priority": 100,
+          "lhs": [
+            {
+              "ann": "Lookup",
+              "features": {
+                "kind": "entity_alias",
+                "entity": "faktura"
+              }
+            },
+            {
+              "ann": "Lookup",
+              "features": {
+                "kind": "entity_alias",
+                "entity": "subjekt"
+              }
+            },
+            {
+              "group": {
+                "or": [
+                  [
+                    {
+                      "ann": "ORG"
+                    }
+                  ],
+                  [
+                    {
+                      "ann": "PER"
+                    }
+                  ]
+                ]
+              },
+              "bind": "name"
+            }
+          ],
+          "rhs": [
+            {
+              "add": {
+                "type": "QueryPattern",
+                "features": {
+                  "query": "faktury_zakaznika",
+                  "nazev_zakaznika": {
+                    "from": "name",
+                    "get": "@string"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# FAILS: `phasez` is not a top-level key. additionalProperties:false catches it.
+pack: unknown-top-key
+version: 1
+phasez:
+  - phase: p
+    input: [Lookup]
+    control: appelt
+    rules:
+      - rule: R
+        lhs: [ { ann: Lookup } ]
+        rhs: [ { add: { type: X } } ]

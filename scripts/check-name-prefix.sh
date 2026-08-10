@@ -41,7 +41,31 @@ cd "$(dirname "$0")/.."
 # `ttr-operator-library` (RV-P4.4) is an RV SCHEMA ID, the same class as `ttr-lexicon`
 # and `ttr-skill`: it is the `schemaVersion` inside the compiled operator-library
 # artifact that `tatrman`'s compiler writes, so golem-py must spell it exactly.
-ALLOW='ttr-(metadata-git|metadata-adoption|metadata|translator-extraction|translator|plan-proto|parser|writer|semantics|server-proto|snapshot|lexicon|skill|operator-library|nlp-routing|server|umbrella-ci|umbrella|\*|\{)'
+# `ttr-nlp` (NLS-P0, ⚑NLS-D1) is a THIRD class, and the only member of it: a
+# PUBLISHED DISTRIBUTION NAME owned by this repo — the PyPI project `ttr-nlp`,
+# living at `shared/libs/python/ttr-nlp` and imported as `ttrnlp`. It is the same
+# kind of thing as class 1 (a coordinate you do not get to rename) with the
+# difference that we are the publisher; once it is on PyPI the name is public
+# API. ⚑RV-6's target was the internal module prefix, and that ruling stands:
+# the SERVICE is `services/nlp`, and `services/ttr-nlp` — deleted at NLS-P0.T1
+# as leftover rename debris — must not come back.
+#
+# That last sentence needs the leading guard to be true. The gate works by
+# STRIPPING allowlisted spellings out of each line and then re-testing what is
+# left, so a bare `nlp` entry would erase `ttr-nlp` wherever it appeared —
+# `services/ttr-nlp/generated/x.py:1:…` strips to `services//generated/…` and
+# passes. The guard leaves any `ttr-` that directly follows `services/`
+# un-stripped, so it trips the gate. It applies to every entry, not just `nlp`:
+# ⚑RV-6 made every service bare-named, so no `services/ttr-*` path is
+# allowlistable. Legitimate spellings are unaffected — the wheel lives at
+# `shared/libs/python/ttr-nlp`.
+#
+# The slash is written `\/` because ALLOW is interpolated into `s/…//` below; an
+# unescaped one would end the substitution and perl would refuse the pattern.
+#
+# Order matters: `nlp-routing` must precede bare `nlp` so the longer schema id
+# matches first.
+ALLOW='(?<!services\/)ttr-(metadata-git|metadata-adoption|metadata|translator-extraction|translator|plan-proto|parser|writer|semantics|server-proto|snapshot|lexicon|skill|operator-library|nlp-routing|nlp|server|umbrella-ci|umbrella|\*|\{)'
 
 hits="$(
   git grep -nI -P '(?<![A-Za-z0-9_])ttr-' -- . ':(exclude)scripts/check-name-prefix.sh' \

@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P0.T5 — what the primary hero must produce downstream of the importers.
+# P1 hand-adds `lookups` and runs rule packs; P2 must produce those same
+# `lookups` from list files instead; P4 replays the whole thing E2E.
+hero: hero-cs-invoices
+text: "Zobraz všechny faktury od zákazníka Microsoft"
+language: cs
+
+# --- P2 (gazetteer) -------------------------------------------------------
+# Lemma-mode matching is the Czech declension answer: the list says `faktura`
+# and `zákazník`, the text says `faktury` and `zákazníka`, and the match happens
+# on the Token `lemma` feature. `source` and `matching` are the provenance
+# features every Lookup carries (contracts §4).
+lookups:
+  - type: Lookup
+    start: 15
+    end: 22
+    text: faktury
+    features:
+      kind: entity_alias
+      entity: faktura
+      source: dfp-entity-aliases
+      matching: lemma
+  - type: Lookup
+    start: 26
+    end: 35
+    text: zákazníka
+    features:
+      kind: entity_alias
+      # `zákazník` is an ALIAS; the model entity it resolves to is `subjekt`
+      # (design.md §2's hero rule matches on that). An entity_alias whose
+      # `entity` echoed the surface word would carry no information.
+      entity: subjekt
+      source: dfp-entity-aliases
+      matching: lemma
+
+# --- engine NER, restated ------------------------------------------------
+# Present only in the OPTION lane (NameTag 3). Type is the CNEC-mapped universal
+# label, not spaCy's `ORG` — see the corpus README.
+ner:
+  - type: ORGANIZATION
+    start: 36
+    end: 45
+    text: Microsoft
+
+# --- P1 (rules) -----------------------------------------------------------
+# The same QueryPattern must come out of BOTH lanes. That is the whole point of
+# the NL-14 degrade being *explicit*: losing cs NER costs the pack a rule, not
+# an answer, and the pack author decides what the fallback is allowed to match.
+query_patterns:
+  option_lane:
+    # {Lookup entity=faktura} {Lookup entity=zakaznik} {ORGANIZATION}
+    - type: QueryPattern
+      start: 15
+      end: 45
+      features:
+        query: faktury_zakaznika
+        nazev_zakaznika: Microsoft
+  default_lane:
+    # No ORGANIZATION annotation exists. A lower-priority fallback leans on the
+    # morphology that survives without NER — {Token upos=PROPN} — and reaches
+    # the same answer. `NLS-NLP-011` rides the response (service-side, P3).
+    - type: QueryPattern
+      start: 15
+      end: 45
+      features:
+        query: faktury_zakaznika
+        nazev_zakaznika: Microsoft

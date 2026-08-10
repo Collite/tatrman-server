@@ -1,0 +1,333 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tatrman.org/schemas/ttr-nlp/pack.schema.json",
+  "title": "ttr-nlp rule pack",
+  "description": "A rule pack: JAPE-shaped matching semantics in a declarative YAML surface (contracts §3). One pack is one YAML document. `additionalProperties: false` holds at every level — a typo must fail loudly at load rather than silently widen a match.",
+
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pack", "version", "phases"],
+  "properties": {
+    "pack": {
+      "$ref": "#/$defs/packId",
+      "description": "Pack id (S-2 header). Unique across the loaded set."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Pack FORMAT version — tracks the schema major, not the pack's content."
+    },
+    "phases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/phase" },
+      "description": "Phases run in file order. Each re-reads the annotation set, so a later phase sees what an earlier one added."
+    }
+  },
+
+  "$defs": {
+    "packId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+    },
+    "phaseId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+    },
+    "ruleId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+    },
+    "annType": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "description": "An annotation type name — Token, Lookup, ORGANIZATION, QueryPattern, …"
+    },
+    "bindName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "description": "A name bound on the LHS and referenced from the RHS. Unique within a rule."
+    },
+    "featureName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "input", "control", "rules"],
+      "properties": {
+        "phase": { "$ref": "#/$defs/phaseId" },
+        "input": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/annType" },
+          "description": "JAPE `Input:` — the ONLY annotation types this phase can see. Unlisted types are invisible and are matched ACROSS, which is the gap-skipping device that lets {Lookup}{Lookup} match with Tokens in between."
+        },
+        "control": {
+          "enum": ["appelt", "brill", "all", "first", "once"],
+          "description": "appelt: one rule fires per region, tie-broken longest -> priority -> file order. brill: all accepting matches fire, resume at max end. all: all fire, resume at next offset. first: first acceptance, no longest extension. once: the phase stops after one firing."
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/rule" }
+        }
+      }
+    },
+
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule", "lhs", "rhs"],
+      "properties": {
+        "rule": { "$ref": "#/$defs/ruleId" },
+        "priority": {
+          "type": "integer",
+          "default": 0,
+          "description": "Higher wins, but only AFTER longest-match under appelt."
+        },
+        "lhs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/step" },
+          "description": "A sequence of steps, matched in order."
+        },
+        "rhs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/action" },
+          "description": "What to do when the rule fires. Code-free by construction (P-2)."
+        }
+      }
+    },
+
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One matching step. Exactly one FORM key (ann | text | lemma | all | group | after | notafter | not), plus the modifiers `repeat` and `bind`. Kept as one flat object rather than a union of per-form schemas so that a mistyped key reports as a mistyped key, at its own path, instead of 'not valid under any of the given schemas'.",
+      "properties": {
+        "ann": { "$ref": "#/$defs/annType" },
+        "text": {
+          "type": "string",
+          "description": "Shorthand: ann Token with a `text` feature constraint."
+        },
+        "lemma": {
+          "type": "string",
+          "description": "Shorthand: ann Token with a `lemma` feature constraint."
+        },
+        "all": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/step" },
+          "description": "Conjunction at one position — JAPE `{A, !B}`. Members may use the `not` form."
+        },
+        "group": { "$ref": "#/$defs/group" },
+        "after": {
+          "$ref": "#/$defs/step",
+          "description": "Zero-width positive lookahead: required context, excluded from the match span."
+        },
+        "notafter": {
+          "$ref": "#/$defs/step",
+          "description": "Zero-width negative lookahead."
+        },
+        "not": {
+          "$ref": "#/$defs/step",
+          "description": "Negation. Legal ONLY as a member of `all` — placement is checked by the model, which can say so in one sentence where the schema could only say 'no'."
+        },
+        "features": {
+          "$ref": "#/$defs/features",
+          "description": "Feature constraints on the matched annotation."
+        },
+        "contains": {
+          "$ref": "#/$defs/step",
+          "description": "The matched annotation must contain a match of this step."
+        },
+        "within": {
+          "$ref": "#/$defs/step",
+          "description": "The matched annotation must fall within a match of this step."
+        },
+        "repeat": { "$ref": "#/$defs/repeat" },
+        "bind": { "$ref": "#/$defs/bindName" }
+      },
+      "oneOf": [
+        { "required": ["ann"] },
+        { "required": ["text"] },
+        { "required": ["lemma"] },
+        { "required": ["all"] },
+        { "required": ["group"] },
+        { "required": ["after"] },
+        { "required": ["notafter"] },
+        { "required": ["not"] }
+      ],
+      "dependentRequired": {
+        "features": ["ann"],
+        "contains": ["ann"],
+        "within": ["ann"]
+      }
+    },
+
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Alternation or an explicit sequence. Exactly one of `or` / `seq`.",
+      "properties": {
+        "or": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/step" },
+            "description": "One branch: a sequence of steps. An EMPTY branch would match the empty string and make the alternation vacuously true, so it is rejected."
+          },
+          "description": "At least two branches — a one-branch alternation is a `seq`."
+        },
+        "seq": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/step" }
+        }
+      },
+      "oneOf": [{ "required": ["or"] }, { "required": ["seq"] }]
+    },
+
+    "repeat": {
+      "description": "Kleene/range repetition. Sugar `*` `+` `?` normalises to the object form.",
+      "oneOf": [
+        { "enum": ["*", "+", "?"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min"],
+          "properties": {
+            "min": { "type": "integer", "minimum": 0 },
+            "max": {
+              "type": ["integer", "null"],
+              "minimum": 1,
+              "description": "Omitted or null means unbounded. `min > max` is unsatisfiable and is rejected by the model, which JSON Schema cannot express."
+            }
+          }
+        }
+      ]
+    },
+
+    "features": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/featureName" },
+      "additionalProperties": { "$ref": "#/$defs/constraint" }
+    },
+
+    "constraint": {
+      "description": "A feature constraint: a literal, or one of the operator objects.",
+      "oneOf": [
+        { "type": ["string", "number", "boolean"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["regex"],
+          "properties": { "regex": { "type": "string", "format": "regex" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["in"],
+          "properties": {
+            "in": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": ["string", "number", "boolean"] }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "gt": { "type": "number" },
+            "gte": { "type": "number" },
+            "lt": { "type": "number" },
+            "lte": { "type": "number" }
+          },
+          "required": [],
+          "anyOf": [
+            { "required": ["gt"] },
+            { "required": ["gte"] },
+            { "required": ["lt"] },
+            { "required": ["lte"] }
+          ]
+        }
+      ]
+    },
+
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Exactly one of `add` / `update`. There is no third option and no code (P-2).",
+      "properties": {
+        "add": { "$ref": "#/$defs/addAction" },
+        "update": { "$ref": "#/$defs/updateAction" }
+      },
+      "oneOf": [{ "required": ["add"] }, { "required": ["update"] }]
+    },
+
+    "addAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "$ref": "#/$defs/annType" },
+        "span": {
+          "$ref": "#/$defs/bindName",
+          "description": "Span of the new annotation. Default: the whole match."
+        },
+        "set": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Target annotation set. Default: the working set."
+        },
+        "features": { "$ref": "#/$defs/actionFeatures" }
+      }
+    },
+
+    "updateAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["on", "features"],
+      "properties": {
+        "on": { "$ref": "#/$defs/bindName" },
+        "features": { "$ref": "#/$defs/actionFeatures" }
+      }
+    },
+
+    "actionFeatures": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/featureName" },
+      "additionalProperties": { "$ref": "#/$defs/featureValue" }
+    },
+
+    "featureValue": {
+      "description": "A literal, or a getter reading from a bound step.",
+      "oneOf": [
+        { "type": ["string", "number", "boolean"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "get"],
+          "properties": {
+            "from": { "$ref": "#/$defs/bindName" },
+            "get": {
+              "type": "string",
+              "pattern": "^(@string|@length|[A-Za-z_][A-Za-z0-9_]*)$",
+              "description": "`@string` = the span's text, `@length` = its character length, anything else = a feature of the bound annotation."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

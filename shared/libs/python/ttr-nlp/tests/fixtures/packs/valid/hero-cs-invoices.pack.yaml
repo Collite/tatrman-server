@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P1.2.T7 — the primary hero, against the REAL fixture annotations. Unlike
+# `hero.pack.yaml` (the design's published example, kept verbatim for schema
+# coverage) this one speaks the types the engines actually emit: `ORGANIZATION`,
+# not the design prose's shorthand `ORG`.
+#
+# ── Why two phases ───────────────────────────────────────────────────────────
+#
+# The NL-14 degrade needs a fallback that leans on `Token` morphology when cs
+# NER is absent. It cannot simply be a lower-priority rule in the same phase,
+# because `input:` is per-phase and mixing layers does not work:
+#
+#   * a phase sees ONE list of annotations, and `Ann` matches only the NEXT one
+#     in it — so Tokens listed alongside Lookups sit between them and break
+#     every adjacency the rules rely on;
+#   * worse, a `Lookup` the gazetteer laid over a `Token` shares its start
+#     offset and was inserted later, so with both in `input:` the Lookup is
+#     never the next annotation and becomes UNREACHABLE. (Pinned as
+#     `coextensive-annotation-shadows-a-later-one` in the conformance matrix.)
+#
+# So the token-level signal is LIFTED into the matching layer first. That is
+# ordinary JAPE practice — an early phase promotes what later phases match on —
+# and it keeps every phase's `input:` to a single layer.
+pack: hero-cs-invoices
+version: 1
+phases:
+  # Phase 1 — lift. Proper nouns become candidates the query phase can see.
+  # In the option lane NameTag has already typed "Microsoft" as ORGANIZATION;
+  # this phase still runs, and the query phase simply prefers the NER path.
+  - phase: name-candidates
+    input: [Token]
+    control: brill
+    rules:
+      - rule: ProperNounIsANameCandidate
+        lhs:
+          - { ann: Token, features: { upos: PROPN } }
+        rhs:
+          - add:
+              type: NameCandidate
+              features:
+                source: morphology
+
+  # Phase 2 — match. One layer: the gazetteer's Lookups, the engine's NER, and
+  # the lifted candidates. Both lanes reach the same QueryPattern.
+  - phase: query-match
+    input: [Lookup, ORGANIZATION, NameCandidate]
+    control: appelt
+    rules:
+      # Option lane: NameTag gave us a real organisation.
+      - rule: FakturyZakaznikaNer
+        priority: 100
+        lhs:
+          - { ann: Lookup, features: { kind: entity_alias, entity: faktura } }
+          - { ann: Lookup, features: { kind: entity_alias, entity: subjekt } }
+          - { ann: ORGANIZATION, bind: name }
+        rhs:
+          - add:
+              type: QueryPattern
+              features:
+                query: faktury_zakaznika
+                nazev_zakaznika: { from: name, get: "@string" }
+
+      # Default lane: no cs NER (NLS-NLP-011). The morphology that survives
+      # without it carries the answer instead.
+      - rule: FakturyZakaznikaFallback
+        priority: 10
+        lhs:
+          - { ann: Lookup, features: { kind: entity_alias, entity: faktura } }
+          - { ann: Lookup, features: { kind: entity_alias, entity: subjekt } }
+          - { ann: NameCandidate, bind: name }
+        rhs:
+          - add:
+              type: QueryPattern
+              features:
+                query: faktury_zakaznika
+                nazev_zakaznika: { from: name, get: "@string" }

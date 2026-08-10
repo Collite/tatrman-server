@@ -177,6 +177,48 @@ jobs:
         working-directory: services/golem-py
         run: uv run pytest -q
 
+  # NLS-P0.T7 — the Python unit gate for the `ttr-nlp` wheel (ruff + pytest +
+  # a real wheel build).
+  #
+  # Modelled on the golem-py job above rather than folded into it: these are
+  # separate uv projects with separate locks, and one job per project keeps a
+  # failure legible. No mypy step — unlike golem-py this module has no mypy
+  # config, and adding one is a change with its own discovery cost.
+  #
+  # The build step is not ceremony. The wheel is a published artifact whose
+  # packaging can break without a single test failing (a missing package-data
+  # include ships a wheel that imports fine here and dies on pack load in a
+  # cluster), so CI builds it on every PR and the publish workflow's content
+  # checks are the second line, not the first.
+  ttr-nlp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: ruff
+        working-directory: shared/libs/python/ttr-nlp
+        run: uv run ruff check .
+
+      - name: pytest
+        working-directory: shared/libs/python/ttr-nlp
+        run: uv run pytest -q
+
+      # `uv build`, not `pipx run build` — see the note in publish-python.yml:
+      # the `build` distribution provides only `pyproject-build`, so the pipx form
+      # relied on the runner guessing an app name the package does not ship.
+      - name: build the wheel
+        run: uv build --wheel shared/libs/python/ttr-nlp
+
   # P2/RO-6 dependency rules (contracts §7). Passes trivially on the S1 skeleton;
   # its real bite is S4 once the spine services + protos have arrived.
   dependency-rules:

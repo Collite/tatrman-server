@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# FAILS: no `pack` id. Diagnostics are reported per pack, so a pack with no id
+# cannot even be talked about.
+version: 1
+phases:
+  - phase: p
+    input: [Lookup]
+    control: appelt
+    rules:
+      - rule: R
+        lhs: [ { ann: Lookup } ]
+        rhs: [ { add: { type: X } } ]

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# FAILS: no `version`. It is the pack-format version, which is what lets a later
+# schema major tell old packs apart from new ones.
+pack: missing-version
+phases:
+  - phase: p
+    input: [Lookup]
+    control: appelt
+    rules:
+      - rule: R
+        lhs: [ { ann: Lookup } ]
+        rhs: [ { add: { type: X } } ]

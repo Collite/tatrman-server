@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# FAILS: a rule with no `rhs`. A rule that matches and does nothing is always a
+# mistake, never an intent.
+pack: rule-without-rhs
+version: 1
+phases:
+  - phase: p
+    input: [Lookup]
+    control: appelt
+    rules:
+      - rule: R
+        lhs: [ { ann: Lookup } ]

@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# FAILS: `appelts` is not a control style. Silently falling back to a default
+# would change which rule fires without telling anyone.
+pack: bad-control
+version: 1
+phases:
+  - phase: p
+    input: [Lookup]
+    control: appelts
+    rules:
+      - rule: R
+        lhs: [ { ann: Lookup } ]
+        rhs: [ { add: { type: X } } ]

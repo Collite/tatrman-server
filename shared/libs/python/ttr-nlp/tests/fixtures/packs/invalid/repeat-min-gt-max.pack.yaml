@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+# FAILS: repeat.min > repeat.max — an interval that can never be satisfied, so
+# the rule can never fire. JSON Schema cannot compare two sibling values; the
+# model validator catches this one and reports it under the same code.
+pack: repeat-min-gt-max
+version: 1
+phases:
+  - phase: p
+    input: [Token]
+    control: appelt
+    rules:
+      - rule: R
+        lhs:
+          - { ann: Token, repeat: { min: 5, max: 2 } }
+        rhs: [ { add: { type: X } } ]

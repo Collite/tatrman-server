@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+# FAILS: `feature` is not a step key (it is `features`). A typo here would
+# otherwise silently widen the match to every Lookup.
+pack: unknown-step-key
+version: 1
+phases:
+  - phase: p
+    input: [Lookup]
+    control: appelt
+    rules:
+      - rule: R
+        lhs:
+          - { ann: Lookup, feature: { kind: entity_alias } }
+        rhs: [ { add: { type: X } } ]
