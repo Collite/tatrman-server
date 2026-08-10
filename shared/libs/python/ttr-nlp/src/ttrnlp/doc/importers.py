@@ -43,6 +43,25 @@ special case in the matcher.
 
 Feature names are snake_case (``dep_head``, not ``depHead``) — these are what
 pack authors type, and they sit next to ``lemma`` and ``upos``.
+
+**One annotation per (type, span).** Results arrive as a list and each adapter
+reports whatever its own engine produced, so two results can carry the same
+tokens: a backend asked for entities still tokenizes on the way there. Two
+``Token`` annotations over one word are not a richer document — nothing can tell
+them apart, and every consumer that enumerates a layer (a wire payload, a token
+count, a gazetteer pass) sees each word twice. So the first result to report a
+given type at a given span owns it, later repeats are dropped whole rather than
+merged — a merged annotation would carry one engine's name over another engine's
+features — and the count lands in
+``doc.features["duplicate_annotations_dropped"]``, because a layer that silently
+lost a contribution is exactly the thing an operator needs told.
+
+The *rule engine* is not why this matters, though it looks like it should be:
+``Ann`` re-syncs to the current text offset before matching, which skips any
+annotation starting before it, so same-span duplicates are transparent to
+matching and a rule fires identically with or without them. That is asserted in
+``tests/doc/test_importers.py`` rather than assumed. Routing sends one engine per
+op, so this whole path is a safety net, not the normal one.
 """
 
 from __future__ import annotations
@@ -154,6 +173,18 @@ def build_document(
 
     results = _normalise_results(engine_results)
     model_versions: dict[str, str] = {}
+    #: (type, start, end) already claimed — see "One annotation per (type, span)".
+    claimed: set[tuple[str, int, int]] = set()
+    dropped = 0
+
+    def add(start: int, end: int, anntype: str, features: dict[str, Any]) -> None:
+        nonlocal dropped
+        key = (anntype, start, end)
+        if key in claimed:
+            dropped += 1
+            return
+        claimed.add(key)
+        annset.add(start, end, anntype, features)
 
     for engine, result in results:
         model_version = str(result.get("modelVersion") or "")
@@ -161,7 +192,7 @@ def build_document(
             model_versions[engine] = model_version
 
         for token in result.get("tokens") or []:
-            annset.add(
+            add(
                 int(token["charStart"]),
                 int(token["charEnd"]),
                 TOKEN_TYPE,
@@ -169,7 +200,7 @@ def build_document(
             )
 
         for sentence in result.get("sentences") or []:
-            annset.add(
+            add(
                 int(sentence["charStart"]),
                 int(sentence["charEnd"]),
                 SENTENCE_TYPE,
@@ -178,7 +209,7 @@ def build_document(
 
         for entity in result.get("entities") or []:
             anntype, features = _entity_type_and_features(entity, engine)
-            annset.add(
+            add(
                 int(entity["charStart"]),
                 int(entity["charEnd"]),
                 anntype,
@@ -188,6 +219,7 @@ def build_document(
     doc.features["language"] = language
     doc.features["engines"] = [engine for engine, _ in results if engine]
     doc.features["model_versions"] = model_versions
+    doc.features["duplicate_annotations_dropped"] = dropped
     return doc
 
 

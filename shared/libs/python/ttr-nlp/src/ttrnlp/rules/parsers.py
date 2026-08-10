@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Two parser combinators PAMPAC does not usably provide.
+"""Three parser combinators PAMPAC does not usably provide.
 
-Both subclass PAMPAC's public ``PampacParser`` ABC and compose with the stock
-combinators. Neither is a *patch* to gatenlp — the NL-2 vendored-subset budget
+All three subclass PAMPAC's public ``PampacParser`` ABC and compose with the
+stock combinators. None is a *patch* to gatenlp — the NL-2 vendored-subset budget
 (">2 local patches") is untouched, and the pin stays a pin.
 
 **ZeroWidth** — the DSL's ``after:`` / ``notafter:`` / ``not:``.
@@ -25,6 +25,15 @@ can sit anywhere in a sequence and contributes nothing to the match span.
 two-member conjunction yields two results that downstream parsers read as
 alternatives, and the combined span is whichever one is looked at first. A
 conjunction is one match at one position, so it needs one result.
+
+**Named** — the DSL's ``bind:`` on anything PAMPAC will not name.
+
+PAMPAC's ``name=`` is not universal. ``Or`` and the ``Filter`` that
+``covering()``/``within()`` return have no ``name`` at all, and ``Seq`` — the
+obvious "wrap it in a one-element sequence" — opens with ``assert
+len(parsers) > 1``. Setting ``.name`` on the inner parser is no answer either:
+where the compiler already named it, an outer ``bind:`` would erase the inner
+one and the rule would fire while writing nothing.
 """
 
 from __future__ import annotations
@@ -109,4 +118,40 @@ class Conjunction(PampacParser):
         )
 
 
-__all__ = ["Conjunction", "ZeroWidth"]
+class Named(PampacParser):
+    """Bind a name to whatever a parser matched, leaving the parser alone.
+
+    Every result of the inner parser gains one match entry for ``name``, spanning
+    that result. Location and span are passed through untouched, so wrapping is
+    invisible to the rest of the tree.
+
+    The entry carries no ``ann`` key, because a span is all this can honestly
+    report: the wrapped parser may have matched several annotations or none. That
+    is the same thing ``bind:`` on a group or a repetition means, and the
+    compiler's ``annotation_binds`` already says so — so ``update:`` and feature
+    getters are rejected against these names rather than quietly reading nothing.
+    """
+
+    def __init__(self, parser: PampacParser, name: str):
+        self.parser = parser
+        self.name = name
+
+    def parse(self, location, context):
+        ret = self.parser.parse(location, context)
+        if not ret.issuccess():
+            return ret
+        named = [
+            Result(
+                matches=[
+                    *result.matches,
+                    dict(span=result.span, location=result.location, name=self.name),
+                ],
+                location=result.location,
+                span=result.span,
+            )
+            for result in ret
+        ]
+        return Success(named, context)
+
+
+__all__ = ["Conjunction", "Named", "ZeroWidth"]

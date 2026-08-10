@@ -34,12 +34,17 @@ phases:
           # containment, both directions, on an `ann` step
           - { ann: Lookup, contains: { ann: Token, features: { upos: PROPN } } }
           - { ann: Token, within: { ann: Money } }
-          # alternation
+          # alternation. Two bindings, because the DSL has two kinds and a rule
+          # may only use each for what it is: `subject` names the annotation each
+          # branch matched (the same name in both branches — whichever matched),
+          # which `update:` and feature getters need; `subject_span` names the
+          # group, which records where the match was and nothing more, so only
+          # `@string` / `@length` may read it.
           - group:
               or:
-                - [ { ann: ORGANIZATION } ]
-                - [ { ann: PERSON }, { ann: Token, features: { upos: PUNCT } } ]
-            bind: subject
+                - [ { ann: ORGANIZATION, bind: subject } ]
+                - [ { ann: PERSON, bind: subject }, { ann: Token, features: { upos: PUNCT } } ]
+            bind: subject_span
           # nested sequence group, with a range repeat
           - group:
               seq:
@@ -60,11 +65,11 @@ phases:
           # add with an explicit span, a target set, and every getter
           - add:
               type: QueryPattern
-              span: subject
+              span: subject_span
               set: patterns
               features:
                 query: kitchen_sink            # literal
-                subject_text: { from: subject, get: "@string" }
+                subject_text: { from: subject_span, get: "@string" }
                 subject_length: { from: subject, get: "@length" }
                 subject_kind: { from: subject, get: "kind" }
                 modifier_text: { from: modifiers, get: "@string" }

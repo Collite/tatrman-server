@@ -14,7 +14,20 @@ for full enumeration here is what makes JAPE-exact tie-breaking possible at all.
 
 **Compile-time errors are ``NLS-PACK-002``**, alongside ``checks.py``'s: they
 are the same class of problem (the pack is well-formed but cannot work) and
-they reach the author through the same CLI.
+they reach the author through the same CLI. ``checks.py`` owns the ones about how
+a pack refers to itself; the ones here need to know how the tree is actually
+built, and there are three:
+
+* a ``bind:`` inside ``contains:``/``within:`` — the filter tests the surrounding
+  annotation instead of matching the contained one, so there is no match info
+* a ``bind:`` inside ``after:``/``notafter:``/``not:`` — ``ZeroWidth`` drops the
+  assertion's matches, because the assertion is not part of the match
+* a ``repeat`` over a form that can match without consuming anything — ``N`` never
+  terminates over one, so the pack would take the phase down at match time
+
+The first two share ``checks.py``'s failure mode exactly: the rule fires and
+writes nothing. The third is worse than that, which is why it is refused rather
+than documented.
 
 Two inherited boundaries, both pinned in the conformance matrix and both worth
 knowing before writing a pack:
@@ -56,12 +69,18 @@ from ttrnlp.rules.dsl import (
     StepModel,
 )
 from ttrnlp.rules.normalize import normalize_pack
-from ttrnlp.rules.parsers import Conjunction, ZeroWidth
+from ttrnlp.rules.parsers import Conjunction, Named, ZeroWidth
 
 #: `N` needs a concrete `max`. Repetition terminates when the inner parser stops
 #: matching, not when this bound is reached, so the bound only has to exceed any
 #: possible number of annotations — it is not a silent cap on matching.
 UNBOUNDED_REPEAT = 2**31 - 1
+
+#: The parsers that accept PAMPAC's own ``name=``. ``Or`` and the ``Filter`` that
+#: ``covering()``/``within()`` return have no ``name`` at all, and ``Seq`` cannot
+#: be built around a single parser (``assert len(parsers) > 1``) — so a binding
+#: over either of those goes through ``Named`` instead.
+NAMEABLE = (Ann, N, Seq, ZeroWidth, Conjunction)
 
 
 # ── compiled shapes ──────────────────────────────────────────────────────────
@@ -160,6 +179,91 @@ def _simple_ann(step: StepModel) -> bool:
     )
 
 
+def _binds_the_annotation(step: StepModel) -> bool:
+    """True when this step's ``bind:`` names one annotation rather than a span.
+
+    Only an unrepeated ``ann:`` step does. It also decides *how* the binding is
+    attached: PAMPAC's ``Ann`` is the only parser whose match entry carries
+    ``ann=``, which ``update:`` and feature getters read, so such a step is named
+    at construction. Everything else records a span and can be named afterwards.
+    """
+    return step.bind is not None and step.ann is not None and step.repeat is None
+
+
+def _bind(parser: PampacParser, name: str) -> PampacParser:
+    """Record ``name`` over whatever ``parser`` matched.
+
+    Uses PAMPAC's own naming where the parser accepts one and is not already
+    carrying it. That second half is load-bearing: a one-step ``group: {seq: …}``
+    or a one-member ``all:`` hands its child's parser straight back here, and
+    assigning over the name would erase the inner ``bind:`` — leaving a rule that
+    fires and writes nothing.
+    """
+    if isinstance(parser, NAMEABLE) and parser.name is None:
+        parser.name = name
+        return parser
+    return Named(parser, name)
+
+
+def _matches_without_advancing(step: StepModel) -> bool:
+    """Can this step's FORM match while consuming nothing?
+
+    The step's own ``repeat`` is not consulted — the caller is asking on behalf of
+    that repeat, and repeating a form that can match empty never terminates.
+    ``N`` stops when its inner parser stops matching, and one that succeeds at the
+    same location every time never does: under ``select="all"`` that is unbounded
+    recursion, and otherwise ``max`` iterations, which is ``UNBOUNDED_REPEAT``.
+    """
+    if step.after is not None or step.notafter is not None or step.not_ is not None:
+        return True  # zero-width by construction
+    if step.ann is not None:
+        return False  # `Ann` always consumes one annotation
+    if step.all is not None:
+        return all(_optional(member) for member in step.all)
+    if step.group is not None:
+        if step.group.or_ is not None:
+            # One empty-matching branch is enough — `Or` offers every branch.
+            return any(all(_optional(s) for s in branch) for branch in step.group.or_)
+        return all(_optional(s) for s in step.group.seq or [])
+    return False
+
+
+def _optional(step: StepModel) -> bool:
+    """True when a step can contribute nothing: zero-width, or repeatable zero
+    times."""
+    return (step.repeat is not None and step.repeat.min == 0) or (
+        _matches_without_advancing(step)
+    )
+
+
+def _nested_binds(step: StepModel) -> list[str]:
+    """Every ``bind:`` at or below ``step``, its own included."""
+    names = [step.bind] if step.bind is not None else []
+    for nested in step.substeps():
+        names.extend(_nested_binds(nested))
+    return names
+
+
+def _reject_nested_binds(
+    inner: StepModel, collector: DiagnosticCollector, where: str, *, form: str
+) -> None:
+    """A ``bind:`` under a zero-width assertion can never be read — say so.
+
+    ``ZeroWidth`` reports an empty span at the input location and drops the inner
+    parser's matches, which it has to: the assertion contributes nothing to the
+    match, so there is nothing inside it to bind. A ``bind:`` on the assertion
+    step *itself* is fine — that records the position it held.
+    """
+    for name in _nested_binds(inner):
+        collector.error(
+            NLS_PACK_002,
+            f"{where}: `bind: {name}` sits inside `{form}:`, which is zero-width — "
+            "the assertion contributes nothing to the match, so the binding would "
+            "resolve to nothing and the rule would fire without writing anything; "
+            f"bind the `{form}:` step itself to record where it held",
+        )
+
+
 def _compile_step(
     step: StepModel, collector: DiagnosticCollector, where: str
 ) -> tuple[PampacParser, bool]:
@@ -167,6 +271,16 @@ def _compile_step(
     core, is_annotation = _compile_form(step, collector, where)
 
     if step.repeat is not None:
+        if _matches_without_advancing(step):
+            collector.error(
+                NLS_PACK_002,
+                f"{where}: `repeat` over a form that can match without consuming "
+                "anything — a zero-width `after:`/`notafter:`/`not:`, or a group "
+                "whose every member is optional. The repetition could never "
+                "terminate, so the rule would hang or crash the phase at match "
+                "time rather than simply fail to match",
+            )
+            return core, False
         maximum = step.repeat.max if step.repeat.max is not None else UNBOUNDED_REPEAT
         core = N(
             core,
@@ -179,12 +293,8 @@ def _compile_step(
         # A repetition binds a span, never one annotation.
         return core, False
 
-    nameable = (Ann, ZeroWidth, Conjunction, Seq)
-    if step.bind is not None and not isinstance(core, nameable):
-        # `Or` takes no name; wrap it so the binding still records a span.
-        core = Seq(core, name=step.bind, matchtype="all", select="all")
-    elif step.bind is not None:
-        core.name = step.bind
+    if step.bind is not None and not _binds_the_annotation(step):
+        core = _bind(core, step.bind)
 
     return core, is_annotation
 
@@ -193,7 +303,11 @@ def _compile_form(
     step: StepModel, collector: DiagnosticCollector, where: str
 ) -> tuple[PampacParser, bool]:
     if step.ann is not None:
-        parser: PampacParser = Ann(type=step.ann, features=_features(step))
+        parser: PampacParser = Ann(
+            type=step.ann,
+            features=_features(step),
+            name=step.bind if _binds_the_annotation(step) else None,
+        )
         parser = _apply_containment(parser, step, collector, where)
         return parser, True
 
@@ -204,14 +318,19 @@ def _compile_form(
         return Conjunction(*members), False
 
     if step.not_ is not None:
+        _reject_nested_binds(step.not_, collector, f"{where}.not", form="not")
         inner, _ = _compile_step(step.not_, collector, f"{where}.not")
         return ZeroWidth(inner, negate=True), False
 
     if step.after is not None:
+        _reject_nested_binds(step.after, collector, f"{where}.after", form="after")
         inner, _ = _compile_step(step.after, collector, f"{where}.after")
         return ZeroWidth(inner), False
 
     if step.notafter is not None:
+        _reject_nested_binds(
+            step.notafter, collector, f"{where}.notafter", form="notafter"
+        )
         inner, _ = _compile_step(step.notafter, collector, f"{where}.notafter")
         return ZeroWidth(inner, negate=True), False
 
@@ -249,6 +368,19 @@ def _apply_containment(
                 "nested containment cannot be expressed as a containment filter",
             )
             continue
+        if nested.bind is not None:
+            # `covering()`/`within()` take MATCHER arguments, not a parser, so the
+            # contained annotation is filtered on and never matched: there is no
+            # match info for the name to resolve to.
+            collector.error(
+                NLS_PACK_002,
+                f"{where}: `bind: {nested.bind}` inside `{key}:` can never be "
+                "read — a containment filter tests the surrounding annotation "
+                "rather than matching the contained one, so the binding would "
+                "resolve to nothing and the rule would fire without writing "
+                f"anything; bind the outer `ann: {step.ann}` step instead",
+            )
+            continue
         arguments = {"type": nested.ann, "features": _features(nested)}
         parser = (
             parser.covering(**arguments)
@@ -271,9 +403,15 @@ def _compile_sequence(
 
 
 def _collect_binds(steps: list[StepModel], into: dict[str, bool]) -> None:
+    """Which names a rule binds, and whether each names a single annotation.
+
+    Shares ``_binds_the_annotation`` with the compilation of the step itself, so
+    what this table promises and what the parser tree actually records cannot
+    drift apart.
+    """
     for step in steps:
         if step.bind is not None:
-            into[step.bind] = step.ann is not None and step.repeat is None
+            into[step.bind] = _binds_the_annotation(step)
         _collect_binds(step.substeps(), into)
 
 

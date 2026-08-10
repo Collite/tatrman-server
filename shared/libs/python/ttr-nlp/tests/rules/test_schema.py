@@ -159,7 +159,7 @@ def test_kitchen_sink_covers_both_actions_and_every_getter():
     rhs = pack.phases[0].rules[0].rhs
     add_full, add_bare, update = rhs
 
-    assert add_full.add.span == "subject"
+    assert add_full.add.span == "subject_span"
     assert add_full.add.set == "patterns"
     assert {v.get for v in add_full.add.features.values() if hasattr(v, "get")} == {
         "@string",
@@ -169,6 +169,27 @@ def test_kitchen_sink_covers_both_actions_and_every_getter():
     assert add_bare.add.span is None and add_bare.add.set is None
     assert update.update.on == "subject"
     assert update.update.features["verified"] == "company"
+
+
+def test_kitchen_sink_covers_both_kinds_of_binding():
+    """A span binding on the group, an annotation binding inside its branches.
+
+    The distinction is not cosmetic — the compiler rejects `update:` and feature
+    getters against a span binding — so the coverage fixture has to hold one of
+    each, and the RHS has to read each with the getters that binding allows.
+    """
+    pack = load_pack(VALID / "kitchen-sink.pack.yaml")
+    rule = pack.phases[0].rules[0]
+
+    (alternation,) = [s for s in rule.lhs if s.bind == "subject_span"]
+    assert [branch[0].bind for branch in alternation.group.or_] == [
+        "subject",
+        "subject",
+    ]
+
+    add_full = rule.rhs[0].add
+    assert add_full.features["subject_text"].from_ == "subject_span"
+    assert add_full.features["subject_kind"].from_ == "subject"
 
 
 # ── invalid packs: one file per failure, each naming its path ────────────────

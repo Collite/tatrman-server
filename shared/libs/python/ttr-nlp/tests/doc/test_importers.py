@@ -212,6 +212,110 @@ def test_empty_engine_results_still_yield_a_document():
     doc = build_document("Zobraz faktury", [], language="cs")
     assert doc.text == "Zobraz faktury"
     assert len(list(_annset(doc))) == 0
+    assert doc.features["duplicate_annotations_dropped"] == 0
+
+
+# ── one annotation per (type, span) ──────────────────────────────────────────
+
+
+DUPLICATED_TEXT = "alpha beta gamma"
+
+
+def _two_token_engines():
+    """Two engines that both tokenized the same text — the realistic collision.
+
+    A backend asked for entities still tokenizes on the way there, so a second
+    result carrying the same tokens is a routing accident, not a malformed
+    payload, and the importer has to survive one.
+    """
+    tokens = [
+        {"text": "alpha", "charStart": 0, "charEnd": 5, "lemma": "alpha"},
+        {"text": "beta", "charStart": 6, "charEnd": 10, "lemma": "beta"},
+        {"text": "gamma", "charStart": 11, "charEnd": 16, "lemma": "gamma"},
+    ]
+    return [
+        {"engine": "stanza", "tokens": tokens, "sentences": [], "entities": []},
+        {"engine": "morphodita", "tokens": tokens, "sentences": [], "entities": []},
+    ]
+
+
+def test_a_second_engines_duplicate_layer_is_dropped_not_stacked():
+    """Two `Token` annotations over one word are not a richer layer, just a longer
+    one: nothing can tell them apart, and every consumer that enumerates the layer
+    counts each word twice."""
+    doc = build_document(DUPLICATED_TEXT, _two_token_engines(), language="en")
+    assert [(a.start, a.end) for a in _by_type(doc, "Token")] == [
+        (0, 5),
+        (6, 10),
+        (11, 16),
+    ]
+    assert doc.features["duplicate_annotations_dropped"] == 3
+
+
+def test_the_first_engine_to_report_a_span_owns_it_whole():
+    """Dropped whole rather than merged: a merged annotation would carry one
+    engine's name over another engine's features, which is a quiet lie about
+    where a value came from."""
+    engines = _two_token_engines()
+    engines[1]["tokens"] = [
+        {**token, "lemma": "different", "upos": "NOUN"}
+        for token in engines[1]["tokens"]
+    ]
+    doc = build_document(DUPLICATED_TEXT, engines, language="en")
+    for token in _by_type(doc, "Token"):
+        assert token.features["engine"] == "stanza"
+        assert token.features["lemma"] != "different"
+        assert "upos" not in token.features
+
+
+def test_matching_is_indifferent_to_duplicate_spans_either_way():
+    """Rule matching is NOT the reason the dedup exists — pinned so that nobody
+    reasons their way to the opposite conclusion.
+
+    It looks like it should be: `Ann` matches the next annotation in the visible
+    list and will not skip a non-matching one, which is the boundary
+    `rules/compiler.py` documents for mixed `input:` types. But it re-syncs to the
+    current text offset first (`useoffset=True`), and that skips any annotation
+    starting before it — so a duplicate at the same span is stepped straight over
+    and three adjacent lemmas match the same way with one engine or three.
+    """
+    from ttrnlp.rules import build_pack
+    from ttrnlp.rules.pipeline import run_phases
+
+    pack = build_pack(
+        "pack: adjacency\nversion: 1\nphases:\n"
+        "  - phase: p\n    input: [Token]\n    control: appelt\n"
+        "    rules:\n      - rule: R\n"
+        "        lhs: [ { lemma: alpha }, { lemma: beta }, { lemma: gamma } ]\n"
+        "        rhs: [ { add: { type: M } } ]\n"
+    )
+    one, two = _two_token_engines()[:1], _two_token_engines()
+    for engines in (one, two):
+        doc = build_document(DUPLICATED_TEXT, engines, language="en")
+        report = run_phases(doc, [pack])
+        assert report.firings == 1
+        assert [(a.start, a.end) for a in _by_type(doc, "M")] == [(0, 16)]
+
+
+def test_annotations_of_different_types_at_one_span_both_survive():
+    """The dedup is per (type, span). A `Lookup` laid over a `Token`, or an
+    entity exactly covering one, is not a duplicate of it."""
+    engines = [
+        {
+            "engine": "spacy",
+            "tokens": [{"text": "Microsoft", "charStart": 0, "charEnd": 9}],
+            "sentences": [{"charStart": 0, "charEnd": 9}],
+            "entities": [{"text": "Microsoft", "label": "ORG",
+                          "charStart": 0, "charEnd": 9}],
+        }
+    ]
+    doc = build_document("Microsoft", engines, language="en")
+    assert Counter(a.type for a in _annset(doc)) == {
+        "Token": 1,
+        "Sentence": 1,
+        "ORG": 1,
+    }
+    assert doc.features["duplicate_annotations_dropped"] == 0
 
 
 # ── offsets are characters, and Czech is where that bites ────────────────────
