@@ -1,0 +1,97 @@
+{
+  "_comment": "NLS-P0.T5 — en sample. spaCy passes its own OntoNotes label through (ent.label_ == 'ORG'), and the backend always sends feats: {} for en. Both are faithful to services/nlp/backends/spacy/server.py, and together they are why an en pack does not look like its cs sibling.",
+  "hero": "sample-en-invoices",
+  "text": "Show all invoices from customer Microsoft",
+  "language": "en",
+  "lane": "default",
+  "engines": [
+    {
+      "engine": "spacy",
+      "modelVersion": "spacy-en_core_web_sm-3.8.0",
+      "tokens": [
+        {
+          "text": "Show",
+          "charStart": 0,
+          "charEnd": 4,
+          "lemma": "show",
+          "upos": "VERB",
+          "xpos": "VB",
+          "feats": {},
+          "depHead": 0,
+          "depRelation": "ROOT"
+        },
+        {
+          "text": "all",
+          "charStart": 5,
+          "charEnd": 8,
+          "lemma": "all",
+          "upos": "DET",
+          "xpos": "DT",
+          "feats": {},
+          "depHead": 3,
+          "depRelation": "det"
+        },
+        {
+          "text": "invoices",
+          "charStart": 9,
+          "charEnd": 17,
+          "lemma": "invoice",
+          "upos": "NOUN",
+          "xpos": "NNS",
+          "feats": {},
+          "depHead": 1,
+          "depRelation": "dobj"
+        },
+        {
+          "text": "from",
+          "charStart": 18,
+          "charEnd": 22,
+          "lemma": "from",
+          "upos": "ADP",
+          "xpos": "IN",
+          "feats": {},
+          "depHead": 3,
+          "depRelation": "prep"
+        },
+        {
+          "text": "customer",
+          "charStart": 23,
+          "charEnd": 31,
+          "lemma": "customer",
+          "upos": "NOUN",
+          "xpos": "NN",
+          "feats": {},
+          "depHead": 4,
+          "depRelation": "pobj"
+        },
+        {
+          "text": "Microsoft",
+          "charStart": 32,
+          "charEnd": 41,
+          "lemma": "Microsoft",
+          "upos": "PROPN",
+          "xpos": "NNP",
+          "feats": {},
+          "depHead": 5,
+          "depRelation": "compound"
+        }
+      ],
+      "entities": [
+        {
+          "text": "Microsoft",
+          "label": "ORG",
+          "charStart": 32,
+          "charEnd": 41,
+          "normalizedValue": "",
+          "sourceEngine": "spacy"
+        }
+      ],
+      "sentences": [
+        {
+          "charStart": 0,
+          "charEnd": 41
+        }
+      ]
+    }
+  ]
+}

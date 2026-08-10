@@ -152,14 +152,15 @@ test-component:
     # first CI run stopped at translate and left the rest of the estate unknown.
     ./gradlew componentTest --continue
 
-# ── Python lane (uv + ruff + pytest) — services/nlp, services/golem-py, workers/worker-polars ─
+# ── Python lane (uv + ruff + pytest) — services/nlp, services/golem-py, ───────
+#    workers/worker-polars, shared/libs/python/ttr-nlp ──────────────────────────
 
 # ruff lint every Python module, or one: `just lint-py` / `just lint-py nlp`.
 lint-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars; do just lint-py "$d"; done
+        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp; do just lint-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -171,7 +172,7 @@ build-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars; do just build-py "$d"; done
+        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp; do just build-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -183,7 +184,7 @@ test-py module="" *args:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars; do just test-py "$d" {{args}}; done
+        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp; do just test-py "$d" {{args}}; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")

@@ -1,0 +1,136 @@
+{
+  "_comment": "NLS-P0.T5 — primary hero (S-5). Option lane: Stanza cs for tokens/lemmas/deps, NameTag 3 for cs NER. Offsets are Python character indices.",
+  "hero": "hero-cs-invoices",
+  "text": "Zobraz všechny faktury od zákazníka Microsoft",
+  "language": "cs",
+  "lane": "option",
+  "engines": [
+    {
+      "engine": "stanza",
+      "modelVersion": "stanza-1.10.0",
+      "tokens": [
+        {
+          "text": "Zobraz",
+          "charStart": 0,
+          "charEnd": 6,
+          "lemma": "zobrazit",
+          "upos": "VERB",
+          "xpos": "Vi-S---2--A----",
+          "feats": {
+            "Aspect": "Perf",
+            "Mood": "Imp",
+            "Number": "Sing",
+            "Person": "2",
+            "Polarity": "Pos",
+            "VerbForm": "Fin"
+          },
+          "depHead": 0,
+          "depRelation": "root"
+        },
+        {
+          "text": "všechny",
+          "charStart": 7,
+          "charEnd": 14,
+          "lemma": "všechen",
+          "upos": "DET",
+          "xpos": "PLIP4----------",
+          "feats": {
+            "Case": "Acc",
+            "Gender": "Fem",
+            "Number": "Plur",
+            "PronType": "Tot"
+          },
+          "depHead": 3,
+          "depRelation": "det"
+        },
+        {
+          "text": "faktury",
+          "charStart": 15,
+          "charEnd": 22,
+          "lemma": "faktura",
+          "upos": "NOUN",
+          "xpos": "NNFP4-----A----",
+          "feats": {
+            "Case": "Acc",
+            "Gender": "Fem",
+            "Number": "Plur",
+            "Polarity": "Pos"
+          },
+          "depHead": 1,
+          "depRelation": "obj"
+        },
+        {
+          "text": "od",
+          "charStart": 23,
+          "charEnd": 25,
+          "lemma": "od",
+          "upos": "ADP",
+          "xpos": "RR--2----------",
+          "feats": {
+            "AdpType": "Prep",
+            "Case": "Gen"
+          },
+          "depHead": 5,
+          "depRelation": "case"
+        },
+        {
+          "text": "zákazníka",
+          "charStart": 26,
+          "charEnd": 35,
+          "lemma": "zákazník",
+          "upos": "NOUN",
+          "xpos": "NNMS2-----A----",
+          "feats": {
+            "Animacy": "Anim",
+            "Case": "Gen",
+            "Gender": "Masc",
+            "Number": "Sing",
+            "Polarity": "Pos"
+          },
+          "depHead": 3,
+          "depRelation": "nmod"
+        },
+        {
+          "text": "Microsoft",
+          "charStart": 36,
+          "charEnd": 45,
+          "lemma": "Microsoft",
+          "upos": "PROPN",
+          "xpos": "NNIS1-----A----",
+          "feats": {
+            "Case": "Nom",
+            "Gender": "Inan",
+            "NameType": "Com",
+            "Number": "Sing",
+            "Polarity": "Pos"
+          },
+          "depHead": 5,
+          "depRelation": "nmod"
+        }
+      ],
+      "entities": [],
+      "sentences": [
+        {
+          "charStart": 0,
+          "charEnd": 45
+        }
+      ]
+    },
+    {
+      "engine": "nametag3",
+      "modelVersion": "nametag3-czech-cnec2.0-240830",
+      "tokens": [],
+      "entities": [
+        {
+          "text": "Microsoft",
+          "label": "ORGANIZATION",
+          "charStart": 36,
+          "charEnd": 45,
+          "normalizedValue": "cnec:if",
+          "sourceEngine": "nametag3"
+        }
+      ],
+      "sentences": []
+    }
+  ]
+}

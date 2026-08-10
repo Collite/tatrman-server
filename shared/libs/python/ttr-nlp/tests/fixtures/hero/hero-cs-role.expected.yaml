@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P0.T5 — the secondary hero. Its job is to prove the suite can answer
+# without any named entity at all: the parameter value here is a multi-token
+# *value alias* found in a list, which is the case NER cannot serve and the
+# gazetteer can.
+hero: hero-cs-role
+text: "Najdi roli obchodní zástupce"
+language: cs
+
+# --- P2 (gazetteer) -------------------------------------------------------
+lookups:
+  - type: Lookup
+    start: 6
+    end: 10
+    text: roli
+    features:
+      kind: attribute_alias
+      attribute: role
+      source: dfp-entity-aliases
+      matching: lemma
+  # Multi-token term: the list entry is "obchodní zástupce" and the match runs
+  # over the two tokens' lemmas as a sequence, spanning both.
+  - type: Lookup
+    start: 11
+    end: 28
+    text: obchodní zástupce
+    features:
+      kind: value_alias
+      attribute: role
+      value: obchodni_zastupce
+      source: dfp-entity-aliases
+      matching: lemma
+
+# No engine NER in either lane for this sentence — deliberately.
+ner: []
+
+# --- P1 (rules) -----------------------------------------------------------
+# Lane-independent: nothing here came from NER, so the default lane produces the
+# identical result and needs no fallback rule.
+query_patterns:
+  option_lane: &role_pattern
+    # {Lookup attribute=role} {Lookup kind=value_alias attribute=role}
+    # `nazev_role` takes the bound Lookup's @string — the span text, not the
+    # normalised value id (contracts §5).
+    - type: QueryPattern
+      start: 6
+      end: 28
+      features:
+        query: role
+        nazev_role: obchodní zástupce
+  default_lane: *role_pattern

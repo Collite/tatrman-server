@@ -1,0 +1,135 @@
+name: Publish Python (PyPI)
+
+# Tag-driven release of this repo's pure-Python wheels to public PyPI via PyPI
+# Trusted Publishing (OIDC). No PYPI_TOKEN anywhere: PyPI mints a short-lived
+# token for the `publish` job in the `pypi` environment, which is registered as
+# the trusted publisher for this workflow.
+#
+# Tag → wheel:
+#   python-nlp/v<x.y.z>[-RELEASE]   ttr-nlp   (shared/libs/python/ttr-nlp)
+#
+# ⚑ NAME COUPLING — the trusted-publisher registration on PyPI names three
+# things that MUST keep matching this file (P-BP T1/T2, Bora):
+#   repository  Collite/tatrman-server
+#   workflow    publish-python.yml      <- this file's NAME, not its job's
+#   environment pypi                    <- the `environment:` below
+# Renaming this file or that environment silently breaks the OIDC handshake and
+# the upload fails with a confusing 403. Re-register on PyPI if either changes.
+#
+# RELEASE gating (the 2026-07-16 justfile-sync polarity, same as publish.yml):
+# PyPI is public and has no internal staging equivalent, so a tag only reaches
+# it when explicitly marked `-RELEASE`. A bare tag (`python-nlp/v0.1.0`) still
+# runs the whole BUILD — that is the point of cutting one: it proves the wheel
+# builds and passes its content checks without spending a public version number.
+# The `-RELEASE` marker is stripped before the version reaches PyPI.
+
+on:
+  push:
+    tags:
+      - 'python-nlp/v*'
+
+permissions:
+  contents: read
+
+jobs:
+  # ── ttr-nlp (python-nlp/v*) ───────────────────────────────────────────────
+  build:
+    if: startsWith(github.ref_name, 'python-nlp/v')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      public: ${{ steps.ver.outputs.public }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Derive version from the tag
+        id: ver
+        run: |
+          RAW="${GITHUB_REF_NAME#python-nlp/v}"
+          if [[ "$RAW" == *-RELEASE ]]; then
+            PUBLIC=true
+            VERSION="${RAW%-RELEASE}"
+          else
+            PUBLIC=false
+            VERSION="$RAW"
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::could not derive a version from tag '$GITHUB_REF_NAME'"
+            exit 1
+          fi
+          # Not grammar-coupled (unlike tatrman's ttr-parser lane) — ttr-nlp
+          # versions independently of the TTR grammar.
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([abrc.dev+-][0-9A-Za-z.+-]*)?$ ]]; then
+            echo "::error::'$VERSION' is not a PEP 440 release version"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "public=${PUBLIC}" >> "$GITHUB_OUTPUT"
+          # Inject the tag version into the package metadata (the repo tree
+          # always keeps 0.0.0 — the tatrman pattern).
+          sed -i "s/^version = \"0.0.0\"/version = \"$VERSION\"/" \
+            shared/libs/python/ttr-nlp/pyproject.toml
+          grep -q "^version = \"$VERSION\"$" shared/libs/python/ttr-nlp/pyproject.toml \
+            || { echo "::error::version injection did not take — is the repo tree still 0.0.0?"; exit 1; }
+          echo "Building ttr-nlp $VERSION (public=$PUBLIC)"
+
+      # Wheel only, `py3-none-any`. `--wheel` builds straight from the source
+      # tree; there is no generation step and no sdist lane to keep working.
+      - name: Build wheel
+        run: pipx run build --wheel shared/libs/python/ttr-nlp
+
+      - name: Verify the wheel
+        run: |
+          set -euo pipefail
+          cd shared/libs/python/ttr-nlp
+          pipx run twine check dist/*
+
+          # The import package must actually be in there.
+          unzip -l dist/*.whl | grep -qE 'ttrnlp/__init__\.py' \
+            || { echo "::error::ttrnlp package missing from the wheel"; exit 1; }
+
+          # The DSL JSON Schema is loaded from the INSTALLED package at runtime
+          # (importlib.resources), so a wheel without it fails at pack-load time
+          # rather than at build time. This check tightens itself: while the
+          # schema does not exist yet (it lands at NLS-P1) it only warns, and
+          # the moment the file appears in the source tree it becomes fatal.
+          if [ -f src/ttrnlp/rules/schema/pack.schema.json ]; then
+            unzip -l dist/*.whl | grep -qE 'ttrnlp/rules/schema/pack\.schema\.json' \
+              || { echo "::error::pack.schema.json is in the source tree but NOT in the wheel — fix the hatch build include"; exit 1; }
+            echo "pack.schema.json: present in the wheel"
+          else
+            echo "::warning::pack.schema.json does not exist yet (arrives at NLS-P1); content check skipped"
+          fi
+
+          # The filename carries the version PyPI will see.
+          ls dist/ | grep -qE "^ttr_nlp-${{ steps.ver.outputs.version }}-py3-none-any\.whl$" \
+            || { echo "::error::wheel filename does not carry version ${{ steps.ver.outputs.version }}"; ls dist/; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: shared/libs/python/ttr-nlp/dist/
+
+  publish:
+    needs: build
+    # Bare tags stop here: the build above already proved the wheel is sound.
+    if: needs.build.outputs.public == 'true'
+    runs-on: ubuntu-latest
+    # The trusted publisher on PyPI is scoped to this environment; protection
+    # rules configured here (e.g. a required reviewer) gate the actual upload.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/ttr-nlp
+    permissions:
+      id-token: write          # OIDC token for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,0 +1,84 @@
+[project]
+name = "ttr-nlp"
+# The repo keeps 0.0.0 — `publish-python.yml` injects the version from the
+# `python-nlp/v<x.y.z>-RELEASE` tag at build time (the tatrman ttr-parser /
+# ttr-plan-proto pattern, ⚑NLS-D5).
+version = "0.0.0"
+description = "Annotation model, JAPE-class rule engine and gazetteers for the Tatrman NLP suite"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Collite" }]
+keywords = ["nlp", "gate", "jape", "gazetteer", "annotations", "ttr"]
+
+# MANDATORY DEPS ARE TINY AND MODEL-FREE (architecture §2). gatenlp core pulls
+# only `sortedcontainers` + `iobes`; no torch, no stanza, no spaCy, no models.
+# This is what lets the rule engine run in-process in the ENGINE-FREE nlp front
+# (⚑NLS-D3) without breaking the engine-free invariant.
+dependencies = [
+    # EXACT pin, NL-2. gatenlp is the annotation model and PAMPAC is the matcher
+    # the rule compiler targets; both are pre-1.0-stable APIs in practice, so the
+    # pin is the contract. Vendored-subset exit is pre-approved at >2 local
+    # patches (NL-2) — record any patch in README before reaching for it.
+    "gatenlp==1.0.8",
+    "pydantic>=2",
+    "pyyaml>=6",
+    "jsonschema>=4",
+]
+
+[project.optional-dependencies]
+# The gRPC client lane (NL-16) — only consumers that talk to the nlp front need
+# these, so they stay out of the mandatory set.
+grpc = ["grpcio>=1.68", "protobuf>=5.28"]
+# The HTTP engine-adapter clients (⚑NLS-D7, moved in from services/nlp at P3).
+http = ["httpx>=0.27"]
+
+[project.scripts]
+ttr-nlp = "ttrnlp.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Collite/tatrman-server"
+Source = "https://github.com/Collite/tatrman-server/tree/master/shared/libs/python/ttr-nlp"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# This ships EVERY file under src/ttrnlp, not just the .py ones — including the
+# DSL JSON Schema, which is loaded from the installed package at runtime via
+# importlib.resources. Do NOT add a `force-include` for the schema as well:
+# hatchling refuses to add the same archive path twice, so the belt-and-braces
+# version fails the build outright. The publish workflow's unzip check is the
+# guard here; this line is the mechanism.
+packages = ["src/ttrnlp"]
+
+[tool.uv]
+# NL-10 flip: unlike the deps-only services, this IS an installable package —
+# it is the published artifact.
+package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.0",
+    "ruff>=0.9.4",
+    # protoc + grpc_python plugin, for the P3 client stub generation lane.
+    "grpcio-tools>=1.68.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `src/` layout: tests import `ttrnlp` from the source tree.
+pythonpath = ["src"]
+markers = [
+    "component: real-dependency component tier (needs a live nlp front)",
+]
+addopts = ["-m", "not component"]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
