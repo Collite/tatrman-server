@@ -705,6 +705,7 @@ http = [
 [package.dev-dependencies]
 dev = [
     { name = "grpcio-tools" },
+    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -725,6 +726,7 @@ provides-extras = ["grpc", "http"]
 [package.metadata.requires-dev]
 dev = [
     { name = "grpcio-tools", specifier = ">=1.68.0" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "pytest", specifier = ">=8.3.4" },
     { name = "pytest-asyncio", specifier = ">=0.25.0" },
     { name = "ruff", specifier = ">=0.9.4" },

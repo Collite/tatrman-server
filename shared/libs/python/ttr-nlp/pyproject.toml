@@ -65,6 +65,10 @@ dev = [
     "ruff>=0.9.4",
     # protoc + grpc_python plugin, for the P3 client stub generation lane.
     "grpcio-tools>=1.68.0",
+    # The `[http]` extra, so the loader's URL lane can be tested (P2.2). It stays
+    # OPTIONAL for consumers — a pack source is a directory in every deployment
+    # we run — but an untested lane in a fail-all loader is not a lane.
+    "httpx>=0.27",
 ]
 
 [tool.pytest.ini_options]

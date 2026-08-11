@@ -79,6 +79,54 @@ added = gazetteer.annotate(doc)                      # every list, load order
 added = gazetteer.annotate(doc, lists=["dfp-keywords", "dfp-entity-aliases"])
 ```
 
+## `ttr-nlp validate`
+
+```bash
+ttr-nlp validate packs/ lists/                 # a pack file, a pack dir, a list dir
+ttr-nlp validate packs/ --model models/dfp     # + the query/parameter cross-check
+ttr-nlp validate packs/ --json                 # machine output
+```
+
+```text
+ERROR NLS-PACK-002 packs/dfp-query-patterns.pack.yaml:dfp-query-patterns — $.phases[query-match].rules[FakturyZakaznika]: `add.features.nazev_zakaznika.from` references `name`, which this rule's LHS never binds (bound here: subjekt) — bindings are rule-scoped
+
+1 error(s) in packs/, lists/ — nothing would load (fail-all).
+```
+
+Exit codes: **0** these sources would load · **1** validation errors · **2** the
+command could not be run as asked (a path that is not there, a missing
+`--model` directory). The 1/2 split says *whose* mistake it is, so a wrapper does
+not retry a typo'd path forever.
+
+**Same code path as the service.** This command, the `nlp` service's boot-time
+load and its `ReloadPacks` RPC all call `ttrnlp.packs.validate.validate_sources`
+— not three readers that agree, one reader. A pack that passes here passes there,
+and a test asserts the CLI and the loader emit byte-identical diagnostics on the
+same fixtures. It is what lets the DFP model-validator wrap this rather than
+reimplement it.
+
+The one exception is `--model` (`NLS-PACK-005`): cross-checking a
+`QueryPattern`'s query id and parameter names against a TTR-M model is CLI-only,
+because the service never sees model files (contracts §5). `load_sources` has no
+`model` parameter at all — and a test asserts that, so the absence reads as the
+boundary it is rather than as an omission.
+
+**Fail-all-or-nothing** (NL-15). Three good packs beside one broken one load
+*nothing*. The alternative is worse than it sounds: the service comes up looking
+healthy, answers most questions, and silently cannot answer the ones the broken
+pack was for.
+
+```python
+from ttrnlp.packs import load_sources, validate_sources
+
+diagnostics = validate_sources(["packs/", "lists/"], model="models/dfp")
+state = load_sources(["packs/", "lists/"], pipelines=config.pipelines)
+state.state_id       # same bytes ⇒ same id; what ReloadPacks reports
+```
+
+A source is a directory (globbed for `**/*.pack.yaml` and `**/*.list.yaml`), a
+single file, or an `http(s)` URL naming one file (needs the `[http]` extra).
+
 ## Install
 
 ```bash
