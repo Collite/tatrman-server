@@ -4,6 +4,20 @@
 gRPC is the service contract; the FastAPI app is a dev/health mirror. This
 servicer translates proto ⇄ the orchestrator and stamps the S-1 `used[]` echo
 on every response. Async (grpc.aio) so it co-hosts with uvicorn on one loop.
+
+NLS-P3.2 adds `RunPipeline`, `ReloadPacks`, the `GetStatus` additions and the
+`ReportToken` stub. The status codes are chosen to say whose problem it is:
+
+    unknown pipeline      INVALID_ARGUMENT     the request named something that
+                                               does not exist — and the message
+                                               lists what does
+    packs failed to load  FAILED_PRECONDITION  the request is fine; the server is
+                                               not ready for this rpc. Analyze
+                                               keeps working, because it needs no
+                                               packs.
+
+An op the active lane cannot route is neither: it is a WARNING on the Rule-6
+message slot (`NLS-NLP-011`) and the request completes (NL-14).
 """
 
 from __future__ import annotations
@@ -15,11 +29,15 @@ import grpc
 
 from org.tatrman.common.v1 import response_message_pb2 as common_pb2
 from org.tatrman.nlp.v1 import nlp_pb2, nlp_pb2_grpc
+from ttrnlp.doc.serialize import doc_to_proto
 
 from nlp_service.config import AppConfig, load_config
+from nlp_service.diagnostics import LM_MORPH_007, NLS_NLP_011, message
 from nlp_service.engines import EngineRegistry
 from nlp_service.engines.base import EngineVersion, NlpOp
+from nlp_service.packs_state import PackState
 from nlp_service.pipeline.orchestrator import AnalyzeResponse, Orchestrator
+from nlp_service.pipeline.runner import PipelineRunner, UnknownPipelineError
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +64,19 @@ def _op_to_proto(name: str) -> int:
 
 
 class NlpServicer(nlp_pb2_grpc.NlpServiceServicer):
-    def __init__(self, config: AppConfig | None = None, registry: EngineRegistry | None = None):
+    def __init__(
+        self,
+        config: AppConfig | None = None,
+        registry: EngineRegistry | None = None,
+        packs: PackState | None = None,
+    ):
         self._config = config or load_config()
         self._registry = registry or EngineRegistry(self._config)
         self._orchestrator = Orchestrator(self._config, self._registry)
+        self._runner = PipelineRunner(self._config, self._registry, self._orchestrator)
+        # Injectable so tests can hand in a state built over a fixture tree
+        # without reaching through the config for a directory.
+        self._packs = packs if packs is not None else PackState(self._config)
 
     # ---- Analyze ----------------------------------------------------------
 
@@ -69,6 +96,12 @@ class NlpServicer(nlp_pb2_grpc.NlpServiceServicer):
             mode=_MODE.get(request.mode, "NORMAL"),
             engine_hints=dict(request.engine_hints),
         )
+        # T7 (the NL-14 tail): the same degrade the pipeline reports, on the rpc
+        # that predates it. Shape untouched — one more entry on messages[99],
+        # which is what the Rule-6 slot is for.
+        language = result.language or self._config.default_language
+        for op in self._runner.unrouted_ops(language, sorted(ops, key=lambda o: o.value)):
+            result.messages.append(message(NLS_NLP_011, f"{language}/{op.value}"))
         return self._to_analyze_proto(result)
 
     def _to_analyze_proto(self, r: AnalyzeResponse) -> "nlp_pb2.AnalyzeResponse":
@@ -101,14 +134,7 @@ class NlpServicer(nlp_pb2_grpc.NlpServiceServicer):
             )
         for ev in r.used:
             resp.used.append(_engine_version_proto(ev))
-        for m in r.messages:
-            resp.messages.append(
-                common_pb2.ResponseMessage(
-                    severity=_SEVERITY.get(m.get("severity", "INFO"), common_pb2.INFO),
-                    code=m.get("code", ""),
-                    human_message=m.get("message", ""),
-                )
-            )
+        _append_messages(resp, r.messages)
         return resp
 
     # ---- BatchLemmatize ---------------------------------------------------
@@ -122,11 +148,102 @@ class NlpServicer(nlp_pb2_grpc.NlpServiceServicer):
             resp.used.append(_engine_version_proto(ev))
         return resp
 
+    # ---- RunPipeline (NLS-P3.2) -------------------------------------------
+
+    async def RunPipeline(self, request, context):  # noqa: N802
+        if not request.pipeline:
+            await context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "pipeline is required — name one of: "
+                + (", ".join(self._runner.pipeline_names()) or "none configured"),
+            )
+
+        state = self._packs.state
+        if state is None:
+            # The request is fine; the server is not ready for it. The pack
+            # diagnostics are on GetStatus.pack_state rather than crammed into
+            # this message — there can be dozens, and one of them is rarely the
+            # whole story.
+            await context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "rule packs failed to load — see GetStatus.pack_state for the "
+                f"diagnostics ({len(self._packs.diagnostics)} of them)",
+            )
+
+        try:
+            result = self._runner.run(
+                request.text,
+                request.pipeline,
+                state,
+                language=request.language,
+            )
+        except UnknownPipelineError as exc:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+
+        resp = nlp_pb2.RunPipelineResponse(
+            document=doc_to_proto(
+                result.document,
+                include_sets=list(request.include_sets),
+                include_types=list(request.include_types),
+            ),
+            language=result.language,
+            language_confidence=result.language_confidence,
+            trace_id=result.trace_id,
+            elapsed_ms=result.elapsed_ms,
+        )
+        for ev in result.used:
+            resp.used.append(_engine_version_proto(ev))
+        for trace in result.traces:
+            resp.phases.append(
+                nlp_pb2.PhaseTrace(
+                    phase=trace.phase,
+                    kind=trace.kind,
+                    annotations_added=trace.annotations_added,
+                    elapsed_ms=trace.elapsed_ms,
+                )
+            )
+        _append_messages(resp, result.messages)
+        return resp
+
+    # ---- ReloadPacks (NLS-P3.2, NL-15) ------------------------------------
+
+    async def ReloadPacks(self, request, context):  # noqa: N802
+        applied, state_id, diagnostics = await self._packs.reload()
+        resp = nlp_pb2.ReloadPacksResponse(applied=applied, state_id=state_id)
+        for d in diagnostics:
+            resp.diagnostics.append(_pack_diagnostic_proto(d))
+        return resp
+
+    # ---- ReportToken (LM, NLS-P9) -----------------------------------------
+
+    async def ReportToken(self, request, context):  # noqa: N802
+        """The LM queue sink's front door — not wired until NLS-P9.
+
+        `accepted=false` rather than UNIMPLEMENTED, and the difference matters to
+        the caller: `accepted` is already the field that says "the sink is
+        disabled" (cz-lemma contracts §6), so a client written against the final
+        shape needs no special case for the interim, and one written today keeps
+        working when the sink arrives.
+        """
+        logger.info(
+            "%s: ReportToken(world=%s, verdict=%s) — sink not configured",
+            LM_MORPH_007,
+            request.world,
+            request.verdict,
+        )
+        return nlp_pb2.ReportTokenResponse(accepted=False)
+
     # ---- GetStatus --------------------------------------------------------
 
     async def GetStatus(self, request, context):  # noqa: N802
-        resp = nlp_pb2.StatusResponse(ready=self._registry.is_ready())
-        for row in self._registry.capability_matrix():
+        resp = nlp_pb2.StatusResponse(
+            ready=self._registry.is_ready(),
+            lane=self._config.lane,
+        )
+        # `served_capabilities`, not the full matrix: an op nothing in this lane
+        # can produce has no row (contracts §2.4). Its absence is the NL-14
+        # degrade — see the registry's docstring.
+        for row in self._registry.served_capabilities():
             resp.capabilities.append(
                 nlp_pb2.Capability(
                     language=row["language"],
@@ -136,6 +253,23 @@ class NlpServicer(nlp_pb2_grpc.NlpServiceServicer):
                     tier=_tier_to_proto(row["tier"]),
                 )
             )
+        for name in self._runner.pipeline_names():
+            resp.pipelines.append(
+                nlp_pb2.PipelineInfo(
+                    name=name, steps=self._config.pipelines[name].steps()
+                )
+            )
+        state = self._packs.state
+        resp.pack_state.CopyFrom(
+            nlp_pb2.PackState(
+                state_id=state.state_id if state else "",
+                packs_loaded=state.packs_loaded if state else 0,
+                lists_loaded=state.lists_loaded if state else 0,
+                diagnostics=[
+                    _pack_diagnostic_proto(d) for d in self._packs.diagnostics
+                ],
+            )
+        )
         return resp
 
 
@@ -143,6 +277,27 @@ def _engine_version_proto(ev: EngineVersion) -> "nlp_pb2.EngineVersion":
     return nlp_pb2.EngineVersion(
         op=ev.op, engine=ev.engine, model=ev.model, model_version=ev.model_version
     )
+
+
+def _pack_diagnostic_proto(d) -> "nlp_pb2.PackDiagnostic":
+    """The wheel's `Diagnostic` on the wire — five fields, same names, no mapping
+    table. That identity is the point (contracts §2.3): a pack author reading a
+    `ttr-nlp validate` error and an operator reading a reload response see the
+    same text."""
+    return nlp_pb2.PackDiagnostic(
+        source=d.source, pack=d.pack, severity=d.severity, code=d.code, message=d.message
+    )
+
+
+def _append_messages(resp, messages: list[dict]) -> None:
+    for m in messages:
+        resp.messages.append(
+            common_pb2.ResponseMessage(
+                severity=_SEVERITY.get(m.get("severity", "INFO"), common_pb2.INFO),
+                code=m.get("code", ""),
+                human_message=m.get("message", ""),
+            )
+        )
 
 
 def _tier_to_proto(tier: str) -> int:

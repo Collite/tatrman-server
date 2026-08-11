@@ -28,6 +28,14 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.40b0",
     "opentelemetry-instrumentation-httpx>=0.40b0",
     "otel-config",
+    # NLS-P3.2: the suite itself. The rule engine, the gazetteers, the pack
+    # loader and the Document<->proto serializer all run IN-PROCESS in this
+    # front, which is only possible because the wheel is model-free — that is the
+    # whole point of NLS-D3, and `tests/test_engine_free_front.py` enforces it.
+    # `[grpc]` for the serializer's stubs. Editable from the path during
+    # development; NLS-P4.T7 swaps the image build to the pinned `ttr-nlp==0.1.0`
+    # once it is on PyPI.
+    "ttr-nlp[grpc]",
 ]
 
 [dependency-groups]
@@ -71,3 +79,6 @@ target-version = "py313"
 
 [tool.uv.sources]
 otel-config = { path = "../../shared/libs/python/otel-config", editable = true }
+# TODO(NLS-P4.T7): after the first PyPI publish, the IMAGE build installs
+# `ttr-nlp==0.1.0` from PyPI; this editable path stays for local development.
+ttr-nlp = { path = "../../shared/libs/python/ttr-nlp", editable = true }

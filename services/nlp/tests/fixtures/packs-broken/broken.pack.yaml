@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P3.2.T1 — a pack that parses as YAML and fails the schema (`appelts` is not
+# a control style). Used for the boot-with-a-broken-pack and refused-reload paths.
+pack: broken
+version: 1
+phases:
+  - phase: p
+    input: [Token]
+    control: appelts
+    rules:
+      - rule: R
+        lhs: [ { ann: Token } ]
+        rhs: [ { add: { type: M } } ]

@@ -70,6 +70,21 @@ services:
       NLP_SERVICE_PORT: "7270"
       # Self-hosted tier (default). Do NOT set NLP_UFAL_ENDPOINT_MODE=lindat here
       # — the whole point is offline, no Lindat egress.
+      #
+      # NLS-P3.2: `option` is the UFAL lane, which is the one this compose file
+      # actually brings up — MorphoDiTa and NameTag 3 are running above. Flip to
+      # `default` to exercise the NL-14 degrade against the very same containers:
+      # the lane stops routing to them, cs NER goes unrouted, and RunPipeline
+      # answers with NLS-NLP-011 while the pack's fallback rule still reaches the
+      # QueryPattern (NLS-P4.T4 records both runs).
+      NLP_LANE: "option"
+    volumes:
+      # Rule packs and gazetteer lists, mounted at the paths `config.yaml` names.
+      # Content is per-world and never part of the suite (NL-17); these are the
+      # wheel's own fixtures, which is what makes the hero recipe runnable from a
+      # clean checkout with nothing else to fetch.
+      - ../../shared/libs/python/ttr-nlp/tests/fixtures/packs/valid:/etc/nlp/packs:ro
+      - ../../shared/libs/python/ttr-nlp/tests/fixtures/lists/valid:/etc/nlp/lists:ro
     ports:
       - "7270:7270"  # REST mirror (dev/health)
       - "7271:7271"  # gRPC contract

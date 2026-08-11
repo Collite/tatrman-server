@@ -1645,6 +1645,8 @@ spec:
               value: "7270"
             - name: NLP_SERVICE_GRPC_PORT
               value: "7271"
+            - name: NLP_LANE
+              value: "default"
           readinessProbe:
             httpGet:
               path: /readyz

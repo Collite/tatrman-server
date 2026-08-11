@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P3.2.T1 — the gazetteer list the service-side pipeline tests run through.
+# A trimmed copy of the wheel's `dfp-entity-aliases` fixture: the same two Czech
+# lemma entries the invoices hero needs, and nothing else. Deliberately NOT
+# imported from the wheel's test tree — a service fixture that reaches into
+# another module's tests breaks when that module reorganises its own.
+list: hero-aliases
+version: 1
+matching: lemma
+source:
+  world: dfp
+  origin: "fixture@NLS-P3.2"
+entries:
+  - term: faktura
+    features:
+      kind: entity_alias
+      entity: faktura
+  - term: zákazník
+    features:
+      kind: entity_alias
+      entity: subjekt

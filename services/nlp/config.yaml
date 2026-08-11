@@ -65,16 +65,32 @@ engines:
     model: "lingua"
     model_version: "lingua-2.0"
 
+# ── Lane (NL-4, NLS-P3.2) ────────────────────────────────────────────────────
+#
+# `default` is the lane a deployment can run anywhere: Stanza and spaCy only,
+# permissively licensed, no UFAL images. `option` adds MorphoDiTa + NameTag 3,
+# whose licence is a per-deployment decision (NL-5, still open with bora-legal).
+#
+# So the lane is not a preference among engines that are all present — it decides
+# which engines exist. An engine named ONLY inside a `lane_overrides` block is not
+# registered in the default lane, which is what makes `NER.cs` genuinely unrouted
+# there rather than merely unpreferred (routing has a last-resort "any engine that
+# supports this op" scan, and it can only find what was registered).
+lane: "default"
+
 # Per-op-per-language routing: {op}.{lang} -> engine name (+ optional .fallback).
+# THIS IS THE DEFAULT-LANE TABLE (contracts §7).
 op_routing:
-  # Czech (cs) — UFAL stack; Stanza's cs bundle has no NER head, so NER routes
-  # to NameTag 3 and DEP_PARSE (the resolver's span-proposal feed) to Stanza.
-  TOKENIZE.cs: "morphodita"
-  SENTENCE_SPLIT.cs: "morphodita"
-  LEMMATIZE.cs: "morphodita"
-  POS_TAG.cs: "morphodita"
+  # Czech (cs) — Stanza serves everything it has a head for. `NER.cs` is ABSENT
+  # on purpose: Stanza's Czech bundle has no NER head and nothing else in this
+  # lane does either, so a cs NER request degrades explicitly (NLS-NLP-011) and
+  # every other phase still runs (NL-14). It also gets no GetStatus capability
+  # row — that absence is half the degrade.
+  TOKENIZE.cs: "stanza"
+  SENTENCE_SPLIT.cs: "stanza"
+  LEMMATIZE.cs: "stanza"
+  POS_TAG.cs: "stanza"
   DEP_PARSE.cs: "stanza"
-  NER.cs: "nametag3"
 
   # English (en)
   TOKENIZE.en: "stanza"
@@ -85,6 +101,50 @@ op_routing:
   NER.en.fallback: "spacy"
 
   DETECT_LANGUAGE: "langid"
+
+# Applied over `op_routing` when `lane` names it. This is the UFAL stack — the
+# routing this file carried before NLS-P3.2, moved here unchanged: MorphoDiTa for
+# cs morphology, NameTag 3 for cs NER, Stanza still for the cs dependency parse
+# (the resolver's span-proposal feed).
+lane_overrides:
+  option:
+    TOKENIZE.cs: "morphodita"
+    SENTENCE_SPLIT.cs: "morphodita"
+    LEMMATIZE.cs: "morphodita"
+    POS_TAG.cs: "morphodita"
+    DEP_PARSE.cs: "stanza"
+    NER.cs: "nametag3"
+
+# ── Rule packs, gazetteer lists, pipelines (NL-15, contracts §7) ──────────────
+#
+# Sources are directories (globbed for `**/*.pack.yaml` and `**/*.list.yaml`) or
+# `http(s)` URLs naming one file. FAIL-ALL-OR-NOTHING: one bad file anywhere and
+# nothing loads — the service still serves Analyze, reports `ready=false`, and
+# puts the diagnostics on `GetStatus.pack_state`.
+#
+# Pack CONTENT is never part of the suite (NL-17): each world mounts its own.
+# These paths are the mount points; an unmounted directory is reported, not fatal.
+packs:
+  sources: ["/etc/nlp/packs"]
+lists:
+  sources: ["/etc/nlp/lists"]
+
+# A pipeline runs engine ops, then gazetteer lists, then rule phases — in that
+# order, because the gazetteer matches on `lemma` an engine produced and the rules
+# match on `Lookup` the gazetteer produced. Every reference here is validated
+# against the loaded packs at boot AND at every reload (NLS-PACK-004).
+#
+# Commented out rather than shipped: the ids belong to a world's packs, and a
+# pipeline referring to packs that are not mounted would fail the boot load. The
+# hero recipe in `docker-compose.offline.yml` (NLS-P4.T4) mounts the pack tree and
+# turns this on.
+pipelines: {}
+#  query-patterns:
+#    ops: [TOKENIZE, SENTENCE_SPLIT, LEMMATIZE, NER]
+#    gazetteer: [dfp-entity-aliases]
+#    rules:
+#      - { pack: dfp-query-patterns, phase: lookup-cleanup }
+#      - { pack: dfp-query-patterns, phase: query-match }
 
 default_language: "cs"
 log_level: "INFO"

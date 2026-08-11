@@ -85,17 +85,49 @@ library emits the key at the right depth and interpolates the items verbatim.
 {{- define "tatrman-service.lexiconEnabled" -}}
 {{- if and .Values.lexicon .Values.lexicon.configMapName }}true{{- end -}}
 {{- end -}}
+{{/*
+NLS-P3.2 — rule-pack and gazetteer-list mounts, contributed here for exactly the
+reason the ⚑ above gives. Only `nlp` mounts these, so a per-chart override of
+`extraVolumes`/`extraVolumeMounts` would be the obvious home — except charon
+already overrides both, and a shared define has one global winner per render. An
+umbrella carrying charon and nlp would silently drop one chart's mounts, and the
+symptom would be a service that starts, reports itself healthy, and serves an
+empty vocabulary. Same trap, same fix as the lexicon: implemented once, behind a
+values contract that is OFF unless set, so every chart that has never heard of a
+rule pack renders byte-identically to before.
+
+Two separate mounts rather than one, because packs and lists are separate configmaps
+in practice: a world republishes its glossary-derived lists far more often than its
+rule packs, and coupling them would make every list update a pack rollout.
+*/}}
+{{- define "tatrman-service.packsEnabled" -}}
+{{- if and .Values.packs .Values.packs.configMapName }}true{{- end -}}
+{{- end -}}
+{{- define "tatrman-service.listsEnabled" -}}
+{{- if and .Values.lists .Values.lists.configMapName }}true{{- end -}}
+{{- end -}}
 {{/* The in-container path of the mounted archive — the value of every `*_LEXICON_ARCHIVE_PATH`. */}}
 {{- define "tatrman-service.lexiconPath" -}}
 {{- printf "%s/%s" (.Values.lexicon.mountPath | trimSuffix "/") .Values.lexicon.key -}}
 {{- end -}}
 {{- define "tatrman-service.volumeMounts" -}}
 {{- $extra := include "tatrman-service.extraVolumeMounts" . }}
-{{- if or (include "tatrman-service.lexiconEnabled" .) (trim $extra) }}
+{{- $any := or (include "tatrman-service.lexiconEnabled" .) (include "tatrman-service.packsEnabled" .) (include "tatrman-service.listsEnabled" .) }}
+{{- if or $any (trim $extra) }}
           volumeMounts:
 {{- if include "tatrman-service.lexiconEnabled" . }}
             - name: lexicon
               mountPath: {{ .Values.lexicon.mountPath }}
+              readOnly: true
+{{- end }}
+{{- if include "tatrman-service.packsEnabled" . }}
+            - name: packs
+              mountPath: {{ .Values.packs.mountPath }}
+              readOnly: true
+{{- end }}
+{{- if include "tatrman-service.listsEnabled" . }}
+            - name: lists
+              mountPath: {{ .Values.lists.mountPath }}
               readOnly: true
 {{- end }}
 {{- with $extra }}{{ . }}{{- end }}
@@ -103,12 +135,23 @@ library emits the key at the right depth and interpolates the items verbatim.
 {{- end -}}
 {{- define "tatrman-service.volumes" -}}
 {{- $extra := include "tatrman-service.extraVolumes" . }}
-{{- if or (include "tatrman-service.lexiconEnabled" .) (trim $extra) }}
+{{- $any := or (include "tatrman-service.lexiconEnabled" .) (include "tatrman-service.packsEnabled" .) (include "tatrman-service.listsEnabled" .) }}
+{{- if or $any (trim $extra) }}
       volumes:
 {{- if include "tatrman-service.lexiconEnabled" . }}
         - name: lexicon
           configMap:
             name: {{ .Values.lexicon.configMapName }}
+{{- end }}
+{{- if include "tatrman-service.packsEnabled" . }}
+        - name: packs
+          configMap:
+            name: {{ .Values.packs.configMapName }}
+{{- end }}
+{{- if include "tatrman-service.listsEnabled" . }}
+        - name: lists
+          configMap:
+            name: {{ .Values.lists.configMapName }}
 {{- end }}
 {{- with $extra }}{{ . }}{{- end }}
 {{- end }}
