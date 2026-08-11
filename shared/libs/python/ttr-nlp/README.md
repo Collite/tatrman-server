@@ -199,6 +199,18 @@ just build-py shared/libs/python/ttr-nlp    # uv sync --frozen
 
 `just test-py ttr-nlp` (bare module name) resolves too.
 
+## What `0.1.0` is, and is not
+
+**In:** the annotation model, the rule DSL and its JAPE-exact executor,
+gazetteers with the four matching modes, the fail-all pack loader,
+`ttr-nlp validate`, `Document ⇄ proto`, and the gRPC + HTTP clients.
+
+**Not in:** Czech morphology (`ttrnlp.morph`, arriving at NLS-P7…P9), anything
+trained on a corpus (post-v1 by ruling), and rule-pack or list **content** —
+that is never part of the suite (NL-17). Each world maintains its own packs.
+
+Full detail in the repo's [`CHANGELOG.md`](https://github.com/Collite/tatrman-server/blob/master/CHANGELOG.md).
+
 ## Publishing
 
 Tag lane **`python-nlp/v<x.y.z>-RELEASE`** → `.github/workflows/publish-python.yml`

@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P4.T4 — the front's config for the OFFLINE hero recipe
+# (`docker-compose.offline.yml`). Mounted over `config.yaml` as `CONFIG_FILE`.
+#
+# It exists because the shipped `config.yaml` carries `pipelines: {}` on purpose:
+# pipeline ids name a *world's* packs, and a default config referring to packs
+# that are not mounted would fail the boot load in every deployment that has not
+# authored them yet. The hero recipe DOES mount packs — the wheel's own fixtures —
+# so this is where the pipeline that runs over them is declared.
+#
+# Everything else is inherited from the real file by being repeated here rather
+# than merged: config is read whole, and a half-file that quietly dropped the
+# pinned model ids would take S-1 down without saying so.
+
+service:
+  host: "0.0.0.0"
+  port: 7270
+  grpc_port: 7271
+
+engines:
+  morphodita:
+    enabled: true
+    url: "http://nlp-morphodita:8080/tag"
+    model: "czech-morfflex2.0-pdtc1.0-220710"
+    model_version: "czech-morfflex2.0-pdtc1.0-220710"
+    tier: "SELF_HOSTED_PINNED"
+    timeout_seconds: 30
+    max_retries: 3
+  nametag3:
+    enabled: true
+    url: "http://nlp-nametag3:8001/recognize"
+    model: "nametag3-czech-cnec2.0-240830"
+    model_version: "nametag3-czech-cnec2.0-240830"
+    tier: "SELF_HOSTED_PINNED"
+    timeout_seconds: 60
+    max_retries: 3
+  stanza:
+    enabled: true
+    url: "http://nlp-stanza:8090"
+    model: "stanza-cs-en"
+    model_version: "stanza-1.10.0"
+    tier: "SELF_HOSTED_PINNED"
+    timeout_seconds: 60
+  spacy:
+    enabled: true
+    url: "http://nlp-spacy:8091"
+    model: "en_core_web_md"
+    model_version: "en_core_web_md-3.8.0"
+    tier: "SELF_HOSTED_PINNED"
+    timeout_seconds: 30
+  langid:
+    enabled: true
+    model: "lingua"
+    model_version: "lingua-2.0"
+
+# The DEFAULT lane: Stanza only for cs, and NO `NER.cs`. The compose file sets
+# `NLP_LANE=option` to overlay the UFAL routing; flipping that one env var to
+# `default` is the whole degrade drill (NLS-P4.T4's second run).
+lane: "default"
+
+op_routing:
+  TOKENIZE.cs: "stanza"
+  SENTENCE_SPLIT.cs: "stanza"
+  LEMMATIZE.cs: "stanza"
+  POS_TAG.cs: "stanza"
+  DEP_PARSE.cs: "stanza"
+  TOKENIZE.en: "stanza"
+  LEMMATIZE.en: "stanza"
+  POS_TAG.en: "stanza"
+  DEP_PARSE.en: "stanza"
+  NER.en: "stanza"
+  NER.en.fallback: "spacy"
+  DETECT_LANGUAGE: "langid"
+
+lane_overrides:
+  option:
+    TOKENIZE.cs: "morphodita"
+    SENTENCE_SPLIT.cs: "morphodita"
+    LEMMATIZE.cs: "morphodita"
+    POS_TAG.cs: "morphodita"
+    DEP_PARSE.cs: "stanza"
+    NER.cs: "nametag3"
+
+# The wheel's own fixtures, mounted by the compose file. Using them rather than a
+# copy is what makes the recipe runnable from a clean checkout with nothing to
+# fetch — and it means this run exercises the same packs the unit suite does.
+packs:
+  sources: ["/etc/nlp/packs"]
+lists:
+  sources: ["/etc/nlp/lists"]
+
+pipelines:
+  # One pipeline per hero pack. They are separate packs (each names its own
+  # phases), and `rules.jsonl` names the pipeline per case — so the invoices
+  # corpus lines run the invoices pack and the role lines run the role pack,
+  # rather than one pipeline being asked to be both.
+  query-patterns:
+    ops: [TOKENIZE, SENTENCE_SPLIT, LEMMATIZE, NER]
+    gazetteer: [dfp-entity-aliases]
+    rules:
+      - { pack: hero-cs-invoices, phase: name-candidates }
+      - { pack: hero-cs-invoices, phase: query-match }
+  role-patterns:
+    ops: [TOKENIZE, SENTENCE_SPLIT, LEMMATIZE]
+    gazetteer: [dfp-entity-aliases]
+    rules:
+      - { pack: hero-cs-role, phase: query-match }
+
+default_language: "cs"
+log_level: "INFO"

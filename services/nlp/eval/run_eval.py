@@ -1,6 +1,27 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""NLP evaluation harness - runs corpus against NLP service and computes per-engine metrics."""
+"""NLP evaluation harness.
+
+Two modes, two questions.
+
+**Default** — runs `eval/corpus/seed.jsonl` through `Analyze` and computes
+per-engine token/lemma/POS/NER metrics over REST. That is the RG-P1 question:
+which engine reads Czech better.
+
+**`--rules`** (NLS-P4.T3) — runs `eval/corpus/rules.jsonl` through `RunPipeline`
+over gRPC and scores what the rule packs actually produced: the `QueryPattern`'s
+query id, and every declared parameter, exact-match. That is a different question
+and deliberately a harsher one. A pack is not "mostly right": a query id that is
+almost the right id routes to nothing, and a parameter that is almost the right
+span queries for the wrong customer.
+
+**Decoys are half the corpus and carry the weight.** A rules corpus of positive
+cases only would be passed by a pack that fires on everything, which is the most
+likely way for a pack to be wrong — an over-broad LHS matches the hero AND every
+sentence near it, and the hero test alone would stay green. So a `decoy` case
+asserts that NO QueryPattern was produced, and it counts as a failure when one
+was.
+"""
 
 from __future__ import annotations
 
@@ -408,15 +429,25 @@ def generate_markdown_report(summary: dict[str, Any], output_path: Path | None =
 def main():
     parser = argparse.ArgumentParser(description="Run NLP evaluation harness")
     parser.add_argument("--url", default="http://localhost:8080", help="NLP service base URL")
-    parser.add_argument("--corpus", default="eval/corpus/seed.jsonl", help="Corpus file path")
+    parser.add_argument("--corpus", default="", help="Corpus file path")
     parser.add_argument("--output-json", help="Output JSON metrics to file")
     parser.add_argument("--output-md", help="Output markdown report to file")
+    parser.add_argument(
+        "--rules",
+        action="store_true",
+        help="score rule packs through RunPipeline (gRPC) instead of engines "
+        "through Analyze (REST) — NLS-P4.T3",
+    )
     args = parser.parse_args()
 
-    corpus_path = Path(args.corpus)
+    default_corpus = "eval/corpus/rules.jsonl" if args.rules else "eval/corpus/seed.jsonl"
+    corpus_path = Path(args.corpus or default_corpus)
     if not corpus_path.exists():
         print(f"Error: Corpus file not found: {corpus_path}")
         sys.exit(1)
+
+    if args.rules:
+        return _main_rules(args, corpus_path)
 
     print(f"Running evaluation on {corpus_path} against {args.url}")
     summary = run_evaluation(args.url, corpus_path)
@@ -434,6 +465,236 @@ def main():
         generate_markdown_report(summary, Path(args.output_md))
     else:
         print("\n" + generate_markdown_report(summary))
+
+
+# ── the rules lane (NLS-P4.T3) ───────────────────────────────────────────────
+
+
+@dataclass
+class RuleCase:
+    """One line of `rules.jsonl`."""
+
+    id: str
+    kind: str  # hero | paraphrase | decoy
+    text: str
+    lang: str
+    pipeline: str
+    expected_query: str | None
+    expected_params: dict
+    agent: str = ""
+    note: str = ""
+
+    @property
+    def is_decoy(self) -> bool:
+        return self.expected_query is None
+
+
+@dataclass
+class RuleOutcome:
+    case: RuleCase
+    produced_query: str | None = None
+    produced_params: dict = None  # type: ignore[assignment]
+    passed: bool = False
+    reason: str = ""
+    messages: list = None  # type: ignore[assignment]
+
+
+def load_rule_corpus(path: Path) -> list[RuleCase]:
+    cases = []
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            raw = json.loads(line)
+            expected = raw.get("expected") or {}
+            cases.append(
+                RuleCase(
+                    id=raw["id"],
+                    kind=raw.get("kind", "hero"),
+                    text=raw["text"],
+                    lang=raw.get("lang", ""),
+                    pipeline=raw.get("pipeline", "query-patterns"),
+                    expected_query=expected.get("query"),
+                    expected_params=expected.get("params") or {},
+                    agent=raw.get("agent", ""),
+                    note=raw.get("note", ""),
+                )
+            )
+    return cases
+
+
+def score_rule_case(case: RuleCase, patterns: list[dict], messages: list) -> RuleOutcome:
+    """Exact match on the query id and every declared parameter.
+
+    Deliberately unforgiving. A query id that is almost right routes to nothing,
+    and a parameter span that is almost right queries for the wrong customer —
+    there is no partial credit available downstream, so there is none here.
+    """
+    outcome = RuleOutcome(case=case, produced_params={}, messages=messages)
+
+    if case.is_decoy:
+        if patterns:
+            outcome.reason = (
+                f"decoy matched: produced {[p.get('query') for p in patterns]}"
+            )
+            return outcome
+        outcome.passed = True
+        return outcome
+
+    if not patterns:
+        outcome.reason = "no QueryPattern produced"
+        return outcome
+    if len(patterns) > 1:
+        # Not a near-miss: two answers to one question means the consumer has to
+        # choose, and nothing downstream is equipped to.
+        outcome.reason = f"{len(patterns)} QueryPatterns produced, expected 1"
+        return outcome
+
+    (produced,) = patterns
+    outcome.produced_query = produced.get("query")
+    outcome.produced_params = {
+        key: value for key, value in produced.items() if key != "query"
+    }
+
+    if outcome.produced_query != case.expected_query:
+        outcome.reason = (
+            f"query {outcome.produced_query!r} != expected {case.expected_query!r}"
+        )
+        return outcome
+
+    for name, expected_value in case.expected_params.items():
+        actual = outcome.produced_params.get(name)
+        if actual != expected_value:
+            outcome.reason = f"param {name}: {actual!r} != expected {expected_value!r}"
+            return outcome
+
+    outcome.passed = True
+    return outcome
+
+
+def run_rules_evaluation(target: str, corpus_path: Path, *, lane: str = "") -> dict[str, Any]:
+    """Run every case through `RunPipeline` and score it.
+
+    `target` is a gRPC `host:port` — this lane does not use the REST mirror,
+    which has no pipeline surface by design (NL-16).
+    """
+    import asyncio
+
+    from ttrnlp.client.grpc import NlpClient
+
+    cases = load_rule_corpus(corpus_path)
+
+    async def run_all() -> list[RuleOutcome]:
+        outcomes = []
+        async with NlpClient(target) as client:
+            for case in cases:
+                print(f"Evaluating {case.id}: {case.text[:50]}...")
+                result = await client.run_pipeline(
+                    case.text, case.pipeline, language=case.lang
+                )
+                patterns = [
+                    dict(a.features)
+                    for a in result.document.annset("").with_type("QueryPattern")
+                ]
+                outcomes.append(
+                    score_rule_case(
+                        case,
+                        patterns,
+                        [
+                            {"code": m.code, "severity": m.severity, "message": m.message}
+                            for m in result.messages
+                        ],
+                    )
+                )
+        return outcomes
+
+    outcomes = asyncio.run(run_all())
+    return summarize_rules(outcomes, lane=lane)
+
+
+def summarize_rules(outcomes: list[RuleOutcome], *, lane: str = "") -> dict[str, Any]:
+    by_kind: dict[str, dict[str, int]] = {}
+    for outcome in outcomes:
+        bucket = by_kind.setdefault(outcome.case.kind, {"passed": 0, "total": 0})
+        bucket["total"] += 1
+        bucket["passed"] += int(outcome.passed)
+
+    passed = sum(1 for o in outcomes if o.passed)
+    return {
+        "mode": "rules",
+        "lane": lane,
+        "total": len(outcomes),
+        "passed": passed,
+        "failed": len(outcomes) - passed,
+        "by_kind": by_kind,
+        "cases": [
+            {
+                "id": o.case.id,
+                "kind": o.case.kind,
+                "passed": o.passed,
+                "reason": o.reason,
+                "expected_query": o.case.expected_query,
+                "produced_query": o.produced_query,
+                "produced_params": o.produced_params,
+                "messages": [m["code"] for m in (o.messages or [])],
+            }
+            for o in outcomes
+        ],
+    }
+
+
+def generate_rules_report(summary: dict[str, Any], output_path: Path | None = None) -> str:
+    lines = [
+        "# Rule-pack evaluation",
+        "",
+        f"**{summary['passed']}/{summary['total']} passed**"
+        + (f" · lane `{summary['lane']}`" if summary["lane"] else ""),
+        "",
+        "| kind | passed | total |",
+        "|---|---|---|",
+    ]
+    for kind, counts in sorted(summary["by_kind"].items()):
+        lines.append(f"| {kind} | {counts['passed']} | {counts['total']} |")
+
+    lines += ["", "| case | kind | result | detail |", "|---|---|---|---|"]
+    for case in summary["cases"]:
+        mark = "✅" if case["passed"] else "❌"
+        detail = case["reason"] or (case["produced_query"] or "—")
+        lines.append(f"| `{case['id']}` | {case['kind']} | {mark} | {detail} |")
+
+    codes = sorted({c for case in summary["cases"] for c in case["messages"]})
+    if codes:
+        lines += ["", f"Diagnostics observed: {', '.join(f'`{c}`' for c in codes)}"]
+
+    report = "\n".join(lines) + "\n"
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(report, encoding="utf-8")
+        print(f"Report written to {output_path}")
+    return report
+
+
+def _main_rules(args, corpus_path: Path) -> None:
+    print(f"Running RULE evaluation on {corpus_path} against {args.url}")
+    summary = run_rules_evaluation(args.url, corpus_path)
+
+    print("\n=== Summary ===")
+    print(json.dumps(summary, indent=2))
+
+    if args.output_json:
+        path = Path(args.output_json)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        print(f"JSON metrics written to {path}")
+
+    if args.output_md:
+        generate_rules_report(summary, Path(args.output_md))
+    else:
+        print("\n" + generate_rules_report(summary))
+
+    if summary["failed"]:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

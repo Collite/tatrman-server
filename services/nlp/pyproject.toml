@@ -55,7 +55,10 @@ dev = [
 package = false
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+# `tools/` too: the lexicon exporter (NLS-P4) is world-side tooling rather than
+# service code, but its round-trip test — does its output pass the suite's own
+# validator — is exactly the kind that stops mattering the moment it stops running.
+testpaths = ["tests", "tools"]
 asyncio_mode = "auto"
 # Component tier (real backends: MorphoDiTa/NameTag 3 self-hosted + Lindat) is
 # opt-in — excluded by default so the unit suite needs no network. Run it with
