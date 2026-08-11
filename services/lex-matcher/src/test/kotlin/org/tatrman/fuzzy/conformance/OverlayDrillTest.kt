@@ -184,6 +184,28 @@ class OverlayDrillTest :
             }
         }
 
+        "H3 — …and the refusals apply to that spelling too, which they did not" {
+            runBlocking {
+                // The regression. Both halves of the layer answer for one term, so both must be
+                // reachable by the same spellings: the positive was merged into the index and found
+                // fuzzily, while the negative was a map lookup on the authored form. So this exact
+                // query returned the learned positive AND handed back the two refused rivals
+                // unflagged — the estate applying two users' "yes" and silently dropping two other
+                // users' "no", from one document, in one answer.
+                val hits =
+                    FuzzyMatcher(estate(withOverlay = true))
+                        .lookup(LookupQuery("cerpacich stanic", maxCandidates = 20))
+                        .candidates
+
+                withClue("a refusal is about the meaning, not about whether the user typed the accents") {
+                    hits.single { it.targetRef == REFUSED_A }.autoBindable shouldBe false
+                }
+                withClue("and the target the users actually meant is still untouched") {
+                    hits.single { it.targetRef == LEARNED }.autoBindable shouldBe null
+                }
+            }
+        }
+
         // ---- the negatives, proven live ---------------------------------------------------------
 
         // Step (4) of the gate, and the only place it can be proven: two users refused this

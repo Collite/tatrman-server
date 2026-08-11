@@ -43,14 +43,41 @@ class OverlayArchiveSource(
     private var loaded: Loaded? = null
 
     private companion object {
-        /** The one consult rule, shared by the live source and by a [Pinned] view of it. */
+        /**
+         * The one consult rule, shared by the live source and by a [Pinned] view of it.
+         *
+         * **Asked of the query AND of every candidate on the table**, which is what
+         * [OverlayRequest.candidates] is for and what this originally failed to do. The two halves
+         * of the layer reach a term by different routes: a POSITIVE is merged into the index and so
+         * is found by the engine, fuzzily, through whatever the user actually typed; a NEGATIVE is
+         * a map lookup and has no engine behind it. Keyed on the query alone, the halves disagree —
+         * `cerpacich stanic` reaches the learned positive and walks straight past the refusal for
+         * the same term, so two users' explicit "no" is silently not applied while their "yes" is.
+         *
+         * Reading the candidates closes it without a second engine: retrieval has already decided
+         * which terms this query reaches, and [FuzzyMatchResult.candidate] is the term it reached.
+         * A suppression that fires through a candidate is therefore exactly as fuzzy as the match
+         * that put the candidate on the table — no more, and never less.
+         *
+         * Over-reach is the safe direction here and bounded by design: a suppressed candidate is
+         * flagged, never removed (see [OverlayVerdict.suppressedTargets]), so the cost of firing
+         * too widely is an auto-bind the resolver has to ask about, and the cost of firing too
+         * narrowly is a binding two people already rejected.
+         */
         fun consult(
             at: Loaded?,
             request: OverlayRequest,
         ): OverlayVerdict {
-            val suppressed =
-                at?.suppressions?.get(TextNormalizer.canonical(request.term)) ?: return OverlayVerdict.EMPTY
-            return OverlayVerdict(suppressed)
+            val suppressions = at?.suppressions ?: return OverlayVerdict.EMPTY
+            if (suppressions.isEmpty()) return OverlayVerdict.EMPTY
+
+            val reached =
+                buildSet {
+                    add(TextNormalizer.fold(request.term))
+                    request.candidates.forEach { add(TextNormalizer.fold(it.candidate)) }
+                }
+            val suppressed = reached.flatMapTo(mutableSetOf()) { suppressions[it].orEmpty() }
+            return if (suppressed.isEmpty()) OverlayVerdict.EMPTY else OverlayVerdict(suppressed)
         }
 
         const val POSITIVE = "POSITIVE"
@@ -66,7 +93,7 @@ class OverlayArchiveSource(
         val doc: OverlayDoc,
         /** POSITIVE + servable, by category (= target ref). */
         val candidates: Map<String, List<Candidate>>,
-        /** canonical term → the refs this estate has learned it does NOT mean. */
+        /** **Folded** term → the refs this estate has learned it does NOT mean (see [toSuppressions]). */
         val suppressions: Map<String, Set<String>>,
     )
 
@@ -243,13 +270,21 @@ class OverlayArchiveSource(
             }
 
     /**
-     * NEGATIVE entries by canonical term. Only ACTIVE ones suppress: a PROPOSED negative is one
+     * NEGATIVE entries by **folded** term. Only ACTIVE ones suppress: a PROPOSED negative is one
      * refusal, which RV-P7.2 ruled is not enough to deny a term for a whole estate.
+     *
+     * ⚑ **Folded, not canonical.** `canonical` is the *authored* form — diacritics preserved —
+     * and exists so `EXACT` dispatch compares against what an author actually wrote. This map
+     * answers a different question ("did the user's span reach this term?"), which is a retrieval
+     * question, and `fold` is the retrieval key: it erases diacritics precisely so `zakaznik`
+     * reaches `zákazník`. Keyed on the authored form, a refusal recorded as `distribuční centrum`
+     * would not apply to a user who typed it without the accents — a distinction nobody making the
+     * refusal intended to draw.
      */
     private fun OverlayDoc.toSuppressions(): Map<String, Set<String>> =
         entries
             .filter { it.polarity == NEGATIVE && it.status == ACTIVE }
-            .groupBy { TextNormalizer.canonical(it.term) }
+            .groupBy { TextNormalizer.fold(it.term) }
             .mapValues { (_, rows) -> rows.map { it.targetRef }.toSet() }
 
     /**
