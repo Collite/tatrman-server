@@ -19,7 +19,10 @@ from typing import Dict
 
 # error — no engine backend reachable for a routed (lang, op) at startup
 RG_NLP_001 = "RG-NLP-001"
-# warning — route points at a REMOTE_UNPINNED (Lindat) tier (non-conformant)
+# warning — route points at a REMOTE_UNPINNED tier (non-conformant). Lindat was
+# the only one until RV-P8 made LLM_EMULATED a second: a hosted model is unpinned
+# in exactly the sense this code means, so the wording no longer names Lindat and
+# `RV-NLP-022` rides beside it to say WHICH unpinned thing served the op.
 RG_NLP_002 = "RG-NLP-002"
 # error — backend launched/responded without an explicit model id (S-1)
 RG_NLP_003 = "RG-NLP-003"
@@ -66,7 +69,7 @@ _SEVERITY: Dict[str, str] = {
 
 _MEANING: Dict[str, str] = {
     RG_NLP_001: "no engine backend reachable for a routed (language, op)",
-    RG_NLP_002: "route points at a REMOTE_UNPINNED (Lindat) tier — non-conformant for parity/determinism",
+    RG_NLP_002: "route points at a REMOTE_UNPINNED tier — non-conformant for parity/determinism",
     RG_NLP_003: "backend has no explicit model id (S-1 violation)",
     RG_NLP_010: "unsupported (language, op) — degrade floor applied (tokenize+fold+langid)",
     NLS_NLP_011: "op not routed in the active lane — skipped; the remaining phases still ran",

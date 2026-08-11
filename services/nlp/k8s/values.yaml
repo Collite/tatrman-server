@@ -69,6 +69,30 @@ affinity: {}
 # swaps an explicit degrade for a connection error.
 lane: default
 
+# ── RV-P8: LLM_EMULATED — a model standing in for an engine ─────────────────
+#
+# OFF, and the off state is the ABSENCE of the env vars rather than a var set to
+# "false": a chart that says nothing here leaves the image's own default
+# standing, which is what makes "nothing routes to it by default" survive a
+# values file nobody edited.
+#
+# Turning this on is not a routing decision. The engine has to exist AND an op
+# has to be routed at it in `config.yaml`'s `op_routing` (or a lane overlay), and
+# a table that routes an op at a DISABLED emulated engine makes the pod refuse to
+# boot rather than answer that op from somewhere else — loud, and one line to fix.
+#
+# What an estate buys with it: cs NER (or lemmas) where the licence forbids the
+# UFAL images. What it gives up: a pinned model. Every emulated route advertises
+# the REMOTE_UNPINNED tier and its `RG-NLP-002` caution, and the conformance
+# suite excludes the ops it touches (RV-P8.3).
+#
+# `apiKey` is deliberately absent: the `ttrk-` virtual key rides `secretEnv` as
+# NLP_LLM_EMULATED_API_KEY, like every other credential.
+llmEmulated:
+  enabled: false
+  gatewayUrl: ""        # e.g. http://llm-gateway:8080 — required when enabled
+  model: ""             # blank keeps config.yaml's pinned default
+
 # Rule packs and gazetteer lists come from configmaps, mounted read-only. OFF
 # unless `configMapName` is set — a front with no packs serves Analyze normally
 # and simply has no pipelines. Content is per-world and never part of the suite

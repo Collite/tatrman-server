@@ -29,7 +29,7 @@ from nlp_service.config import (
     LlmEmulatedConfig,
     load_config,
 )
-from nlp_service.diagnostics import RG_NLP_010
+from nlp_service.diagnostics import RG_NLP_002, RG_NLP_010, RV_NLP_022
 from nlp_service.engines import EngineRegistry
 from nlp_service.engines.base import EngineResult, NlpOp, Token
 from nlp_service.engines.llm_emulated_engine import (
@@ -91,7 +91,12 @@ def a_config(*, emulation: bool) -> AppConfig:
             "SENTENCE_SPLIT.cs": "morphodita",
             "LEMMATIZE.cs": "morphodita",
             "POS_TAG.cs": "morphodita",
-            "NER.cs": EMULATED_ENGINE_NAME,
+            # ⚠ Routing NER at the emulated engine while it is DISABLED is a
+            # boot failure, not a degrade (`p8-2` T1(e)) — so an estate turning
+            # emulation off drops the route with it, and that pair is what this
+            # file's off-case deploys. The two lists disagreed here and the
+            # stricter rule won; see p8-2's list for why.
+            **({"NER.cs": EMULATED_ENGINE_NAME} if emulation else {}),
         },
     )
 
@@ -148,6 +153,43 @@ class TestTheMixedAnalysis:
         assert by_op["LEMMATIZE"].engine == "morphodita"
         assert by_op["NER"].engine == EMULATED_ENGINE_NAME
         assert by_op["NER"].model_version.endswith("/tpl-1")
+
+
+class TestTheMergeRule:
+    """RV-P8.2 T2 — the reconciliation rule, characterised rather than assumed.
+
+    The task list asked whether engines share a tokenization and said to flag the
+    answer rather than paper over it. They do not: each returns its own stream,
+    and the orchestrator reconciles them on `(char_start, char_end)`. This is
+    what that costs when the spans disagree, pinned here so the next person to
+    write an engine sees it as a test rather than as a support ticket.
+    """
+
+    def test_an_entity_on_a_span_no_tokeniser_produced_attaches_to_nothing_and_says_nothing(self):
+        offset_by_one = json.dumps({"entities": [{"text": "icrosoft", "label": "ORGANIZATION"}]})
+        registry, _ = a_registry(emulation=True, reply=offset_by_one)
+        response = Orchestrator(registry._config, registry).analyze(
+            TEXT, "cs", {NlpOp.TOKENIZE, NlpOp.NER}
+        )
+
+        # It is served, and it is wrong, and NOTHING in the response is about
+        # that: the only messages are the standing cautions every emulated route
+        # carries, which would be there for a correct answer too. The engine is
+        # what has to prevent this — which is why it locates spans in the source
+        # text itself instead of letting a model report them.
+        entity = response.entities[0]
+        spans = {(t.char_start, t.char_end) for t in response.tokens}
+        assert (entity.char_start, entity.char_end) not in spans
+        assert {m["code"] for m in response.messages} == {RG_NLP_002, RV_NLP_022}
+
+    def test_two_engines_on_matching_spans_merge_into_one_token_stream(self):
+        """The other half of the same rule, and the reason it exists: matching
+        spans mean one token carrying both engines' fields, not two tokens."""
+        registry, _ = a_registry(emulation=True)
+        response = Orchestrator(registry._config, registry).analyze(
+            TEXT, "cs", {NlpOp.TOKENIZE, NlpOp.LEMMATIZE, NlpOp.NER}
+        )
+        assert len(response.tokens) == len(MORPH_TOKENS)
 
 
 class TestTheSameConfigWithEmulationOff:

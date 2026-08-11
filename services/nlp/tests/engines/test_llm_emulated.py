@@ -104,14 +104,17 @@ class TestOffByDefault:
     def test_disabled_means_the_op_is_unrouted_not_silently_served(self):
         """The degrade posture, stated as the front already states it.
 
-        `NER.cs` routed at `llm_emulated` while the engine is disabled must NOT
-        fall through to some other engine that happens to support NER — it must
-        reach the floor and be labelled. Falling through is the failure this
-        asserts against: it would serve a Czech question from an English model
-        and say nothing.
+        With emulation off and nothing routing to it, `NER.cs` must reach the
+        floor and be labelled — NOT fall through to some other engine that
+        happens to support NER. Falling through is the failure this asserts
+        against: it would serve a Czech question from an English model and say
+        nothing about it.
+
+        (A config that *routes* an op at the disabled engine is a different
+        case, and a stricter one: it refuses to load at all — `p8-2`'s
+        `test_routing_to_the_emulated_engine_while_it_is_disabled_is_a_load_error`.)
         """
         cfg = _app_config(enabled=False)
-        cfg.op_routing["NER.cs"] = EMULATED_ENGINE_NAME
         route = EngineRegistry(cfg).route("cs", NlpOp.NER)
         assert route.is_floor
         assert route.engine != EMULATED_ENGINE_NAME

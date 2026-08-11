@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 
 from nlp_service.config import AppConfig, BackendConfig, LangidEngineConfig, load_config
-from nlp_service.diagnostics import RG_NLP_002, RG_NLP_003, RG_NLP_010
+from nlp_service.diagnostics import RG_NLP_002, RG_NLP_003, RG_NLP_010, RV_NLP_022
 from nlp_service.engines.base import NlpEngine, NlpOp
 from nlp_service.engines.langid_engine import LangidEngine
 from nlp_service.engines.llm_emulated_engine import (
@@ -35,6 +35,7 @@ from nlp_service.routing import (
     FLOOR_MODEL,
     FLOOR_MODEL_VERSION,
     Route,
+    validate_routing,
 )
 
 # Engines that never carry a routable model op but participate in the floor.
@@ -52,6 +53,20 @@ class EngineRegistry:
         self._op_routing: Dict[str, str] = self._config.resolved_op_routing()
         self._withheld: set[str] = self._config.withheld_engines()
         self._register_engines()
+        # RV-P8.2: the table is checked here because this is the first moment
+        # BOTH halves exist — the resolved routing and the engines whose
+        # `supports()` it must be checked against. The registry is built once at
+        # boot on both paths (`create_app()` at import; `NlpServicer.__init__`),
+        # so an estate whose routing cannot serve finds out then rather than one
+        # request at a time.
+        validate_routing(
+            routing=self._op_routing,
+            engines=self._engines,
+            lane=self._config.lane,
+            declared=self._declared_engines(),
+            withheld=self._withheld,
+            default_language=self._config.default_language,
+        )
 
     @property
     def lane(self) -> str:
@@ -88,6 +103,22 @@ class EngineRegistry:
     def withheld_engines(self) -> set[str]:
         """Engines this lane does not admit — reported, not just applied."""
         return set(self._withheld)
+
+    def _declared_engines(self) -> Dict[str, bool]:
+        """Every engine name this build knows, mapped to whether config enabled it.
+
+        The registry only holds what it registered, so on its own it cannot tell
+        a typo from a switched-off engine — and those have different fixes.
+        """
+        e = self._config.engines
+        return {
+            "morphodita": e.morphodita.enabled,
+            "nametag3": e.nametag3.enabled,
+            "stanza": e.stanza.enabled,
+            "spacy": e.spacy.enabled,
+            "langid": e.langid.enabled,
+            EMULATED_ENGINE_NAME: e.llm_emulated.enabled,
+        }
 
     # ---- lookup -----------------------------------------------------------
 
@@ -166,6 +197,11 @@ class EngineRegistry:
         info: list[str] = []
         if tier == "REMOTE_UNPINNED":
             info.append(RG_NLP_002)
+        if name == EMULATED_ENGINE_NAME:
+            # Beside RG-NLP-002, not instead of it: that code says the route is
+            # unpinned, this one says what did the serving. Until RV-P8 there was
+            # only one unpinned thing (Lindat) and the distinction did not exist.
+            info.append(RV_NLP_022)
         if name in _MODEL_BEARING and not model:
             info.append(RG_NLP_003)
         return Route(
