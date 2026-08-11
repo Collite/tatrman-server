@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P4.T1 — a member-ref slice: the target names a dimension MEMBER, so the
+# exported entry is a `value_alias` rather than an `attribute_alias`. Entry kind is
+# never authored (RV-38) — it is derived from the target class, here and in the
+# Kotlin compiler both.
+schema: ttr-lexicon/v1
+defaults: { lang: cs, method: TOKENS }
+entries:
+  - terms:
+      - { text: "nákladové účty" }
+    target: md.dimension.Account.class.expense
+  - terms:
+      - { text: "obchodní zástupce" }
+    target: md.dimension.Role.class.obchodni_zastupce

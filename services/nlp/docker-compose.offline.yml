@@ -18,6 +18,20 @@
 #   # component parity suite against the running backends:
 #   NLP_MORPHODITA_URL=http://localhost:8080/tag NLP_NAMETAG3_URL=http://localhost:8001/recognize \
 #     just test-py services/nlp -m component
+#
+#   # ── NLS-P4.T4: the hero E2E, both lanes (arc gate 2) ──────────────────────
+#   # Option lane (as configured above) — both heroes must resolve, no degrade:
+#   cd services/nlp && uv run python eval/run_eval.py --rules --lane option \
+#     --output-json eval/reports/metrics.json --output-md eval/reports/report.md
+#
+#   # Default lane — same containers, one env var. cs NER goes unrouted, the
+#   # response carries NLS-NLP-011, and the invoices hero STILL resolves through
+#   # the pack's morphology fallback. That pair is the whole NL-14 claim:
+#   NLP_LANE=default docker compose -f services/nlp/docker-compose.offline.yml up -d front
+#   cd services/nlp && uv run python eval/run_eval.py --rules --lane default \
+#     --output-json eval/reports/metrics-default-lane.json \
+#     --output-md eval/reports/report-default-lane.md
+#   # Expect: same pass count, and `NLS-NLP-011` in the report's diagnostics line.
 
 services:
   # Service names match the config.yaml default in-cluster hostnames, so the
@@ -70,6 +84,27 @@ services:
       NLP_SERVICE_PORT: "7270"
       # Self-hosted tier (default). Do NOT set NLP_UFAL_ENDPOINT_MODE=lindat here
       # — the whole point is offline, no Lindat egress.
+      #
+      # NLS-P3.2: `option` is the UFAL lane, which is the one this compose file
+      # actually brings up — MorphoDiTa and NameTag 3 are running above. Flip to
+      # `default` to exercise the NL-14 degrade against the very same containers:
+      # the lane stops routing to them, cs NER goes unrouted, and RunPipeline
+      # answers with NLS-NLP-011 while the pack's fallback rule still reaches the
+      # QueryPattern (NLS-P4.T4 records both runs).
+      NLP_LANE: "option"
+      # NLS-P4.T4: the shipped config.yaml carries `pipelines: {}` on purpose —
+      # pipeline ids name a world's packs, and referring to unmounted packs would
+      # fail the boot load everywhere. This file declares the two the hero recipe
+      # runs, over the fixtures mounted below.
+      CONFIG_FILE: "/etc/nlp/offline-config.yaml"
+    volumes:
+      # Rule packs and gazetteer lists, mounted at the paths `config.yaml` names.
+      # Content is per-world and never part of the suite (NL-17); these are the
+      # wheel's own fixtures, which is what makes the hero recipe runnable from a
+      # clean checkout with nothing else to fetch.
+      - ../../shared/libs/python/ttr-nlp/tests/fixtures/packs/valid:/etc/nlp/packs:ro
+      - ../../shared/libs/python/ttr-nlp/tests/fixtures/lists/valid:/etc/nlp/lists:ro
+      - ./eval/offline-config.yaml:/etc/nlp/offline-config.yaml:ro
     ports:
       - "7270:7270"  # REST mirror (dev/health)
       - "7271:7271"  # gRPC contract

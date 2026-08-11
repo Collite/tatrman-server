@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P2.1.T1 — `matching` has no default. Guessing one would mean a list whose
+# author forgot the mode still loads, keyed on something they did not choose.
+list: no-mode
+version: 1
+source:
+  world: hand
+  origin: fixture
+entries:
+  - term: faktura

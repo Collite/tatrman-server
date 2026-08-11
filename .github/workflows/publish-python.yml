@@ -116,6 +116,30 @@ jobs:
             echo "::warning::pack.schema.json does not exist yet (arrives at NLS-P1); content check skipped"
           fi
 
+          # The `[grpc]` extra brings grpcio/protobuf and NEITHER contains
+          # `org.tatrman.nlp.v1` — that comes from `shared/proto` via the
+          # `hatch_build.py` hook. Without it in the archive, `pip install
+          # 'ttr-nlp[grpc]'` gives a consumer (nlp-mcp, the DFP model-validator)
+          # a client that cannot import its own stubs, and the failure only shows
+          # up after publish. The source tree cannot catch this: there
+          # `generated/` is on pythonpath and every import succeeds.
+          for stub in nlp/v1/nlp_pb2.py nlp/v1/nlp_pb2_grpc.py \
+                      common/v1/response_message_pb2.py; do
+            unzip -l dist/*.whl | grep -qE "ttrnlp/_proto/org/tatrman/${stub}" \
+              || { echo "::error::${stub} is missing from the wheel — the [grpc] extra would be unusable"; exit 1; }
+          done
+          echo "proto stubs: present in the wheel"
+
+          # And they must actually import from an install, not merely be present.
+          python -m venv /tmp/wheelcheck
+          /tmp/wheelcheck/bin/pip install --quiet "$(ls dist/*.whl)[grpc]"
+          /tmp/wheelcheck/bin/python -c "
+          from ttrnlp.client.grpc import NlpClient
+          from ttrnlp.doc.serialize import doc_to_proto
+          NlpClient('localhost:7271')
+          print('installed wheel: NlpClient constructs and the serializer imports')
+          " || { echo "::error::the installed wheel cannot construct an NlpClient"; exit 1; }
+
           # The filename carries the version PyPI will see.
           ls dist/ | grep -qE "^ttr_nlp-${{ steps.ver.outputs.version }}-py3-none-any\.whl$" \
             || { echo "::error::wheel filename does not carry version ${{ steps.ver.outputs.version }}"; ls dist/; exit 1; }

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P2.2.T1 — a minimal stand-in for the `queries` block of a TTR-M model, for
+# the `--model` cross-check lane (NLS-PACK-005, contracts §5).
+#
+# It is NOT a TTR-M schema fixture and must not grow into one: the model language
+# belongs to `tatrman`, and the wheel reads exactly two things out of a model —
+# which query ids exist and what each one's parameters are called. Everything
+# else here is present only to prove the reader ignores it.
+#
+# The two queries are the ones the heroes emit.
+model: dfp
+version: 3
+
+entities:
+  # Ignored by the reader. Real models carry far more of this.
+  - id: faktura
+    attributes: [datum, castka]
+
+queries:
+  - id: faktury_zakaznika
+    description: "invoices of a customer"
+    parameters:
+      - name: nazev_zakaznika
+        type: string
+  - id: role
+    parameters:
+      - name: nazev_role
+        type: string

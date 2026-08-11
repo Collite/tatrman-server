@@ -30,7 +30,19 @@ uv run python eval/run_eval.py \
     --url http://localhost:7270 \
     --output-json eval/reports/metrics.json \
     --output-md eval/reports/report.md
+
+# The rule-pack lane (NLS-P4.T3). It talks gRPC, so it takes `--target`, a bare
+# host:port — NOT `--url`, which is the REST mirror's base URL and would be
+# handed to insecure_channel as a DNS name.
+uv run python eval/run_eval.py --rules \
+    --target localhost:7271 \
+    --lane option \
+    --output-json eval/reports/metrics.json \
+    --output-md eval/reports/report.md
 ```
+
+`--target` defaults to `localhost:7271` and `--lane` to `$NLP_LANE`; the lane is
+a label for the report only — the front decides its own.
 
 ## Metrics
 

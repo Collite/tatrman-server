@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P3.2.T1 — two phases, so the lane matrix has something to prove.
+#
+# `query-match` sees ONE annotation layer (the Lookups plus whatever got lifted
+# into it), because `input:` is per-phase and mixing layers breaks adjacency —
+# a Lookup laid over a Token shares its start offset and would be unreachable.
+# So the token-level signal is lifted first, which is ordinary JAPE practice.
+pack: hero-patterns
+version: 1
+phases:
+  - phase: name-candidates
+    input: [Token]
+    control: brill
+    rules:
+      - rule: ProperNounIsANameCandidate
+        lhs:
+          - { ann: Token, features: { upos: PROPN } }
+        rhs:
+          - add:
+              type: NameCandidate
+              features: { source: morphology }
+
+  - phase: query-match
+    input: [Lookup, ORGANIZATION, NameCandidate]
+    control: appelt
+    rules:
+      # Option lane: NameTag typed the organisation.
+      - rule: FakturyZakaznikaNer
+        priority: 100
+        lhs:
+          - { ann: Lookup, features: { entity: faktura } }
+          - { ann: Lookup, features: { entity: subjekt } }
+          - { ann: ORGANIZATION, bind: name }
+        rhs:
+          - add:
+              type: QueryPattern
+              features:
+                query: faktury_zakaznika
+                nazev_zakaznika: { from: name, get: "@string" }
+
+      # Default lane: no cs NER (NLS-NLP-011). Morphology carries the answer.
+      - rule: FakturyZakaznikaFallback
+        priority: 10
+        lhs:
+          - { ann: Lookup, features: { entity: faktura } }
+          - { ann: Lookup, features: { entity: subjekt } }
+          - { ann: NameCandidate, bind: name }
+        rhs:
+          - add:
+              type: QueryPattern
+              features:
+                query: faktury_zakaznika
+                nazev_zakaznika: { from: name, get: "@string" }

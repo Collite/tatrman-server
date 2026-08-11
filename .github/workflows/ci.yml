@@ -219,6 +219,44 @@ jobs:
       - name: build the wheel
         run: uv build --wheel shared/libs/python/ttr-nlp
 
+  # NLS-P3.3 — the Python unit gate for `services/nlp` (ruff + pytest).
+  #
+  # ⚑ This job did not exist before NLS-P3. `golem-py` and the `ttr-nlp` wheel had
+  # one; the nlp front did not, so its whole suite ran only on a developer's
+  # machine. NLS-P3 put the pipeline surface, the lane degrade and the atomic pack
+  # reload in this module — an ungated 162-test suite guarding a wire contract that
+  # Themis, Echo and kantheon all speak is not a state to ship in.
+  #
+  # The component tier (`-m component`) stays out, matching the other Python jobs:
+  # it needs backends up, and `component-test` above is where real-dependency
+  # tiers live.
+  nlp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: ruff
+        working-directory: services/nlp
+        run: uv run ruff check .
+
+      # A conftest regenerates the gitignored `org.tatrman.{nlp,common}.v1` stubs
+      # from shared/proto before collection, so there is no separate codegen step
+      # — and the contract-shape freeze (NLS-P3.1.T2) therefore runs against stubs
+      # built from the .proto in this very commit, which is the point of it.
+      - name: pytest
+        working-directory: services/nlp
+        run: uv run pytest -q
+
   # P2/RO-6 dependency rules (contracts §7). Passes trivially on the S1 skeleton;
   # its real bite is S4 once the spine services + protos have arrived.
   dependency-rules:

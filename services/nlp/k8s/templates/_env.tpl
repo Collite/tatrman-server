@@ -8,6 +8,10 @@
 - name: NLP_SERVICE_GRPC_PORT
   value: {{ .Values.ports.grpc | quote }}
 {{- end }}
+{{- if .Values.lane }}
+- name: NLP_LANE
+  value: {{ .Values.lane | quote }}
+{{- end }}
 {{- if and .Values.telemetry.enabled .Values.telemetry.otlpHost }}
 - name: OTEL_EXPORTER_OTLP_HOST
   value: {{ .Values.telemetry.otlpHost | quote }}

@@ -5,6 +5,13 @@ Builds the engine-free front's adapters from config and resolves each
 (language, op) to a `Route` that names an engine + explicit model + version +
 pinning tier (S-1). Unsupported (language, op) resolves to the degrade floor
 (RG-NLP-010). Also builds the capability matrix that `GetStatus` returns (RS-7).
+
+NLS-P3.2: routing is **lane-resolved** (NL-4). The lane supplies both the routing
+overlay and the set of engines that exist at all — see
+`AppConfig.lane_gated_engines` for why the second half is necessary rather than
+tidy. Every lane decision is read from config here, so the capability matrix and
+the per-request degrade agree by construction instead of by two lookups that
+happen to match.
 """
 
 from __future__ import annotations
@@ -37,27 +44,39 @@ class EngineRegistry:
         self._config = config or load_config()
         self._engines: Dict[str, NlpEngine] = {}
         self._backends: Dict[str, BackendConfig] = {}
-        self._op_routing: Dict[str, str] = dict(self._config.op_routing)
+        # Lane-resolved (NL-4): base table, then the active lane's overlay.
+        self._op_routing: Dict[str, str] = self._config.resolved_op_routing()
+        self._withheld: set[str] = self._config.withheld_engines()
         self._register_engines()
+
+    @property
+    def lane(self) -> str:
+        return self._config.lane
 
     # ---- construction -----------------------------------------------------
 
     def _register_engines(self) -> None:
         e = self._config.engines
-        if e.morphodita.enabled:
-            self._engines["morphodita"] = MorphoditaEngine(e.morphodita)
-            self._backends["morphodita"] = e.morphodita
-        if e.nametag3.enabled:
-            self._engines["nametag3"] = Nametag3Engine(e.nametag3)
-            self._backends["nametag3"] = e.nametag3
-        if e.stanza.enabled:
-            self._engines["stanza"] = StanzaEngine(e.stanza)
-            self._backends["stanza"] = e.stanza
-        if e.spacy.enabled:
-            self._engines["spacy"] = SpacyEngine(e.spacy)
-            self._backends["spacy"] = e.spacy
-        if e.langid.enabled:
+        for name, backend, factory in (
+            ("morphodita", e.morphodita, MorphoditaEngine),
+            ("nametag3", e.nametag3, Nametag3Engine),
+            ("stanza", e.stanza, StanzaEngine),
+            ("spacy", e.spacy, SpacyEngine),
+        ):
+            # `enabled: false` says the backend is not deployed; the lane says it
+            # is not in THIS deployment's stack. Both mean "not registered", and
+            # not registering is what makes an op genuinely unrouted rather than
+            # merely unpreferred — routing's last-resort scan only sees what is
+            # here.
+            if backend.enabled and name not in self._withheld:
+                self._engines[name] = factory(backend)
+                self._backends[name] = backend
+        if e.langid.enabled and "langid" not in self._withheld:
             self._engines["langid"] = LangidEngine(e.langid)
+
+    def withheld_engines(self) -> set[str]:
+        """Engines this lane does not admit — reported, not just applied."""
+        return set(self._withheld)
 
     # ---- lookup -----------------------------------------------------------
 
@@ -135,11 +154,17 @@ class EngineRegistry:
     # ---- capability matrix (RS-7) ----------------------------------------
 
     def capability_matrix(self) -> List[dict]:
-        """One row per routed (language, op), built from config + capabilities
-        (not hardcoded). Rows: {language, op, engine, model_version, tier}."""
-        languages = self._configured_languages()
+        """One row per (language, op), built from config + capabilities (not
+        hardcoded). Rows: {language, op, engine, model_version, tier, is_floor,
+        info}.
+
+        This is the FULL internal view and keeps the rows for ops nothing can
+        serve, flagged `is_floor` with `RG-NLP-010` — an operator reading logs
+        wants the gap named, not omitted. `served_capabilities()` is the subset
+        that goes on the wire.
+        """
         rows: List[dict] = []
-        for lang in sorted(languages):
+        for lang in sorted(self._configured_languages()):
             for op in NlpOp:
                 route = self.route(lang, op)
                 rows.append(
@@ -154,6 +179,39 @@ class EngineRegistry:
                     }
                 )
         return rows
+
+    def served_capabilities(self) -> List[dict]:
+        """The matrix rows `GetStatus` reports — contracts §2.4.
+
+        An op that nothing in the active lane can actually produce gets **no
+        row**. `NER.cs` in the default lane is the case the design turns on: its
+        absence here, plus `NLS-NLP-011` on the response, IS the NL-14 degrade. A
+        row naming the degrade floor would say the same thing less clearly, and a
+        consumer reading the matrix to decide whether to ask for cs NER would read
+        it as a yes.
+
+        The rows are the same lane-resolved routes every request uses, so the row
+        disappears because the route did — there is no lane logic here, only the
+        wire's own rule about what counts as a capability.
+        """
+        return [
+            row
+            for row in self.capability_matrix()
+            if not row["is_floor"] or self.floor_serves(row["language"], row["op"])
+        ]
+
+    @staticmethod
+    def floor_serves(lang: str, op: NlpOp) -> bool:
+        """Whether the degrade floor can actually produce this op.
+
+        The floor tokenizes and splits sentences deterministically, in the front,
+        for any language — those routes are real capabilities and keep their row.
+        It cannot lemmatize, tag, parse or recognise entities, and a row for one
+        of those would advertise a capability nobody has.
+        """
+        from nlp_service.floor import FloorEngine
+
+        return FloorEngine().supports(lang, op)
 
     def _configured_languages(self) -> set[str]:
         langs: set[str] = set()

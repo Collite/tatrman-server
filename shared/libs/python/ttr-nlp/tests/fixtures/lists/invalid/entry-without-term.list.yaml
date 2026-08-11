@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P2.1.T1 — an entry with features but nothing to match on. Exporters
+# produce this when a source row has metadata and an empty label column.
+list: no-term
+version: 1
+matching: ci
+source:
+  world: hand
+  origin: fixture
+entries:
+  - term: faktura
+    features: { kind: entity_alias }
+  - features: { kind: entity_alias, entity: subjekt }

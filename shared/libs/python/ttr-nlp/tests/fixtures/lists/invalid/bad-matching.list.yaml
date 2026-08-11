@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P2.1.T1 — a mode outside the closed set of four. `fuzzy` is the one an
+# author is most likely to reach for, and the one NL-17 rules out: the scoring
+# line stays world-side.
+list: bad-mode
+version: 1
+matching: fuzzy
+source:
+  world: hand
+  origin: fixture
+entries:
+  - term: faktura

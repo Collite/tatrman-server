@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P4.T1 — a real minimal slice, copied from
+# tatrman/packages/kotlin/ttr-lexicon/src/test/resources/sample-lexicon-area/,
+# with the two Czech terms the invoices hero needs added. Kept in the authored
+# `ttr-lexicon/v1` shape rather than trimmed to something convenient: the point of
+# the exporter test is that it reads what a defining repo actually writes.
+schema: ttr-lexicon/v1
+defaults: { lang: cs, method: TYPOS(1) }
+entries:
+  - terms:
+      - { text: "středisko" }
+      - { text: "cost center", lang: en }
+    target: er.CostCenter
+  - terms:
+      - { text: "zákazník" }
+      - { text: "customer", lang: en }
+    target: er.Customer
+  - terms:
+      - { text: "faktura", method: EXACT }
+    target: er.Invoice
+  - terms:
+      - { text: "tržba", method: TOKENS }
+    target: md.measure.revenue

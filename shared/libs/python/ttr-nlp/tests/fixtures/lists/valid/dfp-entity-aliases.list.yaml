@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P2.1.T5 — the list that produces both heroes' Lookups.
+#
+# Up to P1 these annotations were hand-added in `test_hero.py` from each hero's
+# `expected.yaml`; that file was written as the contract between the phases, and
+# this list is the other side of it. `tests/gazetteer/test_hero_from_lists.py`
+# asserts the produced Lookups equal the expected ones feature for feature, so
+# if this file drifts from that contract the heroes fail rather than quietly
+# matching something else.
+#
+# Everything here is `matching: lemma`, because everything here is a Czech noun
+# phrase the user will decline: the text says `faktury`, `zákazníka`, `roli`, and
+# the list says the lemma once (contracts §4).
+list: dfp-entity-aliases
+version: 1
+matching: lemma
+annotation: Lookup
+source:
+  world: dfp
+  # A real export carries the glossary manifest version; the fixture states what
+  # it is instead of pretending to a version number that does not exist.
+  origin: "fixture@NLS-P2.1"
+entries:
+  # ── the invoices hero ──────────────────────────────────────────────────────
+  - term: faktura
+    features:
+      kind: entity_alias
+      entity: faktura
+
+  # `zákazník` is an ALIAS; the model entity it resolves to is `subjekt`. An
+  # entity_alias whose `entity` echoed the surface word would carry no
+  # information — the point of the alias is the mapping.
+  - term: zákazník
+    features:
+      kind: entity_alias
+      entity: subjekt
+
+  # ── the role hero ─────────────────────────────────────────────────────────
+  - term: role
+    features:
+      kind: attribute_alias
+      attribute: role
+
+  # Multi-token term: split on whitespace, matched as a two-token lemma
+  # sequence (`obchodní` `zástupce`), and the Lookup spans both tokens.
+  - term: "obchodní zástupce"
+    features:
+      kind: value_alias
+      attribute: role
+      value: obchodni_zastupce

@@ -9,7 +9,7 @@ phase-exit runtime smoke).
 
 from __future__ import annotations
 
-from nlp_service.config import load_config
+from nlp_service.config import AppConfig, load_config
 
 
 def test_default_load_config_reads_pinned_models():
@@ -17,8 +17,53 @@ def test_default_load_config_reads_pinned_models():
     # The real config.yaml pins these; empty means the file wasn't found.
     assert cfg.engines.morphodita.model == "czech-morfflex2.0-pdtc1.0-220710"
     assert cfg.engines.nametag3.model == "nametag3-czech-cnec2.0-240830"
-    assert cfg.op_routing.get("LEMMATIZE.cs") == "morphodita"
-    assert cfg.op_routing.get("NER.cs") == "nametag3"
+    # NLS-P3.2 moved the UFAL cs routing out of the base table and into the
+    # `option` overlay: base IS the default lane now (contracts §7). The models
+    # stay pinned either way — the lane decides whether they are routed, not
+    # whether they are named.
+    assert cfg.lane == "default"
+    assert cfg.op_routing.get("LEMMATIZE.cs") == "stanza"
+    assert cfg.lane_overrides["option"]["LEMMATIZE.cs"] == "morphodita"
+    assert cfg.lane_overrides["option"]["NER.cs"] == "nametag3"
+
+
+def test_ner_cs_is_absent_from_the_default_lane_entirely():
+    """The NL-14 degrade, at the config layer. Not "routed to nothing" — absent,
+    from both the base table and the resolved default-lane table."""
+    cfg = load_config()
+    assert "NER.cs" not in cfg.op_routing
+    assert "NER.cs" not in cfg.resolved_op_routing()
+
+
+def test_the_option_lane_restores_the_ufal_routing():
+    cfg = load_config()
+    cfg.lane = "option"
+    resolved = cfg.resolved_op_routing()
+
+    assert resolved["NER.cs"] == "nametag3"
+    assert resolved["LEMMATIZE.cs"] == "morphodita"
+    # The overlay does not disturb what it does not name.
+    assert resolved["NER.en"] == "stanza"
+    assert resolved["DEP_PARSE.cs"] == "stanza"
+
+
+def test_the_ufal_engines_are_withheld_in_the_default_lane():
+    """The half that makes "unrouted" real: routing's last-resort scan can only
+    find engines that were registered, so the lane has to withhold them."""
+    cfg = load_config()
+    assert cfg.withheld_engines() == {"morphodita", "nametag3"}
+
+    cfg.lane = "option"
+    assert cfg.withheld_engines() == set()
+
+
+def test_the_real_config_declares_pack_and_list_mount_points():
+    cfg = load_config()
+    assert cfg.packs.sources == ["/etc/nlp/packs"]
+    assert cfg.lists.sources == ["/etc/nlp/lists"]
+    # No pipelines by default: their ids belong to a world's packs, and a pipeline
+    # referring to packs that are not mounted would fail the boot load.
+    assert cfg.pipelines == {}
 
 
 def test_explicit_config_file_still_honored():
@@ -30,3 +75,66 @@ def test_explicit_config_file_still_honored():
     cfg = load_config(path)
     assert cfg.default_language == "en"
     assert cfg.engines.morphodita.model == "test-model"
+
+
+def test_nlp_lane_env_selects_the_lane(monkeypatch):
+    """NLS-P3.2: the lane is a deployment decision, so the helm chart sets it as
+    an env var rather than every cluster carrying a `config.yaml` that differs in
+    one line."""
+    monkeypatch.setenv("NLP_LANE", "option")
+    assert load_config().lane == "option"
+
+
+def test_a_typod_lane_keeps_the_safe_one(monkeypatch, caplog):
+    """Not fatal, deliberately. A typo must not take the front down, and `default`
+    is the lane that needs no licence decision — the safe one to be wrong
+    towards."""
+    monkeypatch.setenv("NLP_LANE", "optionn")
+    with caplog.at_level("WARNING"):
+        cfg = load_config()
+    assert cfg.lane == "default"
+    assert "NLP_LANE" in caplog.text
+
+
+def test_the_lane_env_is_case_and_space_tolerant(monkeypatch):
+    monkeypatch.setenv("NLP_LANE", "  OPTION ")
+    assert load_config().lane == "option"
+
+
+# ── the two halves of the lane mechanism must agree ──────────────────────────
+
+
+def _with_default_overlay() -> AppConfig:
+    """A config that writes an overlay for the lane it is running."""
+    return AppConfig(
+        op_routing={"TOKENIZE.cs": "stanza", "DETECT_LANGUAGE": "langid"},
+        lane="default",
+        lane_overrides={"default": {"TOKENIZE.cs": "experimental"}},
+    )
+
+
+def test_the_active_lanes_overlay_applies_whatever_the_lane_is_called():
+    """`withheld_engines` admits the active lane's overlay engines with no regard
+    for the lane's name, so routing must not skip that overlay for `default`.
+
+    They disagreed: `experimental` below was admitted as an available engine and
+    its routing was dropped on the floor, leaving it reachable only through
+    routing's last-resort "any engine that supports this op" scan — availability
+    gated by one half of the mechanism and routing decided by the other, which is
+    the silent fallback `lane_gated_engines` exists to prevent.
+    """
+    config = _with_default_overlay()
+    assert config.resolved_op_routing()["TOKENIZE.cs"] == "experimental"
+    assert config.withheld_engines() == set()
+
+
+def test_a_config_with_no_overlay_for_its_lane_is_the_base_table():
+    """The shipped shape, unchanged: base routing IS the default lane."""
+    config = AppConfig(
+        op_routing={"TOKENIZE.cs": "stanza"},
+        lane="default",
+        lane_overrides={"option": {"TOKENIZE.cs": "morphodita"}},
+    )
+    assert config.resolved_op_routing() == {"TOKENIZE.cs": "stanza"}
+    # And the option lane's engine stays withheld while `default` is running.
+    assert config.withheld_engines() == {"morphodita"}

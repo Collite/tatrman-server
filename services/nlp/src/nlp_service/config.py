@@ -6,16 +6,34 @@ HTTP-adapter client to a separate backend image (`url`), launched with an
 **explicit model id** (`model`, S-1). Only `langid` (lingua) runs in-process.
 Each backend declares its pinning `tier`: `SELF_HOSTED_PINNED` (in-cluster,
 conformant) or `REMOTE_UNPINNED` (Lindat dev/eval — `RG-NLP-002`).
+
+NLS-P3.2 adds the **lane** switch (NL-4) and the pack/list/pipeline sections
+(contracts §7).
+
+**What a lane is.** `default` is the lane a deployment can run anywhere: Stanza
+and spaCy, permissively licensed, no UFAL images. `option` adds the UFAL stack
+(MorphoDiTa, NameTag 3), whose licence is a per-deployment decision (NL-5). So
+the lane is not a preference between engines that are all present — it decides
+*which engines are there at all*, and that is why `base op_routing` IS the
+default lane rather than a lane-neutral table with the lane picking favourites.
+
+**`NER.cs` is the case the whole design turns on.** Stanza's Czech bundle has no
+NER head, so in the default lane nothing can serve it. It is left out of the base
+table on purpose, the request still runs every other phase, and the response
+carries `NLS-NLP-011` saying so (NL-14: honest degrade, never a silent one).
 """
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Literal, Optional
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+logger = logging.getLogger(__name__)
 
 
 class ServiceConfig(BaseModel):
@@ -58,12 +76,121 @@ class EnginesConfig(BaseModel):
     langid: LangidEngineConfig = Field(default_factory=LangidEngineConfig)
 
 
+LANE_DEFAULT = "default"
+LANE_OPTION = "option"
+
+
+class SourcesConfig(BaseModel):
+    """Where packs or lists come from (NL-15). Dirs and/or `http(s)` URLs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sources: List[str] = Field(default_factory=list)
+
+
+class RuleRef(BaseModel):
+    """One `(pack, phase)` step of a pipeline's rule stage."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pack: str
+    phase: str
+
+
+class PipelineConfig(BaseModel):
+    """A named pipeline (contracts §7): engine ops, then gazetteer lists, then
+    rule phases — in that order, and in the order written."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ops: List[str] = Field(default_factory=list)
+    gazetteer: List[str] = Field(default_factory=list)
+    rules: List[RuleRef] = Field(default_factory=list)
+
+    def steps(self) -> List[str]:
+        """The step names `GetStatus` reports (contracts §2.4 `PipelineInfo`)."""
+        return [
+            *self.ops,
+            *self.gazetteer,
+            *(f"{ref.pack}:{ref.phase}" for ref in self.rules),
+        ]
+
+
 class AppConfig(BaseModel):
     service: ServiceConfig = Field(default_factory=ServiceConfig)
     engines: EnginesConfig = Field(default_factory=EnginesConfig)
+    # Base routing IS the default-lane routing — see the module docstring.
     op_routing: Dict[str, str] = Field(default_factory=dict)
+    lane: Literal["default", "option"] = LANE_DEFAULT
+    #: lane name -> routing overlay, applied over `op_routing` when active.
+    lane_overrides: Dict[str, Dict[str, str]] = Field(default_factory=dict)
+    packs: SourcesConfig = Field(default_factory=SourcesConfig)
+    lists: SourcesConfig = Field(default_factory=SourcesConfig)
+    pipelines: Dict[str, PipelineConfig] = Field(default_factory=dict)
     default_language: str = "cs"
     log_level: str = "INFO"
+
+    # `extra` is left permissive on THIS model, deliberately. The new nested
+    # sections above forbid it — their whole shape is ours, and a typo'd
+    # `gazeteer:` that silently loaded no lists is the exact failure NL-15 exists
+    # to prevent. Tightening the top level too would mean any deployed config
+    # carrying a key this build does not know about stops the service from
+    # booting, and there are configmaps out there this checkout cannot see.
+
+    def resolved_op_routing(self) -> Dict[str, str]:
+        """The routing table for the ACTIVE lane: base, then its overlay.
+
+        The active lane's overlay applies whatever the lane is called, `default`
+        included. Skipping it for `default` looked harmless — no shipped config
+        writes a `lane_overrides.default` block, and base routing IS the default
+        lane (module docstring) — but it disagreed with `withheld_engines`, which
+        admits the active lane's overlay engines unconditionally. One that did
+        write that block therefore got the engines *registered* and their routing
+        *ignored*, leaving them reachable only through routing's last-resort "any
+        engine that supports this op" scan: availability gated on one half of the
+        mechanism, routing on the other, which is precisely the silent fallback
+        `lane_gated_engines` exists to prevent.
+
+        With no `default` key — every config in the tree — this is `dict(op_routing)`,
+        exactly as before.
+        """
+        routing = dict(self.op_routing)
+        routing.update(self.lane_overrides.get(self.lane, {}))
+        return routing
+
+    def lane_gated_engines(self) -> set[str]:
+        """Engines that exist only inside a lane overlay.
+
+        These are the ones the default lane does not have: an engine named
+        *exclusively* by an overlay is, by construction, part of that lane's
+        stack. Engines the base table names are always available, so a config
+        with no `lane_overrides` at all behaves exactly as it did before this
+        section existed — which is why every pre-NLS config and test is
+        unaffected.
+
+        This matters more than it looks. Routing has a last-resort scan ("any
+        engine that supports this op"), so simply *omitting* `NER.cs` from the
+        base table would not make it unrouted — the scan would find NameTag 3
+        anyway and the NL-14 degrade would never happen. Gating availability is
+        what makes "unrouted" real.
+        """
+        overlaid: set[str] = set()
+        for overlay in self.lane_overrides.values():
+            overlaid.update(overlay.values())
+        return overlaid - set(self.op_routing.values())
+
+    def withheld_engines(self) -> set[str]:
+        """Engines the ACTIVE lane does not admit. Empty means "all of them".
+
+        A gated engine is admitted when the active lane's own overlay names it —
+        so with two overlays (`option`, say, and something experimental), running
+        `option` admits option's engines and still withholds the other's.
+        """
+        gated = self.lane_gated_engines()
+        if not gated:
+            return set()
+        admitted = set(self.lane_overrides.get(self.lane, {}).values())
+        return gated - admitted
 
 
 # Lindat dev/eval endpoints (the REMOTE_UNPINNED tier — RG-NLP-002). Selected by
@@ -80,7 +207,23 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
       `REMOTE_UNPINNED` dev/eval tier (endpoint + tier + rate-limit change; the
       model id stays pinned — S-1).
     - `NLP_MORPHODITA_URL` / `NLP_NAMETAG3_URL` override just the endpoint.
+    - `NLP_LANE=default|option` selects the engine stack (NL-4, NLS-P3.2). An env
+      var rather than config-only because the lane is a *deployment* decision —
+      the helm chart sets it per environment, and the alternative is a per-cluster
+      copy of `config.yaml` differing in one line.
     """
+    if lane := os.getenv("NLP_LANE"):
+        lane = lane.strip().lower()
+        if lane in (LANE_DEFAULT, LANE_OPTION):
+            config.lane = lane  # type: ignore[assignment]
+        else:
+            # Not fatal, and deliberately so: a typo'd lane must not take the
+            # front down, and `default` is the lane that needs no licence
+            # decision — the safe one to be wrong towards.
+            logger.warning(
+                "NLP_LANE=%r is not a known lane — keeping %r", lane, config.lane
+            )
+
     if os.getenv("NLP_UFAL_ENDPOINT_MODE", "self_hosted").lower() == "lindat":
         m = config.engines.morphodita
         m.url = _LINDAT_MORPHODITA

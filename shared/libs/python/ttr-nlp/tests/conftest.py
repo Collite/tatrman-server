@@ -1,5 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Shared fixtures — the hero corpus loader."""
+"""Shared fixtures — the hero corpus loader, and the proto-stub bootstrap.
+
+The `org.tatrman.{nlp,common}.v1` stubs the serializer and the client need are
+generated from `shared/proto` and gitignored, exactly as `services/nlp` does it.
+Generating them at collection keeps `uv run pytest` self-contained instead of
+requiring a remembered manual step whose absence looks like a missing feature.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +15,21 @@ from typing import Any
 
 import pytest
 import yaml
+
+_WHEEL_DIR = Path(__file__).resolve().parent.parent
+_STUB_MARKER = (
+    _WHEEL_DIR / "generated" / "org" / "tatrman" / "nlp" / "v1" / "nlp_pb2_grpc.py"
+)
+
+if not _STUB_MARKER.exists():  # pragma: no cover - one-time bootstrap
+    import runpy
+
+    try:
+        runpy.run_path(
+            str(_WHEEL_DIR / "scripts" / "gen_proto.py"), run_name="__main__"
+        )
+    except SystemExit:
+        pass
 
 FIXTURES = Path(__file__).parent / "fixtures"
 HERO_DIR = FIXTURES / "hero"

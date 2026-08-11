@@ -10,6 +10,10 @@ let a minor release quietly change what a rule matches.
 `lib_stanza` / `lib_spacy` convenience importers that `import stanza` / `import
 spacy` at module top — so a single innocent-looking import of theirs would drag
 torch into a container built to be model-free.
+
+**No scoring in the gazetteer (NL-17, added at NLS-P2.1).** The deterministic
+matcher and the fuzzy matchers are separated by a line that is easy to erode one
+"just a confidence field" at a time, and the erosion looks like a feature.
 """
 
 from __future__ import annotations
@@ -77,6 +81,119 @@ def test_no_module_imports_an_engine_even_transitively():
     assert offenders == [], (
         "the wheel must stay engine-free (⚑NLS-D3) — build annotations from the "
         f"backends' JSON instead: {offenders}"
+    )
+
+
+#: NL-17. Names that would mean the deterministic gazetteer had grown a scoring
+#: dimension — a feature it emits, a threshold it reads, a distance it computes.
+SCORING_NAMES = (
+    "score",
+    "scores",
+    "scoring",
+    "confidence",
+    "threshold",
+    "fuzzy",
+    "levenshtein",
+    "similarity",
+    "edit_distance",
+)
+
+
+def test_the_wheel_never_imports_the_service():
+    """NLS-P3.3.T4 (⚑NLS-D7) — the dependency runs one way only.
+
+    `services/nlp` depends on this wheel; the wheel must not depend back. It is
+    published to PyPI and installed by consumers who do not have the service at
+    all (nlp-mcp, the DFP model-validator), so an import of `nlp_service`
+    anywhere in here would be a wheel that works in this repo and fails
+    everywhere else.
+
+    The task list asked for `rg "nlp_service" src` to come back empty. Taken
+    literally that also forbids *saying where the adapters came from*, which is
+    the one thing a reader of `client/backends.py` most wants to know. So this
+    reads imports instead: prose may name the service, code may not.
+    """
+    offenders = []
+    for path in sorted(SRC.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""]
+            else:
+                continue
+            for name in names:
+                if name.split(".")[0] == "nlp_service":
+                    offenders.append(f"{path.name}:{node.lineno} imports {name}")
+
+    assert offenders == [], (
+        "the wheel is published and installed without services/nlp — the "
+        f"dependency goes one way (⚑NLS-D7): {offenders}"
+    )
+
+
+def _docstring_nodes(tree: ast.AST) -> set[int]:
+    """The `id()`s of every Constant that is a docstring, not a value."""
+    ids = set()
+    for node in ast.walk(tree):
+        if isinstance(
+            node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
+        ):
+            body = getattr(node, "body", [])
+            if (
+                body
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                ids.add(id(body[0].value))
+    return ids
+
+
+def test_the_gazetteer_has_no_scoring_dimension():
+    """NL-17, at the source level.
+
+    The P2.1 verify block asks for `rg -i "score|fuzzy|levenshtein"
+    src/ttrnlp/gazetteer/` to come back empty. Taken literally that gate also
+    forbids *documenting* the exclusion, which is the wrong trade: those two
+    modules explain at length why scoring lives world-side, and a reader who
+    cannot find that explanation is the person most likely to add a `score`
+    field. So the gate reads the AST instead — prose may name what the code may
+    not do, and only identifiers and real string values count.
+
+    A companion assertion lives in `tests/gazetteer/test_annotate.py`
+    (`test_no_lookup_carries_a_score`), which checks the emitted annotations
+    rather than the source: this test catches the field being computed, that one
+    catches it arriving from a list.
+    """
+    gazetteer_src = SRC / "gazetteer"
+    offenders = []
+    for path in sorted(gazetteer_src.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        docstrings = _docstring_nodes(tree)
+        for node in ast.walk(tree):
+            found = ""
+            if isinstance(node, ast.Name):
+                found = node.id
+            elif isinstance(node, ast.Attribute):
+                found = node.attr
+            elif isinstance(node, ast.arg):
+                found = node.arg
+            elif isinstance(node, ast.FunctionDef | ast.ClassDef):
+                found = node.name
+            elif (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and id(node) not in docstrings
+            ):
+                found = node.value
+            if any(name in found.lower() for name in SCORING_NAMES):
+                offenders.append(f"{path.name}:{getattr(node, 'lineno', 0)}: {found!r}")
+
+    assert offenders == [], (
+        "the gazetteer is deterministic longest-match and nothing else (NL-17) — "
+        "the scoring line stays world-side, in the glossary service and the "
+        f"lex-matcher-core / fuzzy-common engines: {offenders}"
     )
 
 

@@ -90,7 +90,13 @@ import yaml
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from ttrnlp.packs.diag import NLS_PACK_001, Diagnostic, PackError, error
+from ttrnlp.packs.diag import (
+    NLS_PACK_001,
+    Diagnostic,
+    PackError,
+    diagnostics_from_pydantic,
+    error,
+)
 
 SCHEMA_RESOURCE = "schema/pack.schema.json"
 
@@ -486,68 +492,6 @@ def _most_specific(err: jsonschema.ValidationError) -> jsonschema.ValidationErro
     return err
 
 
-def _pydantic_path(loc: tuple[Any, ...]) -> str:
-    """Render a pydantic error location the way the schema errors render theirs.
-
-    Pydantic splices its own machinery into `loc` — validator wrappers like
-    ``function-after[_min_le_max(), RepeatModel]`` and union-member tags. Those
-    describe *our* implementation, not the author's document, and a pack author
-    reading `$.phases[0]…repeat.function-after[…]` learns nothing from the tail.
-    Drop those segments and use the same `$.a[0].b` shape jsonschema produces, so
-    both halves of validation point at a file the same way.
-    """
-    path = "$"
-    for part in loc:
-        if isinstance(part, int):
-            path += f"[{part}]"
-        elif "[" in part:
-            continue  # pydantic internals
-        else:
-            path += f".{part}"
-    return path
-
-
-#: Trailing `loc` segments pydantic adds to name which arm of a union failed.
-_UNION_TAGS = frozenset(
-    {"str", "int", "float", "bool", "none", "NoneType", "function-after"}
-)
-
-
-def _strip_union_tag(loc: tuple[Any, ...]) -> tuple[Any, ...]:
-    if loc and isinstance(loc[-1], str) and loc[-1] in _UNION_TAGS:
-        return loc[:-1]
-    return loc
-
-
-def _pydantic_diagnostics(
-    exc: ValidationError, *, source: str, pack: str
-) -> list[Diagnostic]:
-    """Turn pydantic's errors into diagnostics a pack author can act on.
-
-    Two pieces of noise get removed. A union field reports once per arm, so
-    ``repeat: {min: 5, max: 2}`` yields both "min is greater than max" and
-    "Input should be a valid string" — the second is pydantic explaining that
-    the value is not the `*`/`+`/`?` sugar, which the author did not attempt.
-    Where a location has a message from one of our own validators, that message
-    is the answer and the generic type complaints beside it are dropped.
-    """
-    grouped: dict[str, list[tuple[str, str]]] = {}
-    for err in exc.errors():
-        path = _pydantic_path(_strip_union_tag(err["loc"]))
-        # Pydantic prefixes custom ValueErrors with "Value error, ".
-        message = err["msg"].removeprefix("Value error, ")
-        grouped.setdefault(path, []).append((err["type"], message))
-
-    diagnostics = []
-    for path, entries in grouped.items():
-        authored = [msg for kind, msg in entries if kind == "value_error"]
-        for message in authored or [msg for _, msg in entries]:
-            # A validator that already located itself should not be located twice.
-            text = message if message.startswith("$") else f"{path}: {message}"
-            diagnostics.append(error(NLS_PACK_001, text, source=source, pack=pack))
-    return diagnostics
-
-
 def load_pack(path_or_str: str | Path, *, source: str = "") -> PackModel:
     """Parse and validate ONE pack.
 
@@ -600,7 +544,9 @@ def load_pack(path_or_str: str | Path, *, source: str = "") -> PackModel:
         return PackModel.model_validate(document)
     except ValidationError as exc:
         raise PackError(
-            _pydantic_diagnostics(exc, source=resolved_source, pack=pack_id)
+            diagnostics_from_pydantic(
+                exc, code=NLS_PACK_001, source=resolved_source, pack=pack_id
+            )
         ) from exc
 
 
