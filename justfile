@@ -242,6 +242,12 @@ conformance-service-level:
     ./gradlew :services:resolver:test --tests '*IssuesRegressionTest*'
     ./gradlew :services:lex-matcher:test --tests '*MatchQualityCorpusTest*'
     ./gradlew :services:lex-matcher:test --tests '*LexiconConformanceTest*'
+    # RV-P7.4 T6 — the LEARNED overlay joins the gating tier, on its recorded promotion
+    # criterion: `OverlayDrillTest` is fed by `drill/overlay-final.json`, which is the exact
+    # document kantheon's H2H3DrillSpec produced from a real H2 conversation — so this corpus
+    # is a statement about the LOOP now, not about the reader. Hermetic (no cluster, no Golem).
+    ./gradlew :services:lex-matcher:test --tests '*OverlayConformanceTest*'
+    ./gradlew :services:lex-matcher:test --tests '*OverlayDrillTest*'
     just eval-grounding-test
     # RV-P4.4.T3 — the conformance-CONVERSATION tier (the P4 phase gate). Hermetic: the
     # five hero conversations in conformance/conversations/ driven through golem-py
@@ -249,6 +255,13 @@ conformance-service-level:
     # day it fails the Kotlin tier. The SAME fixtures are what RV-P5's Kotlin Golem must
     # pass (RV-28: one corpus, N shells).
     just test-py services/golem-py
+
+# RV-P7.4 T5 — this repo's half of the H2->H3 drill: load the overlay kantheon's half grew from
+# a real conversation, and prove H3 (the same term binds at LEARNED with zero asks) and the
+# negative suppression. The handoff document is `drill/overlay-final.json`; regenerate it with
+# `just rv-drill` in kantheon and copy it here in the SAME change.
+rv-drill:
+    ./gradlew :services:lex-matcher:test --tests '*OverlayDrillTest*' --rerun-tasks
 
 # Pin the three-tier corpora by content hash (RG-P6 review I): the recorded provenance
 # in conformance/README.md is now ENFORCED — a silent corpus edit (even whitespace /

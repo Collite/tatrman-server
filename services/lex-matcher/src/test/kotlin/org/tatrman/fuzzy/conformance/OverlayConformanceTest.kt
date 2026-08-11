@@ -50,16 +50,18 @@ import kotlin.io.path.writeBytes
 /**
  * RV-P7.3 T4 — the hartland_cz corpus with a **LEARNED overlay** on top of its declared layer.
  *
- * ### ⚑ NON-GATING, deliberately, and here is what promotes it
+ * ### ✅ GATING since RV-P7.4, on the criterion this file recorded at P7.3
  *
- * Absent from `just conformance` and from `conformance/corpus-hashes.sha256`, because the flow it
- * exercises is only half-proved: this stage can show that an overlay *serves*, but the overlay it
- * serves is hand-authored here rather than grown from real feedback. **The promotion criterion is
- * RV-P7.4's end-to-end drill** — once H2→H3 runs live (ask → confirm → entry → the second identical
- * question binds at LEARNED_ALIAS with zero asks), this corpus stops being a statement about the
- * reader and becomes a statement about the loop, and at that point it joins the gating tier and
- * gets hash-pinned like its declared sibling. Promoting it before then would gate the build on a
- * fixture that agrees with the code by construction.
+ * It shipped NON-gating, with the promotion criterion written here: *once H2→H3 runs end to end
+ * (ask → confirm → entry → the same question binds at LEARNED_ALIAS with zero asks), this corpus
+ * stops being a statement about the reader and becomes a statement about the loop.* RV-P7.4's
+ * drill met it — `OverlayDrillTest` next door is fed by `drill/overlay-final.json`, which is the
+ * exact document kantheon's `H2H3DrillSpec` produced from a real conversation rather than a
+ * fixture anyone wrote. So both joined `just conformance` and `corpus-hashes.sha256` together.
+ *
+ * ⚠ **What is still NOT proven, and is not what this gate is for:** the pod hop — a deployed Golem
+ * writing the archive and a deployed lex-matcher reading it. That needs images, a resolver on the
+ * estate and the transport medium ruled; see the stage's `implementation/` record.
  *
  * ### What it is
  *
