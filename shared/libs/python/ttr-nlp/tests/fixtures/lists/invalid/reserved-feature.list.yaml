@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P2.1.T4 — `source` and `matching` are the gazetteer's own. An entry
+# setting one would overwrite the provenance of the very Lookup it produced.
+list: reserved
+version: 1
+matching: ci
+source:
+  world: hand
+  origin: fixture
+entries:
+  - term: faktura
+    features:
+      kind: entity_alias
+      source: somewhere-else

@@ -32,6 +32,53 @@ Full detail in the effort's `architecture.md` §2.
 | `ttrnlp.client` | gRPC client for the `nlp` front; HTTP engine-adapter clients |
 | `ttrnlp.cli` | `ttr-nlp validate` |
 
+## Gazetteer lists
+
+One YAML file is one list, and `matching` is a property of the **list**, not of
+an entry — the mode decides what the trie is keyed on, so two modes over one
+vocabulary means two files (and a diff that shows which is which).
+
+```yaml
+list: dfp-entity-aliases          # id, [a-z0-9-]+
+version: 1
+matching: lemma                   # exact | ci | lemma | fold-diacritics
+annotation: Lookup                # optional; the type emitted
+source:                           # provenance, required
+  world: dfp
+  origin: "glossary@2026-08-01"
+entries:
+  - term: faktura                 # matched via the token's `lemma` feature
+    features: { kind: entity_alias, entity: faktura }
+  - term: "obchodní zástupce"     # multi-token: matched as a token sequence
+    features: { kind: value_alias, attribute: role, value: obchodni_zastupce }
+```
+
+| Mode | Keyed on | Use it for |
+|---|---|---|
+| `lemma` | the token's `lemma` feature | inflected languages — one entry covers *faktura/faktury/faktuře* |
+| `ci` | the token's text, casefolded | names and keywords whose spelling is stable |
+| `fold-diacritics` | the text, casefolded and unaccented | text typed without a Czech keyboard (the glossary's `*_ai`) |
+| `exact` | the raw character run, no tokens | codes and SKUs (`INV-2026/0042`) |
+
+Every emitted annotation carries the entry's `features` plus `source` (the list
+id) and `matching` (the mode that fired). Those two names are **reserved**: an
+entry that sets one is rejected at load, because it would erase the provenance of
+the annotation it produced.
+
+Matching is deterministic longest-match and nothing else — the longest term wins,
+and what it covers is not matched again. **There is no scoring** (NL-17): no
+thresholds, no edit distance, no confidence. That line belongs to the world-side
+matchers (the glossary service, `lex-matcher-core`, `fuzzy-common`), where a
+human can see the thresholds; a test asserts the gazetteer has not grown one.
+
+```python
+from ttrnlp.gazetteer import build_gazetteer, load_list
+
+gazetteer = build_gazetteer([load_list("lists/dfp-entity-aliases.list.yaml")])
+added = gazetteer.annotate(doc)                      # every list, load order
+added = gazetteer.annotate(doc, lists=["dfp-keywords", "dfp-entity-aliases"])
+```
+
 ## Install
 
 ```bash
