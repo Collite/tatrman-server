@@ -118,7 +118,7 @@ class IssuesRegressionTest :
 
             val stanic = state.mentionsList.single { it.span.text == "čerpacích stanic" }
             // A mention with zero bindings is the sentence "I do not know this word" — which the
-            // pre-RV core had no way to say at all, and which is why RV-P3 waited for the lattice.
+            // pre-RV core had no way to say at all, and which is why RV-P4 waited for the lattice.
             stanic.bindingsCount shouldBe 0
             state.gapsList.single { it.mentionId == stanic.id }.kind shouldBe GapKind.GAP_KIND_G1_UNBOUND
 

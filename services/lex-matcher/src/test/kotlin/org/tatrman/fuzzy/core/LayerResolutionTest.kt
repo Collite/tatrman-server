@@ -21,7 +21,7 @@ import org.tatrman.fuzzy.loader.SnapshotVocabularySource
  * RV-P1.4 T2 — layer resolution, written before the loader that fills the layers.
  *
  * RV-39 makes lex-matcher resolve three layers behind one query surface: the compiled
- * declared+metadata artifact, the member index, and the (empty until RV-P6) LEARNED overlay.
+ * declared+metadata artifact, the member index, and the LEARNED overlay (loaded since RV-P7.3).
  *
  * The rule these tests exist to pin is that **lex-matcher does not pick a winner across layers**.
  * A term that is both an authored alias and a data value yields two candidates, each carrying its

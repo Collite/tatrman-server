@@ -69,7 +69,7 @@ class LatticeProtoTest :
             gap.valueId shouldBe "" // a mention gap names no value — the two slots are exclusive
         }
 
-        "zero bindings is expressible — the whole reason RV-P3 waited for this field" {
+        "zero bindings is expressible — the whole reason RV-P4 waited for this field" {
             val mention =
                 Mention
                     .newBuilder()

@@ -159,7 +159,7 @@ message ResolveResponse {
   // `awaiting` above are unchanged and still decide the outcome, so every pre-RV client
   // keeps working (ResolverCompatTest proves it). The lattice is what RV consumers read:
   // it is the only surface that can express a mention that bound to NOTHING (G1), which
-  // is why RV-P3 cannot start before this field ships.
+  // is why RV-P4 cannot start before this field ships.
   ResolutionState resolution_state = 7;
 }
 
@@ -406,7 +406,7 @@ message RungLogEntry {
 message LexiconVersions {
   string lexicon_artifact_hash = 1;              // "" when no compiled lexicon is loaded
   map<string, string> member_index_versions = 2; // category → content-derived version
-  optional string overlay_version = 3;           // ABSENT until RV-P6 — absence is the contract
+  optional string overlay_version = 3;           // ABSENT when no overlay is loaded — absence is the contract
 }
 
 // RV-38 — what a binding's target IS. The *kind* derives from this; it is never stored.
@@ -453,7 +453,7 @@ enum SourceTag {
   SOURCE_TAG_DECLARED = 1;            // authored in the lexicon/ area or as TTR-M sugar
   SOURCE_TAG_METADATA = 2;            // harvested from model labels
   SOURCE_TAG_DATA = 3;                // a data value from the member index
-  SOURCE_TAG_LEARNED = 4;             // the RV-P6 estate overlay
+  SOURCE_TAG_LEARNED = 4;             // the estate overlay (RV-P7.3)
   SOURCE_TAG_VOCABULARY = 5;          // legacy: declared|metadata, undifferentiated
 }
 

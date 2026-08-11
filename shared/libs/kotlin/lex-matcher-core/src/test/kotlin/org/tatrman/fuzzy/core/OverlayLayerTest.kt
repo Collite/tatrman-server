@@ -3,7 +3,6 @@ package org.tatrman.fuzzy.core
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
-import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.runBlocking
@@ -11,23 +10,30 @@ import kotlinx.coroutines.runBlocking
 /**
  * RV-P1.4 T6 — the overlay slot: the third layer, defined and empty.
  *
- * The bar the task sets is that the RV-P6 store "plugs in here without touching resolution code",
+ * The bar the task set was that the RV-P7 store "plugs in here without touching resolution code",
  * which is not something a no-op can demonstrate on its own. So these tests drive a **fake store**
- * that does everything contracts §5 says an `OverlayEntry` can do — POSITIVE additions, NEGATIVE
- * suppression, a version — and assert the matcher already behaves correctly for all of it. If any
- * of that needed a change in `FuzzyMatcher` at RV-P6, one of these would be failing now.
+ * that does what contracts §5 says an `OverlayEntry` can do, and assert the matcher already behaves
+ * correctly for it.
+ *
+ * **Amended at RV-P7.3.** The prediction held for NEGATIVE entries — every suppression test below
+ * is untouched, and the two that pin the *ordering* against `recomputeMargins` are the reason the
+ * widening did not break anything. It did not hold for POSITIVE ones: `OverlayVerdict.additions`
+ * let a store hand back rows nobody scored, and P7.3 T2(a) requires the engine's own
+ * `in_class_score`, so positives now LOAD instead (see [OverlayStore.learned]). The four addition
+ * tests that lived here moved to `LearnedLayerSpec` and got stronger there — they can now assert
+ * a learned row scores identically to the same row declared, which a made-up number could only
+ * match by coincidence.
  */
 class OverlayLayerTest :
     StringSpec({
 
         /**
-         * The test fake the task calls for — an in-memory overlay standing in for the RV-P6 store.
+         * The test fake the task calls for — an in-memory overlay standing in for the RV-P7 store.
          * Deliberately shaped like the real one: entries are (term → target) with polarity, scoped
          * to this estate, and it reports a version.
          */
         class FakeOverlay(
             private val version: String? = "overlay-1",
-            private val positives: List<Triple<String, String, Double>> = emptyList(),
             private val negatives: Map<String, Set<String>> = emptyMap(),
         ) : OverlayStore {
             var consultations = 0
@@ -40,24 +46,7 @@ class OverlayLayerTest :
             override suspend fun consult(request: OverlayRequest): OverlayVerdict {
                 consultations++
                 lastRequest = request
-                val term = TextNormalizer.canonical(request.term)
-                return OverlayVerdict(
-                    additions =
-                        positives
-                            .filter { (t, _, _) -> TextNormalizer.canonical(t) == term }
-                            .map { (t, target, score) ->
-                                FuzzyMatchResult(
-                                    candidateId = "learned:$target:$t",
-                                    candidate = t,
-                                    score = score,
-                                    category = target,
-                                    source = SourceTag.LEARNED,
-                                    targetRef = target,
-                                    provenance = Provenance("overlay", "LEARNED_ALIAS", score),
-                                )
-                            },
-                    suppressedTargets = negatives[term] ?: emptySet(),
-                )
+                return OverlayVerdict(negatives[TextNormalizer.canonical(request.term)] ?: emptySet())
             }
         }
 
@@ -102,7 +91,7 @@ class OverlayLayerTest :
         }
 
         "the no-op store is still consulted — the seam is live, not bypassed" {
-            // If the call site were conditional on "an overlay exists", RV-P6 would have to add it
+            // If the call site were conditional on "an overlay exists", RV-P7 would have to add it
             // back, which is exactly the resolution-code change T6 exists to avoid.
             val counting =
                 object : OverlayStore by NoopOverlayStore {
@@ -112,6 +101,13 @@ class OverlayLayerTest :
                         seen++
                         return OverlayVerdict.EMPTY
                     }
+
+                    // ⚠ `by NoopOverlayStore` delegates EVERY member, `pinned()` included — so
+                    // without this the matcher pins the delegate and consults *that*, and this
+                    // counter never moves. A trap worth naming rather than quietly working
+                    // around: any decorator over an OverlayStore has to decide what its pin is,
+                    // and "the thing I delegate to" is almost never the right answer.
+                    override fun pinned(): OverlayStore = this
                 }
             runBlocking {
                 FuzzyMatcher(repo(declared, counting)).match("obrat", null, AlgorithmType.TATRMAN, 10)
@@ -119,34 +115,7 @@ class OverlayLayerTest :
             }
         }
 
-        // ---- POSITIVE entries ------------------------------------------------------------------
-
-        "a learned alias joins the answer, tagged LEARNED and ranked with everything else" {
-            val store = FakeOverlay(positives = listOf(Triple("tržba", "md.net", 0.99)))
-            runBlocking {
-                val hits = FuzzyMatcher(repo(declared, store)).match("tržba", null, AlgorithmType.TATRMAN, 10)
-
-                hits.first().source shouldBe SourceTag.LEARNED
-                hits.first().targetRef shouldBe "md.net"
-                hits.first().provenance.producer shouldBe "overlay"
-            }
-        }
-
-        "the overlay is consulted AFTER dispatch, so a learned alias is not gated by an authored method" {
-            // A learned entry has no author. Running it through the RV-32 gate would discard exactly
-            // the aliases users taught the estate, on the grounds that the estate's authors never
-            // wrote them down.
-            val strict = listOf(Candidate.vocabulary("t1", "výroba", "md.vyroba", SourceTag.DECLARED, "EXACT"))
-            val store = FakeOverlay(positives = listOf(Triple("vyroba", "md.vyroba", 0.9)))
-            runBlocking {
-                val hits = FuzzyMatcher(repo(strict, store)).match("vyroba", null, AlgorithmType.TATRMAN, 10)
-
-                // The declared EXACT term is still refused for the unaccented query (T4)…
-                hits.none { it.source == SourceTag.DECLARED } shouldBe true
-                // …and the learned alias for the same target still lands.
-                hits.single().source shouldBe SourceTag.LEARNED
-            }
-        }
+        // ---- what the store is asked ------------------------------------------------------------
 
         "the store sees the query, the scope, and what the other layers found" {
             val store = FakeOverlay()
@@ -211,7 +180,7 @@ class OverlayLayerTest :
 
         "the overlay is consulted ONCE per lookup, not once per requested category" {
             // A NEGATIVE entry is a statement about a candidate, so a store handed one category's
-            // slice at a time could not make it — and once RV-P6 backs this with a real store, a
+            // slice at a time could not make it — and once RV-P7 backs this with a real store, a
             // consult per category is a round trip per category.
             val store = FakeOverlay()
             runBlocking {
@@ -233,21 +202,6 @@ class OverlayLayerTest :
             }
         }
 
-        "both polarities in one verdict: the learned alias lands and the denied term is flagged" {
-            val store =
-                FakeOverlay(
-                    positives = listOf(Triple("čistý obrat", "md.other", 0.97)),
-                    negatives = mapOf("čistý obrat" to setOf("md.net")),
-                )
-            runBlocking {
-                val hits = FuzzyMatcher(repo(declared, store)).match("čistý obrat", null, AlgorithmType.TATRMAN, 10)
-
-                hits.map { it.targetRef } shouldContainExactlyInAnyOrder listOf("md.net", "md.other")
-                hits.single { it.targetRef == "md.net" }.autoBindable shouldBe false
-                hits.single { it.targetRef == "md.other" }.source shouldBe SourceTag.LEARNED
-            }
-        }
-
         // ---- the version -----------------------------------------------------------------------
 
         "a present overlay reports its version into the tuple" {
@@ -260,22 +214,5 @@ class OverlayLayerTest :
             val repository = repo(declared, FakeOverlay(version = null))
 
             repository.layerVersions().overlayVersion.shouldBeNull()
-        }
-
-        // ---- bounds ----------------------------------------------------------------------------
-
-        "additions respect the caller's limit" {
-            val store =
-                FakeOverlay(
-                    positives =
-                        listOf(
-                            Triple("obrat", "md.a", 0.99),
-                            Triple("obrat", "md.b", 0.98),
-                            Triple("obrat", "md.c", 0.97),
-                        ),
-                )
-            runBlocking {
-                FuzzyMatcher(repo(declared, store)).match("obrat", null, AlgorithmType.TATRMAN, 2).size shouldBe 2
-            }
         }
     })

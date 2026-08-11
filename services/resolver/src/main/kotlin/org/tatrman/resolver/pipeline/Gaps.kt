@@ -18,7 +18,7 @@ import org.tatrman.resolver.v1.ValueKind
  * not-knowing this is*, because the kind selects the policy. Contracts §3 gives each kind its
  * own rung list and its own ask rule — G1 escalates then asks, G3 emits unless load-bearing,
  * G5 degrades with a banner — so a single untyped "unresolved" would collapse four different
- * responses into one. This is also the surface RV-P3 was blocked on: before it, a
+ * responses into one. This is also the surface RV-P4 was blocked on: before it, a
  * `ResolveResponse` could carry bindings or an ambiguity, and had no way at all to say
  * "nothing in this estate binds that word".
  *
@@ -131,7 +131,7 @@ object Gaps {
             .addAllFrameRoles(roles)
             // The core's own verdict is always UNRESOLVED: it neither ignores a gap nor decides a
             // user confirmed anything. The other dispositions are written by the ladder and by the
-            // ask round-trip (RV-P3/P2.4).
+            // ask round-trip (RV-P4/P2.4).
             .setDisposition(Disposition.DISPOSITION_UNRESOLVED)
 
     private fun span(
