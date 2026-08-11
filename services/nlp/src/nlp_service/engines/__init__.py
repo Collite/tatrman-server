@@ -22,6 +22,10 @@ from nlp_service.config import AppConfig, BackendConfig, LangidEngineConfig, loa
 from nlp_service.diagnostics import RG_NLP_002, RG_NLP_003, RG_NLP_010
 from nlp_service.engines.base import NlpEngine, NlpOp
 from nlp_service.engines.langid_engine import LangidEngine
+from nlp_service.engines.llm_emulated_engine import (
+    EMULATED_ENGINE_NAME,
+    LlmEmulatedEngine,
+)
 from nlp_service.engines.morphodita_engine import MorphoditaEngine
 from nlp_service.engines.nametag_engine import Nametag3Engine
 from nlp_service.engines.spacy_engine import SpacyEngine
@@ -73,6 +77,13 @@ class EngineRegistry:
                 self._backends[name] = backend
         if e.langid.enabled and "langid" not in self._withheld:
             self._engines["langid"] = LangidEngine(e.langid)
+        # RV-P8.1: `LLM_EMULATED` registers on exactly the same terms as the
+        # four above — `enabled` (off by default, RV-6) and the lane. Nothing
+        # about it is special-cased here, which is the point: an estate routes
+        # to it, withholds it or degrades without it using the machinery that
+        # was already there.
+        if e.llm_emulated.enabled and EMULATED_ENGINE_NAME not in self._withheld:
+            self._engines[EMULATED_ENGINE_NAME] = LlmEmulatedEngine(e.llm_emulated)
 
     def withheld_engines(self) -> set[str]:
         """Engines this lane does not admit — reported, not just applied."""
@@ -91,6 +102,18 @@ class EngineRegistry:
         if name == "langid":
             cfg: LangidEngineConfig = self._config.engines.langid
             return cfg.model, cfg.model_version, "SELF_HOSTED_PINNED"
+        if name == EMULATED_ENGINE_NAME:
+            # The version is DERIVED (model + prompt-template revision), not
+            # authored — see the engine. And the tier is `REMOTE_UNPINNED`
+            # because that is what it is: a provider can change what a model
+            # name serves, which is precisely the property that tier already
+            # names. It costs nothing and buys the `RG-NLP-002` caution
+            # ("non-conformant for parity/determinism") on every emulated route,
+            # for every caller, without inventing a second way to say it.
+            emulated = self._config.engines.llm_emulated
+            engine = self._engines.get(name)
+            version = engine.model_version if engine is not None else emulated.model
+            return emulated.model, version, "REMOTE_UNPINNED"
         backend = self._backends.get(name)
         if backend is None:
             return "", "", "SELF_HOSTED_PINNED"

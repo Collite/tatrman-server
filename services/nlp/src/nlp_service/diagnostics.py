@@ -35,6 +35,22 @@ NLS_PACK_010 = "NLS-PACK-010"
 # info — ReportToken arrived but the morph queue sink is not wired (LM, NLS-P9)
 LM_MORPH_007 = "LM-MORPH-007"
 
+# ── RV-P8 (LLM_EMULATED, RV-6) ───────────────────────────────────────────────
+# error — the llm-gateway could not be reached or would not serve. Deliberately
+# NOT its own degrade shape: from the front's side an unreachable gateway is an
+# absent backend, and `RG-NLP-010`'s floor is what an absent backend already
+# means. This code names the cause in the log; the posture is the existing one.
+RV_NLP_020 = "RV-NLP-020"
+# error — the model answered with something no analysis can be built from. The
+# engine emits NOTHING in this case: a confidently wrong lemma is the failure
+# mode emulation must never have silently, so a partial parse is not a partial
+# success.
+RV_NLP_021 = "RV-NLP-021"
+# warning — this op was served by emulation. The response-level counterpart of
+# the capability matrix's row: determinism here is conditional-on-matrix (RV-6),
+# and a caller that reads only the answer still gets told.
+RV_NLP_022 = "RV-NLP-022"
+
 _SEVERITY: Dict[str, str] = {
     RG_NLP_001: "ERROR",
     RG_NLP_002: "WARNING",
@@ -43,6 +59,9 @@ _SEVERITY: Dict[str, str] = {
     NLS_NLP_011: "WARNING",
     NLS_PACK_010: "ERROR",
     LM_MORPH_007: "INFO",
+    RV_NLP_020: "ERROR",
+    RV_NLP_021: "ERROR",
+    RV_NLP_022: "WARNING",
 }
 
 _MEANING: Dict[str, str] = {
@@ -53,6 +72,9 @@ _MEANING: Dict[str, str] = {
     NLS_NLP_011: "op not routed in the active lane — skipped; the remaining phases still ran",
     NLS_PACK_010: "reload refused — the previous pack snapshot is still serving",
     LM_MORPH_007: "token report accepted=false — the morph queue sink is not configured",
+    RV_NLP_020: "llm-gateway unreachable — the emulated engine degrades like an absent backend",
+    RV_NLP_021: "the emulated engine's model output could not be parsed — no analysis emitted",
+    RV_NLP_022: "this op was served by LLM_EMULATED — determinism is conditional (RV-6)",
 }
 
 
