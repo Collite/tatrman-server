@@ -21,6 +21,20 @@ likely way for a pack to be wrong — an over-broad LHS matches the hero AND eve
 sentence near it, and the hero test alone would stay green. So a `decoy` case
 asserts that NO QueryPattern was produced, and it counts as a failure when one
 was.
+
+**`--emulation-quality`** (RV-P8.3.T4) — a third question: how good is
+`LLM_EMULATED`, measured rather than assumed. Runs the same seed corpus in
+COMPARE mode, which fans every op out to every engine that supports it, and
+scores the emulated engine BOTH against the golden AND against the real engine
+it stands in for. Agreement with the incumbent is the number that decides
+whether an estate can turn emulation on; agreement with the golden is what says
+whether either of them is any good.
+
+**Emulated cases are excluded from the default lane, by name** (RV-6, T3). A
+conformance or eval claim made from a hosted model is not the claim it looks
+like, so a case whose asserted ops are routed at `llm_emulated` is reported as
+SKIPPED with its reason rather than scored. Emulation off ⇒ zero exclusions and
+a run identical to before this existed.
 """
 
 from __future__ import annotations
@@ -308,19 +322,78 @@ def compute_ner_metrics(
     return f1
 
 
+EMULATED = "llm_emulated"
+
+
+def fetch_capabilities(base_url: str, timeout: int = 30) -> list[dict[str, Any]]:
+    """The capability matrix from `GET /version` — the same rows GetStatus serves.
+
+    Read over the protocol this lane already speaks. A front that cannot be
+    reached returns nothing, and the caller must treat that as "unknown", never
+    as "no emulation": a silent empty matrix would turn every exclusion off at
+    exactly the moment the run is least trustworthy.
+    """
+    with httpx.Client(timeout=timeout) as client:
+        resp = client.get(f"{base_url}/version")
+        resp.raise_for_status()
+        return resp.json().get("capabilities", [])
+
+
+def emulated_pairs(capabilities: list[dict[str, Any]]) -> set[tuple[str, str]]:
+    """`{(language, op)}` served by the emulated engine, per the matrix."""
+    return {
+        (row["language"], row["op"]) for row in capabilities if row.get("engine") == EMULATED
+    }
+
+
+def asserted_ops(entry: EvalEntry) -> set[str]:
+    """The ops a corpus case actually makes a claim about.
+
+    Derived from what the case asserts rather than declared beside it, so a
+    fixture that gains entities gains the NER assertion — and the exclusion —
+    without anyone remembering to update a second field.
+    """
+    expected = entry.expected
+    ops: set[str] = set()
+    tokens = expected.get("tokens", [])
+    if tokens:
+        ops.add("TOKENIZE")
+    if expected.get("lemmas") or any(t.get("lemma") for t in tokens):
+        ops.add("LEMMATIZE")
+    if any(t.get("upos") for t in tokens):
+        ops.add("POS_TAG")
+    if expected.get("entities"):
+        ops.add("NER")
+    return ops
+
+
 def run_evaluation(
     base_url: str,
     corpus_path: Path,
     engines: list[str] | None = None,
+    *,
+    emulated: set[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Run evaluation on corpus and return per-engine metrics."""
     entries = load_corpus(corpus_path)
+    emulated = emulated or set()
+    excluded: list[dict[str, str]] = []
 
     # Track metrics per engine
     engine_metrics: dict[str, EngineMetrics] = {}
     all_engine_names: set[str] = set()
 
     for entry in entries:
+        hit = sorted(op for op in asserted_ops(entry) if (entry.lang, op) in emulated)
+        if hit:
+            # Named, never silently passed: a green run containing an emulated
+            # assertion is worse than a red one, because it reads as a
+            # determinism claim it is not.
+            reason = f"emulated: {'/'.join(hit)}/{entry.lang}"
+            print(f"SKIP {entry.id}: {reason}")
+            excluded.append({"id": entry.id, "reason": reason})
+            continue
+
         print(f"Evaluating {entry.id}: {entry.question[:50]}...")
 
         response = analyze_text(base_url, entry.question, entry.lang, {"NER"})
@@ -370,6 +443,8 @@ def run_evaluation(
     # Build result summary
     summary = {
         "corpus_size": len(entries),
+        "excluded": excluded,
+        "scored": len(entries) - len(excluded),
         "engines": {},
     }
 
@@ -390,16 +465,38 @@ def run_evaluation(
 
 def generate_markdown_report(summary: dict[str, Any], output_path: Path | None = None) -> str:
     """Generate markdown summary report."""
+    excluded = summary.get("excluded", [])
     lines = [
         "# NLP Engine Evaluation Report",
         "",
-        f"**Corpus size:** {summary['corpus_size']} questions",
+        f"**Corpus size:** {summary['corpus_size']} questions"
+        + (f" — **{len(excluded)} excluded**, {summary.get('scored', '?')} scored" if excluded else ""),
         "",
+    ]
+
+    if excluded:
+        # Printed BEFORE the metrics, deliberately. A reduced run's numbers mean
+        # something different from a full run's, and the reader has to know that
+        # before reading them rather than after.
+        lines.extend([
+            "## Excluded cases (RV-6)",
+            "",
+            "These assert an op the active config routes at `llm_emulated`. Emulated output",
+            "cannot carry a determinism claim, so the case is **skipped and named** rather than",
+            "scored — a green run containing one would read as a claim it is not.",
+            "",
+            "| Case | Reason |",
+            "|------|--------|",
+            *(f"| {e['id']} | {e['reason']} |" for e in excluded),
+            "",
+        ])
+
+    lines.extend([
         "## Per-Engine Metrics",
         "",
         "| Engine | Token F1 | Lemma Acc | POS F1 | NER F1 | Errors | Total |",
         "|--------|---------|-----------|--------|--------|--------|-------|",
-    ]
+    ])
 
     for eng_name, metrics in summary["engines"].items():
         lines.append(
@@ -424,6 +521,157 @@ def generate_markdown_report(summary: dict[str, Any], output_path: Path | None =
         output_path.write_text(report)
         print(f"Report written to {output_path}")
 
+    return report
+
+
+# ── the emulation-quality lane (RV-P8.3.T4) ─────────────────────────────────
+
+
+def run_emulation_quality(base_url: str, corpus_path: Path) -> dict[str, Any]:
+    """Score `llm_emulated` against the golden AND against the incumbent engine.
+
+    COMPARE mode is what makes this cheap: it already fans every op out to every
+    engine that supports it and returns `byEngine`, so the emulated and the real
+    analysis of the same sentence arrive in one response — same text, same
+    request, no drift between two runs to explain away.
+
+    Two numbers per op, and they answer different questions. **Agreement** with
+    the incumbent is what an estate deciding whether to switch needs: it says
+    what changes. **Precision** against the golden is what says whether either
+    engine is any good, and it is the one that stops "they agree" from being
+    read as "they are right" when both are wrong the same way.
+
+    ⚠ Cost is NOT computed here. llm-gateway owns pricing, meters every call and
+    keeps a prompt log; a second price table in this harness would be a second
+    thing to drift. The snapshot reports latency (measured) and reads spend from
+    the gateway's own accounting for the run window.
+    """
+    entries = load_corpus(corpus_path)
+    per_engine: dict[str, EngineMetrics] = {}
+    agreement: dict[str, list[float]] = {"LEMMATIZE": [], "POS_TAG": [], "NER": []}
+    latencies: list[int] = []
+    missing = 0
+
+    for entry in entries:
+        response = analyze_text(
+            base_url, entry.question, entry.lang, {"TOKENIZE", "LEMMATIZE", "POS_TAG", "NER"}
+        )
+        if "error" in response:
+            print(f"  {entry.id}: {response['error']}")
+            continue
+        latencies.append(int(response.get("elapsedMs", 0)))
+
+        by_engine = response.get("byEngine", {})
+        emulated = by_engine.get(EMULATED)
+        if not emulated:
+            missing += 1
+            continue
+
+        # The incumbent = every other engine that answered. There is normally
+        # one per op; when there are more, the first is used and the rest are
+        # reported as such rather than averaged into a number nobody can read.
+        incumbents = {k: v for k, v in by_engine.items() if k != EMULATED and not v.get("error")}
+        for name, result in {**incumbents, EMULATED: emulated}.items():
+            metrics = per_engine.setdefault(name, EngineMetrics(name=name))
+            metrics.total += 1
+            if result.get("error"):
+                metrics.errors += 1
+                continue
+            token_f1, lemma_acc = compute_token_metrics(
+                entry.expected.get("tokens", []), result.get("tokens", [])
+            )
+            pos_f1 = compute_pos_metrics(entry.expected.get("tokens", []), result.get("tokens", []))
+            ner_f1 = compute_ner_metrics(
+                entry.expected.get("entities", []), result.get("entities", [])
+            )
+            n = metrics.total - metrics.errors
+            metrics.token_f1 = (metrics.token_f1 * (n - 1) + token_f1) / n
+            metrics.lemma_accuracy = (metrics.lemma_accuracy * (n - 1) + lemma_acc) / n
+            metrics.pos_f1 = (metrics.pos_f1 * (n - 1) + pos_f1) / n
+            metrics.ner_f1 = (metrics.ner_f1 * (n - 1) + ner_f1) / n
+
+        for name, result in incumbents.items():
+            ref_tokens = result.get("tokens", [])
+            emu_tokens = emulated.get("tokens", [])
+            if ref_tokens and emu_tokens:
+                _, lemma_agree = compute_token_metrics(ref_tokens, emu_tokens)
+                agreement["LEMMATIZE"].append(lemma_agree)
+                agreement["POS_TAG"].append(compute_pos_metrics(ref_tokens, emu_tokens))
+            if result.get("entities"):
+                agreement["NER"].append(
+                    compute_ner_metrics(result["entities"], emulated.get("entities", []))
+                )
+            break  # first incumbent only — see the docstring
+
+    return {
+        "corpus_size": len(entries),
+        "cases_without_emulated_output": missing,
+        "engines": {
+            name: {
+                "token_f1": round(m.token_f1, 4),
+                "lemma_accuracy": round(m.lemma_accuracy, 4),
+                "pos_f1": round(m.pos_f1, 4),
+                "ner_f1": round(m.ner_f1, 4),
+                "errors": m.errors,
+                "total": m.total,
+            }
+            for name, m in sorted(per_engine.items())
+        },
+        "agreement_with_incumbent": {
+            op: (round(sum(v) / len(v), 4) if v else None) for op, v in agreement.items()
+        },
+        "latency_ms": {
+            "n": len(latencies),
+            "mean": round(sum(latencies) / len(latencies), 1) if latencies else None,
+            "max": max(latencies) if latencies else None,
+        },
+    }
+
+
+def generate_quality_report(summary: dict[str, Any], output_path: Path | None = None) -> str:
+    lines = [
+        "# LLM_EMULATED — emulation-quality snapshot",
+        "",
+        f"**Corpus:** {summary['corpus_size']} cases · "
+        f"**no emulated output:** {summary['cases_without_emulated_output']}",
+        "",
+        "## Against the golden",
+        "",
+        "| Engine | Token F1 | Lemma Acc | POS F1 | NER F1 | Errors |",
+        "|--------|----------|-----------|--------|--------|--------|",
+    ]
+    for name, m in summary["engines"].items():
+        lines.append(
+            f"| {name} | {m['token_f1']:.4f} | {m['lemma_accuracy']:.4f} | "
+            f"{m['pos_f1']:.4f} | {m['ner_f1']:.4f} | {m['errors']} |"
+        )
+    lines.extend([
+        "",
+        "## Agreement with the incumbent engine",
+        "",
+        "What CHANGES if an estate switches. Read beside the table above: agreement is not",
+        "correctness, and two engines wrong in the same way agree perfectly.",
+        "",
+        "| Op | Agreement |",
+        "|----|-----------|",
+        *(
+            f"| {op} | {'—' if v is None else f'{v:.4f}'} |"
+            for op, v in summary["agreement_with_incumbent"].items()
+        ),
+        "",
+        "## Latency",
+        "",
+        f"n={summary['latency_ms']['n']} · mean={summary['latency_ms']['mean']} ms · "
+        f"max={summary['latency_ms']['max']} ms (whole analysis, COMPARE fan-out —",
+        "an upper bound on the emulated hop, not the hop itself)",
+        "",
+        "Spend for the run window comes from llm-gateway's own accounting; this harness",
+        "does not price calls (one price table, in the service that owns it).",
+    ])
+    report = "\n".join(lines)
+    if output_path:
+        output_path.write_text(report)
+        print(f"Report written to {output_path}")
     return report
 
 
@@ -454,6 +702,12 @@ def main():
         help="score rule packs through RunPipeline (gRPC) instead of engines "
         "through Analyze (REST) — NLS-P4.T3",
     )
+    parser.add_argument(
+        "--emulation-quality",
+        action="store_true",
+        help="score LLM_EMULATED against the golden AND the incumbent engine — "
+        "RV-P8.3.T4. Needs a front with emulation ENABLED and a live gateway.",
+    )
     args = parser.parse_args()
 
     default_corpus = "eval/corpus/rules.jsonl" if args.rules else "eval/corpus/seed.jsonl"
@@ -465,8 +719,28 @@ def main():
     if args.rules:
         return _main_rules(args, corpus_path)
 
+    if args.emulation_quality:
+        print(f"Emulation-quality run on {corpus_path} against {args.url}")
+        quality = run_emulation_quality(args.url, corpus_path)
+        print(json.dumps(quality, indent=2))
+        if args.output_json:
+            Path(args.output_json).write_text(json.dumps(quality, indent=2))
+        report = generate_quality_report(
+            quality, Path(args.output_md) if args.output_md else None
+        )
+        if not args.output_md:
+            print("\n" + report)
+        return None
+
     print(f"Running evaluation on {corpus_path} against {args.url}")
-    summary = run_evaluation(args.url, corpus_path)
+    # RV-6: read what the front says it is serving BEFORE scoring anything. An
+    # unreachable front is "unknown", not "no emulation" — failing here is right,
+    # because the alternative is a full-looking run whose exclusions were all
+    # silently switched off.
+    emulated = emulated_pairs(fetch_capabilities(args.url))
+    if emulated:
+        print(f"Emulated routes in the active config: {sorted(emulated)}")
+    summary = run_evaluation(args.url, corpus_path, emulated=emulated)
 
     # Output JSON
     print("\n=== Summary ===")

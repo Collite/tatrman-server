@@ -218,6 +218,21 @@ eval-grounding-test:
 eval-grounding:
     cd eval/grounding && .venv/bin/python run_eval.py
 
+# RV-P8.3.T4 — the emulation-quality snapshot. LIVE: needs an nlp front with
+# `LLM_EMULATED` enabled and a reachable llm-gateway, so it is NOT gating and
+# never will be — the whole point is measuring a hosted model, which is exactly
+# what a gate must not depend on. The harness is committed and re-runnable; the
+# snapshot it writes is dated and is not.
+#
+#   URL=http://localhost:7270 just eval-nlp-emulation-quality
+#
+# ⚑ Note `eval/README.md` also documents a `just eval-nlp` that does not exist in
+# this justfile (pre-existing drift, not RV-P8's to guess at — it describes a
+# port-forward this checkout cannot verify).
+eval-nlp-emulation-quality url="http://localhost:7270" out="eval/reports/emulation-quality.md":
+    cd services/nlp && uv run python eval/run_eval.py --emulation-quality \
+        --url {{url}} --output-md {{out}} --output-json eval/reports/emulation-quality.json
+
 # RG-P6.S2.T1 — the GATING service-level conformance tier (the SV-P3 instrument):
 # the four service-level corpora — ENTITIES_ONLY (resolver), Q-17 match-quality
 # (fuzzy), hartland_cz declared layer (fuzzy, RV-P1.4 T7), grounding hermetic —
