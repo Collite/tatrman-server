@@ -82,6 +82,18 @@ data class LexiconConfig(
      * where no class system exists — recorded so nobody "harmonizes" the two later.
      */
     val minInClassScore: Double = ProfileScorer.DEFAULT_MIN_IN_CLASS_SCORE,
+    /**
+     * RV-P7.3 — the LEARNED overlay archive, written by the estate's Golem. Blank = no overlay,
+     * which is every estate that has not learned anything and every deployment with no learning
+     * store at all: `overlay_version` stays absent from the RV-39 tuple, exactly as the contract
+     * says it must for a pre-P7 estate.
+     *
+     * A local path for the same reason [archivePath] is one, and it is the reason the transport
+     * ruling costs this service nothing: lex-matcher reads a file. **Who writes it is not its
+     * business** — an open-runtime service that had to call the commercial constellation to serve
+     * a layer would be a dependency the licence boundary does not allow.
+     */
+    val overlayArchivePath: String = "",
 )
 
 data class MetadataConfig(
@@ -245,6 +257,12 @@ object ConfigLoader {
                         lexicon.getDouble("min-in-class-score")
                     } else {
                         defaults.minInClassScore
+                    },
+                overlayArchivePath =
+                    if (lexicon.hasPath("overlay-archive-path")) {
+                        lexicon.getString("overlay-archive-path")
+                    } else {
+                        defaults.overlayArchivePath
                     },
             )
         } catch (e: com.typesafe.config.ConfigException) {

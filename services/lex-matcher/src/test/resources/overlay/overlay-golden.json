@@ -1,0 +1,57 @@
+{
+  "schema": "rv-overlay/v1",
+  "estate_id": "golem-hartland",
+  "version": 7,
+  "entries": [
+    {
+      "term": "Praha",
+      "lang": "cs",
+      "target_ref": "er.entity.branch.name#42",
+      "polarity": "POSITIVE",
+      "status": "ACTIVE",
+      "target_class": "MEMBER",
+      "distinct_users": 1,
+      "conflicted": false
+    },
+    {
+      "term": "distribuční centrum",
+      "lang": "cs",
+      "target_ref": "md.dimension.DistributionCentre",
+      "polarity": "NEGATIVE",
+      "status": "ACTIVE",
+      "target_class": "MODEL_OBJECT",
+      "distinct_users": 2,
+      "conflicted": false
+    },
+    {
+      "term": "loni",
+      "lang": "cs",
+      "target_ref": "ground:chrono",
+      "polarity": "POSITIVE",
+      "status": "ACTIVE",
+      "target_class": "GROUNDING_TRIGGER",
+      "distinct_users": 1,
+      "conflicted": false
+    },
+    {
+      "term": "vývoj",
+      "lang": "cs",
+      "target_ref": "op:trend",
+      "polarity": "POSITIVE",
+      "status": "ACTIVE",
+      "target_class": "OPERATOR",
+      "distinct_users": 1,
+      "conflicted": false
+    },
+    {
+      "term": "čerpací stanice",
+      "lang": "cs",
+      "target_ref": "md.dimension.Store",
+      "polarity": "POSITIVE",
+      "status": "PROMOTION_CANDIDATE",
+      "target_class": "MODEL_OBJECT",
+      "distinct_users": 2,
+      "conflicted": false
+    }
+  ]
+}

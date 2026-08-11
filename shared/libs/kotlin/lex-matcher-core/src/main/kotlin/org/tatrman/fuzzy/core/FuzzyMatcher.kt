@@ -124,7 +124,7 @@ class FuzzyMatcher(
         limit: Int,
     ): List<FuzzyMatchResult> {
         val scored = runSingle(query, category, algorithmType ?: AlgorithmType.TATRMAN, limit)
-        return consultOverlay(query, listOfNotNull(category), scored).take(limit)
+        return consultOverlay(repository.overlay().pinned(), query, listOfNotNull(category), scored).take(limit)
     }
 
     /**
@@ -149,15 +149,17 @@ class FuzzyMatcher(
         limit: Int,
     ): CascadeOutcome {
         if (steps.isEmpty()) return CascadeOutcome(emptyList(), null)
+        // Pinned ONCE for the whole cascade: a reload between two steps would let the step that
+        // wins have been decided against a different overlay than the one the tuple names.
+        val overlay = repository.overlay().pinned()
         var lastResults: List<FuzzyMatchResult> = emptyList()
         var lastAlgorithm: AlgorithmType? = null
         for (step in steps) {
             // The overlay is consulted per step, before the gate: a learned alias is evidence like
             // any other, and a step it satisfies should win rather than fall through to a looser
             // algorithm. Cascades return on the first qualifying step, so this is 1-2 consults.
-            val results =
-                consultOverlay(query, listOfNotNull(category), runSingle(query, category, step.algorithm, limit))
-                    .take(limit)
+            val scored = runSingle(query, category, step.algorithm, limit)
+            val results = consultOverlay(overlay, query, listOfNotNull(category), scored).take(limit)
             lastResults = results
             lastAlgorithm = step.algorithm
             val topScore = results.firstOrNull()?.score ?: Double.NEGATIVE_INFINITY
@@ -184,11 +186,15 @@ class FuzzyMatcher(
         val version = repository.vocabularyVersion()
         if (spans.isEmpty()) return BatchMatchResult(emptyList(), version)
 
+        // T4 — one overlay for the whole batch, read here for the same reason `version` is: a
+        // reload landing between two spans would answer them from two different overlays and
+        // report one version for both.
+        val overlay = repository.overlay().pinned()
         val gate = Semaphore(maxParallelism.coerceAtLeast(1))
         val results =
             coroutineScope {
                 spans
-                    .map { span -> async { gate.withPermit { matchSpan(span) } } }
+                    .map { span -> async { gate.withPermit { matchSpan(span, overlay) } } }
                     .awaitAll()
             }
         return BatchMatchResult(results, version)
@@ -203,10 +209,11 @@ class FuzzyMatcher(
      * [LookupQuery.methodOverride] and a second round it chose to run.
      *
      * The stage order is load-bearing, and each step is where it is for a reason:
-     * score+dispatch per category → merge → **re-margin over the union** → **consult the overlay**
-     * → filter by class → take the limit. Re-margining after the overlay would overwrite a NEGATIVE
-     * entry's `autoBindable=false`; taking the limit before either would manufacture uniqueness by
-     * truncation.
+     * score+dispatch per category → merge → **re-margin over the union** → **consult the overlay
+     * (which re-margins again, now suppression-aware)** → filter by class → take the limit. The
+     * first re-margin is what a merged answer needs whether or not an overlay exists; the second
+     * is RV-P7.3 T3's ordering, so a suppressed target stops counting as a rival. Taking the limit
+     * before any of it would manufacture uniqueness by truncation.
      */
     suspend fun lookup(query: LookupQuery): LookupResult {
         val limit =
@@ -238,7 +245,14 @@ class FuzzyMatcher(
         val remargined = methodDispatcher.recomputeMargins(merged, query.methodOverride)
         // ONE consult over the whole answer, not one per category — a NEGATIVE entry is a statement
         // about a candidate, and a store that saw only one category's slice could not make it.
-        val withOverlay = consultOverlay(query.term, query.categories, remargined)
+        val withOverlay =
+            consultOverlay(
+                repository.overlay().pinned(),
+                query.term,
+                query.categories,
+                remargined,
+                query.methodOverride,
+            )
 
         val filtered =
             if (query.targetClasses.isEmpty()) {
@@ -254,7 +268,10 @@ class FuzzyMatcher(
         return LookupResult(candidates = filtered.take(limit), unknownCategories = unknown)
     }
 
-    private suspend fun matchSpan(span: SpanQuery): BatchSpanResult {
+    private suspend fun matchSpan(
+        span: SpanQuery,
+        overlay: OverlayStore,
+    ): BatchSpanResult {
         val limit = if (span.limit > 0) span.limit else DEFAULT_LOOKUP_CANDIDATES
 
         // Empty categories ⇒ deliberate global (cross-category) lookup; otherwise
@@ -274,10 +291,11 @@ class FuzzyMatcher(
                 .sortedByDescending { it.score }
                 .distinctBy { it.candidateId to it.category }
         // Same stage order as [lookup], for the same reasons: re-margin over the union first (a span
-        // asked about several categories), then ONE overlay consult over the whole answer, then the
-        // limit — so neither a rival nor a NEGATIVE verdict can be lost to truncation or overwritten.
+        // asked about several categories), then ONE overlay consult over the whole answer — which
+        // re-margins again once suppression is known — then the limit, so neither a rival nor a
+        // NEGATIVE verdict can be lost to truncation.
         val remargined = methodDispatcher.recomputeMargins(merged)
-        val withOverlay = consultOverlay(span.query, span.categories, remargined)
+        val withOverlay = consultOverlay(overlay, span.query, span.categories, remargined)
         return BatchSpanResult(withOverlay.take(limit), matchedAlgorithm)
     }
 
@@ -348,32 +366,50 @@ class FuzzyMatcher(
     }
 
     /**
-     * RV-P1.4 T6 — the third layer, consulted after the other two have spoken.
+     * The overlay's NEGATIVE half, applied after the other layers have spoken.
      *
-     * Additions merge in and are ranked with everything else; suppressed targets are **flagged, not
-     * removed** ([OverlayVerdict.suppressedTargets]). With the default [NoopOverlayStore] the
-     * verdict is empty and the input list is returned as-is, so a deployment with no learning
-     * history is byte-identical to the pre-overlay service.
+     * Its POSITIVE half is not here: RV-P7.3 loads learned entries into the index, so by the time
+     * this runs they have already been retrieved and scored like any other candidate. What is left
+     * is polarity — targets the estate has learned this term does not mean — and those are
+     * **flagged, not removed** ([OverlayVerdict.suppressedTargets]): the candidate is still
+     * returned, still ranked, and never auto-bound (RV-2).
      *
-     * **Always the last word on `autoBindable`.** Every caller runs
-     * [MethodDispatcher.recomputeMargins] before this, never after — that function derives the flag
-     * from the margin alone and would overwrite a NEGATIVE entry's `false`.
+     * **Then the margin is recomputed**, which is the T3 ordering: suppression applies after the
+     * layer merge and *before* the uniqueness margin, so a denied target stops counting as a rival
+     * to the one the user actually meant. That recompute is only safe because the estate's
+     * statement rides [FuzzyMatchResult.suppressed] rather than `autoBindable` alone — see
+     * [MethodDispatcher.recomputeMargins].
+     *
+     * With the default [NoopOverlayStore] the verdict is empty and the input list is returned as-is
+     * — same instances, no recompute — so a deployment with no learning history is byte-identical
+     * to the pre-overlay service.
      *
      * **Does not truncate**, deliberately: [lookup] still has its class filter to run afterwards,
      * and cutting to `limit` here would throw away the very headroom [runSingle] scored to give it.
      * Every caller applies its own `take(limit)` once nothing further narrows.
      */
     private suspend fun consultOverlay(
+        overlay: OverlayStore,
         term: String,
         categories: List<String>,
         results: List<FuzzyMatchResult>,
+        // Carried so the recompute below asks the uniqueness question over the same set of rows the
+        // caller's own re-margin did. Reading the authored method back without it would compute the
+        // margin over a different population than the one that produced the answer.
+        methodOverride: MatchMethod? = null,
     ): List<FuzzyMatchResult> {
-        val verdict = repository.overlay().consult(OverlayRequest(term, categories, results))
+        val verdict = overlay.consult(OverlayRequest(term, categories, results))
         if (verdict.isEmpty) return results
 
         val flagged =
-            results.map { if (it.targetRef in verdict.suppressedTargets) it.copy(autoBindable = false) else it }
-        return (flagged + verdict.additions).sortedByDescending { it.score }
+            results.map {
+                if (it.targetRef in verdict.suppressedTargets) {
+                    it.copy(suppressed = true, autoBindable = false)
+                } else {
+                    it
+                }
+            }
+        return methodDispatcher.recomputeMargins(flagged, methodOverride)
     }
 
     /**

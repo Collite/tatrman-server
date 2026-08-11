@@ -24,9 +24,11 @@ import org.tatrman.fuzzy.core.Lemmatizer
 import org.tatrman.fuzzy.core.MethodDispatcher
 import org.tatrman.fuzzy.core.ProfileScorer
 import org.tatrman.fuzzy.core.NoopLemmatizer
+import org.tatrman.fuzzy.core.NoopOverlayStore
 import org.tatrman.fuzzy.core.StringRepository
 import org.tatrman.fuzzy.db.DatabaseFactory
 import org.tatrman.fuzzy.loader.LexiconArchiveSource
+import org.tatrman.fuzzy.loader.OverlayArchiveSource
 import org.tatrman.fuzzy.loader.FuzzyCatalog
 import org.tatrman.fuzzy.loader.LoaderSource
 import org.tatrman.fuzzy.loader.MetadataLoaderSource
@@ -166,7 +168,20 @@ fun Application.module(serverConfig: KtorServerConfig) {
                         .of(path),
                 )
             }
-    val repository = StringRepository(config, loaderSource, telemetry, lemmatizer, lexiconSource)
+    // RV-P7.3 T3 — the LEARNED layer, when the estate's Golem is exporting one. `NoopOverlayStore`
+    // otherwise, which is the pre-P7 service exactly: no version in the tuple, nothing loaded,
+    // nothing consulted.
+    val overlaySource =
+        config.lexicon.overlayArchivePath
+            .takeIf { it.isNotBlank() }
+            ?.let { path ->
+                log.info("LEARNED overlay layer enabled: {}", path)
+                OverlayArchiveSource(
+                    java.nio.file.Path
+                        .of(path),
+                )
+            } ?: NoopOverlayStore
+    val repository = StringRepository(config, loaderSource, telemetry, lemmatizer, lexiconSource, overlaySource)
     val fuzzyMatcher =
         FuzzyMatcher(
             repository,

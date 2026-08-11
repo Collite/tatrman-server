@@ -17,7 +17,8 @@ package org.tatrman.fuzzy.core
  *  - [VOCABULARY] is the pre-RV conflation of DECLARED and METADATA (it covered both lexicon
  *    terms and `valueLabels`). Kept for the fixture-stub source, which cannot tell them apart.
  *    Anything reading the compiled artifact emits [DECLARED] or [METADATA] instead.
- *  - [LEARNED] is the RV-P6 overlay. Nothing produces it yet.
+ *  - [LEARNED] is the estate overlay. Produced from RV-P7.3, when the overlay became a loaded
+ *    layer rather than an empty slot.
  *
  * All of them flow through the same cascade with the same scoring — the layer is evidence, not a
  * filter, and lex-matcher never picks a winner across layers (that is the resolver's gate).
@@ -35,7 +36,7 @@ enum class SourceTag {
     /** Harvested from model labels (`displayLabel`, `labelPlural`, `aliases`, `valueLabels`). */
     METADATA,
 
-    /** The estate overlay (RV-P6). Never produced before that store exists. */
+    /** The estate overlay (RV-4/18/20/23), loaded from the overlay archive since RV-P7.3. */
     LEARNED,
 }
 
@@ -76,7 +77,7 @@ data class LayerVersions(
     val lexiconArtifactHash: String = "",
     /** category → the member index's version for that category. */
     val memberIndexVersions: Map<String, String> = emptyMap(),
-    /** Absent (null) until the RV-P6 overlay store exists — absence is the contract, not `""`. */
+    /** Absent (null) when no overlay is loaded — absence is the contract, not `""`. */
     val overlayVersion: String? = null,
 )
 
@@ -126,10 +127,30 @@ data class FuzzyMatchResult(
      * **Reason-agnostic** (RV-P1.4 T6). Two independent things set it false: an RV-32 margin under
      * the floor, and an estate overlay entry with NEGATIVE polarity. The caller's action is the same
      * either way — offer it, rank it, ask about it, do not bind it unattended — so one channel
-     * carries both. If RV-P6 turns out to need the reason, that is an additive field then, not a
+     * carries both. If RV-P7 turns out to need the reason, that is an additive field then, not a
      * second flag now.
      */
     val autoBindable: Boolean? = null,
+    /**
+     * RV-P7.3 T3 — the estate's overlay carries a NEGATIVE entry for this (term, target).
+     *
+     * P1.4 predicted this field and deferred it correctly: *"if RV-P7 turns out to need the reason,
+     * that is an additive field then"*. It turned out to, for a reason that is about the margin
+     * rather than about the caller. [autoBindable] alone cannot survive the pipeline, because
+     * `MethodDispatcher.recomputeMargins` derives that flag from the margin and would overwrite a
+     * suppression — so the only safe order was overlay-last, and overlay-last is exactly what T3
+     * forbids: a denied candidate would go on counting as a rival and go on making the candidate
+     * the user actually meant look ambiguous.
+     *
+     * Carrying the reason on the row fixes both. The margin computation reads it — a suppressed
+     * row is not a rival, and never has its `autoBindable` re-enabled — so suppression may now run
+     * BEFORE the margin, which is where the estate's own statement belongs.
+     *
+     * **Engine-internal, and deliberately not on the wire.** `Binding.auto_bindable` is still the
+     * whole instruction to the caller (P1.4's reason-agnostic ruling stands): offer it, rank it,
+     * ask about it, do not bind it unattended. Nothing downstream acts differently on *why*.
+     */
+    val suppressed: Boolean = false,
     /**
      * RV-38 — the target's class. Null for member values; the kind is derived from this, never
      * stored. T5's lookup scopes on it.

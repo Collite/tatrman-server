@@ -83,11 +83,14 @@ class MethodDispatcher(
      *
      * Admission is not re-run: it is per-candidate and already decided.
      *
-     * **Must run BEFORE the overlay is consulted.** This recomputes `autoBindable` from the margin
-     * alone, so it overwrites whatever was there — including an overlay NEGATIVE's `false`. Running
-     * it after [FuzzyMatcher.consultOverlay] would silently re-enable auto-binding on a candidate
-     * the estate explicitly denied. Every path in [FuzzyMatcher] orders it that way, and
-     * `OverlayLayerTest` pins the ordering on the merged paths specifically.
+     * **Safe to run after the overlay speaks — and RV-P7.3 T3 requires it to.** Until P7.3 this
+     * carried the opposite instruction: it derived `autoBindable` from the margin *alone*, so
+     * running it after a consult silently re-enabled auto-binding on a candidate the estate had
+     * denied, and the only safe order was overlay-last. Overlay-last is also wrong, for the
+     * complementary reason — a denied target went on counting as a rival. Both are fixed by
+     * [FuzzyMatchResult.suppressed]: the estate's statement now lives on the row, so this function
+     * can read it instead of overwriting it. `OverlayLayerTest` and `LearnedLayerSpec` pin both
+     * halves.
      */
     fun recomputeMargins(
         results: List<FuzzyMatchResult>,
@@ -182,11 +185,18 @@ class MethodDispatcher(
      * two aliases of one measure are one binding, not a tie, so they must not depress each other's
      * margin. Only TOKENS rows compete — see [FuzzyMatchResult.uniquenessMargin] for why the margin
      * stays inside the declared layer instead of ranking across layers.
+     *
+     * **RV-P7.3 T3 — a SUPPRESSED row is not a rival.** An overlay NEGATIVE is the estate saying
+     * this term does not mean that target; a target the estate has denied cannot then be the reason
+     * another one looks ambiguous. Left in the rival set, one user's "no, not that one" would go on
+     * blocking auto-binding of the target they actually picked, forever — the ask would repeat
+     * every time, which is the precise opposite of learning. Suppressed rows still get their own
+     * margin computed and reported: they are offered and ranked, just never bound (RV-2).
      */
     private fun withUniquenessMargin(admitted: List<Pair<FuzzyMatchResult, MatchMethod?>>): List<FuzzyMatchResult> {
         val bestByTarget =
             admitted
-                .filter { (_, method) -> method == MatchMethod.Tokens }
+                .filter { (result, method) -> method == MatchMethod.Tokens && !result.suppressed }
                 .groupBy { (result, _) -> result.identity }
                 .mapValues { (_, rows) -> rows.maxOf { (result, _) -> result.score } }
 
@@ -202,12 +212,25 @@ class MethodDispatcher(
             if (method != MatchMethod.Tokens) {
                 result
             } else {
-                val mine = bestByTarget.getValue(result.identity)
-                val rival = if (result.identity == leader.key) runnerUp else leader.value
+                // A suppressed row is absent from `bestByTarget`, so its own best is its own score.
+                val mine = bestByTarget[result.identity] ?: result.score
+                val rival =
+                    when {
+                        // Its rivals are the surviving targets; the leader IS one of them, since a
+                        // suppressed row never entered the ranking.
+                        result.suppressed -> leader.value
+                        result.identity == leader.key -> runnerUp
+                        else -> leader.value
+                    }
                 // Unopposed ⇒ the gap is measured from zero, which clears any sane floor. That is
                 // the right reading: nothing else in the layer answers to this query.
                 val margin = if (rival == null) mine else mine - rival
-                result.copy(uniquenessMargin = margin, autoBindable = margin >= uniquenessFloor)
+                result.copy(
+                    uniquenessMargin = margin,
+                    // The estate's NEGATIVE is final: a margin cannot argue a denied target back
+                    // into auto-binding, whatever the arithmetic says.
+                    autoBindable = !result.suppressed && margin >= uniquenessFloor,
+                )
             }
         }
     }

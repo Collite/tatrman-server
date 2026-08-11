@@ -1,0 +1,37 @@
+{
+  "schema": "rv-overlay/v1",
+  "estate_id": "golem-hartland",
+  "version": 4,
+  "entries": [
+    {
+      "term": "čerpacích stanic",
+      "lang": "cs",
+      "target_ref": "er.entity.catalog_sales",
+      "polarity": "NEGATIVE",
+      "status": "ACTIVE",
+      "target_class": "MODEL_OBJECT",
+      "distinct_users": 2,
+      "conflicted": false
+    },
+    {
+      "term": "čerpacích stanic",
+      "lang": "cs",
+      "target_ref": "er.entity.store_sales",
+      "polarity": "POSITIVE",
+      "status": "PROMOTION_CANDIDATE",
+      "target_class": "MODEL_OBJECT",
+      "distinct_users": 2,
+      "conflicted": false
+    },
+    {
+      "term": "čerpacích stanic",
+      "lang": "cs",
+      "target_ref": "er.entity.web_sales",
+      "polarity": "NEGATIVE",
+      "status": "ACTIVE",
+      "target_class": "MODEL_OBJECT",
+      "distinct_users": 2,
+      "conflicted": false
+    }
+  ]
+}

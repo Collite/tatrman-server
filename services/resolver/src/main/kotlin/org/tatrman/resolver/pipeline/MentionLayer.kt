@@ -13,7 +13,7 @@ import org.tatrman.nlp.v1.Token
  * The lattice's mention layer is a different question — what the user TALKED ABOUT — and it
  * costs nothing in precision to answer it fully: an unmatched mention produces a typed **gap**,
  * never a binding. Without it the core cannot say "I do not know this word", which is exactly
- * the `issues.md` complaint ("Not admitting not knowing the entity") and the reason RV-P3
+ * the `issues.md` complaint ("Not admitting not knowing the entity") and the reason RV-P4
  * waited for this phase.
  *
  * Everything already proposed for gating keeps its span; this only adds the leftovers. Values

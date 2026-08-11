@@ -99,7 +99,7 @@ enum SourceTag {
   VOCABULARY = 1;  // legacy: declared lexicon/valueLabels, undifferentiated
   DECLARED = 2;    // authored in the lexicon/ area or as TTR-M `def term` sugar
   METADATA = 3;    // harvested from model labels (displayLabel/labelPlural/aliases/valueLabels)
-  LEARNED = 4;     // the RV-P6 estate overlay; nothing produces it yet
+  LEARNED = 4;     // the estate overlay (RV-P7.3): what this estate's users taught it
 }
 
 // RV-39 — the layer-version tuple, echoed per S-1. Additive alongside the older opaque
@@ -108,7 +108,7 @@ enum SourceTag {
 message LayerVersions {
   string lexicon_artifact_hash = 1;               // CompiledLexicon.contentHash; "" when none loaded
   map<string, string> member_index_versions = 2;  // category → content-derived version
-  optional string overlay_version = 3;            // ABSENT until RV-P6 — absence is the contract
+  optional string overlay_version = 3;            // ABSENT when no overlay is loaded — absence is the contract
 }
 
 // RG-P2 (S-4): confidence provenance — producer + scoring method + raw score.

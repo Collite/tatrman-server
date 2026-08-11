@@ -36,10 +36,15 @@ class StringRepository(
     // categories merged alongside the member data. Null = member data only.
     private val snapshotSource: SnapshotVocabularySource? = null,
     /**
-     * RV-P1.4 T6 — the estate overlay (RV-P6). [NoopOverlayStore] until that store exists, which is
-     * what every deployment runs today: no version in the tuple, nothing consulted, results
+     * RV-P1.4 T6 — the estate overlay, filled at RV-P7.3. [NoopOverlayStore] for any deployment
+     * without a learning store: no version in the tuple, nothing consulted, nothing loaded, results
      * untouched. Injected here rather than into [FuzzyMatcher] so the third layer has ONE home —
      * the repository owns the other two, and the matcher reaches it through `overlay()`.
+     *
+     * The repository drives **both** halves: it merges the store's POSITIVE candidates into the
+     * index on the third clock (below), and the matcher consults the same store for NEGATIVE
+     * suppressions per query. One store, so a suppression can never be applied against candidates
+     * from a different overlay version.
      */
     private val overlayStore: OverlayStore = NoopOverlayStore,
 ) : MatchRepository {
@@ -102,6 +107,32 @@ class StringRepository(
     @Volatile
     private var declaredHash: String = ""
 
+    // RV-P7.3 T3 — the LEARNED layer's candidates, on their own clock (below). Held separately
+    // from [declaredCache] because the tuple names the layers separately: folding them would make
+    // "the estate authored a term" indistinguishable from "a user taught it one".
+    @Volatile
+    private var overlayCache: Map<String, List<Candidate>> = emptyMap()
+
+    @Volatile
+    private var overlayHash: String = ""
+
+    /**
+     * RV-P7.3 T4 — the overlay a query is answered from, **published with the index built from
+     * it**.
+     *
+     * Not [overlayStore] directly, and this is the determinism fix rather than a nicety. The store
+     * swaps its loaded archive the moment `hash()` reads a new one, but the index built from that
+     * archive is only published at the end of this refresh — so a query landing in between would
+     * have been answered with the OLD candidates, the NEW suppressions, and a tuple naming the new
+     * version. RV-39's whole promise is that the tuple identifies the answer; a response assembled
+     * from two overlays cannot be reproduced from it.
+     *
+     * So candidates, suppressions and version move together, at one instant, exactly as
+     * [categoryKeys] and [memberVersions] already do.
+     */
+    @Volatile
+    private var servedOverlay: OverlayStore = NoopOverlayStore
+
     // RV-39 — content-derived version per MEMBER category, computed at refresh. Deliberately
     // excludes the declared layer: the tuple names the layers separately, and folding them would
     // make "the artifact changed" indistinguishable from "a data column changed".
@@ -158,13 +189,27 @@ class StringRepository(
         // Second clock: reload + lemmatise declared vocabulary ONLY when its
         // snapshot hash changes (T5), then merge it into the member cache.
         refreshDeclaredIfChanged()
+        // Third clock (RV-P7.3): the same discipline for the LEARNED overlay, on its own hash. Its
+        // cadence is genuinely different — a lexicon changes when someone authors one, an overlay
+        // changes when a user answers a question — which is precisely why it gets its own clock
+        // rather than riding the declared one.
+        refreshOverlayIfChanged()
         val nextCache = LinkedHashMap<String, List<Candidate>>(memberCache)
         declaredCache.forEach { (key, vocab) ->
             nextCache.merge(key, vocab) { member, declared -> member + declared }
         }
+        // Merged into the SAME index as the other two layers, which is the whole point of loading
+        // the positives rather than consulting for them: a learned alias is then retrieved,
+        // tokenised, IDF-weighted and scored by the engine like every other row, and it matches
+        // fuzzily — the estate learns `tržba` and the matcher serves it for `trzba`.
+        overlayCache.forEach { (key, learned) ->
+            nextCache.merge(key, learned) { existing, overlay -> existing + overlay }
+        }
 
         cache.clear()
         cache.putAll(nextCache)
+        // Published here, with the cache it matches — see [servedOverlay].
+        servedOverlay = overlayStore.pinned()
         // Published only once the cache is whole — a reader mid-refresh keeps the previous keys
         // rather than seeing a half-filled map (see [knownCategories]).
         categoryKeys = java.util.Collections.unmodifiableSet(LinkedHashSet(nextCache.keys))
@@ -185,6 +230,36 @@ class StringRepository(
         logger.info("Declared vocabulary loaded (hash={}, categories={})", hash, declaredCache.size)
     }
 
+    /**
+     * RV-P7.3 T4 — the overlay's clock, in the shape [refreshDeclaredIfChanged] proved.
+     *
+     * `hash()` is the only call that touches the source; everything else this refresh reads is
+     * whatever that call swapped in. So one reload per interval, and an unchanged overlay costs a
+     * content-id comparison.
+     *
+     * The empty-cache condition the declared clock carries is deliberately **not** repeated here:
+     * an estate that has learned nothing legitimately has an empty overlay, and re-fetching it on
+     * every tick to rediscover that would be work in exchange for nothing.
+     */
+    private suspend fun refreshOverlayIfChanged() {
+        val hash = overlayStore.hash()
+        if (hash == overlayHash) return
+        // Lower-cased like every other category key: the query side lowercases what it asks for,
+        // and a target ref that arrived with any capital would build an index nothing ever hits.
+        overlayCache =
+            overlayStore
+                .learned()
+                .entries
+                .associate { (category, rows) -> category.lowercase() to lemmatiseCandidates(rows) }
+        overlayHash = hash
+        logger.info(
+            "Overlay layer loaded (hash={}, version={}, targets={})",
+            hash,
+            overlayStore.version(),
+            overlayCache.size,
+        )
+    }
+
     /** The vocabulary version (S-1): content signature + load stamp. */
     override fun vocabularyVersion(): String = version
 
@@ -195,17 +270,20 @@ class StringRepository(
      * bakes in [loadedAtMs] and therefore changes on every refresh whether or not any vocabulary
      * did, so it cannot answer the one question a version tuple is asked.
      *
-     * `overlayVersion` is null, not `""` — no overlay store exists before RV-P6, and "absent" and
-     * "present at an empty version" are different facts.
+     * `overlayVersion` is null, not `""` — an estate with no learning store has no overlay, and
+     * "absent" and "present at an empty version" are different facts. Absence stays the contract
+     * for every pre-P7 estate.
      */
     override fun layerVersions(): LayerVersions =
         LayerVersions(
             lexiconArtifactHash = snapshotSource?.artifactHash() ?: "",
             memberIndexVersions = memberVersions,
-            // T6 — sourced from the overlay slot at last. Still null in every deployment, because
-            // the slot holds NoopOverlayStore until RV-P6; the difference is that it is now null
-            // because the store says so, not because the field was hardcoded.
-            overlayVersion = overlayStore.version(),
+            // RV-P7.3 — the store's own version, and it rides EVERY response. Not the archive's
+            // content id: this answers "which overlay produced this answer?", traceable back to a
+            // row in the Golem's `rv_overlay_versions`, while the content id answers the different
+            // question "is the file different?" and drives the reload. Same split, for the same
+            // reason, as `LexiconArchiveSource.hash()` vs `artifactHash()`.
+            overlayVersion = servedOverlay.version(),
         )
 
     /**
@@ -261,15 +339,25 @@ class StringRepository(
      */
     override fun knownCategories(): Set<String> = categoryKeys
 
-    override fun overlay(): OverlayStore = overlayStore
+    /**
+     * The **published** overlay, not the live store: what a query is answered from must be the
+     * overlay the loaded index was built from. See [servedOverlay].
+     */
+    override fun overlay(): OverlayStore = servedOverlay
 
     /**
-     * RV-P1.4 T4 — whether a declared layer is loaded, read from the second clock's cache.
+     * RV-P1.4 T4 — whether a layer that narrows AFTER scoring is loaded, read from the second and
+     * third clocks' caches. O(1).
      *
-     * O(1), and false for every estate that has not authored a lexicon — which is what keeps the
-     * gate's scoring headroom off the member-only path entirely.
+     * RV-P7.3 added the overlay, because the real question is *"can a row here be narrowed after
+     * scoring?"* and a learned row can: it carries a target class, so T5's class-scoped filter can
+     * reject it, and without the headroom it would be truncated before that filter ever ran.
+     *
+     * False for every estate that has authored no lexicon and learned nothing — which is what keeps
+     * the gate's scoring headroom off the member-only path entirely, and is the byte-identical
+     * promise P1.4 T7 made.
      */
-    override fun servesDeclaredLayer(): Boolean = declaredCache.isNotEmpty()
+    override fun servesDeclaredLayer(): Boolean = declaredCache.isNotEmpty() || overlayCache.isNotEmpty()
 
     /** Per-category discovery + staleness for `GetStatus` (contracts §2). */
     fun categoryStatuses(): List<CategoryStatusInfo> =

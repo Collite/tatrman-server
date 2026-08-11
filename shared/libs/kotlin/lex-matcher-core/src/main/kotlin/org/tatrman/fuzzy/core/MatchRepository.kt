@@ -38,7 +38,7 @@ interface MatchRepository {
     fun knownCategories(): Set<String>? = null
 
     /**
-     * RV-P1.4 T6 — the estate overlay (RV-P6), empty by default.
+     * RV-P1.4 T6 — the estate overlay, filled at RV-P7.3. Empty by default.
      *
      * Hung off the repository because the repository is the **layer owner**: it already owns the
      * member index and the declared source, and hanging the third layer somewhere else would give

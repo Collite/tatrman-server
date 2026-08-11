@@ -335,7 +335,7 @@ class LatticeAssemblerTest :
                 )
             state.lexiconVersions.lexiconArtifactHash shouldBe "sha256:abc"
             state.lexiconVersions.memberIndexVersionsMap shouldBe mapOf("er.branch" to "v7")
-            // absent until RV-P6 — and absence is the contract, not an empty string
+            // absent with no overlay loaded — and absence is the contract, not an empty string
             state.lexiconVersions.hasOverlayVersion().shouldBeFalse()
         }
     }) {

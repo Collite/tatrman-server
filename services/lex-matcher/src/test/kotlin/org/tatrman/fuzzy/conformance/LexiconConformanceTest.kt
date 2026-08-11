@@ -261,7 +261,7 @@ class LexiconConformanceTest :
 
                 tuple.lexiconArtifactHash.shouldNotBeBlank()
                 tuple.memberIndexVersions.keys shouldContainExactlyInAnyOrder listOf("db.dbo.dc.name")
-                // Absent until RV-P6 — absence is the contract, not an empty string (T2/T6).
+                // Absent with no overlay loaded — absence is the contract, not an empty string (T2/T6).
                 tuple.overlayVersion.shouldBeNull()
             } finally {
                 repo.close()
