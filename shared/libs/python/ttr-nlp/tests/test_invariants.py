@@ -99,6 +99,39 @@ SCORING_NAMES = (
 )
 
 
+def test_the_wheel_never_imports_the_service():
+    """NLS-P3.3.T4 (⚑NLS-D7) — the dependency runs one way only.
+
+    `services/nlp` depends on this wheel; the wheel must not depend back. It is
+    published to PyPI and installed by consumers who do not have the service at
+    all (nlp-mcp, the DFP model-validator), so an import of `nlp_service`
+    anywhere in here would be a wheel that works in this repo and fails
+    everywhere else.
+
+    The task list asked for `rg "nlp_service" src` to come back empty. Taken
+    literally that also forbids *saying where the adapters came from*, which is
+    the one thing a reader of `client/backends.py` most wants to know. So this
+    reads imports instead: prose may name the service, code may not.
+    """
+    offenders = []
+    for path in sorted(SRC.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""]
+            else:
+                continue
+            for name in names:
+                if name.split(".")[0] == "nlp_service":
+                    offenders.append(f"{path.name}:{node.lineno} imports {name}")
+
+    assert offenders == [], (
+        "the wheel is published and installed without services/nlp — the "
+        f"dependency goes one way (⚑NLS-D7): {offenders}"
+    )
+
+
 def _docstring_nodes(tree: ast.AST) -> set[int]:
     """The `id()`s of every Constant that is a docstring, not a value."""
     ids = set()

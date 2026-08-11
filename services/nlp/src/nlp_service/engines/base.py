@@ -1,48 +1,37 @@
 # SPDX-License-Identifier: Apache-2.0
+"""The engine protocol, and the value types it deals in.
+
+NLS-P3.3 (⚑NLS-D7) moved the HTTP adapters into `ttrnlp.client.backends`, and the
+value types went with them — a `Token` is what a backend reports, not something
+this service invented, and the wheel's consumers need it as much as the front
+does. They are re-exported here so every call site in the service keeps reading
+`from nlp_service.engines.base import Token`: the move is about where code lives,
+not about churning two hundred imports.
+
+What stays here is what the *service* owns: the `NlpEngine` protocol that
+`EngineRegistry` builds against. Routing (which backend serves a (language, op)),
+the registry, the orchestrator and `langid` are all service-side by design — the
+division is "how to talk to one backend" versus "which one to talk to", and the
+second is a deployment's business.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass
 from typing import Protocol, Set, runtime_checkable
 
-
-class NlpOp(str, Enum):
-    """NLP operations supported by the NLP service."""
-
-    TOKENIZE = "TOKENIZE"
-    SENTENCE_SPLIT = "SENTENCE_SPLIT"
-    LEMMATIZE = "LEMMATIZE"
-    POS_TAG = "POS_TAG"
-    DEP_PARSE = "DEP_PARSE"
-    NER = "NER"
-    DETECT_LANGUAGE = "DETECT_LANGUAGE"
-
-
-@dataclass(frozen=True)
-class Token:
-    """Represents a single token with linguistic annotations."""
-
-    text: str
-    char_start: int
-    char_end: int
-    lemma: str = ""
-    upos: str = ""  # Universal POS tag
-    xpos: str = ""  # Language-specific POS tag
-    feats: dict[str, str] = field(default_factory=dict)  # Morphological features
-    dep_head: int = 0  # Head token index (1-based), 0 = root
-    dep_relation: str = ""  # UD dependency relation
-
-
-@dataclass(frozen=True)
-class NerEntity:
-    """Represents a named entity extracted from text."""
-
-    text: str
-    label: str  # e.g., PER, LOC, ORG, DATE, MONEY
-    char_start: int
-    char_end: int
-    normalized_value: str = ""  # e.g., ISO date for DATE, typed amount for MONEY
-    source_engine: str = ""  # Which engine produced this entity
+from ttrnlp.client.backends import (
+    EngineResult as EngineResult,
+)
+from ttrnlp.client.backends import (
+    NerEntity as NerEntity,
+)
+from ttrnlp.client.backends import (
+    NlpOp as NlpOp,
+)
+from ttrnlp.client.backends import (
+    Token as Token,
+)
 
 
 @dataclass(frozen=True)
@@ -51,25 +40,18 @@ class EngineVersion:
 
     Mirrors the proto `org.tatrman.nlp.v1.EngineVersion`. Populated on every
     model-touched response's `used[]` (never a blank `model`).
+
+    Stayed service-side while the other value types moved, and the reason is the
+    S-1 contract itself: an `EngineVersion` records what a *route* resolved to,
+    and routes are what this service owns. A backend client knows which model it
+    was told to ask for; it does not know that this was the op it served on this
+    request.
     """
 
     op: str
     engine: str
     model: str
     model_version: str
-
-
-@dataclass
-class EngineResult:
-    """Result from a single NLP engine."""
-
-    tokens: list[Token] = field(default_factory=list)
-    entities: list[NerEntity] = field(default_factory=list)
-    sentences: list[tuple[int, int]] = field(default_factory=list)  # (char_start, char_end) tuples
-    paragraphs: list[tuple[int, int]] = field(default_factory=list)  # (char_start, char_end) tuples
-    error: str = ""  # Non-empty if engine failed
-    detected_language: str = ""  # Language code (used by DETECT_LANGUAGE engine)
-    language_confidence: float = 0.0  # Confidence score (used by DETECT_LANGUAGE engine)
 
 
 @runtime_checkable
@@ -113,3 +95,13 @@ class NlpEngine(Protocol):
             to avoid redundant tokenization/parsing.
         """
         ...
+
+
+__all__ = [
+    "EngineResult",
+    "EngineVersion",
+    "NerEntity",
+    "NlpEngine",
+    "NlpOp",
+    "Token",
+]

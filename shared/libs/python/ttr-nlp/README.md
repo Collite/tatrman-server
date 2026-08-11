@@ -29,7 +29,7 @@ Full detail in the effort's `architecture.md` §2.
 | `ttrnlp.rules` | The rule engine — YAML DSL → PAMPAC; the JAPE-exact executor |
 | `ttrnlp.gazetteer` | List interchange + `Lookup` annotation (lemma / ci / fold-diacritics / exact) |
 | `ttrnlp.packs` | Pack + list loading (fail-all) and **the** validation code path |
-| `ttrnlp.client` | gRPC client for the `nlp` front; HTTP engine-adapter clients |
+| `ttrnlp.client` | `NlpClient` (gRPC, `[grpc]`) + the HTTP engine-adapter clients (`[http]`) |
 | `ttrnlp.cli` | `ttr-nlp validate` |
 
 ## Gazetteer lists
@@ -126,6 +126,42 @@ state.state_id       # same bytes ⇒ same id; what ReloadPacks reports
 
 A source is a directory (globbed for `**/*.pack.yaml` and `**/*.list.yaml`), a
 single file, or an `http(s)` URL naming one file (needs the `[http]` extra).
+
+## Talking to the `nlp` service
+
+```python
+from ttrnlp.client import NlpClient
+
+async with NlpClient("nlp:7271") as client:
+    result = await client.run_pipeline(
+        "Zobraz všechny faktury od zákazníka Microsoft",
+        pipeline="query-patterns",
+        language="cs",
+    )
+
+    for pattern in result.document.annset("").with_type("QueryPattern"):
+        print(pattern.features["query"], dict(pattern.features))
+
+    if degraded := result.diagnostic("NLS-NLP-011"):
+        print("degraded:", degraded.message)   # an op the active lane cannot route
+```
+
+`run_pipeline` returns a **`Document`**, not a wire message — that is the client's
+whole reason to exist. The rpc answers with an `AnnotatedDocument` (nested
+`FeatureValue` oneofs, features as dotted keys); the client turns it back into the
+same gatenlp `Document` the service was holding, so `annset()`, `with_type()` and
+`features` all work as they do in-process.
+
+`.analyze()`, `.batch_lemmatize()`, `.get_status()` and `.reload_packs()` are there
+too. Every call carries a deadline (30s by default, per-call overridable) and
+**none of them retries** — retry policy belongs to the caller, because a batch job
+and an interactive request want opposite answers, and `nlp-mcp` already has a
+circuit breaker.
+
+`reload_packs()` returning `applied=False` is an outcome, not an error: the
+previous snapshot is still serving and `state_id` names it.
+
+Needs the `[grpc]` extra.
 
 ## Install
 

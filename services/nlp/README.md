@@ -15,8 +15,9 @@ the UFAL stack). It is the NLP foundation consumed by Themis (via
 **RG-P1.S1 (Resolution & Grounding, workstream C):**
 
 - **gRPC is the service contract** — `org.tatrman.nlp.v1.NlpService`
-  (`Analyze` / `BatchLemmatize` / `GetStatus`) on port **7271**. The FastAPI
-  REST endpoint (port **7270**) is a **dev/health mirror only**.
+  (`Analyze` / `BatchLemmatize` / `GetStatus`, plus NLS-P3's `RunPipeline` /
+  `ReloadPacks` / `ReportToken`) on port **7271**. The FastAPI REST endpoint
+  (port **7270**) is a **dev/health mirror only**.
 - **The front is engine-free** — no in-process torch/models. Every model-bearing
   engine (MorphoDiTa, NameTag 3, Stanza, spaCy) is an **HTTP-adapter client** to
   its own backend image; only `langid` (lingua) runs in-front. Backends land in
@@ -27,6 +28,35 @@ the UFAL stack). It is the NLP foundation consumed by Themis (via
   routed (language, op)'s pinning `tier` (`SELF_HOSTED_PINNED` /
   `REMOTE_UNPINNED`). Diagnostics: `RG-NLP-002` (Lindat/unpinned), `RG-NLP-003`
   (empty model), `RG-NLP-010` (degrade floor).
+
+**NLS-P3 (the NLP suite):** the front gained the **pipeline surface** — a named
+pipeline runs engine ops, then gazetteer lists, then rule phases, and answers with
+an annotated document.
+
+- **`RunPipeline`** / **`ReloadPacks`** on the same gRPC service; the REST mirror
+  gains **no** pipeline surface (NL-16, and there is a test for the absence).
+- **`ttr-nlp` runs in-process here.** The rule engine, gazetteers, pack loader and
+  the `Document ⇄ proto` serializer all come from the wheel, which is model-free —
+  that is what lets the engine-free front host them (⚑NLS-D3). The HTTP
+  engine-adapter clients moved INTO the wheel at NLS-P3.3 (⚑NLS-D7):
+  `ttrnlp.client.backends` owns the transport and the four response protocols,
+  while `EngineRegistry`, per-op-per-language routing, the orchestrator and
+  `langid` stay here. The division is "how to talk to one backend" versus "which
+  backend to talk to".
+- **Lanes (NL-4).** `lane: default` is Stanza + spaCy only — anyone may run it.
+  `lane: option` adds the UFAL stack, whose licence is a per-deployment call
+  (NL-5). The lane decides which engines are *registered*, so in the default lane
+  cs `NER` is genuinely unrouted: it gets no `GetStatus` capability row, the
+  response carries **`NLS-NLP-011`**, and every other phase still runs (NL-14 —
+  honest degrade, never a silent one). Set it per environment with `NLP_LANE` or
+  the chart's `lane` value.
+- **Packs are fail-all-or-nothing (NL-15).** One bad file and nothing loads: the
+  service still serves `Analyze`, reports `ready=false`, puts the diagnostics on
+  `GetStatus.pack_state`, and refuses `RunPipeline` with `FAILED_PRECONDITION`.
+  `ReloadPacks` validates into a new snapshot and swaps atomically; a refusal
+  (`applied=false` + `NLS-PACK-010`) leaves the previous snapshot serving
+  untouched. Pack **content** is per-world and never part of the suite (NL-17) —
+  mount it at `packs.sources` / `lists.sources`.
 
 > **Proto stubs.** nlp owns its generated `org.tatrman.{nlp,common}.v1`
 > Python stubs under `generated/` (gitignored), produced from the shared

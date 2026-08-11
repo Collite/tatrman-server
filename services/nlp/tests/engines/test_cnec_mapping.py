@@ -12,6 +12,8 @@ survive as MISC so the resolver's domain path can still catch it).
 
 from __future__ import annotations
 
+from ttrnlp.client.backends import parse_nametag_conll
+
 from nlp_service.config import BackendConfig
 from nlp_service.engines.base import NlpOp
 from nlp_service.engines.nametag_engine import Nametag3Engine
@@ -23,48 +25,49 @@ def _engine() -> Nametag3Engine:
     )
 
 
+def _parse(conll: str, original: str):
+    """NLS-P3.3 (⚑NLS-D7): the parser moved to `ttrnlp.client.backends` and is a
+    free function there rather than a private method. Every assertion below is
+    unchanged — this shim is the "imports re-pointed only" the move promised, and
+    the reason this file is the regression harness for it."""
+    return parse_nametag_conll(conll, original, "nametag3")
+
+
 class TestCnecToUniversal:
     def test_geo_prefix_maps_to_location(self):
-        eng = _engine()
         # NameTag vertical output: "pražských pobočkách" tagged as a geo entity.
         vertical = "pražských\tB-gu\npobočkách\tI-gu\n"
-        ents = eng._parse_vertical(vertical, "v pražských pobočkách")
+        ents = _parse(vertical, "v pražských pobočkách")
         assert len(ents) == 1
         assert ents[0].label == "LOCATION"
         assert ents[0].text == "pražských pobočkách"
 
     def test_person_prefix_maps_to_person(self):
-        eng = _engine()
-        ents = eng._parse_vertical("Novák\tB-ps\n", "Novák")
+        ents = _parse("Novák\tB-ps\n", "Novák")
         assert ents[0].label == "PERSON"
 
     def test_institution_prefix_maps_to_organization(self):
-        eng = _engine()
-        ents = eng._parse_vertical("Shell\tB-if\n", "Shell")
+        ents = _parse("Shell\tB-if\n", "Shell")
         assert ents[0].label == "ORGANIZATION"
 
     def test_time_prefix_maps_to_date(self):
-        eng = _engine()
-        ents = eng._parse_vertical("čtvrtletí\tB-th\n", "čtvrtletí")
+        ents = _parse("čtvrtletí\tB-th\n", "čtvrtletí")
         assert ents[0].label == "DATE"
 
     def test_product_class_survives_as_misc_not_dropped(self):
         """`Octavie` (product; CNEC `o*`/`P*`) must NOT be silently dropped."""
-        eng = _engine()
-        ents = eng._parse_vertical("Octavie\tB-oa\n", "za Octavie")
+        ents = _parse("Octavie\tB-oa\n", "za Octavie")
         assert len(ents) == 1  # not dropped
         assert ents[0].label == "MISC"
         assert ents[0].text == "Octavie"
 
     def test_unknown_class_defaults_to_misc(self):
-        eng = _engine()
-        ents = eng._parse_vertical("Cosi\tB-zz\n", "Cosi")
+        ents = _parse("Cosi\tB-zz\n", "Cosi")
         assert ents[0].label == "MISC"
 
     def test_raw_cnec_tag_preserved_for_downstream(self):
         """The fine CNEC tag is not lost — kept for the resolver's domain path."""
-        eng = _engine()
-        ents = eng._parse_vertical("pražských\tB-gu\n", "pražských")
+        ents = _parse("pražských\tB-gu\n", "pražských")
         assert ents[0].normalized_value == "cnec:gu"
 
     def test_supports_only_ner(self):
