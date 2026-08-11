@@ -21,14 +21,14 @@
 #
 #   # ── NLS-P4.T4: the hero E2E, both lanes (arc gate 2) ──────────────────────
 #   # Option lane (as configured above) — both heroes must resolve, no degrade:
-#   cd services/nlp && uv run python eval/run_eval.py --rules --url localhost:7271 \
+#   cd services/nlp && uv run python eval/run_eval.py --rules --lane option \
 #     --output-json eval/reports/metrics.json --output-md eval/reports/report.md
 #
 #   # Default lane — same containers, one env var. cs NER goes unrouted, the
 #   # response carries NLS-NLP-011, and the invoices hero STILL resolves through
 #   # the pack's morphology fallback. That pair is the whole NL-14 claim:
 #   NLP_LANE=default docker compose -f services/nlp/docker-compose.offline.yml up -d front
-#   cd services/nlp && uv run python eval/run_eval.py --rules --url localhost:7271 \
+#   cd services/nlp && uv run python eval/run_eval.py --rules --lane default \
 #     --output-json eval/reports/metrics-default-lane.json \
 #     --output-md eval/reports/report-default-lane.md
 #   # Expect: same pass count, and `NLS-NLP-011` in the report's diagnostics line.

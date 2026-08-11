@@ -174,27 +174,47 @@ class PipelineRunner:
         lane-routed grouping, one call per backend, the token merge and the S-1
         `used[]` stamping, and a second path through the same backends would
         drift from `Analyze` in ways only a live cluster would show.
+
+        **Detection comes first, and the degrade set is computed after it.** The
+        NL-14 set is language-specific — `NER.cs` is unrouted in the default lane
+        and `NER.en` is not — so deciding it against the *requested* language is
+        only right when there is one. On an empty `language` it used to fall back
+        to `default_language`, which meant an English document on a `cs` default
+        lost NER to a degrade computed for Czech and got an `NLS-NLP-011` naming
+        `cs/NER` — a phase silently missing its input, and a message pointing at
+        the wrong language while the document says `en`. `Analyze` computes its
+        degrade from the resolved language for the same reason.
         """
         ops = _ops_of(spec)
         wanted = set(ops)
+        started = time.perf_counter()
+        used: list[EngineVersion] = []
+        confidence = 1.0
+        resolved = language
 
-        for op in self.unrouted_ops(language or self._config.default_language, ops):
-            messages.append(
-                message(NLS_NLP_011, f"{language or self._config.default_language}/{op.value}")
+        if not language:
+            # A detection-only pass, exactly as Analyze does when `language` is
+            # empty (contracts §2.2) — just ahead of the ops rather than beside
+            # them. It costs one more call into the orchestrator and no backend
+            # hop at all: langid is lingua, in-process, the one engine that never
+            # left the front.
+            detection = self._orchestrator.analyze(
+                text=text, language="", ops={NlpOp.DETECT_LANGUAGE}
             )
+            resolved = detection.language or self._config.default_language
+            confidence = detection.language_confidence
+            used.extend(detection.used)
+            messages.extend(detection.messages)
+
+        for op in self.unrouted_ops(resolved, ops):
+            messages.append(message(NLS_NLP_011, f"{resolved}/{op.value}"))
             wanted.discard(op)
 
-        # No language given ⇒ ask for detection too, exactly as Analyze does when
-        # `language` is empty (contracts §2.2).
-        requested = wanted if language else wanted | {NlpOp.DETECT_LANGUAGE}
-
-        started = time.perf_counter()
         analysis = self._orchestrator.analyze(
-            text=text, language=language, ops=requested
+            text=text, language=resolved, ops=set(wanted)
         )
         elapsed = int((time.perf_counter() - started) * 1000)
 
-        resolved = analysis.language or language or self._config.default_language
         doc = build_document(
             text, _as_engine_results(analysis), language=resolved
         )
@@ -202,6 +222,7 @@ class PipelineRunner:
         # The orchestrator's own diagnostics ride along — a Lindat tier or an S-1
         # violation matters just as much on this rpc as on Analyze.
         messages.extend(analysis.messages)
+        used.extend(analysis.used)
 
         traces = [
             Trace(
@@ -211,7 +232,7 @@ class PipelineRunner:
                 elapsed_ms=elapsed,
             )
         ]
-        return doc, resolved, analysis.language_confidence, list(analysis.used), traces
+        return doc, resolved, confidence, used, traces
 
     def _run_gazetteer(
         self, doc: Document, spec: PipelineConfig, state: LoadedState

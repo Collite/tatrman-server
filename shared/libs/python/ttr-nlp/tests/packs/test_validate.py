@@ -22,7 +22,12 @@ from pathlib import Path
 
 import pytest
 
-from ttrnlp.packs.diag import NLS_PACK_004, NLS_PACK_005
+from ttrnlp.packs.diag import (
+    NLS_PACK_004,
+    NLS_PACK_005,
+    SEVERITY_ERROR,
+    SEVERITY_INFO,
+)
 from ttrnlp.packs.loader import LoadError, load_sources
 from ttrnlp.packs.validate import (
     read_model_queries,
@@ -249,6 +254,55 @@ def test_a_model_with_no_queries_says_so_rather_than_condemning_every_pack(
 
     assert len(diagnostics) == 1
     assert "no queries found" in diagnostics[0].message
+    # INFO, not ERROR: the reader recognising no queries says it met a shape it
+    # has not learned, and the CLI exits 1 on any ERROR — so as an ERROR this
+    # failed the build over a `queries:` block written a way this wheel does not
+    # know yet. See `check_against_model` on the severity split.
+    assert diagnostics[0].severity == SEVERITY_INFO
+
+
+def test_a_model_file_the_reader_cannot_parse_is_a_note_not_a_failure(tmp_path):
+    """The reader is deliberately tolerant, so what it cannot read is not a
+    verdict on the packs. As an ERROR this blocked a push over a templated
+    `.yaml` sitting beside the model — the false NLS-PACK-005 the module
+    docstring calls the worse failure."""
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "broken.yaml").write_text("queries: [\n", encoding="utf-8")
+    (model / "good.yaml").write_text(
+        "queries:\n  - id: faktury_zakaznika\n    parameters: [nazev_zakaznika]\n",
+        encoding="utf-8",
+    )
+
+    diagnostics = validate_sources(
+        [str(VALID_PACKS / "hero-cs-invoices.pack.yaml")], model=str(model)
+    )
+
+    (note,) = diagnostics
+    assert note.severity == SEVERITY_INFO
+    assert "broken.yaml" in note.message
+    # And the pack-side check still ran against what the reader DID understand.
+    assert not [d for d in diagnostics if d.severity == SEVERITY_ERROR]
+
+
+def test_a_pack_side_finding_is_still_an_error(tmp_path):
+    """The split cuts one way only: a query id the model does not declare is the
+    mistake this lane exists to catch, and it must keep failing the build."""
+    tree(tmp_path, {"q.pack.yaml": a_query_pack("nope", "x: 1")})
+    diagnostics = validate_sources([str(tmp_path)], model=str(MODEL))
+
+    assert [d.severity for d in diagnostics] == [SEVERITY_ERROR]
+    assert diagnostics[0].code == NLS_PACK_005
+
+
+def test_a_model_directory_that_is_not_there_is_still_an_error():
+    """The exception to the split. Not a shape the reader failed to understand —
+    the invocation is wrong and the cross-check silently did not happen."""
+    diagnostics = validate_sources([str(VALID_PACKS)], model="/definitely/not/here")
+
+    (diagnostic,) = diagnostics
+    assert diagnostic.severity == SEVERITY_ERROR
+    assert "does not exist" in diagnostic.message
 
 
 def test_the_model_lane_is_off_unless_asked_for(tmp_path):

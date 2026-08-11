@@ -171,6 +171,18 @@ pip install 'ttr-nlp[grpc]'      # + the org.tatrman.nlp.v1 client
 pip install 'ttr-nlp[http]'      # + the HTTP engine-adapter clients
 ```
 
+`[grpc]` is enough on its own: the wheel **carries the generated
+`org.tatrman.*.v1` stubs**, built from `shared/proto` at build time and shipped
+under `ttrnlp/_proto`. There is nothing to generate after installing, and the
+extra's `grpcio`/`protobuf` do not contain them.
+
+A process that already has `org.tatrman.nlp.v1` importable — `services/nlp` and
+its own generated tree — keeps using its own: `ttrnlp.proto` appends the bundled
+copy to `sys.path` rather than prepending it, so there is never a second
+importable copy of one generated module for protobuf's descriptor pool to
+collide over. In a source checkout `generated/` is on `pythonpath` and the
+bundled copy is not consulted at all.
+
 The mandatory dependency set is deliberately tiny and **model-free** —
 `gatenlp`, `pydantic`, `pyyaml`, `jsonschema`. No torch, no Stanza, no spaCy, no
 models. That is what lets the rule engine run in-process inside the engine-free

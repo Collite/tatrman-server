@@ -27,24 +27,24 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from ttrnlp import proto
 from ttrnlp.doc.model import Document
 from ttrnlp.doc.serialize import doc_from_proto
 
 DEFAULT_TIMEOUT_S = 30.0
 
-_MISSING_GRPC = (
-    "NlpClient needs the gRPC extra — install `ttr-nlp[grpc]`, and in a source "
-    "checkout run `uv run python scripts/gen_proto.py`"
-)
-
 
 def _stubs():
-    try:
-        import grpc  # noqa: F401
-        from org.tatrman.nlp.v1 import nlp_pb2, nlp_pb2_grpc
-    except ImportError as exc:  # pragma: no cover - exercised via monkeypatch
-        raise ImportError(_MISSING_GRPC) from exc
-    return nlp_pb2, nlp_pb2_grpc
+    """`(nlp_pb2, nlp_pb2_grpc)` — the extra checked before either is touched.
+
+    `nlp_pb2_grpc` imports `grpc` itself, so a core-only install would otherwise
+    fail with `No module named 'grpc'` rather than the message naming the extra.
+    The check leads because it is also the honest diagnosis: on a core-only
+    install `protobuf` is missing too, so resolving the messages first would
+    blame the stubs — which the wheel does ship — for a missing dependency.
+    """
+    proto.require_grpc()
+    return proto.nlp_pb2(), proto.nlp_pb2_grpc()
 
 
 @dataclass
@@ -115,9 +115,11 @@ class NlpClient:
     """
 
     def __init__(self, target: str, *, timeout_s: float = DEFAULT_TIMEOUT_S):
-        import grpc
-
+        # `_stubs()` first: it is what turns a missing `grpcio` into the message
+        # naming the extra. A bare `import grpc` above it would get there first
+        # and raise the ModuleNotFoundError this client exists to avoid.
         self._pb2, pb2_grpc = _stubs()
+        grpc = proto.require_grpc()
         self._target = target
         self._timeout_s = timeout_s
         self._channel = grpc.aio.insecure_channel(target)
@@ -261,7 +263,7 @@ class NlpClient:
 
 
 def _diagnostic(message: Any) -> Diagnostic:
-    from org.tatrman.common.v1 import response_message_pb2 as common_pb2
+    common_pb2 = proto.common_pb2()
 
     return Diagnostic(
         severity=common_pb2.Severity.Name(message.severity),

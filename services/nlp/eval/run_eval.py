@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -429,6 +430,21 @@ def generate_markdown_report(summary: dict[str, Any], output_path: Path | None =
 def main():
     parser = argparse.ArgumentParser(description="Run NLP evaluation harness")
     parser.add_argument("--url", default="http://localhost:8080", help="NLP service base URL")
+    # The two lanes speak different protocols, so they need different addresses.
+    # `--url` is a REST base URL and `--target` is a gRPC `host:port`; handing
+    # the former to `grpc.aio.insecure_channel` resolves "http://localhost:8080"
+    # as a DNS name and every case fails before the front is even contacted.
+    parser.add_argument(
+        "--target",
+        default="localhost:7271",
+        help="gRPC host:port of the nlp front (the --rules lane; NOT a URL)",
+    )
+    parser.add_argument(
+        "--lane",
+        default=os.getenv("NLP_LANE", ""),
+        help="lane label for the report (default: $NLP_LANE). The front decides "
+        "its own lane — this only records which one the run was against.",
+    )
     parser.add_argument("--corpus", default="", help="Corpus file path")
     parser.add_argument("--output-json", help="Output JSON metrics to file")
     parser.add_argument("--output-md", help="Output markdown report to file")
@@ -676,8 +692,8 @@ def generate_rules_report(summary: dict[str, Any], output_path: Path | None = No
 
 
 def _main_rules(args, corpus_path: Path) -> None:
-    print(f"Running RULE evaluation on {corpus_path} against {args.url}")
-    summary = run_rules_evaluation(args.url, corpus_path)
+    print(f"Running RULE evaluation on {corpus_path} against {args.target}")
+    summary = run_rules_evaluation(args.target, corpus_path, lane=args.lane)
 
     print("\n=== Summary ===")
     print(json.dumps(summary, indent=2))

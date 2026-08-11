@@ -8,13 +8,17 @@ cannot import the service's `generated/` tree: `ttr-nlp` is installed by
 consumers who do not have `services/nlp` at all (`nlp-mcp`, the DFP
 model-validator).
 
-**Generated code is not committed and not shipped.** The `[grpc]` extra brings
-`grpcio`/`protobuf`; the stubs themselves are produced here from
-`shared/proto`, which stays the single canonical source. That is why
-`ttrnlp.doc.serialize` imports them lazily and says something useful when they
-are absent — a consumer who installed the core wheel and never asked for gRPC
-should get an actionable message, not a ModuleNotFoundError from a file they
-have never heard of.
+**Generated code is not committed, but it IS shipped.** `shared/proto` stays the
+single canonical source and nothing under `generated/` goes into git; the wheel
+build runs this script (`hatch_build.py`) and stages the result into the archive
+at `ttrnlp/_proto`, because the `[grpc]` extra brings `grpcio`/`protobuf` and
+neither of those contains `org.tatrman.nlp.v1`. A consumer who pip-installs the
+extra and cannot import the client's own stubs has no way to fix it — there is no
+checkout to run this script in.
+
+`ttrnlp.proto` is the resolver on the installed side: consumer stubs first,
+bundled copy second, and an actionable message rather than a ModuleNotFoundError
+when a core-only install reaches for either.
 
 Run:  uv run python scripts/gen_proto.py
 Output: shared/libs/python/ttr-nlp/generated/org/tatrman/{nlp,common}/v1/*.py(i)

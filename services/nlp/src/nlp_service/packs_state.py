@@ -34,7 +34,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 
-from ttrnlp.packs.diag import Diagnostic
+from ttrnlp.packs.diag import NLS_PACK_001, Diagnostic
 from ttrnlp.packs.diag import error as diagnostic
 from ttrnlp.packs.loader import LoadedState, LoadError, load_sources
 
@@ -102,6 +102,20 @@ class PackState:
             )
         except LoadError as exc:
             return None, list(exc.diagnostics)
+        except Exception as exc:  # noqa: BLE001
+            # The loader turns everything it meets into a diagnostic (its module
+            # docstring: "unreadable sources are diagnostics, not exceptions"),
+            # so reaching here means it met something it did not expect. That is
+            # a bug to fix, not a reason to take Analyze down with it — the whole
+            # point of this class is that a bad pack tree costs RunPipeline and
+            # nothing else. Loud, and reported through the same channel.
+            logger.exception("unexpected error loading packs: %s", exc)
+            return None, [
+                diagnostic(
+                    NLS_PACK_001,
+                    f"unexpected error loading packs: {type(exc).__name__}: {exc}",
+                )
+            ]
         return state, []
 
     def load(self) -> bool:

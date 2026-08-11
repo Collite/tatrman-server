@@ -214,20 +214,41 @@ def _read_url(source: str) -> tuple[list[SourceFile], list[Diagnostic]]:
     return [SourceFile(source=source, path=source, kind=kind, text=response.text)], []
 
 
+#: What reading a file can fail with. `OSError` is the missing/unreadable half;
+#: `UnicodeDecodeError` (a `ValueError`, NOT an `OSError`) is the other one, and
+#: it is the likelier of the two in a cluster: one stray byte in a mounted
+#: configmap is a decode error, and leaving it unguarded turned a diagnostic into
+#: an exception escaping `load_sources` — a boot crash, or an UNKNOWN on
+#: `ReloadPacks`. See the module docstring: unreadable sources are diagnostics.
+_READ_FAILURES = (OSError, UnicodeDecodeError)
+
+
+def _read_file(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
 def _read_dir(source: str, root: Path) -> tuple[list[SourceFile], list[Diagnostic]]:
     files: list[SourceFile] = []
+    problems: list[Diagnostic] = []
     for suffix, kind in ((PACK_SUFFIX, "pack"), (LIST_SUFFIX, "list")):
         for path in sorted(root.rglob(f"*{suffix}")):
             try:
-                text = path.read_text(encoding="utf-8")
-            except OSError as exc:
-                return files, [
+                text = _read_file(path)
+            except _READ_FAILURES as exc:
+                # Collected, not returned: bailing on the first bad file left
+                # every later pack — and every `*.list.yaml`, which is a whole
+                # second suffix pass — unread and unreported, so the author fixed
+                # one unreadable file only to be told about the next. Nothing is
+                # loaded either way (fail-all), so reading on costs nothing and
+                # names every problem in one run.
+                problems.append(
                     error(NLS_PACK_001, f"could not read {path}: {exc}", source=source)
-                ]
+                )
+                continue
             files.append(
                 SourceFile(source=source, path=str(path), kind=kind, text=text)
             )
-    return files, []
+    return files, problems
 
 
 def read_sources(sources: Iterable[str]) -> tuple[list[SourceFile], list[Diagnostic]]:
@@ -259,14 +280,23 @@ def read_sources(sources: Iterable[str]) -> tuple[list[SourceFile], list[Diagnos
                         )
                     ]
                 else:
-                    found, problems = [
-                        SourceFile(
-                            source=source,
-                            path=str(path),
-                            kind=kind,
-                            text=path.read_text(encoding="utf-8"),
-                        )
-                    ], []
+                    try:
+                        found, problems = [
+                            SourceFile(
+                                source=source,
+                                path=str(path),
+                                kind=kind,
+                                text=_read_file(path),
+                            )
+                        ], []
+                    except _READ_FAILURES as exc:
+                        found, problems = [], [
+                            error(
+                                NLS_PACK_001,
+                                f"could not read {path}: {exc}",
+                                source=source,
+                            )
+                        ]
             else:
                 found, problems = [], [
                     error(

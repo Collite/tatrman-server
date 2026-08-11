@@ -44,16 +44,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
+from ttrnlp import proto
 from ttrnlp.doc.model import Document
 
 #: Separator for a flattened dict feature (`feats` -> `feats.Case`).
 NESTED_SEPARATOR = "."
-
-_MISSING_STUBS = (
-    "the org.tatrman.nlp.v1 proto stubs are not available — install the gRPC "
-    "extra (`pip install 'ttr-nlp[grpc]'`) and, in a source checkout, run "
-    "`uv run python scripts/gen_proto.py`"
-)
 
 
 def _stubs():
@@ -63,12 +58,12 @@ def _stubs():
     (⚑NLS-D3) and most consumers never serialise anything. One that does and has
     not asked for the extra should be told which extra, not handed a
     ModuleNotFoundError naming a generated file they have never heard of.
+
+    Resolution — the consumer's stubs first, the wheel's bundled copy second —
+    lives in `ttrnlp.proto`, which is also where the reason for that order is
+    written down.
     """
-    try:
-        from org.tatrman.nlp.v1 import nlp_pb2
-    except ImportError as exc:  # pragma: no cover - exercised via monkeypatch
-        raise ImportError(_MISSING_STUBS) from exc
-    return nlp_pb2
+    return proto.nlp_pb2()
 
 
 # ── Python value -> FeatureValue ─────────────────────────────────────────────

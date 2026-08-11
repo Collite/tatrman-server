@@ -27,6 +27,7 @@ from run_eval import (  # noqa: E402 — the harness is a script, not a package
     RuleCase,
     generate_rules_report,
     load_rule_corpus,
+    main,
     score_rule_case,
     summarize_rules,
 )
@@ -294,3 +295,70 @@ def test_every_corpus_pipeline_exists_in_the_offline_config():
     )
     named = {case.pipeline for case in load_rule_corpus(CORPUS)}
     assert named <= set(config.pipelines), named - set(config.pipelines)
+
+
+# ── the two lanes address the front differently ──────────────────────────────
+
+
+def test_the_rules_lane_gets_a_grpc_target_not_a_rest_url(monkeypatch):
+    """`--rules` talks gRPC, and `grpc.aio.insecure_channel` takes `host:port`.
+
+    Handing it `--url`'s default, an `http://…` base URL, made every case fail on
+    DNS resolution of the literal string before the front was contacted at all —
+    a run that looks like twelve scoring failures and is a wrong address. The
+    compose recipe only worked because it spelled a bare `host:port` into `--url`.
+    """
+    seen = {}
+
+    def fake_run(target, corpus_path, *, lane=""):
+        seen["target"] = target
+        seen["lane"] = lane
+        return summarize_rules([], lane=lane)
+
+    monkeypatch.setattr("run_eval.run_rules_evaluation", fake_run)
+    monkeypatch.setattr(sys, "argv", ["run_eval.py", "--rules", "--corpus", str(CORPUS)])
+    main()
+
+    assert seen["target"] == "localhost:7271"
+    assert "://" not in seen["target"]
+
+
+def test_the_lane_label_reaches_the_report(monkeypatch):
+    """`run_rules_evaluation` and `summarize_rules` both took `lane=` and nothing
+    ever passed it, so the report's `· lane` line was unreachable — and that line
+    is how a report says which of the two arc-gate-2 runs produced it."""
+    seen = {}
+
+    def fake_run(target, corpus_path, *, lane=""):
+        seen["lane"] = lane
+        return summarize_rules([score_rule_case(hero(), [MATCH], [])], lane=lane)
+
+    monkeypatch.setattr("run_eval.run_rules_evaluation", fake_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_eval.py", "--rules", "--corpus", str(CORPUS), "--lane", "option"],
+    )
+    main()
+
+    assert seen["lane"] == "option"
+    assert "· lane `option`" in generate_rules_report(
+        summarize_rules([], lane="option")
+    )
+
+
+def test_the_lane_label_defaults_to_the_env(monkeypatch):
+    """The compose drill flips `NLP_LANE` for the second run; reading it here
+    means the report cannot disagree with the front it ran against."""
+    seen = {}
+    monkeypatch.setenv("NLP_LANE", "default")
+
+    def fake_run(target, corpus_path, *, lane=""):
+        seen["lane"] = lane
+        return summarize_rules([], lane=lane)
+
+    monkeypatch.setattr("run_eval.run_rules_evaluation", fake_run)
+    monkeypatch.setattr(sys, "argv", ["run_eval.py", "--rules", "--corpus", str(CORPUS)])
+    main()
+
+    assert seen["lane"] == "default"

@@ -155,6 +155,13 @@ def create_app() -> FastAPI:
 
     @app.get("/readyz")
     def readyz():
+        # Engines only, and deliberately NOT the pack snapshot — unlike
+        # `GetStatus.ready`, which is both. This is the k8s readinessProbe:
+        # failing it pulls the pod out of service, taking Analyze and
+        # BatchLemmatize down with it, and those need no packs. A YAML typo in a
+        # pack tree must cost RunPipeline and nothing else (`packs_state.py`), so
+        # the pack half is reported on GetStatus where a consumer can read it
+        # without a broken pack tree becoming an outage for Themis and Echo.
         if orchestrator._registry.is_ready():
             return {"status": "ready"}
         return JSONResponse(

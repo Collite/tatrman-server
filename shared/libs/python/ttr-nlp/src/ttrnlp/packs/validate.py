@@ -33,7 +33,7 @@ from typing import Any
 
 import yaml
 
-from ttrnlp.packs.diag import NLS_PACK_005, Diagnostic, error
+from ttrnlp.packs.diag import NLS_PACK_005, Diagnostic, error, info
 from ttrnlp.packs.loader import Gathered, check_pipelines, gather_sources
 from ttrnlp.rules.compiler import CompiledPack
 
@@ -159,18 +159,45 @@ def check_against_model(
     query runs, with the parameter empty. That is the failure this catches, and
     it is precisely the kind that survives every test that does not have the
     model in front of it.
+
+    **The severity split matters as much as the check.** A finding about a *pack*
+    is an ERROR — that is the mistake this lane exists to catch. What the reader
+    says about the *model* is INFO: "I could not read this file", "I recognised
+    no queries at all". The reader is deliberately tolerant (see the module
+    docstring), so those say it met a shape it has not learned, not that anything
+    is wrong — and the TTR-M schema is ``tatrman``'s to change. As ERRORs they
+    exited the CLI 1 and failed the build over a templated ``.yaml`` beside the
+    model or a ``queries:`` block written a way this wheel does not know yet:
+    the false NLS-PACK-005 that blocks a push, which the module docstring calls
+    the worse failure.
+
+    The one exception is ``--model`` naming somewhere that is not there. That is
+    not a shape this reader failed to understand — it is the invocation being
+    wrong, the check silently not happening, and it stays an ERROR.
     """
+    root = Path(model_dir)
+    if not root.exists():
+        return [
+            error(
+                NLS_PACK_005,
+                f"model directory does not exist: {model_dir} — `--model` names "
+                "the tree to cross-check against, so nothing was checked",
+                source=str(model_dir),
+            )
+        ]
+
     queries, notes = read_model_queries(model_dir)
     diagnostics = [
-        error(NLS_PACK_005, note, source=str(model_dir)) for note in notes
+        info(NLS_PACK_005, note, source=str(model_dir)) for note in notes
     ]
 
     if not queries:
         diagnostics.append(
-            error(
+            info(
                 NLS_PACK_005,
                 f"no queries found under {model_dir} — nothing to cross-check "
-                "against, so every `query:` id would be reported as unknown",
+                "against, so the pack-side checks were skipped rather than "
+                "reporting every `query:` id as unknown",
                 source=str(model_dir),
             )
         )

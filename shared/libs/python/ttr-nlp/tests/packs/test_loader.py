@@ -179,6 +179,63 @@ def test_a_source_that_is_not_there_is_a_diagnostic_not_a_crash():
     assert "does not exist" in diagnostic.message
 
 
+def test_a_file_that_cannot_be_read_is_a_diagnostic_not_a_crash(tmp_path):
+    """Same posture as a missing directory, and the likelier failure of the two.
+
+    An unreadable file named directly as a source went through an unguarded
+    `read_text`, so a `PermissionError` escaped `load_sources` entirely — past
+    `PackState._attempt`, which catches `LoadError` — and crashed the boot or
+    came back from `ReloadPacks` as UNKNOWN. What an operator needs is
+    NLS-PACK-001 naming the file.
+    """
+    path = tmp_path / "sealed.pack.yaml"
+    path.write_text(good_pack("sealed"), encoding="utf-8")
+    path.chmod(0o000)
+    try:
+        with pytest.raises(LoadError) as raised:
+            load_sources([str(path)])
+    finally:
+        path.chmod(0o644)
+
+    (diagnostic,) = raised.value.diagnostics
+    assert diagnostic.code == NLS_PACK_001
+    assert "could not read" in diagnostic.message
+
+
+def test_a_file_that_is_not_utf8_is_a_diagnostic_not_a_crash(tmp_path):
+    """`UnicodeDecodeError` is a `ValueError`, NOT an `OSError`, so guarding only
+    the latter left it escaping — and one stray byte in a mounted configmap is
+    the likeliest way a cluster meets this."""
+    (tmp_path / "latin.pack.yaml").write_bytes(
+        b"pack: x\nversion: 1\n# z\xe1kazn\xedk\n"
+    )
+
+    with pytest.raises(LoadError) as raised:
+        load_sources([str(tmp_path)])
+
+    assert raised.value.codes == [NLS_PACK_001]
+    assert "could not read" in raised.value.diagnostics[0].message
+
+
+def test_an_unreadable_file_does_not_hide_the_rest_of_the_tree(tmp_path):
+    """Reading stopped at the first bad file, and `*.list.yaml` is a whole second
+    suffix pass — so an author fixed one unreadable pack only to be told about
+    the next, and the lists were never even looked at."""
+    three_good(tmp_path)
+    (tmp_path / "latin.pack.yaml").write_bytes(b"# z\xe1kazn\xedk\n")
+    (tmp_path / "bad.list.yaml").write_text(
+        "id: nope\nentries: not-a-list\n", encoding="utf-8"
+    )
+
+    with pytest.raises(LoadError) as raised:
+        load_sources([str(tmp_path)])
+
+    messages = " ".join(d.message for d in raised.value.diagnostics)
+    assert "latin.pack.yaml" in messages
+    # The list was reached, parsed and complained about in the SAME run.
+    assert NLS_PACK_003 in raised.value.codes
+
+
 def test_a_single_file_is_a_valid_source():
     state = load_sources([str(VALID_PACKS / "hero-cs-role.pack.yaml")])
     assert sorted(state.packs) == ["hero-cs-role"]

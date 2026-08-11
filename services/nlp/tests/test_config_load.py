@@ -9,7 +9,7 @@ phase-exit runtime smoke).
 
 from __future__ import annotations
 
-from nlp_service.config import load_config
+from nlp_service.config import AppConfig, load_config
 
 
 def test_default_load_config_reads_pinned_models():
@@ -99,3 +99,42 @@ def test_a_typod_lane_keeps_the_safe_one(monkeypatch, caplog):
 def test_the_lane_env_is_case_and_space_tolerant(monkeypatch):
     monkeypatch.setenv("NLP_LANE", "  OPTION ")
     assert load_config().lane == "option"
+
+
+# ── the two halves of the lane mechanism must agree ──────────────────────────
+
+
+def _with_default_overlay() -> AppConfig:
+    """A config that writes an overlay for the lane it is running."""
+    return AppConfig(
+        op_routing={"TOKENIZE.cs": "stanza", "DETECT_LANGUAGE": "langid"},
+        lane="default",
+        lane_overrides={"default": {"TOKENIZE.cs": "experimental"}},
+    )
+
+
+def test_the_active_lanes_overlay_applies_whatever_the_lane_is_called():
+    """`withheld_engines` admits the active lane's overlay engines with no regard
+    for the lane's name, so routing must not skip that overlay for `default`.
+
+    They disagreed: `experimental` below was admitted as an available engine and
+    its routing was dropped on the floor, leaving it reachable only through
+    routing's last-resort "any engine that supports this op" scan — availability
+    gated by one half of the mechanism and routing decided by the other, which is
+    the silent fallback `lane_gated_engines` exists to prevent.
+    """
+    config = _with_default_overlay()
+    assert config.resolved_op_routing()["TOKENIZE.cs"] == "experimental"
+    assert config.withheld_engines() == set()
+
+
+def test_a_config_with_no_overlay_for_its_lane_is_the_base_table():
+    """The shipped shape, unchanged: base routing IS the default lane."""
+    config = AppConfig(
+        op_routing={"TOKENIZE.cs": "stanza"},
+        lane="default",
+        lane_overrides={"option": {"TOKENIZE.cs": "morphodita"}},
+    )
+    assert config.resolved_op_routing() == {"TOKENIZE.cs": "stanza"}
+    # And the option lane's engine stays withheld while `default` is running.
+    assert config.withheld_engines() == {"morphodita"}

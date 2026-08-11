@@ -236,8 +236,18 @@ class NlpServicer(nlp_pb2_grpc.NlpServiceServicer):
     # ---- GetStatus --------------------------------------------------------
 
     async def GetStatus(self, request, context):  # noqa: N802
+        # `ready` is BOTH halves. The registry answers for the engines; the pack
+        # snapshot answers for RunPipeline, and a boot with a broken pack tree
+        # leaves it None while every RunPipeline aborts FAILED_PRECONDITION. On
+        # the registry alone that front reads healthy — which is what a consumer
+        # gating traffic on `ready` acts on, and what the README, `config.yaml`,
+        # `k8s/values.yaml` and `packs_state.py` all already say happens.
+        #
+        # Analyze needs no packs and keeps working either way; `ready` is not a
+        # liveness signal, and the diagnostics for the pack half are on
+        # `pack_state` below rather than inferred from this bit.
         resp = nlp_pb2.StatusResponse(
-            ready=self._registry.is_ready(),
+            ready=self._registry.is_ready() and self._packs.ready,
             lane=self._config.lane,
         )
         # `served_capabilities`, not the full matrix: an op nothing in this lane

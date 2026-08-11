@@ -41,8 +41,16 @@ Homepage = "https://github.com/Collite/tatrman-server"
 Source = "https://github.com/Collite/tatrman-server/tree/master/shared/libs/python/ttr-nlp"
 
 [build-system]
-requires = ["hatchling"]
+# `grpcio-tools` is a BUILD dependency, not a runtime one: `hatch_build.py`
+# runs protoc to generate the `org.tatrman.*.v1` stubs the `[grpc]` extra needs
+# and stages them into the wheel (NL-16). Nothing installs it at runtime.
+requires = ["hatchling", "grpcio-tools>=1.68"]
 build-backend = "hatchling.build"
+
+# Generates + stages the proto stubs. See hatch_build.py for why they are shipped
+# under `ttrnlp/_proto` rather than as a top-level `org/` package.
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
 
 [tool.hatch.build.targets.wheel]
 # This ships EVERY file under src/ttrnlp, not just the .py ones — including the

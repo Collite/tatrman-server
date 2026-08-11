@@ -451,6 +451,7 @@ async def test_a_broken_pack_tree_leaves_analyze_working_and_fails_run_pipeline(
             stub = nlp_pb2_grpc.NlpServiceStub(channel)
 
             status = await stub.GetStatus(nlp_pb2.StatusRequest())
+            assert status.ready is False
             assert status.pack_state.diagnostics
             assert status.pack_state.diagnostics[0].code == "NLS-PACK-001"
             assert status.pack_state.state_id == ""
@@ -690,6 +691,108 @@ async def test_no_pack_sources_is_ready_with_no_pipelines():
             assert "none configured" in raised.value.details()
     finally:
         await server.stop(None)
+
+
+# ── detection decides the degrade set (NL-14 × contracts §2.2) ───────────────
+
+#: Long enough for lingua to be sure, and English on purpose — the point of the
+#: pair below is that the DETECTED language is what the degrade is computed for.
+EN_TEXT = "Show me all invoices from the customer Microsoft for the last quarter"
+
+
+@pytest.mark.asyncio
+async def test_an_empty_language_degrades_against_the_detected_one():
+    """The degrade set is language-specific, so it cannot be decided before the
+    language is.
+
+    On the default lane `NER.cs` is unrouted and `NER.en` is not. Deciding the
+    set against `default_language` when the request left `language` empty meant
+    an English document lost NER to a degrade computed for Czech — and said so
+    in an `NLS-NLP-011` naming `cs/NER`, while the response's own `language`
+    field said `en`. A rule phase keyed on NER then matched nothing, which looks
+    exactly like a pack with a typo in it.
+    """
+    server, port, _ = await boot(a_config(lane="default"))
+    try:
+        resp = await run_pipeline(port, text=EN_TEXT, pipeline="query-patterns")
+    finally:
+        await server.stop(None)
+
+    assert resp.language == "en"
+    degraded = [m.human_message for m in resp.messages if m.code == NLS_NLP_011]
+    # Nothing this pipeline asks for is unroutable in en, so there is no degrade
+    # at all. Computed against `default_language` instead, this list held
+    # `cs/NER` — a degrade named for a language the response does not report.
+    assert degraded == [], degraded
+
+
+@pytest.mark.asyncio
+async def test_an_empty_language_still_degrades_when_the_detected_one_cannot_serve():
+    """The other half: detection finding `cs` on the default lane must still
+    produce the `cs/NER` degrade. The fix is "compute it later", not "compute it
+    less"."""
+    server, port, _ = await boot(a_config(lane="default"))
+    try:
+        resp = await run_pipeline(port, text=TEXT, pipeline="query-patterns")
+    finally:
+        await server.stop(None)
+
+    assert resp.language == "cs"
+    degraded = [m.human_message for m in resp.messages if m.code == NLS_NLP_011]
+    assert any(m.endswith("cs/NER") for m in degraded), degraded
+
+
+@pytest.mark.asyncio
+async def test_detection_still_stamps_the_langid_engine_in_used():
+    """S-1 survives the split into two orchestrator calls: the detection pass is
+    where `DETECT_LANGUAGE`'s `used[]` entry comes from, and dropping it would
+    lose the model identity for the op that decided everything downstream."""
+    server, port, _ = await boot(a_config())
+    try:
+        resp = await run_pipeline(port, text=TEXT, pipeline="query-patterns")
+    finally:
+        await server.stop(None)
+
+    detect = [ev for ev in resp.used if ev.op == "DETECT_LANGUAGE"]
+    assert detect, [ev.op for ev in resp.used]
+    assert detect[0].engine == "langid"
+    assert detect[0].model_version == "lingua-2.0"
+    assert 0.0 < resp.language_confidence <= 1.0
+
+
+# ── ready is both halves (contracts §2.4) ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_a_broken_pack_tree_reports_not_ready():
+    """`ready` is what a consumer gates traffic on, and with a failed pack load
+    every `RunPipeline` answers FAILED_PRECONDITION. Reporting the engine
+    registry alone put a healthy front in front of a service that could not serve
+    the rpc — which is not what the README, `config.yaml`, `k8s/values.yaml` or
+    `packs_state.py` say happens."""
+    server, port, _ = await boot(a_config(packs=[str(BROKEN)]))
+    try:
+        async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
+            stub = nlp_pb2_grpc.NlpServiceStub(channel)
+            status = await stub.GetStatus(nlp_pb2.StatusRequest())
+    finally:
+        await server.stop(None)
+
+    assert status.ready is False
+    assert status.pack_state.diagnostics
+
+
+@pytest.mark.asyncio
+async def test_a_sound_pack_tree_reports_ready():
+    server, port, _ = await boot(a_config())
+    try:
+        async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
+            stub = nlp_pb2_grpc.NlpServiceStub(channel)
+            status = await stub.GetStatus(nlp_pb2.StatusRequest())
+    finally:
+        await server.stop(None)
+
+    assert status.ready is True
 
 
 # ── the unrouted-op helper, directly ─────────────────────────────────────────

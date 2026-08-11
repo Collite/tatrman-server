@@ -138,10 +138,24 @@ class AppConfig(BaseModel):
     # booting, and there are configmaps out there this checkout cannot see.
 
     def resolved_op_routing(self) -> Dict[str, str]:
-        """The routing table for the ACTIVE lane: base, then the overlay."""
+        """The routing table for the ACTIVE lane: base, then its overlay.
+
+        The active lane's overlay applies whatever the lane is called, `default`
+        included. Skipping it for `default` looked harmless — no shipped config
+        writes a `lane_overrides.default` block, and base routing IS the default
+        lane (module docstring) — but it disagreed with `withheld_engines`, which
+        admits the active lane's overlay engines unconditionally. One that did
+        write that block therefore got the engines *registered* and their routing
+        *ignored*, leaving them reachable only through routing's last-resort "any
+        engine that supports this op" scan: availability gated on one half of the
+        mechanism, routing on the other, which is precisely the silent fallback
+        `lane_gated_engines` exists to prevent.
+
+        With no `default` key — every config in the tree — this is `dict(op_routing)`,
+        exactly as before.
+        """
         routing = dict(self.op_routing)
-        if self.lane != LANE_DEFAULT:
-            routing.update(self.lane_overrides.get(self.lane, {}))
+        routing.update(self.lane_overrides.get(self.lane, {}))
         return routing
 
     def lane_gated_engines(self) -> set[str]:
