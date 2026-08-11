@@ -71,6 +71,13 @@ services/nlp/generated/
 # services/golem-py/scripts/gen_proto.py).
 services/golem-py/generated/
 
+# NLS-P3.1 — the ttr-nlp wheel's own nlp.v1 stubs. The wheel ships the client
+# (NL-16) and the Document<->proto serializer, and cannot borrow services/nlp's
+# copy: consumers install `ttr-nlp` without the service (nlp-mcp, the DFP
+# model-validator). Regenerated from shared/proto via that wheel's
+# scripts/gen_proto.py; NOT part of the published wheel.
+shared/libs/python/ttr-nlp/generated/
+
 # uv's per-module virtualenvs. Every Python module here is deps-only (`package =
 # false`), so `.venv/` is pure build output — it was simply never ignored, because
 # nothing had run `uv sync` in a tracked checkout before.

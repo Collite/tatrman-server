@@ -15,6 +15,20 @@ syntax = "proto3";
 // dev/health only (contracts §1). Additive-only over the forked wire shapes:
 // `BatchLemmatize` (RS-6), `GetStatus`/capability matrix (RS-7), `EngineVersion`
 // `used[]` echo (S-1: model identity on the wire), and the `Tier` label.
+//
+// NLS (nlp-suite) additions — contracts.md §2; messages=99 Rule-6 slot on
+// RunPipelineResponse. The annotation surface (§2.1), `RunPipeline` (§2.2),
+// `ReloadPacks` (§2.3) and `StatusResponse` fields 3–5 (§2.4). Every addition is
+// additive: no existing field number, name or type is touched, and
+// `services/nlp/tests/test_contract_shapes.py` freezes the pre-NLS messages
+// field-by-field so a later edit cannot quietly renumber one.
+//
+// ⚑ ONE PROTO WINDOW. The LM effort's `ReportToken` (cz-lemma contracts §6)
+// rides this same batch by ruling ⚑LMP-D3 — deliberately, so `:shared:proto`
+// takes one additive diff rather than two. Its servicer arrives at NLS-P9;
+// until then the front answers `accepted=false` (LM-MORPH-007), which is the
+// honest answer for a sink that is not wired rather than an UNIMPLEMENTED that
+// a caller has to special-case.
 
 package org.tatrman.nlp.v1;
 
@@ -178,14 +192,155 @@ message Capability {
 message StatusResponse {
   bool ready = 1;
   repeated Capability capabilities = 2;  // the capability matrix
+  // NLS additions (contracts §2.4). `NER.cs` in the default lane has NO
+  // capability row — it is unrouted, and that absence plus the NLS-NLP-011
+  // response diagnostic IS the NL-14 explicit degrade. A row with an empty
+  // engine would be the same information said less clearly.
+  string lane = 3;                       // "default" | "option"
+  repeated PipelineInfo pipelines = 4;
+  PackState pack_state = 5;
+}
+
+// ---------------------------------------------------------------------------
+// NLS-P3.1 — the annotation surface (contracts §2.1).
+// ---------------------------------------------------------------------------
+
+// A feature value. Explicit oneof (not google.protobuf.Struct): keeps
+// Kotlin/Python codegen dependency-free and the value domain deliberately small
+// (P-2 — features are data, not objects). Lists of scalars cover gazetteer
+// multi-refs.
+message FeatureValue {
+  oneof kind {
+    string string_value = 1;
+    double number_value = 2;
+    bool   bool_value   = 3;
+    FeatureValueList list_value = 4;
+  }
+}
+
+message FeatureValueList { repeated FeatureValue items = 1; }
+
+message Annotation {
+  uint64 id = 1;                          // unique within the document (gatenlp annid)
+  string type = 2;                        // e.g. Token, Lookup, ORG, QueryPattern
+  int32 char_start = 3;
+  int32 char_end = 4;
+  map<string, FeatureValue> features = 5;
+}
+
+message AnnotationSet {
+  string name = 1;                        // "" = default set (gatenlp convention)
+  repeated Annotation annotations = 2;
+}
+
+message AnnotatedDocument {
+  string text = 1;
+  repeated AnnotationSet annotation_sets = 2;
+  map<string, FeatureValue> document_features = 3;   // e.g. language, pipeline, lane
+}
+
+// ---------------------------------------------------------------------------
+// RunPipeline (contracts §2.2) — a sibling of Analyze, not a mode of it (S-3).
+// Analyze answers "what are the tokens"; this answers "what did the rules make
+// of them", and its response is a document rather than a token list.
+// ---------------------------------------------------------------------------
+
+message RunPipelineRequest {
+  string text = 1;
+  string language = 2;                    // empty ⇒ langid detect (as Analyze)
+  string pipeline = 3;                    // named pipeline (config §7); REQUIRED
+  // Optional output filter: return only these annotation sets/types (empty = all).
+  repeated string include_sets = 4;
+  repeated string include_types = 5;
+}
+
+message RunPipelineResponse {
+  AnnotatedDocument document = 1;
+  string language = 2;
+  double language_confidence = 3;
+  repeated EngineVersion used = 4;        // S-1: model identity, per engine op that ran
+  repeated PhaseTrace phases = 5;         // one entry per executed phase (observability)
+  string trace_id = 6;
+  int64 elapsed_ms = 7;
+  repeated org.tatrman.common.v1.ResponseMessage messages = 99;  // Rule-6 slot
+}
+
+message PhaseTrace {
+  string phase = 1;                       // phase or step name (engine op / gazetteer / rule phase)
+  string kind = 2;                        // "engine" | "gazetteer" | "rules"
+  int32 annotations_added = 3;
+  int64 elapsed_ms = 4;
+}
+
+// ---------------------------------------------------------------------------
+// ReloadPacks (contracts §2.3, NL-15). Sources come from config, never from the
+// request: a reload that could be pointed anywhere is a remote code-load with
+// extra steps. Semantics are re-read everything, validate everything, and swap
+// atomically only on full green — `applied=false` means the previous immutable
+// snapshot is still serving, untouched.
+// ---------------------------------------------------------------------------
+
+message ReloadPacksRequest {}
+
+message ReloadPacksResponse {
+  bool applied = 1;                       // false ⇒ previous snapshot still serving
+  string state_id = 2;                    // opaque id of the now-active snapshot
+  repeated PackDiagnostic diagnostics = 3;
+}
+
+// Field-for-field the wheel's `ttrnlp.packs.diag.Diagnostic` (and the CLI's
+// `--json` output). One shape, so a pack author reading a validation error and an
+// operator reading a reload response are looking at the same text.
+message PackDiagnostic {
+  string source = 1;                      // dir/URL the pack/list came from
+  string pack = 2;                        // pack id ("" for list files)
+  string severity = 3;                    // INFO | ERROR
+  string code = 4;                        // NLS-PACK-0xx (contracts §8)
+  string message = 5;
+}
+
+message PipelineInfo {
+  string name = 1;
+  repeated string steps = 2;
+}
+
+message PackState {
+  string state_id = 1;
+  int32 packs_loaded = 2;
+  int32 lists_loaded = 3;
+  repeated PackDiagnostic diagnostics = 4;  // non-empty only when boot load failed
+}
+
+// ---------------------------------------------------------------------------
+// LM (cz-lemma contracts §6, ⚑LMP-D3) — riding the same proto window.
+// A world-scoped report that a token could not be resolved, or was resolved
+// wrongly. `world` is REQUIRED because queues never cross worlds (LM-5/S-4), and
+// `context_span` is opt-in per world config — a lemmatizer queue that collected
+// surrounding text by default would be collecting user data by default.
+// ---------------------------------------------------------------------------
+
+message ReportTokenRequest {
+  string world = 1;                 // REQUIRED; queues never cross worlds
+  string token = 2;                 // REQUIRED; surface form
+  string verdict = 3;               // "miss" | "resolved_wrong"
+  string context_span = 4;          // OPT-IN per world config; else empty
+  string language = 5;
+}
+
+message ReportTokenResponse {
+  bool accepted = 1;                // false = queue sink disabled
 }
 
 // ---------------------------------------------------------------------------
 // Service (RG-P1.S1). gRPC is the contract; the REST mirror is dev/health only.
+// NLS: the REST mirror gains NO pipeline surface (NL-16).
 // ---------------------------------------------------------------------------
 
 service NlpService {
   rpc Analyze        (AnalyzeRequest)        returns (AnalyzeResponse);
   rpc BatchLemmatize (BatchLemmatizeRequest) returns (BatchLemmatizeResponse);
   rpc GetStatus      (StatusRequest)         returns (StatusResponse);
+  rpc RunPipeline    (RunPipelineRequest)    returns (RunPipelineResponse);   // NLS-P3
+  rpc ReloadPacks    (ReloadPacksRequest)    returns (ReloadPacksResponse);   // NLS-P3
+  rpc ReportToken    (ReportTokenRequest)    returns (ReportTokenResponse);   // LM (NLS-P9)
 }
