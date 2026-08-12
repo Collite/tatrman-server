@@ -17,6 +17,7 @@ extra is named rather than surfacing as a ModuleNotFoundError.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -91,3 +92,69 @@ def test_unresolvable_stubs_name_the_extra_and_the_script(monkeypatch):
         proto.nlp_pb2()
     assert "ttr-nlp[grpc]" in str(raised.value)
     assert "gen_proto.py" in str(raised.value)
+
+
+# ── the build hook's one decision (see hatch_build.py) ───────────────────────
+
+
+def _load_hook_module():
+    """`hatch_build.py` sits at the wheel root, outside `src/` — load it by path."""
+    import importlib.util
+
+    path = Path(__file__).resolve().parent.parent / "hatch_build.py"
+    spec = importlib.util.spec_from_file_location("_ttrnlp_hatch_build", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _hook(module, target: str):
+    hook = module.CustomBuildHook.__new__(module.CustomBuildHook)
+    type(hook).target_name = property(lambda self: target)
+    return hook
+
+
+def test_an_editable_build_never_touches_the_proto_tree(monkeypatch):
+    """An editable install is not a distribution and must not need `shared/proto`.
+
+    `services/nlp`'s Dockerfile is the case that proves it: its deps stage copies
+    the wheel and runs `uv sync --frozen` BEFORE `shared/proto` is copied in, so
+    generating stubs there failed the whole image build — for a consumer that
+    never wanted the bundled copy, because a checkout that path-depends on this
+    wheel has its own `generated/` tree on `pythonpath`.
+    """
+    module = _load_hook_module()
+
+    def explode():
+        raise AssertionError("an editable build must not run gen_proto")
+
+    monkeypatch.setattr(module, "_gen_proto", explode)
+    build_data: dict = {"force_include": {}}
+    _hook(module, "wheel").initialize("editable", build_data)
+
+    assert build_data["force_include"] == {}
+
+
+def test_a_real_wheel_build_refuses_without_the_proto_sources(monkeypatch):
+    """The other half: a distribution with no stubs is the bug this all exists to
+    prevent, so a wheel build that cannot generate them stops rather than ships."""
+    module = _load_hook_module()
+
+    class _NoProto:
+        PROTO_ROOT = Path("/definitely/not/here")
+
+    monkeypatch.setattr(module, "_gen_proto", lambda: _NoProto())
+
+    with pytest.raises(RuntimeError) as raised:
+        _hook(module, "wheel").initialize("standard", {"force_include": {}})
+    assert "proto sources" in str(raised.value)
+
+
+def test_a_non_wheel_target_is_left_alone(monkeypatch):
+    module = _load_hook_module()
+
+    def explode():
+        raise AssertionError("only the wheel target stages stubs")
+
+    monkeypatch.setattr(module, "_gen_proto", explode)
+    _hook(module, "sdist").initialize("standard", {"force_include": {}})

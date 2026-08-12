@@ -73,6 +73,12 @@ dev = [
     "ruff>=0.9.4",
     # protoc + grpc_python plugin, for the P3 client stub generation lane.
     "grpcio-tools>=1.68.0",
+    # The build backend, so `hatch_build.py` is importable under pytest. It is a
+    # BUILD requirement (see `[build-system]`) and normally absent from the test
+    # env, which meant the one hook deciding whether a wheel ships its stubs had
+    # no test at all — and it broke the services/nlp image build the first time
+    # it met a tree without `shared/proto`.
+    "hatchling",
     # The `[http]` extra, so the loader's URL lane can be tested (P2.2). It stays
     # OPTIONAL for consumers — a pack source is a directory in every deployment
     # we run — but an untested lane in a fail-all loader is not a lane.
