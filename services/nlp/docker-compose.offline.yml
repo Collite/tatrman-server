@@ -20,6 +20,12 @@
 #     just test-py services/nlp -m component
 #
 #   # ── NLS-P4.T4: the hero E2E, both lanes (arc gate 2) ──────────────────────
+#   # PREREQUISITE for the eval lanes below (first run in a checkout): the harness
+#   # imports `org.tatrman.nlp.v1` through the wheel's client, and the service's
+#   # stubs are gitignored. `pythonpath` in pyproject.toml is a PYTEST setting and
+#   # does not apply to `uv run python`, so both of these are needed:
+#   cd services/nlp && uv run python scripts/gen_proto.py
+#   export PYTHONPATH=generated        # for every run_eval.py invocation below
 #   # Option lane (as configured above) — both heroes must resolve, no degrade:
 #   cd services/nlp && uv run python eval/run_eval.py --rules --lane option \
 #     --output-json eval/reports/metrics.json --output-md eval/reports/report.md
@@ -91,7 +97,13 @@ services:
       # the lane stops routing to them, cs NER goes unrouted, and RunPipeline
       # answers with NLS-NLP-011 while the pack's fallback rule still reaches the
       # QueryPattern (NLS-P4.T4 records both runs).
-      NLP_LANE: "option"
+      # Interpolated, NOT literal: the T4 drill's second leg is documented as
+      # `NLP_LANE=default docker compose … up -d front`, and against a literal
+      # value that command did nothing at all — the front came back up in the
+      # option lane and produced a report identical to the first leg. A degrade
+      # that silently does not happen is the one failure this recipe exists to
+      # rule out, so the default belongs here and the override has to reach it.
+      NLP_LANE: "${NLP_LANE:-option}"
       # NLS-P4.T4: the shipped config.yaml carries `pipelines: {}` on purpose —
       # pipeline ids name a world's packs, and referring to unmounted packs would
       # fail the boot load everywhere. This file declares the two the hero recipe
