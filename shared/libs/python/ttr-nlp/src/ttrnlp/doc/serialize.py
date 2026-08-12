@@ -34,6 +34,28 @@ keys are re-nested. Anything else unexpected raises rather than being dropped
 silently: a feature that vanishes between two services is the kind of bug that
 takes a day to find.
 
+*A LIST of dicts is JSON, and it is one-way* (⚑ NLS-P9.1). The morph annotator
+writes one — ``Token.analyses``, the ranked readings (LM contracts §1/§5) — and
+the dotted-key trick cannot reach it: flattening a list of records means either
+parallel arrays keyed by field, which nothing else in the estate reads, or a
+nested-map encoding, which §2.1 deliberately does not have. So each record is
+``json.dumps``-ed and the feature travels as a list of strings, sorted keys, one
+string per reading.
+
+That is a real wart and it is the smallest one available. Two contracts meet
+here and disagree: §2.1 says features are data and not objects (P-2), while LM
+contracts §5 says the annotator writes a list of records. Refusing to serialise
+would mean ``RunPipeline`` fails outright on every Czech morph request; dropping
+the feature would be the silent loss this module exists to prevent; widening
+``FeatureValue`` would reopen the proto and undo the one decision §2.1 argues
+for at length. **Coming back, they stay strings** — the object-ness is exactly
+what the wire's value domain does not carry, and a heuristic that re-parsed any
+string starting with ``{`` would corrupt a genuine string feature that happened
+to look like JSON. In-process consumers (the rule engine, the gazetteer, the
+``lemma_any``/``upos_any`` helpers) never cross this boundary and see the
+records themselves; ``lemma``, ``upos`` and ``lemmas`` carry the same answers as
+scalars for everyone who does.
+
 **Filtering lives here too** (``include_sets``/``include_types``, contracts
 §2.2), because a filter applied in the servicer and a filter applied in the
 client would be two subtly different filters within a release.
@@ -41,6 +63,7 @@ client would be two subtly different filters within a release.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
@@ -81,6 +104,14 @@ def _to_value(value: Any, *, where: str):
         return nlp_pb2.FeatureValue(string_value=value)
     if isinstance(value, int | float):
         return nlp_pb2.FeatureValue(number_value=float(value))
+    if isinstance(value, Mapping):
+        # Only reachable from INSIDE a list — `_flatten` has already dealt with
+        # a dict feature at the top level. See the module docstring: one record
+        # per string, sorted keys so two runs serialise identically and a golden
+        # comparison downstream does not flap.
+        return nlp_pb2.FeatureValue(
+            string_value=json.dumps(value, sort_keys=True, ensure_ascii=False)
+        )
     if isinstance(value, Sequence):
         return nlp_pb2.FeatureValue(
             list_value=nlp_pb2.FeatureValueList(

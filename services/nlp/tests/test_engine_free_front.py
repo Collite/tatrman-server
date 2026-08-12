@@ -37,6 +37,13 @@ def test_importing_the_front_pulls_no_engine_libraries():
         # NLS-P3.2: the pipeline surface, which imports the whole wheel.
         "nlp_service.packs_state",
         "nlp_service.pipeline.runner",
+        # NLS-P9.1 (LM): the Czech morphology now runs IN this process. That is
+        # only allowed because `ttrnlp.morph` is stdlib plus a file it reads —
+        # no model, no torch, no native anything. An in-process lemmatizer is
+        # exactly the kind of thing that arrives with a dependency, so the front
+        # asserts it from its own side rather than trusting the wheel's guard.
+        "nlp_service.morph_state",
+        "nlp_service.morph_queue",
     ):
         importlib.import_module(mod)
 
@@ -58,6 +65,7 @@ def test_the_ttr_nlp_wheel_brings_no_engine_with_it():
         "ttrnlp.gazetteer",
         "ttrnlp.packs.loader",
         "ttrnlp.packs.validate",
+        "ttrnlp.morph",
     ):
         importlib.import_module(mod)
 

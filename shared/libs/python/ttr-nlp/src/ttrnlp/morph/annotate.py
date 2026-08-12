@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """The morph annotator: ranked analyses onto token features (contracts §5).
 
-Four features are written on every word token::
+Five features are written on every word token::
 
     lemma             head of the ranked list — what EVERY pre-morph consumer
                       already reads, so nothing downstream needs changing
+    upos              the head reading's part of speech, for the same reason
     lemmas            the ranked list, for the match-if-any gazetteer (LM-8)
     analyses          the full records as dicts (contracts §1)
     morph_provenance  lexicon | statistical | provisional
@@ -15,6 +16,17 @@ payload all keep working unchanged; what they lose is the *other* candidates,
 which is exactly what they lost before as well because the engine only ever gave
 one. Nothing regresses, and a consumer that wants ambiguity now has somewhere to
 read it.
+
+``upos`` is that same hinge, and it was missing until a real pack walked into
+the gap. A JAPE rule saying ``features: {upos: PROPN}`` is ordinary — the hero
+pack's `ProperNounIsANameCandidate` is exactly that — and a pack is data, so
+`ttrnlp.morph.helpers.upos_any` (a callable) is not available to it. Writing
+only ``analyses`` would mean a pipeline that swapped its engine for the lexicon
+kept matching lemmas and silently stopped matching parts of speech: the phase
+still runs, the rule still compiles, nothing fires, and the diff that caused it
+is in a config file three layers away. So the head reading's ``upos`` is written
+beside its ``lemma``, from the same analysis, with the same "best guess with the
+ranking behind it" caveat that ``lemma`` has always carried.
 
 **Who wins over whom.** A lexicon hit always overwrites whatever an engine
 wrote: curated vocabulary is the reason this layer exists. When there is no
@@ -46,6 +58,7 @@ LOOKUP_KINDS = frozenset({"word"})
 
 #: Feature names written by this module (contracts §5).
 FEATURE_LEMMA = "lemma"
+FEATURE_UPOS = "upos"
 FEATURE_LEMMAS = "lemmas"
 FEATURE_ANALYSES = "analyses"
 FEATURE_PROVENANCE = "morph_provenance"
@@ -154,6 +167,13 @@ def annotate_morph(
             token.features[FEATURE_PROVENANCE] = PROVENANCE_STATISTICAL
         else:
             token.features[FEATURE_LEMMA] = analyses[0].lemma
+            if analyses[0].upos:
+                # From the head analysis, beside its lemma — never invented, so
+                # a reading with no part of speech leaves whatever an engine
+                # wrote rather than replacing it with an empty string that
+                # `features: {upos: NOUN}` would then have to be written to
+                # avoid matching.
+                token.features[FEATURE_UPOS] = analyses[0].upos
             token.features[FEATURE_LEMMAS] = list(
                 dict.fromkeys(a.lemma for a in analyses)
             )
@@ -168,6 +188,7 @@ __all__ = [
     "FEATURE_KIND",
     "FEATURE_LEMMA",
     "FEATURE_LEMMAS",
+    "FEATURE_UPOS",
     "FEATURE_PROVENANCE",
     "LOOKUP_KINDS",
     "annotate_morph",

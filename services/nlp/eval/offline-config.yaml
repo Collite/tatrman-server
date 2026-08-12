@@ -90,6 +90,27 @@ packs:
 lists:
   sources: ["/etc/nlp/lists"]
 
+# LM (NLS-P9.1) — the compiled Czech snapshot, mounted by the compose file from
+# `dist/morph` (run `just morph-compile` first). `sources` lists the body and
+# its separable share-alike member files; fail-all, so a directory that did not
+# mount reports LM-MORPH-001 on GetStatus.morph_state and costs `morph-patterns`
+# only.
+#
+# The queue spools to a container-local directory rather than posting: the
+# offline recipe has no morph-studio in it, and `dir:` is what makes the miss
+# queue inspectable from the drill (`docker compose exec front cat
+# /var/lib/nlp/morph-queue/dfp.jsonl`).
+morph:
+  sources:
+    - "/etc/nlp/morph/cs.morph.snap"
+    - "/etc/nlp/morph/core-cac.morph.part"
+    - "/etc/nlp/morph/core-kaikki.morph.part"
+  world: "dfp"
+  queue:
+    sink: "dir:/var/lib/nlp/morph-queue"
+  worlds:
+    dfp: { spans: false, retention_days: 90 }
+
 pipelines:
   # One pipeline per hero pack. They are separate packs (each names its own
   # phases), and `rules.jsonl` names the pipeline per case — so the invoices
@@ -106,6 +127,19 @@ pipelines:
     gazetteer: [dfp-entity-aliases]
     rules:
       - { pack: hero-cs-role, phase: query-match }
+  # The same invoices pack, run over the LEXICON instead of an engine
+  # (NLS-P9.1). `morph: true` replaces TOKENIZE + LEMMATIZE with MORPH_TOKENIZE
+  # + MORPH_ANNOTATE, in-process; `NER` stays, so the lane matrix is untouched —
+  # NameTag in the option lane, NLS-NLP-011 in the default one. Declared BESIDE
+  # `query-patterns` rather than replacing it so a single drill can run both and
+  # compare, which is the only way to see what the swap changed.
+  morph-patterns:
+    morph: true
+    ops: [NER]
+    gazetteer: [dfp-entity-aliases]
+    rules:
+      - { pack: hero-cs-invoices, phase: name-candidates }
+      - { pack: hero-cs-invoices, phase: query-match }
 
 default_language: "cs"
 log_level: "INFO"

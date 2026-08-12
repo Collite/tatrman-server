@@ -14,6 +14,7 @@ from ttrnlp.morph.annotate import (
     FEATURE_LEMMA,
     FEATURE_LEMMAS,
     FEATURE_PROVENANCE,
+    FEATURE_UPOS,
     annotate_morph,
     build_document,
 )
@@ -52,12 +53,13 @@ def test_build_document_carries_our_own_spans():
 # ── T2: what lands on a token ────────────────────────────────────────────────
 
 
-def test_every_word_gets_the_four_features(state):
+def test_every_word_gets_the_five_features(state):
     doc = build_document(HERO)
     assert annotate_morph(doc, state) == 8
     token = by_text(doc, "tržby")
     assert token.features[FEATURE_LEMMA] == "tržba"
     assert token.features[FEATURE_LEMMAS] == ["tržba"]
+    assert token.features[FEATURE_UPOS] == "NOUN"
     assert token.features[FEATURE_PROVENANCE] == PROVENANCE_LEXICON
     analysis = token.features[FEATURE_ANALYSES][0]
     assert analysis["lemma"] == "tržba"
@@ -183,3 +185,57 @@ def test_the_annotator_has_no_statistical_parameter():
     import inspect
 
     assert "statistical" not in inspect.signature(annotate_morph).parameters
+
+
+# ── NLS-P9.1: `upos`, the other half of the compatibility hinge ──────────────
+#
+# A pack is data, so `helpers.upos_any` — a callable — is not available to it,
+# and `features: {upos: PROPN}` is what a rule author actually writes. These
+# tests exist because a service pipeline swapped its engine for the lexicon and
+# a rule matching exactly that silently stopped firing: the phase ran, the rule
+# compiled, nothing matched, and the cause was in a config file three layers
+# away. `analyses[].upos` was there the whole time and no pack could read it.
+
+
+def test_the_head_readings_upos_lands_as_a_flat_feature(state):
+    doc = build_document(HERO)
+    annotate_morph(doc, state)
+    assert by_text(doc, "tržby").features[FEATURE_UPOS] == "NOUN"
+    assert by_text(doc, "loňský").features[FEATURE_UPOS] == "ADJ"
+
+
+def test_upos_comes_from_the_SAME_analysis_as_the_lemma(state):
+    """Not from a vote across readings, and not from the first one that has one:
+    `má` reads as *mít* (VERB) or *můj* (DET), and a token whose `lemma` says
+    one and whose `upos` says the other describes a word that does not exist."""
+    doc = build_document("má")
+    annotate_morph(doc, state)
+    token = by_text(doc, "má")
+    head = token.features[FEATURE_ANALYSES][0]
+    assert (token.features[FEATURE_LEMMA], token.features[FEATURE_UPOS]) == (
+        head["lemma"],
+        head["upos"],
+    )
+
+
+def test_an_engine_upos_stands_where_the_lexicon_is_silent(state):
+    """The mirror of the lemma rule: a stem guess knows an ending, not a word
+    class, and overwriting MorphoDiTa's PROPN with the guess's `X` would be a
+    regression sold as an upgrade."""
+    doc = _engine_document("Kaufland", "Kaufland")
+    tokens(doc)[0].features[FEATURE_UPOS] = "PROPN"
+    annotate_morph(doc, state)
+    token = tokens(doc)[0]
+    assert token.features[FEATURE_PROVENANCE] == PROVENANCE_STATISTICAL
+    assert token.features[FEATURE_UPOS] == "PROPN"
+
+
+def test_a_guess_with_no_engine_beside_it_says_X(state):
+    """UD's honest tag for "no idea". A rule matching PROPN does not match it,
+    which is the same outcome as a missing feature and a more informative one to
+    read in a trace."""
+    doc = build_document("Kaufland")
+    annotate_morph(doc, state)
+    token = by_text(doc, "Kaufland")
+    assert token.features[FEATURE_PROVENANCE] == PROVENANCE_STATISTICAL
+    assert token.features[FEATURE_UPOS] == "X"

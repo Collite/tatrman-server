@@ -154,6 +154,58 @@ op_routing:
 default_language: "cs"
 ```
 
+### Czech morphology — the lexicon front (LM, NLS-P9.1)
+
+A pipeline marked `morph: true` runs the curated Czech lexicon **in this
+process** instead of calling a backend for tokens and lemmas:
+
+```yaml
+morph:
+  sources:                                   # fail-all (NL-15); body, members, overlays
+    - "/etc/nlp/morph/cs.morph.snap"
+    - "/etc/nlp/morph/core-cac.morph.part"
+    - "/etc/nlp/morph/dfp.morph.overlay"
+  world: "dfp"                               # whose misses these are (LM-5)
+  queue:
+    sink: "url:http://morph-studio:8000"     # or dir:<path>, or none
+    spool_dir: "/var/lib/nlp/morph-queue"    # the never-lose-a-miss fallback
+  worlds:
+    dfp: { spans: false, retention_days: 90 }
+
+pipelines:
+  query-patterns:
+    morph: true
+    ops: [NER]        # TOKENIZE + LEMMATIZE are the morph front's now
+    gazetteer: [dfp-entity-aliases]
+    rules: [{ pack: dfp-query-patterns, phase: query-match }]
+```
+
+Env overrides, like the lane: `NLP_MORPH_SOURCES` (comma-separated),
+`NLP_MORPH_WORLD`, `NLP_MORPH_QUEUE_SINK`, `NLP_MORPH_QUEUE_SPOOL_DIR`.
+
+What the swap does and does not change:
+
+| | |
+|---|---|
+| `MORPH_TOKENIZE` + `MORPH_ANNOTATE` | replace `TOKENIZE` + `LEMMATIZE`, in-process |
+| `SENTENCE_SPLIT`, `NER`, `DEP_PARSE` | still engine ops; their sentences and entities merge onto the same document, their **tokens do not** (one substrate, LM-9) |
+| the lane matrix | untouched — `NER.cs` is still unrouted in the default lane and still says so with `NLS-NLP-011` |
+| a non-Czech request | takes the engine path unchanged; the gate is the *snapshot's own* declared language, not config |
+| `GetStatus` | gains a `LEMMATIZE.cs` capability row with `engine: lexicon`, plus `morph_state` (version, rows, forms, worlds, content hash) |
+| `ReloadPacks` | re-reads packs **and** the snapshot; either refusing means neither is swapped |
+
+Failure posture matches the pack half: a `morph: true` pipeline with no sources
+declared anywhere **refuses to boot** (a typo, unfixable by waiting), while a
+declared source that will not load reports `LM-MORPH-001` on
+`GetStatus.morph_state`, costs only the pipelines that need it, and comes good
+on the next `ReloadPacks` (a volume that has not mounted).
+
+`ReportToken` (LM contracts §6) is the other door into the same queue: a
+consumer that saw a *wrong* answer reports it, and the front spools it deduped
+on `(world, token)`. A world this front does not serve gets `accepted=false`
+with `LM-MORPH-007` — never another world's file (S-4). `spans: false` is the
+default and the span is dropped **at the sink**, before anything is written.
+
 ## API
 
 ### POST /v1/analyze
