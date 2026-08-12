@@ -22,6 +22,7 @@ _STUB_MARKER = (
 )
 
 if not _STUB_MARKER.exists():  # pragma: no cover - one-time bootstrap
+    import importlib
     import runpy
 
     try:
@@ -29,7 +30,23 @@ if not _STUB_MARKER.exists():  # pragma: no cover - one-time bootstrap
             str(_WHEEL_DIR / "scripts" / "gen_proto.py"), run_name="__main__"
         )
     except SystemExit:
+        # The script ends in `raise SystemExit(main())`; under `runpy` that
+        # reaches here rather than exiting the interpreter.
         pass
+    finally:
+        # MANDATORY, and in a `finally` so a partial generation cannot skip it.
+        # `pythonpath = ["src", "generated"]` puts `generated/` on `sys.path`
+        # before this file runs. When the directory does not exist yet, the path
+        # finder caches that absence — and creating it a moment later does not
+        # invalidate the cache, so every `import org.tatrman…` fails with
+        # `No module named 'org'` while the stubs sit on disk in plain sight.
+        #
+        # It stayed hidden while the wheel's own editable build generated the
+        # tree as a side effect, which put it there before pytest started. That
+        # build no longer generates anything (an editable install must not need
+        # `shared/proto` — see hatch_build.py), so this bootstrap is now the only
+        # thing creating the directory, and the cache is always stale without it.
+        importlib.invalidate_caches()
 
 FIXTURES = Path(__file__).parent / "fixtures"
 HERO_DIR = FIXTURES / "hero"
