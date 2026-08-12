@@ -1,0 +1,56 @@
+[
+  {
+    "text": "Zákazník",
+    "start": 0,
+    "end": 8,
+    "kind": "word"
+  },
+  {
+    "text": "zaplatil",
+    "start": 9,
+    "end": 17,
+    "kind": "word"
+  },
+  {
+    "text": "fakturu",
+    "start": 18,
+    "end": 25,
+    "kind": "word"
+  },
+  {
+    "text": "(",
+    "start": 26,
+    "end": 27,
+    "kind": "punct"
+  },
+  {
+    "text": "č.",
+    "start": 27,
+    "end": 29,
+    "kind": "abbrev"
+  },
+  {
+    "text": "42",
+    "start": 30,
+    "end": 32,
+    "kind": "number"
+  },
+  {
+    "text": ")",
+    "start": 32,
+    "end": 33,
+    "kind": "punct"
+  },
+  {
+    "text": "včas",
+    "start": 34,
+    "end": 38,
+    "kind": "word"
+  },
+  {
+    "text": ".",
+    "start": 38,
+    "end": 39,
+    "kind": "punct"
+  }
+]

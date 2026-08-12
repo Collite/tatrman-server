@@ -1,0 +1,50 @@
+[
+  {
+    "text": "Porovnej",
+    "start": 0,
+    "end": 8,
+    "kind": "word"
+  },
+  {
+    "text": "tržby",
+    "start": 9,
+    "end": 14,
+    "kind": "word"
+  },
+  {
+    "text": "Kauflandu",
+    "start": 15,
+    "end": 24,
+    "kind": "word"
+  },
+  {
+    "text": "za",
+    "start": 25,
+    "end": 27,
+    "kind": "word"
+  },
+  {
+    "text": "loňský",
+    "start": 28,
+    "end": 34,
+    "kind": "word"
+  },
+  {
+    "text": "rok",
+    "start": 35,
+    "end": 38,
+    "kind": "word"
+  },
+  {
+    "text": "s",
+    "start": 39,
+    "end": 40,
+    "kind": "word"
+  },
+  {
+    "text": "letošním",
+    "start": 41,
+    "end": 49,
+    "kind": "word"
+  }
+]

@@ -52,6 +52,28 @@ FIXTURES = Path(__file__).parent / "fixtures"
 HERO_DIR = FIXTURES / "hero"
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """`--update-golden` — rewrite golden expectations instead of asserting.
+
+    The morph tokenizer's matrix (`tests/morph/golden/`) is checked-in expected
+    output, and hand-editing a dozen JSON offset tables after a deliberate
+    profile change is the kind of chore that ends with the matrix being deleted.
+    The runner that honours this flag also *fails* the run afterwards, so
+    regenerating can never be mistaken for passing.
+    """
+    parser.addoption(
+        "--update-golden",
+        action="store_true",
+        default=False,
+        help="rewrite golden expectation files from current output, then fail",
+    )
+
+
+@pytest.fixture
+def update_golden(request: pytest.FixtureRequest) -> bool:
+    return bool(request.config.getoption("--update-golden"))
+
+
 def load_engines(name: str) -> dict[str, Any]:
     """Load a canned `*.engines.json` case from the hero corpus."""
     return json.loads((HERO_DIR / f"{name}.engines.json").read_text(encoding="utf-8"))

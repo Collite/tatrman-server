@@ -1,0 +1,14 @@
+[
+  {
+    "text": "1 234,50",
+    "start": 0,
+    "end": 8,
+    "kind": "number"
+  },
+  {
+    "text": "Kč",
+    "start": 9,
+    "end": 11,
+    "kind": "word"
+  }
+]

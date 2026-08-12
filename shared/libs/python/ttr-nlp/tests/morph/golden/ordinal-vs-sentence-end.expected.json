@@ -1,0 +1,68 @@
+[
+  {
+    "text": "Uzávěrka",
+    "start": 0,
+    "end": 8,
+    "kind": "word"
+  },
+  {
+    "text": "je",
+    "start": 9,
+    "end": 11,
+    "kind": "word"
+  },
+  {
+    "text": "31.",
+    "start": 12,
+    "end": 15,
+    "kind": "ordinal"
+  },
+  {
+    "text": "12",
+    "start": 16,
+    "end": 18,
+    "kind": "number"
+  },
+  {
+    "text": ".",
+    "start": 18,
+    "end": 19,
+    "kind": "punct"
+  },
+  {
+    "text": "Data",
+    "start": 20,
+    "end": 24,
+    "kind": "word"
+  },
+  {
+    "text": "přijdou",
+    "start": 25,
+    "end": 32,
+    "kind": "word"
+  },
+  {
+    "text": "v",
+    "start": 33,
+    "end": 34,
+    "kind": "word"
+  },
+  {
+    "text": "roce",
+    "start": 35,
+    "end": 39,
+    "kind": "word"
+  },
+  {
+    "text": "2025",
+    "start": 40,
+    "end": 44,
+    "kind": "number"
+  },
+  {
+    "text": ".",
+    "start": 44,
+    "end": 45,
+    "kind": "punct"
+  }
+]
