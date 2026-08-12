@@ -68,12 +68,44 @@ class LangidEngineConfig(BaseModel):
     model_version: str = "lingua-2.0"
 
 
+class LlmEmulatedConfig(BaseModel):
+    """`LLM_EMULATED` — a language model standing in for an engine (RV-6).
+
+    **`enabled: False` is the contract, not a default anyone should flip
+    casually.** An estate turning this on trades a pinned model for a hosted one:
+    the analysis is no longer reproducible across providers, and the conformance
+    suite excludes the ops it touches (RV-P8.3). Off is what every deployment
+    that has a real engine wants, which is all of them but the licence-blocked
+    ones this exists for.
+
+    `model_version` is not authored here — it is derived from the model AND the
+    prompt-template version, because two deployments running the same model on
+    different templates are not the same engine (S-1).
+    """
+
+    enabled: bool = False
+    url: str = ""            # llm-gateway base URL (this repo's LG 2.0 service)
+    model: str = ""          # the model class the emulation runs on (S-1)
+    api_key: str = ""        # `ttrk-` virtual key; the gateway validates it itself
+    timeout_seconds: int = 15  # ⚑RV-3's emulated-rung budget
+    max_retries: int = 2
+    #: The ops this engine is allowed to emulate. LEMMATIZE/POS_TAG/NER is the
+    #: v1 set (⚑ p8-1 T1); anything else is rejected at construction rather than
+    #: quietly ignored.
+    ops: List[str] = Field(default_factory=lambda: ["LEMMATIZE", "POS_TAG", "NER"])
+    languages: List[str] = Field(default_factory=lambda: ["cs", "en"])
+    #: Deployment determinism is a cache, and an unbounded one in a long-running
+    #: front is a leak. LRU.
+    cache_max_entries: int = 1024
+
+
 class EnginesConfig(BaseModel):
     morphodita: BackendConfig = Field(default_factory=BackendConfig)
     nametag3: BackendConfig = Field(default_factory=BackendConfig)
     stanza: BackendConfig = Field(default_factory=BackendConfig)
     spacy: BackendConfig = Field(default_factory=BackendConfig)
     langid: LangidEngineConfig = Field(default_factory=LangidEngineConfig)
+    llm_emulated: LlmEmulatedConfig = Field(default_factory=LlmEmulatedConfig)
 
 
 LANE_DEFAULT = "default"
@@ -193,6 +225,53 @@ class AppConfig(BaseModel):
         return gated - admitted
 
 
+class EngineConfigError(ValueError):
+    """An engine is switched on with a configuration that cannot serve.
+
+    The sibling of `RoutingConfigError`, and raised at the same moment for the
+    same reason: a config that cannot serve must not load half-way. Routing is
+    only half the question — an engine can be routed correctly, register, pass
+    `validate_routing`, and still be unable to answer because it has no address.
+    """
+
+
+def validate_llm_emulated(config: LlmEmulatedConfig) -> None:
+    """An ENABLED emulated engine must be able to reach a model, or refuse to boot.
+
+    Helm's `required` covers the chart path and nothing else, so
+    `NLP_LLM_EMULATED_ENABLED=true` from compose, a dev shell or a bare env left
+    `url` empty, the engine registered, `supports()` answered true (the templates
+    are on disk, which is all it reads), routing validated — and every routed
+    request then spent its transport failures and its backoff discovering what the
+    config already knew. That is precisely the "boots green, cannot serve" state
+    RV-P8.2 made a boot error everywhere else.
+
+    `api_key` is a warning, not an error, and the asymmetry is deliberate: a
+    gateway with no address cannot be called at all, whereas a keyless one is an
+    ordinary local setup. Failing on it would make a working dev deployment
+    unbootable to guard against a 401 the gateway itself reports.
+    """
+    if not config.enabled:
+        return
+    missing = [
+        name
+        for name, value in (("url", config.url), ("model", config.model))
+        if not value.strip()
+    ]
+    if missing:
+        env = ", ".join(f"NLP_LLM_EMULATED_{name.upper()}" for name in missing)
+        raise EngineConfigError(
+            f"`engines.llm_emulated` is ENABLED but has no {' and no '.join(missing)} — "
+            f"set {env} (or the matching `engines.llm_emulated` keys), or turn the "
+            "engine off. An engine that cannot reach a model must not boot green."
+        )
+    if not config.api_key.strip():
+        logger.warning(
+            "engines.llm_emulated is enabled with no api_key — the gateway will "
+            "reject every call unless it is deployed without key validation"
+        )
+
+
 # Lindat dev/eval endpoints (the REMOTE_UNPINNED tier — RG-NLP-002). Selected by
 # NLP_UFAL_ENDPOINT_MODE=lindat; the pinned model ids stay explicit (S-1).
 _LINDAT_MORPHODITA = "https://lindat.mff.cuni.cz/services/morphodita/api/tag"
@@ -238,6 +317,21 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
         config.engines.morphodita.url = url
     if url := os.getenv("NLP_NAMETAG3_URL"):
         config.engines.nametag3.url = url
+
+    # RV-P8.1 — `LLM_EMULATED`. The enable switch is an env var for the same
+    # reason the lane is: it is a deployment decision (and, unlike the others,
+    # one with a licence and a cost attached), and the alternative is a
+    # per-cluster copy of config.yaml differing in one line. The key never goes
+    # in config.yaml at all — it comes from a secret, like every other credential.
+    emulated = config.engines.llm_emulated
+    if flag := os.getenv("NLP_LLM_EMULATED_ENABLED"):
+        emulated.enabled = flag.strip().lower() in ("1", "true", "yes", "on")
+    if url := os.getenv("NLP_LLM_EMULATED_URL"):
+        emulated.url = url
+    if model := os.getenv("NLP_LLM_EMULATED_MODEL"):
+        emulated.model = model
+    if key := os.getenv("NLP_LLM_EMULATED_API_KEY"):
+        emulated.api_key = key
 
     return config
 

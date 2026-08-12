@@ -20,12 +20,28 @@ from typing import Dict, List, Optional, Set
 
 from nlp_service.config import AppConfig, load_config
 from nlp_service.contract import iter_s1_violations
-from nlp_service.diagnostics import RG_NLP_003, RG_NLP_010, message
+from nlp_service.diagnostics import RG_NLP_003, RG_NLP_010, message, split_code
 from nlp_service.engines import EngineRegistry
 from nlp_service.engines.base import EngineResult, EngineVersion, NerEntity, NlpOp, Token
 from nlp_service.floor import FloorEngine
 
 logger = logging.getLogger(__name__)
+
+
+def _engine_failure(engine_name: str, error: str) -> dict:
+    """The response message for an engine that returned nothing but an error.
+
+    An engine that named a registered diagnostic keeps it: `RV-NLP-020` (gateway
+    unreachable) and `RV-NLP-021` (unusable model output) are registered codes
+    with distinct meanings, and flattening both into `engine_error` left a caller
+    filtering `messages[].code` unable to tell an outage from an engine that is
+    answering nonsense — one is waited out, the other is a prompt or a model
+    change. Anything untyped stays `engine_error`, exactly as before.
+    """
+    code, detail = split_code(error)
+    if code:
+        return message(code, f"{engine_name}: {detail}" if detail else engine_name)
+    return {"severity": "ERROR", "code": "engine_error", "message": f"{engine_name} failed: {error}"}
 
 
 class NlpPipelineError(Exception):
@@ -176,9 +192,7 @@ class Orchestrator:
                 continue
             result = engine.analyze(text, language, engine_ops)
             if result.error and not result.tokens and not result.entities:
-                messages.append(
-                    {"severity": "ERROR", "code": "engine_error", "message": f"{engine_name} failed: {result.error}"}
-                )
+                messages.append(_engine_failure(engine_name, result.error))
                 continue
             engine_results[engine_name] = result
             if not primary_engine and result.tokens:
@@ -307,9 +321,7 @@ class Orchestrator:
                     engine_name, result = future.result()
                     engine_results[engine_name] = result
                     if result.error:
-                        messages.append(
-                            {"severity": "ERROR", "code": "engine_error", "message": f"{engine_name} failed: {result.error}"}
-                        )
+                        messages.append(_engine_failure(engine_name, result.error))
                     elif not primary_engine and result.tokens:
                         primary_engine = engine_name
 

@@ -65,6 +65,39 @@ engines:
     model: "lingua"
     model_version: "lingua-2.0"
 
+  # ---- LLM_EMULATED (RV-6, RV-P8) — OFF, and it stays off unless an estate
+  #      deliberately turns it on ----------------------------------------------
+  #
+  # A language model standing in for an engine, through this repo's llm-gateway.
+  # It exists for the estate that CANNOT host a real engine — the UFAL stack is
+  # CC BY-NC-SA (NL-5) — not as a preference. Turning it on trades a pinned model
+  # for a hosted one: the analysis stops being reproducible across providers, the
+  # conformance suite excludes the ops it touches (RV-P8.3), and every route it
+  # serves carries the REMOTE_UNPINNED tier's `RG-NLP-002` caution.
+  #
+  # Nothing routes to it here. Enabling the engine is one decision and routing an
+  # op to it is another — an estate makes both, in `op_routing` or a lane
+  # overlay, and a config that routes to it while it is disabled REFUSES TO LOAD
+  # rather than serving from somewhere else (RV-P8.2).
+  #
+  # `api_key` is deliberately empty in the file: the `ttrk-` virtual key comes
+  # from a secret via NLP_LLM_EMULATED_API_KEY, like every other credential.
+  llm_emulated:
+    # Env overrides (a deployment decision, like the lane): NLP_LLM_EMULATED_ENABLED
+    # / _URL / _MODEL / _API_KEY.
+    enabled: false
+    url: "http://llm-gateway:8080"
+    model: "claude-haiku-4-5"
+    api_key: ""
+    timeout_seconds: 15        # ⚑RV-3's emulated-rung budget
+    max_retries: 2
+    # The v1 emulation set. DEP_PARSE is not promised (a wrong parse is silent);
+    # TOKENIZE/SENTENCE_SPLIT are the degrade floor's, done deterministically and
+    # in-process, and emulating them would spend a model call to do them worse.
+    ops: ["LEMMATIZE", "POS_TAG", "NER"]
+    languages: ["cs", "en"]
+    cache_max_entries: 1024
+
 # ── Lane (NL-4, NLS-P3.2) ────────────────────────────────────────────────────
 #
 # `default` is the lane a deployment can run anywhere: Stanza and spaCy only,
