@@ -15,6 +15,13 @@ set shell := ["bash", "-uc"]
 # tag → ghcr.io/collite/<module>). Kept in lockstep with release-image.yml's map.
 image_modules := "veles query translate validate dispatch charon lex-matcher llm-gateway nlp golem-py chrono geo money grounding-mcp resolver meta-mcp query-mcp lex-matcher-mcp nlp-mcp worker-postgres worker-mssql worker-polars identity health"
 
+# The pure-Python wheels publish-python.yml builds (`python-<lane>/v*` tag →
+# PyPI). Kept in lockstep with that workflow's tag map — the wheel-name → tag-
+# prefix mapping is in `publish` itself, since the two differ (`ttr-nlp` ships
+# from the `python-nlp` tag lane). `otel-config` is shared config, not a
+# published distribution, and is deliberately absent.
+wheel_modules := "ttr-nlp"
+
 # List available recipes
 default:
     @just --list
@@ -324,24 +331,29 @@ charts-publish:
 #
 # Tags the repo; the matching GitHub Actions workflow does the actual
 # build+publish when it sees the tag — publish.yml for `bundle server-libs`
-# (Maven), release-image.yml for everything else (GHCR container images).
+# (Maven), publish-python.yml for `wheel <name>` (PyPI), release-image.yml for
+# everything else (GHCR container images).
 #
 # Internal targets (GH Packages staging / GHCR) get EVERY tag. The external
-# target (Maven Central, `bundle server-libs` only — container images have no
-# external registry) only fires when the tag is marked RELEASE — a published
-# RELEASE version is ALWAYS the bare `x.y.z` (the `-RELEASE` marker is stripped
-# before it ever reaches a registry; see publish.yml). This is the 2026-07-16
-# change: previously bare tags went public and `-rc` suffixes stayed internal —
-# inverted, because internal patches vastly outnumber real releases, and a
-# release now needs to be marked explicitly.
+# targets (Maven Central for `bundle server-libs`, PyPI for `wheel …` —
+# container images have no external registry) only fire when the tag is marked
+# RELEASE — a published RELEASE version is ALWAYS the bare `x.y.z` (the
+# `-RELEASE` marker is stripped before it ever reaches a registry; see
+# publish.yml). This is the 2026-07-16 change: previously bare tags went public
+# and `-rc` suffixes stayed internal — inverted, because internal patches vastly
+# outnumber real releases, and a release now needs to be marked explicitly.
 #
-# `what`: one of the 17 image modules (by name or path — veles, query,
-#   translate, validate, dispatch, lex-matcher, llm-gateway,
-#   nlp, meta-mcp, query-mcp, lex-matcher-mcp, nlp-mcp,
-#   worker-postgres, worker-mssql, worker-polars, identity,
-#   health — GHCR only, RELEASE accepted for interface uniformity but changes
-#   nothing), or `bundle server-libs` (the 11-module Maven library set — GH
-#   Packages always, + Maven Central on RELEASE).
+# `what`: one of the image modules (by name or path — see `image_modules`;
+#   GHCR only, RELEASE accepted for interface uniformity but changes nothing),
+#   `bundle server-libs` (the 14-module Maven library set — GH Packages always,
+#   + Maven Central on RELEASE), or `wheel <name>` (a pure-Python distribution —
+#   see `wheel_modules`; a bare tag BUILDS ONLY, PyPI upload on RELEASE).
+#
+# ⚑ `nlp` and `wheel ttr-nlp` are different artifacts and one letter apart in
+#   intent. `just publish nlp` ships the nlp SERVICE IMAGE to GHCR (internal,
+#   deletable); `just publish wheel ttr-nlp release` ships the ttr-nlp WHEEL to
+#   public PyPI (permanent, and a spent version number never comes back). The
+#   confirm prompt names which one you are about to cut — read it.
 #
 # Usage:
 #   just publish veles                          # internal (GHCR), patch bump
@@ -349,6 +361,8 @@ charts-publish:
 #   just publish services/query patch          # image module, path form
 #   just publish bundle server-libs                 # internal, patch bump
 #   just publish bundle server-libs release set 0.9.2  # + Maven Central, explicit
+#   just publish wheel ttr-nlp                   # build-only proof, no upload
+#   just publish wheel ttr-nlp release set 0.1.0     # + PyPI (PUBLIC), explicit
 publish *args:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -356,12 +370,13 @@ publish *args:
     ARGS=({{args}})
     WHAT="${ARGS[0]:-}"
     NEXT=1
-    if [ "$WHAT" = "bundle" ]; then
-        WHAT="bundle ${ARGS[1]:-}"
+    if [ "$WHAT" = "bundle" ] || [ "$WHAT" = "wheel" ]; then
+        WHAT="$WHAT ${ARGS[1]:-}"
         NEXT=2
     fi
-    if [ -z "$WHAT" ] || [ "$WHAT" = "bundle " ]; then
-        echo "❌ Usage: just publish <module|path|bundle server-libs> [release] [major|minor|patch|set VERSION]" >&2
+    if [ -z "$WHAT" ] || [ "$WHAT" = "bundle " ] || [ "$WHAT" = "wheel " ]; then
+        echo "❌ Usage: just publish <module|path|bundle server-libs|wheel NAME> [release] [major|minor|patch|set VERSION]" >&2
+        echo "   Wheels: {{wheel_modules}}" >&2
         exit 1
     fi
     REST=("${ARGS[@]:$NEXT}")
@@ -389,6 +404,20 @@ publish *args:
         # human echo in the confirm prompt, keep it in sync when publishableLibs changes.
         # 14 since CH-P2 (+transfer-core; server-proto now also carries transfer.v1+metis.v1).
         DESC="the 14 org.tatrman:* Maven libs (publishableLibs — incl. server-proto + transfer-core)"
+    elif [ "${WHAT%% *}" = "wheel" ]; then
+        WHEEL_NAME="${WHAT#wheel }"
+        if ! echo " {{wheel_modules}} " | grep -q " $WHEEL_NAME "; then
+            echo "❌ '$WHEEL_NAME' is not a publishable wheel." >&2
+            echo "   Valid: {{wheel_modules}}" >&2
+            exit 1
+        fi
+        # Wheel name != tag prefix: the distribution is `ttr-nlp`, the tag lane
+        # is `python-nlp`. publish-python.yml owns the mapping; this mirrors it.
+        case "$WHEEL_NAME" in
+            ttr-nlp) PREFIX=python-nlp ;;
+            *) echo "❌ No tag prefix known for wheel '$WHEEL_NAME' — add it here and in publish-python.yml." >&2; exit 1 ;;
+        esac
+        DESC="the ${WHEEL_NAME} wheel (shared/libs/python/${WHEEL_NAME}) → PyPI"
     else
         MOD_PATH=$(just _resolve "$WHAT")
         MOD_NAME=$(basename "$MOD_PATH")
@@ -448,6 +477,16 @@ publish *args:
             LANES="GH Packages (internal) + Maven Central (PUBLIC — counts against Central quota) — published as bare ${NEW_VERSION}"
         else
             LANES="GH Packages (internal) ONLY — not marked RELEASE, no Central step runs"
+        fi
+    elif [ "${WHAT%% *}" = "wheel" ]; then
+        # PyPI has no internal staging equivalent, so a bare tag has no upload
+        # lane at all — it runs the whole BUILD and stops. That is the point of
+        # cutting one: it proves the wheel builds and passes its content checks
+        # (incl. the bundled proto stubs) without spending a public version.
+        if [ "$RELEASE" = true ]; then
+            LANES="PyPI (PUBLIC — permanent, a spent version NEVER comes back) — published as bare ${NEW_VERSION}"
+        else
+            LANES="BUILD + content checks ONLY — not marked RELEASE, nothing is uploaded anywhere"
         fi
     else
         LANES="ghcr.io/collite/${PREFIX}:${NEW_VERSION} (internal registry — no external lane exists for images)"
