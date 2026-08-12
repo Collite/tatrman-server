@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: 'the OTHER shortening: long everywhere except the cell with no ending (smluv), which is why it is
+  a separate flag from `shorten`'
+lemma: smlouva
+vzor: žena
+flags:
+- shorten-zero
+table:
+  Case=Acc|Gender=Fem|Number=Plur:
+  - smlouvy
+  Case=Acc|Gender=Fem|Number=Sing:
+  - smlouvu
+  Case=Dat|Gender=Fem|Number=Plur:
+  - smlouvám
+  Case=Dat|Gender=Fem|Number=Sing:
+  - smlouvě
+  Case=Gen|Gender=Fem|Number=Plur:
+  - smluv
+  Case=Gen|Gender=Fem|Number=Sing:
+  - smlouvy
+  Case=Ins|Gender=Fem|Number=Plur:
+  - smlouvami
+  Case=Ins|Gender=Fem|Number=Sing:
+  - smlouvou
+  Case=Loc|Gender=Fem|Number=Plur:
+  - smlouvách
+  Case=Loc|Gender=Fem|Number=Sing:
+  - smlouvě
+  Case=Nom|Gender=Fem|Number=Plur:
+  - smlouvy
+  Case=Nom|Gender=Fem|Number=Sing:
+  - smlouva
+  Case=Voc|Gender=Fem|Number=Plur:
+  - smlouvy
+  Case=Voc|Gender=Fem|Number=Sing:
+  - smlouvo

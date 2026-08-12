@@ -24,6 +24,7 @@ wants the test side has to ask for it by name, which is what the eval harness
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
@@ -41,6 +42,17 @@ _ID, _FORM, _LEMMA, _UPOS, _XPOS, _FEATS = range(6)
 #: Rows that are not lexicon material. Punctuation has no paradigm, and a
 #: multiword-token line (``8-9``) is a range, not a token.
 _SKIP_UPOS = frozenset({"PUNCT", "SYM", "X"})
+
+#: A lemma is a word: letters, plus the hyphen and apostrophe that live inside
+#: some of them. CAC anonymises figures as SGML-ish entities (``&camount;``,
+#: ``&cyear;``, ``&clabel;``) and they are frequent enough to head the table —
+#: 2,030 occurrences, which would make the placeholder the most common noun in
+#: the language and rank a real word below it.
+_WORD = re.compile(r"^[^\W\d_][\w\-\u2019']*$", re.UNICODE)
+
+
+def is_word(lemma: str) -> bool:
+    return bool(_WORD.match(lemma))
 
 
 @dataclass(frozen=True)
@@ -131,7 +143,7 @@ def read(
             if upos in _SKIP_UPOS:
                 continue
             form, lemma = cells[_FORM], cells[_LEMMA]
-            if not form or not lemma or lemma == "_":
+            if not form or not lemma or not is_word(lemma):
                 continue
             feats = cells[_FEATS] if cells[_FEATS] != "_" else ""
             counts[(form, lemma, upos, _canonical(feats))] += 1
@@ -196,6 +208,7 @@ def attested_for(
 
 __all__ = [
     "SOURCE",
+    "is_word",
     "Attested",
     "CacReport",
     "SplitError",

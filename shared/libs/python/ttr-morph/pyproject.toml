@@ -58,6 +58,7 @@ ttr-nlp = { path = "../ttr-nlp", editable = true }
 dev = [
     "pytest>=8.3.4",
     "ruff>=0.9.4",
+    "simplemma>=2.0.0",
 ]
 
 [tool.pytest.ini_options]

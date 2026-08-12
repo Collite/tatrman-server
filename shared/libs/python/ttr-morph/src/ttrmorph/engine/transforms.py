@@ -122,6 +122,7 @@ def _stem_vowel_map(name: str, spec: Mapping) -> Transform:
     mapping = dict(spec["map"])
     keys = _longest_first(mapping)
     only_with_ending = spec.get("when") == "ending-nonempty"
+    only_without_ending = spec.get("when") == "ending-empty"
 
     def rewrite(stem: str) -> str:
         for i in range(len(stem), -1, -1):
@@ -132,6 +133,8 @@ def _stem_vowel_map(name: str, spec: Mapping) -> Transform:
 
     def apply(stem: str, ending: str) -> tuple[str, str]:
         if only_with_ending and ending == "":
+            return stem, ending
+        if only_without_ending and ending != "":
             return stem, ending
         return rewrite(stem), ending
 

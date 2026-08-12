@@ -96,6 +96,13 @@ class Tags:
     ignore: frozenset[str]
     reject: frozenset[str]
     outside: frozenset[str]
+    compare_ignore: frozenset[str]
+    absent: Mapping[str, Sequence[Sequence[str]]]
+    require: Mapping[str, Sequence[str]]
+    gender_from_entry: frozenset[str]
+    head_gender: Mapping[str, Sequence[str]]
+    entry_gender: Mapping[str, Sequence[str]]
+    defaults: Mapping[str, Sequence[str]]
 
 
 @cache
@@ -107,7 +114,36 @@ def load_tags(path: Path | None = None) -> Tags:
         ignore=frozenset(raw.get("ignore", ())),
         reject=frozenset(raw.get("reject", ())),
         outside=frozenset(raw.get("outside", ())),
+        compare_ignore=frozenset(raw.get("compare_ignore", ())),
+        absent=raw.get("absent", {}),
+        require=raw.get("require", {}),
+        gender_from_entry=frozenset(raw.get("gender_from_entry", ())),
+        head_gender=raw.get("head_gender", {}),
+        entry_gender=raw.get("entry_gender", {}),
+        defaults=raw.get("defaults", {}),
     )
+
+
+def entry_atoms(entry: Mapping, upos: str, tags: Tags) -> list[str] | None:
+    """The atoms the LEXEME carries, which its cells do not state.
+
+    ``None`` means the entry does not say — and an entry that does not say its
+    gender is one this importer must not guess at, because a wrong gender turns
+    every cell into a mismatch and would be counted as the engine's failure.
+    """
+    if upos not in tags.gender_from_entry:
+        return []
+    own = set(entry.get("tags") or ())
+    from_tags = [
+        atom for tag, atoms in tags.entry_gender.items() if tag in own for atom in atoms
+    ]
+    if from_tags:
+        return sorted(set(from_tags))
+    for template in entry.get("head_templates") or ():
+        arg = (template.get("args") or {}).get("1")
+        if arg in tags.head_gender:
+            return sorted(tags.head_gender[arg])
+    return None
 
 
 # ── reading the extract ──────────────────────────────────────────────────────
@@ -123,7 +159,9 @@ def entries(path: Path) -> Iterator[dict]:
                 yield json.loads(line)
 
 
-def table_of(entry: Mapping, tags: Tags) -> tuple[dict[str, set[str]], int]:
+def table_of(
+    entry: Mapping, tags: Tags, *, upos: str = ""
+) -> tuple[dict[str, set[str]], int]:
     """The inflection table an entry carries: ``{feats: {form}}``, plus a count
     of forms dropped as outside the generated subset.
 
@@ -136,6 +174,12 @@ def table_of(entry: Mapping, tags: Tags) -> tuple[dict[str, set[str]], int]:
     """
     table: dict[str, set[str]] = {}
     dropped = 0
+    lexeme = entry_atoms(entry, upos, tags)
+    if lexeme is None:
+        return {}, 0
+    defaults = tags.defaults.get(upos, ())
+    required = set(tags.require.get(upos, ()))
+
     for form in entry.get("forms") or ():
         text = (form.get("form") or "").strip()
         raw = set(form.get("tags") or ())
@@ -149,11 +193,19 @@ def table_of(entry: Mapping, tags: Tags) -> tuple[dict[str, set[str]], int]:
         if raw & tags.outside:
             dropped += 1
             continue
-        atoms = sorted(tags.atoms[tag] for tag in raw if tag in tags.atoms)
+        atoms = [tags.atoms[tag] for tag in raw if tag in tags.atoms]
         if len(atoms) != len(raw) or not atoms:
             dropped += 1
             continue
-        table.setdefault("|".join(atoms), set()).add(text)
+        atoms.extend(lexeme)
+        features = {atom.split("=", 1)[0] for atom in atoms}
+        atoms.extend(
+            atom for atom in defaults if atom.split("=", 1)[0] not in features
+        )
+        if not required <= features | {atom.split("=", 1)[0] for atom in atoms}:
+            dropped += 1
+            continue
+        table.setdefault("|".join(sorted(set(atoms))), set()).add(text)
     return table, dropped
 
 
@@ -168,22 +220,72 @@ def _flag_sets(names: Sequence[str]) -> list[tuple[str, ...]]:
     return out
 
 
-def covers(
-    table: Mapping[str, set[str]], produced: Iterable[tuple[str, str]]
-) -> bool:
-    """Does ``table`` contain every cell of ``produced``, exactly?
+def _normalise(feats: str, ignore: frozenset[str]) -> frozenset[str]:
+    return frozenset(atom for atom in feats.split("|") if atom and atom not in ignore)
 
-    Per-cell set comparison, because a Czech paradigm cell legitimately holds
+
+def _index(
+    table: Mapping[str, set[str]], ignore: frozenset[str]
+) -> dict[frozenset[str], set[str]]:
+    indexed: dict[frozenset[str], set[str]] = {}
+    for feats, forms in table.items():
+        indexed.setdefault(_normalise(feats, ignore), set()).update(forms)
+    return indexed
+
+
+def covers(
+    table: Mapping[str, set[str]],
+    produced: Iterable[tuple[str, str]],
+    *,
+    ignore: frozenset[str] = frozenset(),
+    absent: Sequence[frozenset[str]] = (),
+) -> bool:
+    """Does ``table`` agree with every cell of ``produced``?
+
+    Per-cell *set* comparison, because a Czech paradigm cell legitimately holds
     two forms and a source that lists one of them is not describing the same
     paradigm.
+
+    ⚑ **The two sides split the paradigm at different depths, in both
+    directions**, and neither is wrong. Wiktionary collapses the oblique plural
+    of an adjective into one genderless cell (*nových* for all three) where the
+    engine writes three; the engine writes one masculine singular l-participle
+    where Wiktionary writes an animate and an inanimate one (*jel* twice). So a
+    cell matches against every source cell it is COMPARABLE with — one atom set
+    containing the other — and all of them must agree. That is a real check
+    rather than a relaxation: if the engine produced different forms per gender
+    where the source has one, every one of them is compared against it and the
+    disagreement is caught.
     """
-    generated: dict[str, set[str]] = {}
+    generated: dict[frozenset[str], set[str]] = {}
     for form, feats in produced:
-        generated.setdefault(feats, set()).add(form)
-    for feats, forms in generated.items():
-        if table.get(feats) != forms:
+        generated.setdefault(_normalise(feats, ignore), set()).add(form)
+    if not generated:
+        return False
+
+    indexed = _index(table, ignore)
+    for atoms, forms in generated.items():
+        exact = indexed.get(atoms)
+        if exact is not None:
+            # Subset, not equality: a source cell may list a colloquial or
+            # archaic variant beside the neutral form (*novýma* beside
+            # *novými*, *dělati* beside *dělat*) with no tag to reject it by.
+            # The engine generates the query-relevant subset (GI-1), so a form
+            # it does not make is a form we chose not to model — not evidence
+            # that the pattern is wrong.
+            if not forms <= exact:
+                return False
+            continue
+        # No cell at this depth — compare against every comparable one.
+        matched = False
+        for other, source_forms in indexed.items():
+            if atoms <= other or other <= atoms:
+                if not forms <= source_forms:
+                    return False
+                matched = True
+        if not matched and not any(optional <= atoms for optional in absent):
             return False
-    return bool(generated)
+    return True
 
 
 def classify_projected(
@@ -199,6 +301,9 @@ def classify_projected(
     same table always imports as the same entry, and a re-run diffs cleanly.
     """
     tables = load(lang)
+    tag_tables = load_tags()
+    tables_ignore = tag_tables.compare_ignore
+    optional = [frozenset(group) for group in tag_tables.absent.get(upos, ())]
     flag_sets = _flag_sets(tables.flag_order)
     for name, vzor in tables.vzory.items():
         if vzor.upos != upos:
@@ -213,7 +318,7 @@ def classify_projected(
                 # the pattern. (`engine.classify` had exactly this bug at
                 # p8-1 and the fix is the same one — do not break early.)
                 continue
-            if covers(table, produced):
+            if covers(table, produced, ignore=tables_ignore, absent=optional):
                 return name, tuple(tables.order_flags(flags))
     return None
 
@@ -240,6 +345,8 @@ def do_import(
     taken = set(exclude)
     report = KaikkiReport()
     found: dict[tuple[str, str], dict] = {}
+    best: dict[tuple[str, str], dict[str, set[str]]] = {}
+    seen: set[tuple[str, str]] = set()
 
     for entry in entries(path):
         report.entries_read += 1
@@ -251,46 +358,77 @@ def do_import(
             report.skipped_pos += 1
             continue
         identity = (word, upos)
-        if identity in taken or identity in found:
+        if identity in taken:
             continue
 
-        report.entries_in_target += 1
-        table, dropped = table_of(entry, tags)
+        if identity not in seen:
+            seen.add(identity)
+            report.entries_in_target += 1
+
+        table, dropped = table_of(entry, tags, upos=upos)
+        # ⚑ One word and one part of speech can appear on several lines — the
+        # extract splits by etymology, and only one of them usually carries the
+        # inflection table. Taking the FIRST is how `velký` arrived as a
+        # full-form entry while its own table sat two lines further down. Keep
+        # the richest table instead.
+        if len(table) <= len(best.get(identity, ())):
+            continue
+        best[identity] = table
         report.dropped_forms += dropped
         if len(table) < 2:
-            report.no_table += 1
             continue
 
         answer = classify_projected(word, upos, table, lang=lang)
         if answer is not None:
             vzor, flags = answer
-            report.classified += 1
             found[identity] = vzor_entry(word, upos, vzor, flags, "wiktionary")
-            continue
+        else:
+            found[identity] = forms_entry(
+                word,
+                upos,
+                [(form, feats) for feats, forms in table.items() for form in forms],
+                "wiktionary",
+            )
 
-        report.full_form += 1
-        if len(report.samples) < sample_limit:
-            report.samples.append((word, upos, ""))
-        found[identity] = forms_entry(
-            word,
-            upos,
-            [(form, feats) for feats, forms in table.items() for form in forms],
-            "wiktionary",
-        )
+    for identity, entry in found.items():
+        if entry.get("vzor"):
+            report.classified += 1
+        else:
+            report.full_form += 1
+            if len(report.samples) < sample_limit:
+                report.samples.append((identity[0], identity[1], ""))
+    report.no_table = report.entries_in_target - len(found)
 
     return [found[key] for key in sorted(found)], report
 
 
 def read_targets(path: Path) -> list[str]:
-    """The authored target list (`seed/data/cs/target-words.yaml`)."""
+    """The authored target list (`seed/data/cs/target-words.yaml`).
+
+    The file is ``groups: {name: [lemma, …]}`` with a language header. Walking
+    the whole document for lists rather than reading ``groups`` alone was the
+    first cut, and it silently returned ZERO lemmas — the lists are one level
+    deeper than the walk went, so the entire import ran on frequency targets
+    and the hero vocabulary was never asked for. Read the key the file has.
+    """
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if isinstance(raw, dict):
-        words: list[str] = []
-        for value in raw.values():
-            if isinstance(value, list):
-                words.extend(str(item) for item in value)
-        return words
-    return [str(item) for item in raw or ()]
+    if not isinstance(raw, dict):
+        return [str(item) for item in raw or ()]
+
+    groups = raw.get("groups")
+    if not isinstance(groups, dict):
+        raise ValueError(
+            f"{path}: expected a 'groups' mapping of name -> [lemma, …]; "
+            f"found keys {sorted(raw)}"
+        )
+    words: list[str] = []
+    for name, members in groups.items():
+        if not isinstance(members, list):
+            raise ValueError(f"{path}: group {name!r} is not a list")
+        words.extend(str(item) for item in members)
+    if not words:
+        raise ValueError(f"{path}: the target list is empty")
+    return words
 
 
 def targets_from_frequencies(path: Path, top: int) -> list[str]:
@@ -313,6 +451,7 @@ def targets_from_frequencies(path: Path, top: int) -> list[str]:
 
 __all__ = [
     "SOURCE",
+    "entry_atoms",
     "KaikkiReport",
     "Tags",
     "classify_projected",

@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: the commonest narrowing of `hrad` — a locative singular of -u alone, without the parent's free doublet
+lemma: text
+vzor: hrad-u
+flags: []
+table:
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Plur:
+  - texty
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Sing:
+  - text
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Plur:
+  - textům
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Sing:
+  - textu
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Plur:
+  - textů
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Sing:
+  - textu
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Plur:
+  - texty
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Sing:
+  - textem
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Plur:
+  - textech
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Sing:
+  - textu
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Plur:
+  - texty
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Sing:
+  - text
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Plur:
+  - texty
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Sing:
+  - texte
+classify_as:
+  vzor: hrad-proper
+  flags: []

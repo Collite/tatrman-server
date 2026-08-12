@@ -146,6 +146,34 @@ class Entry(_Base):
     #: Q-7: an unverified generated entry. Overlay compiles only.
     provisional: bool = False
 
+    @model_validator(mode="before")
+    @classmethod
+    def _yaml_booleans(cls, data):
+        """Catch the words YAML 1.1 turns into booleans, by name.
+
+        ``on`` is a Czech pronoun and a YAML boolean, so ``lemma: on`` reaches
+        pydantic as ``True`` and reports as "Input should be a valid string" —
+        which is true and tells an analyst nothing. ``no``, ``off``, ``y`` and
+        ``n`` have the same problem in other languages. The fix is a quote, and
+        this says so.
+        """
+        if not isinstance(data, dict):
+            return data
+        for key in ("lemma", "upos"):
+            if isinstance(data.get(key), bool):
+                raise ValueError(
+                    f"'{key}' is the boolean {data[key]} — YAML 1.1 reads "
+                    "'on'/'off'/'yes'/'no'/'y'/'n' as booleans, and 'on' is a "
+                    "Czech pronoun. Quote it: lemma: \"on\""
+                )
+        for form in data.get("forms") or ():
+            if isinstance(form, dict) and isinstance(form.get("form"), bool):
+                raise ValueError(
+                    f"a form is the boolean {form['form']} — quote it (YAML 1.1 "
+                    "reads 'on'/'off'/'yes'/'no'/'y'/'n' as booleans)"
+                )
+        return data
+
     @model_validator(mode="after")
     def _shape(self) -> Entry:
         if not self.vzor and not self.forms:

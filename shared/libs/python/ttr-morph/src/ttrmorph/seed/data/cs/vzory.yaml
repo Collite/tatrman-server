@@ -69,7 +69,7 @@ spelling:
 # Each flag names a `kind` the driver implements; everything else is
 # parameters. The six kinds are the whole vocabulary — a seventh needs a driver
 # change and a design note, which is the point.
-flag_order: [foreign-stem, fleeting-e, shorten, palatal, indeclinable, acronym]
+flag_order: [foreign-stem, fleeting-e, shorten, shorten-zero, palatal, indeclinable, acronym]
 
 flags:
   # pes/psa, píseň/písně, matka/matek. ONE flag, both directions: the stem has
@@ -94,6 +94,17 @@ flags:
     kind: stem-vowel-map
     when: ending-nonempty
     map: { "ů": "o", "á": "a", "é": "e", "í": "ě", "ou": "u" }
+
+  # The other direction, and it is a different flag rather than a `when:` on
+  # the same one: `dům` is long in the citation form and short everywhere else,
+  # while `smlouva` is long everywhere EXCEPT the cell with no ending at all
+  # (smluv, krav, sil). One lexeme never has both, and a flag that tried to
+  # serve both would have to be told which — which is the thing the analyst is
+  # using the flag to avoid saying.
+  shorten-zero:
+    kind: stem-vowel-map
+    when: ending-empty
+    map: { "ů": "o", "á": "a", "é": "e", "í": "i", "ou": "u" }
 
   # matka/matce, Praha/Praze, vlk/vlci, bratr/bratři. Triggered by the ending,
   # not by the slot: the same rewrite serves the dative-e of a feminine and the
@@ -735,6 +746,27 @@ subvzory:
     slots:
       "Case=Loc|Number=Sing": ["u"]
 
+  # The plain, and by far the commonest, narrowing of `hrad`: a locative
+  # singular of -u alone. The parent allows the free doublet ("na hradu" and
+  # "na hradě" are both standard), and most masculine inanimates do not — so
+  # without this the parent matches almost nothing and every one of those
+  # nouns falls through to whichever narrowing happens to fit.
+  #
+  # ⚑ It is declared BEFORE `hrad-foreign`, and that ordering is the fix for a
+  # real defect: `foreign-stem` is a no-op on a stem with no Latin marker, so
+  # `hrad-foreign` generated exactly this paradigm for `text`, `plán` and `zub`
+  # and claimed 188 ordinary Czech nouns as foreign borrowings. The vzor column
+  # is what the studio shows a human, and a wrong one there is a wrong fact in
+  # front of a reviewer.
+  hrad-u:
+    parent: hrad
+    upos: NOUN
+    hints:
+      capitalized: false
+      lemma_pattern: "[^aeiouyáéíóúůýě]$"
+    slots:
+      "Case=Loc|Number=Sing": ["u"]
+
   # cyklus, mýtus, kosmos. The Latin nominative marker is stripped by the
   # flag; the narrowing is the locative, which is -u only — "v cyklu", never
   # the free doublet `hrad` allows. The same reason `hrad-proper` exists: the
@@ -748,6 +780,63 @@ subvzory:
       lemma_pattern: "(us|os|es)$"
     slots:
       "Case=Loc|Number=Sing": ["u"]
+
+  # rok, zámek, jazyk, dialog, vrch. A velar stem cannot take the vocative -e
+  # (*roce as a vocative is not Czech), and its locative plural is -ích, not
+  # -ech. Both are consequences of the same fact about k/g/h, so they travel
+  # together in one narrowing, with `palatal` implied — the pattern IS "a
+  # masculine inanimate whose stem ends in a velar", and every cell that
+  # alternates does so for that reason. Found by the D-O1 spike: the velar
+  # vocative was the single largest class of noun mismatches.
+  hrad-velar:
+    parent: hrad
+    upos: NOUN
+    implied_flags: [palatal]
+    hints:
+      capitalized: false
+      lemma_pattern: "(k|g|h|ch)$"
+    slots:
+      "Case=Voc|Number=Sing": ["u"]
+      "Case=Loc|Number=Plur": ["ích"]
+
+  # pracovník, zákazník, člověk, úředník. The animate twin of `hrad-velar`,
+  # and the reason the plain `pán` pattern produced *pracovníke* and
+  # *pracovníkech* — 60+ of the sampled misses in one shape.
+  pan-velar:
+    parent: pán
+    upos: NOUN
+    implied_flags: [palatal]
+    hints:
+      capitalized: false
+      lemma_pattern: "(k|g|h|ch)$"
+    slots:
+      "Case=Voc|Number=Sing": ["u"]
+      "Case=Loc|Number=Plur": ["ích"]
+
+  # Athéňan, občan, křesťan, host. The -é animate nominative plural: a closed
+  # class the pattern cannot predict from the stem, which is exactly what a
+  # sub-vzor is for.
+  pan-e:
+    parent: pán
+    upos: NOUN
+    hints:
+      capitalized: false
+      lemma_pattern: "an$"
+    slots:
+      "Case=Nom|Number=Plur": ["é"]
+      "Case=Voc|Number=Plur": ["é"]
+
+  # ulice, tabulka-free -ice feminines: the genitive plural is bare (ulic,
+  # nemocnic), not -í. The soft feminines split here and the citation form
+  # cannot tell you which side a lexeme is on.
+  ruze-ice:
+    parent: růže
+    upos: NOUN
+    hints:
+      capitalized: false
+      lemma_pattern: "ice$"
+    slots:
+      "Case=Gen|Number=Plur": [""]
 
   # Kundera, Svoboda, Nosek-type -a surnames and given names.
   predseda-name:

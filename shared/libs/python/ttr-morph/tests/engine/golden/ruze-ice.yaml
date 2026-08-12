@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: soft feminine with a bare genitive plural (ulic, not *ulicí)
+lemma: ulice
+vzor: ruze-ice
+flags: []
+table:
+  Case=Acc|Gender=Fem|Number=Plur:
+  - ulice
+  Case=Acc|Gender=Fem|Number=Sing:
+  - ulici
+  Case=Dat|Gender=Fem|Number=Plur:
+  - ulicím
+  Case=Dat|Gender=Fem|Number=Sing:
+  - ulici
+  Case=Gen|Gender=Fem|Number=Plur:
+  - ulic
+  Case=Gen|Gender=Fem|Number=Sing:
+  - ulice
+  Case=Ins|Gender=Fem|Number=Plur:
+  - ulicemi
+  Case=Ins|Gender=Fem|Number=Sing:
+  - ulicí
+  Case=Loc|Gender=Fem|Number=Plur:
+  - ulicích
+  Case=Loc|Gender=Fem|Number=Sing:
+  - ulici
+  Case=Nom|Gender=Fem|Number=Plur:
+  - ulice
+  Case=Nom|Gender=Fem|Number=Sing:
+  - ulice
+  Case=Voc|Gender=Fem|Number=Plur:
+  - ulice
+  Case=Voc|Gender=Fem|Number=Sing:
+  - ulice

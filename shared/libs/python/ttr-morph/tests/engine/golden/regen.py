@@ -38,6 +38,56 @@ HERE = Path(__file__).resolve().parent
 
 #: (file stem, lemma, vzor, flags, note)
 CASES: tuple[tuple[str, str, str, tuple[str, ...], str], ...] = (
+    (
+        "hrad-u",
+        "text",
+        "hrad-u",
+        (),
+        "the commonest narrowing of `hrad` — a locative singular of -u alone, "
+        "without the parent's free doublet",
+    ),
+
+    # ── the velar narrowings (NLS-P8.3, from the D-O1 mismatch classes) ──────
+    (
+        "hrad-velar",
+        "rok",
+        "hrad-velar",
+        (),
+        "masculine inanimate, velar stem — vocative -u (never *roce as a "
+        "vocative) and locative plural -ích; `palatal` is implied by the vzor",
+    ),
+    (
+        "pan-velar",
+        "zákazník",
+        "pan-velar",
+        (),
+        "masculine animate, velar stem — the single largest class of noun "
+        "mismatches in the D-O1 sample (pracovníku, not *pracovníce)",
+    ),
+    (
+        "pan-e",
+        "Athéňan",
+        "pan-e",
+        (),
+        "the -é animate nominative plural: a closed class the stem cannot "
+        "predict",
+    ),
+    (
+        "ruze-ice",
+        "ulice",
+        "ruze-ice",
+        (),
+        "soft feminine with a bare genitive plural (ulic, not *ulicí)",
+    ),
+    (
+        "smlouva",
+        "smlouva",
+        "žena",
+        ("shorten-zero",),
+        "the OTHER shortening: long everywhere except the cell with no ending "
+        "(smluv), which is why it is a separate flag from `shorten`",
+    ),
+
     # ── nouns, one per school pattern ────────────────────────────────────────
     ("zena", "žena", "žena", (), "hard feminine"),
     ("ruze", "růže", "růže", (), "soft feminine"),

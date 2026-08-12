@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: masculine inanimate, velar stem — vocative -u (never *roce as a vocative) and locative plural -ích;
+  `palatal` is implied by the vzor
+lemma: rok
+vzor: hrad-velar
+flags: []
+table:
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Plur:
+  - roky
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Sing:
+  - rok
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Plur:
+  - rokům
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Sing:
+  - roku
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Plur:
+  - roků
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Sing:
+  - roku
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Plur:
+  - roky
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Sing:
+  - rokem
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Plur:
+  - rocích
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Sing:
+  - roce
+  - roku
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Plur:
+  - roky
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Sing:
+  - rok
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Plur:
+  - roky
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Sing:
+  - roku
