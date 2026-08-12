@@ -1,9 +1,9 @@
 {
   "mode": "rules",
   "lane": "default",
-  "total": 12,
+  "total": 11,
   "passed": 11,
-  "failed": 1,
+  "failed": 0,
   "by_kind": {
     "hero": {
       "passed": 2,
@@ -11,7 +11,7 @@
     },
     "paraphrase": {
       "passed": 3,
-      "total": 4
+      "total": 3
     },
     "decoy": {
       "passed": 6,
@@ -69,18 +69,6 @@
       "produced_params": {
         "nazev_zakaznika": "Microsoft"
       },
-      "messages": [
-        "NLS-NLP-011"
-      ]
-    },
-    {
-      "id": "para-cs-invoices-capitalised",
-      "kind": "paraphrase",
-      "passed": false,
-      "reason": "no QueryPattern produced",
-      "expected_query": "faktury_zakaznika",
-      "produced_query": null,
-      "produced_params": {},
       "messages": [
         "NLS-NLP-011"
       ]

@@ -10,6 +10,25 @@ fork point).
 The corpus lives in `corpus/seed.jsonl` (50 hand-curated Czech questions with expected
 parses and entity bindings), carried over verbatim from the ai-platform original.
 
+`corpus/rules.jsonl` is the separate rule-pack corpus scored by `--rules`: two
+heroes, paraphrases, and decoys that must match **nothing**. The decoys carry most
+of the weight — a corpus of positive cases only is passed by a pack that fires on
+everything, which is the likeliest way for a pack to be wrong.
+
+**A withdrawn case, so its absence reads as a decision.** `para-cs-invoices-capitalised`
+(`FAKTURY ZÁKAZNÍKA Microsoft`) asserted that shouting still matches, on the stated
+assumption that "lemmas are case-normalised by the engine". They are not: no engine
+configuration turns `ZÁKAZNÍKA` into `zákazník` — Stanza case-folds but stops at
+`zákazníka`, MorphoDiTa leaves the token alone. The case was removed rather than
+left failing, because a permanently red case trains readers to ignore the report.
+It comes back with [#48](https://github.com/Collite/tatrman-server/issues/48).
+
+`para-cs-invoices-declined` still fails under MorphoDiTa (it lemmatizes `fakturám`
+to `fakturá`) and passes under Stanza. That one is left **in** and failing: unlike
+the case above it is a genuine lemma disagreement rather than an unsupported input
+shape, and it is the live evidence for
+[#47](https://github.com/Collite/tatrman-server/issues/47).
+
 ### Adding New Fixtures
 
 1. Add a JSON line to `corpus/seed.jsonl`

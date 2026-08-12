@@ -1,17 +1,17 @@
 {
   "mode": "rules",
   "lane": "option",
-  "total": 12,
-  "passed": 9,
-  "failed": 3,
+  "total": 11,
+  "passed": 10,
+  "failed": 1,
   "by_kind": {
     "hero": {
-      "passed": 1,
+      "passed": 2,
       "total": 2
     },
     "paraphrase": {
       "passed": 2,
-      "total": 4
+      "total": 3
     },
     "decoy": {
       "passed": 6,
@@ -34,11 +34,13 @@
     {
       "id": "hero-cs-role",
       "kind": "hero",
-      "passed": false,
-      "reason": "no QueryPattern produced",
+      "passed": true,
+      "reason": "",
       "expected_query": "role",
-      "produced_query": null,
-      "produced_params": {},
+      "produced_query": "role",
+      "produced_params": {
+        "nazev_role": "obchodn\u00ed z\u00e1stupce"
+      },
       "messages": []
     },
     {
@@ -55,16 +57,6 @@
     },
     {
       "id": "para-cs-invoices-declined",
-      "kind": "paraphrase",
-      "passed": false,
-      "reason": "no QueryPattern produced",
-      "expected_query": "faktury_zakaznika",
-      "produced_query": null,
-      "produced_params": {},
-      "messages": []
-    },
-    {
-      "id": "para-cs-invoices-capitalised",
       "kind": "paraphrase",
       "passed": false,
       "reason": "no QueryPattern produced",

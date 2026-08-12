@@ -67,8 +67,18 @@ def test_the_hero_list_says_what_the_heroes_need():
         "faktura",
         "zákazník",
         "role",
+        # Both lemmatizations of the same value. `matching: lemma` matches what
+        # the ACTIVE lemmatizer produced, and Stanza and MorphoDiTa disagree
+        # here (`zástupce` vs the MorfFlex canonical `zástupec`) — so under the
+        # UFAL lane the second spelling is what makes the role hero fire.
+        # Mitigation only; the real fix is #47.
         "obchodní zástupce",
+        "obchodní zástupec",
     }
+    # Both must carry the SAME value — a variant that resolved to a different
+    # `value:` would make the answer depend on which engine served LEMMATIZE.
+    variants = [e for e in loaded.entries if e.term.startswith("obchodní ")]
+    assert {e.features["value"] for e in variants} == {"obchodni_zastupce"}
 
 
 def test_annotation_defaults_to_lookup():
