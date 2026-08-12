@@ -33,6 +33,13 @@ from ttrnlp.morph.records import (
     LookupResult,
     fold,
 )
+from ttrnlp.morph.snapshot import (
+    LoadError,
+    MorphManifest,
+    MorphState,
+    MorphStats,
+    load_morph,
+)
 from ttrnlp.morph.tokenize import Token, tokenize
 
 __all__ = [
@@ -43,8 +50,13 @@ __all__ = [
     "PROVENANCE_STATISTICAL",
     "Analysis",
     "Generated",
+    "LoadError",
     "LookupResult",
+    "MorphManifest",
+    "MorphState",
+    "MorphStats",
     "Token",
     "fold",
+    "load_morph",
     "tokenize",
 ]

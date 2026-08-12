@@ -1,0 +1,11 @@
+#morph-overlay v1
+#language: cs
+#version: 0.0.0-test
+#world: world-test
+#content-hash: sha256:54b6285e383cbfdf6708aa2a25cb6d69facf503c033b75d6a9f697721e40ec8d
+#rows: 4
+form	lemma	upos	feats	vzor	flags	rank	layer	provenance
+Kaufland	Kaufland	PROPN	Case=Nom|Number=Sing	hrad		0	world-test	lexicon
+Kauflandu	Kaufland	PROPN	Case=Dat|Number=Sing;Case=Gen|Number=Sing;Case=Loc|Number=Sing	hrad		0	world-test	lexicon
+Kauflandem	Kaufland	PROPN	Case=Ins|Number=Sing	hrad		0	world-test	provisional
+moc	moc	NOUN	Case=Acc|Number=Sing;Case=Nom|Number=Sing	žena		0	world-test	lexicon

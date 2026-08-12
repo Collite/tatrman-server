@@ -20,11 +20,18 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 import subprocess
 import sys
 import tomllib
+from importlib import metadata
 
 import pytest
+
+
+def canonical(name: str) -> str:
+    """PEP 503 name normalisation — `typing_extensions` == `typing-extensions`."""
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 MORPH = pathlib.Path(__file__).resolve().parents[2] / "src" / "ttrnlp" / "morph"
 PYPROJECT = pathlib.Path(__file__).resolve().parents[2] / "pyproject.toml"
@@ -43,22 +50,53 @@ BANNED_VENDORS = (
 )
 
 
-def _mandatory_distributions() -> set[str]:
-    """Top-level import names of the wheel's mandatory dependencies.
-
-    Read from `pyproject.toml` rather than hardcoded: the point of the check is
-    that `morph/` imports nothing the wheel did not *already* require, so the
-    allowance has to move when the requirement does.
-    """
+def _declared_mandatory() -> set[str]:
+    """Distribution names from `[project.dependencies]`, extras stripped."""
     declared = tomllib.loads(PYPROJECT.read_text())["project"]["dependencies"]
     names = set()
     for spec in declared:
-        name = spec.split("[")[0].split("==")[0].split(">")[0].split("<")[0].strip()
-        names.add(name.replace("-", "_"))
-    # Import name != distribution name for two of them, and both are pulled in
-    # transitively by gatenlp anyway.
-    names |= {"yaml", "sortedcontainers", "iobes"}
+        name = re.split(r"[<>=!\[; ]", spec, maxsplit=1)[0].strip()
+        if name:
+            names.add(canonical(name))
     return names
+
+
+def _mandatory_distributions() -> set[str]:
+    """Top-level import names the wheel's mandatory dependency set may provide.
+
+    Read from `pyproject.toml` and expanded transitively rather than
+    hardcoded, because the check is "`morph/` imports nothing the wheel did not
+    *already* require" — so the allowance has to move when the requirement
+    does, and it has to include what those requirements themselves pull in
+    (pydantic brings `pydantic_core`; gatenlp brings `sortedcontainers`).
+
+    Extras are deliberately not followed. `httpx` is in the `[http]` extra and a
+    morph module reaching for it would be a real finding, not an allowance.
+    """
+    closure: set[str] = set()
+    frontier = list(_declared_mandatory())
+    while frontier:
+        dist = frontier.pop()
+        if dist in closure:
+            continue
+        closure.add(dist)
+        try:
+            requires = metadata.requires(dist) or []
+        except metadata.PackageNotFoundError:  # pragma: no cover — thin env
+            continue
+        for requirement in requires:
+            # `foo>=1 ; extra == "bar"` — an extra's dependency is not ours.
+            if ";" in requirement and "extra ==" in requirement:
+                continue
+            name = re.split(r"[<>=!\[; ]", requirement, maxsplit=1)[0].strip()
+            if name:
+                frontier.append(canonical(name))
+
+    modules = set()
+    for module, dists in metadata.packages_distributions().items():
+        if {canonical(d) for d in dists} & closure:
+            modules.add(module)
+    return modules
 
 
 def _morph_modules() -> list[str]:
