@@ -129,8 +129,45 @@ _WORD = rf"{_W}+(?:-{_W}+)*"
 #: that makes a number a percentage.
 _PUNCT = r"[.,;:!?…()\[\]{}\"'„“”‚‘’«»–—/\\-]"
 
+#: Endings the fallback chain may strip from an unknown form, longest first.
+#:
+#: This is a *guess* list, not a paradigm: the real endings live in the vzor
+#: tables in `ttr-morph`, and anything that reaches this list is a word the
+#: lexicon does not have. It is short and biased towards the noun cases the
+#: query domain actually produces (*Kauflandu*, *Kauflandem*, *Nováková*),
+#: because a long list guesses confidently and wrongly — and every guess it
+#: makes is a token the enrichment loop then has to un-learn.
+GUESS_SUFFIXES = (
+    "ovi",
+    "ami",
+    "ách",
+    "ími",
+    "ých",
+    "ému",
+    "ého",
+    "ům",
+    "ám",
+    "em",
+    "ou",
+    "mi",
+    "ým",
+    "ím",
+    "ě",
+    "u",
+    "y",
+    "e",
+    "a",
+    "o",
+    "i",
+    "í",
+    "ý",
+    "á",
+    "é",
+)
+
 CS = Profile(
     name="cs",
+    guess_suffixes=GUESS_SUFFIXES,
     rules=(
         Rule(name="code", kind="code", pattern=_CODE),
         Rule(name="number", kind="number", pattern=_NUMBER),

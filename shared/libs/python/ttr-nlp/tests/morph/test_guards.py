@@ -33,7 +33,8 @@ def canonical(name: str) -> str:
     """PEP 503 name normalisation — `typing_extensions` == `typing-extensions`."""
     return re.sub(r"[-_.]+", "-", name).lower()
 
-MORPH = pathlib.Path(__file__).resolve().parents[2] / "src" / "ttrnlp" / "morph"
+SRC = pathlib.Path(__file__).resolve().parents[2] / "src" / "ttrnlp"
+MORPH = SRC / "morph"
 PYPROJECT = pathlib.Path(__file__).resolve().parents[2] / "pyproject.toml"
 
 #: Morphology stacks that must never be a runtime dependency of this module.
@@ -48,6 +49,14 @@ BANNED_VENDORS = (
     "simplemma",
     "majka",
 )
+
+
+#: Names that appear in `sys.modules` without anyone importing them. Cython
+#: injects `cython_runtime` the first time a compiled extension loads — here,
+#: `pydantic_core` — so it is an artefact of a dependency we already have,
+#: not a dependency of its own. No distribution provides it, so the
+#: `packages_distributions()` lookup below can never account for it.
+_PSEUDO_MODULES = frozenset({"cython_runtime"})
 
 
 def _declared_mandatory() -> set[str]:
@@ -153,12 +162,105 @@ def test_importing_a_morph_module_pulls_in_nothing_new(module: str):
         for name in delta
         if not name.startswith("_")
         and name not in sys.stdlib_module_names
+        and name not in _PSEUDO_MODULES
         and name != "ttrnlp"
     }
     unexpected = sorted(third_party - _mandatory_distributions())
     assert not unexpected, (
         f"importing {module} pulled in {unexpected} — `ttrnlp.morph` adds ZERO "
         "mandatory dependencies (architecture §2)"
+    )
+
+
+def test_nothing_in_the_wheel_wires_the_statistical_seam():
+    """NLS-P7.3 T7 — the seam ships unwired, and stays that way.
+
+    `chain.resolve` takes a ``statistical=`` callable and Wave C fills it. If
+    anything inside the wheel passed one, the seam would have a caller — and a
+    seam with a caller is not a seam, it is a dependency that happens to be
+    ``None`` today. `annotate_morph` deliberately has no such parameter to
+    forward, so this check has something to enforce rather than something to
+    hope for.
+
+    The task list spells this as ``rg "statistical=" src/ttrnlp/ | grep -v
+    "=None"``. Read as an AST rather than as text so that *documenting* the
+    seam stays legal — the same trade the P2 scoring guard made.
+    """
+    offenders = []
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            for keyword in node.keywords:
+                if keyword.arg != "statistical":
+                    continue
+                passed = getattr(keyword.value, "value", "not-none")
+                if passed is not None:
+                    offenders.append(f"{path.name}:{node.lineno}")
+    assert offenders == [], (
+        "something in the wheel supplies a statistical backend — Wave C wires "
+        f"the seam, v1 ships it unwired: {offenders}"
+    )
+
+
+def test_the_morph_modules_have_no_scoring_dimension():
+    """NL-17 under `morph/`, the AST way.
+
+    The verify block asks for ``rg -i "score|fuzzy|levenshtein"
+    src/ttrnlp/morph/`` to come back empty. Taken literally that also forbids
+    *saying* that ranking is not scoring — which `chain.py` and `records.py`
+    both need to say, at length, because "just a confidence field" is exactly
+    how the line erodes. So identifiers and real string values are checked, and
+    prose is left free. `tests/test_invariants.py` makes the same trade for the
+    deterministic gazetteer, in the same words.
+    """
+    scoring = (
+        "score",
+        "scores",
+        "scoring",
+        "confidence",
+        "threshold",
+        "fuzzy",
+        "levenshtein",
+        "similarity",
+        "edit_distance",
+    )
+    offenders = []
+    for path in sorted(MORPH.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        docstrings = {
+            id(node.body[0].value)
+            for node in ast.walk(tree)
+            if isinstance(
+                node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
+            )
+            and getattr(node, "body", None)
+            and isinstance(node.body[0], ast.Expr)
+            and isinstance(node.body[0].value, ast.Constant)
+            and isinstance(node.body[0].value.value, str)
+        }
+        for node in ast.walk(tree):
+            found = ""
+            if isinstance(node, ast.Name):
+                found = node.id
+            elif isinstance(node, ast.Attribute):
+                found = node.attr
+            elif isinstance(node, ast.arg):
+                found = node.arg
+            elif isinstance(node, ast.FunctionDef | ast.ClassDef):
+                found = node.name
+            elif (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and id(node) not in docstrings
+            ):
+                found = node.value
+            if any(name in found.lower() for name in scoring):
+                offenders.append(f"{path.name}:{getattr(node, 'lineno', 0)}: {found!r}")
+    assert offenders == [], (
+        "morphology answers with ranked candidate sets, never with scores "
+        f"(NL-17 / design §10): {offenders}"
     )
 
 

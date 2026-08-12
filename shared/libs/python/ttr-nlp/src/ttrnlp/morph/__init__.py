@@ -22,6 +22,10 @@ engine-free `nlp` front, and `tests/morph/test_guards.py` keeps it that way.
 
 from __future__ import annotations
 
+from ttrnlp.morph.annotate import annotate_morph, build_document
+from ttrnlp.morph.chain import VERDICT_MISS, VERDICT_RESOLVED_WRONG, resolve
+from ttrnlp.morph.gazetteer import MorphGazetteer, build_morph_gazetteer
+from ttrnlp.morph.helpers import feats_has, lemma_any, upos_any
 from ttrnlp.morph.records import (
     MATCHED_EXACT,
     MATCHED_FOLDED,
@@ -48,15 +52,25 @@ __all__ = [
     "PROVENANCE_LEXICON",
     "PROVENANCE_PROVISIONAL",
     "PROVENANCE_STATISTICAL",
+    "VERDICT_MISS",
+    "VERDICT_RESOLVED_WRONG",
     "Analysis",
     "Generated",
     "LoadError",
     "LookupResult",
+    "MorphGazetteer",
     "MorphManifest",
     "MorphState",
     "MorphStats",
     "Token",
+    "annotate_morph",
+    "build_document",
+    "build_morph_gazetteer",
+    "feats_has",
     "fold",
+    "lemma_any",
     "load_morph",
+    "resolve",
     "tokenize",
+    "upos_any",
 ]

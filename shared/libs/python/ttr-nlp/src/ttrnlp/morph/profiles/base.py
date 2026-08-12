@@ -91,6 +91,11 @@ class Profile:
     name: str
     rules: tuple[Rule, ...]
     attach: tuple[AttachRule, ...] = ()
+    #: Inflectional endings the fallback chain may strip from an unknown form,
+    #: **longest first** (`chain.py`). Language data like everything else here:
+    #: guessing Czech endings off a Slovak word is worse than admitting the
+    #: miss, so a profile that has not declared any gets no stem guessing.
+    guess_suffixes: tuple[str, ...] = ()
 
 
 __all__ = ["KINDS", "AttachRule", "Profile", "Rule"]

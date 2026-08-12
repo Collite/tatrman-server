@@ -120,7 +120,7 @@ class LookupResult:
     (B-F3): when *byt* is looked up and both *byt* and *být* fold to it, the
     entry that matched the form **as written** comes first. A folded match is a
     weaker piece of evidence than an exact one and the order is the only place
-    that difference survives — there is no score to carry it.
+    that difference survives — nothing else carries it, by design.
     """
 
     form: str

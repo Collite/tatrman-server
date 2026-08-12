@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P7.3.T6 — the vocabulary the LM hero matches on.
+#
+# `matching: lemma` is what the file DECLARES, because it is a lemma list and
+# the schema has one word for that. What runs it is the match-if-any gazetteer
+# (LM-8), which walks every candidate lemma the morph annotator wrote rather
+# than only the head of the list — the emitted `Lookup`s therefore record
+# `matching: morph-lemma`, so a reader can tell which engine matched them.
+list: lm-hero
+version: 1
+matching: lemma
+annotation: Lookup
+source:
+  world: lm-test
+  origin: "fixture@NLS-P7.3"
+entries:
+  # "tržby" in the text; the list says the lemma once and the declension is the
+  # snapshot's problem, not the list author's (contracts §4).
+  - term: tržba
+    features:
+      kind: entity_alias
+      entity: trzba
+
+  - term: rok
+    features:
+      kind: entity_alias
+      entity: rok
+
+  # The fold-collision trap, as vocabulary: a list entry written WITHOUT
+  # diacritics must still match a token the lexicon read as `být`, because the
+  # candidate set carries both and nothing but rank separates them.
+  - term: byt
+    features:
+      kind: entity_alias
+      entity: byt
