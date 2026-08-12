@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: Latin -um borrowings
+lemma: muzeum
+vzor: muzeum-um
+flags: []
+table:
+  Case=Acc|Gender=Neut|Number=Plur:
+  - muzea
+  Case=Acc|Gender=Neut|Number=Sing:
+  - muzeum
+  Case=Dat|Gender=Neut|Number=Plur:
+  - muzeím
+  Case=Dat|Gender=Neut|Number=Sing:
+  - muzeu
+  Case=Gen|Gender=Neut|Number=Plur:
+  - muzeí
+  Case=Gen|Gender=Neut|Number=Sing:
+  - muzea
+  Case=Ins|Gender=Neut|Number=Plur:
+  - muzei
+  Case=Ins|Gender=Neut|Number=Sing:
+  - muzeem
+  Case=Loc|Gender=Neut|Number=Plur:
+  - muzeích
+  Case=Loc|Gender=Neut|Number=Sing:
+  - muzeu
+  Case=Nom|Gender=Neut|Number=Plur:
+  - muzea
+  Case=Nom|Gender=Neut|Number=Sing:
+  - muzeum
+  Case=Voc|Gender=Neut|Number=Plur:
+  - muzea
+  Case=Voc|Gender=Neut|Number=Sing:
+  - muzeum

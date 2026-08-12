@@ -1,0 +1,100 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: soft adjective, positive degree
+lemma: jarní
+vzor: jarní
+flags: []
+table:
+  Animacy=Anim|Case=Acc|Degree=Pos|Gender=Masc|Number=Sing:
+  - jarního
+  Animacy=Anim|Case=Nom|Degree=Pos|Gender=Masc|Number=Plur:
+  - jarní
+  Animacy=Anim|Case=Voc|Degree=Pos|Gender=Masc|Number=Plur:
+  - jarní
+  Animacy=Inan|Case=Acc|Degree=Pos|Gender=Masc|Number=Sing:
+  - jarní
+  Animacy=Inan|Case=Nom|Degree=Pos|Gender=Masc|Number=Plur:
+  - jarní
+  Animacy=Inan|Case=Voc|Degree=Pos|Gender=Masc|Number=Plur:
+  - jarní
+  Case=Acc|Degree=Pos|Gender=Fem|Number=Plur:
+  - jarní
+  Case=Acc|Degree=Pos|Gender=Fem|Number=Sing:
+  - jarní
+  Case=Acc|Degree=Pos|Gender=Masc|Number=Plur:
+  - jarní
+  Case=Acc|Degree=Pos|Gender=Neut|Number=Plur:
+  - jarní
+  Case=Acc|Degree=Pos|Gender=Neut|Number=Sing:
+  - jarní
+  Case=Dat|Degree=Pos|Gender=Fem|Number=Plur:
+  - jarním
+  Case=Dat|Degree=Pos|Gender=Fem|Number=Sing:
+  - jarní
+  Case=Dat|Degree=Pos|Gender=Masc|Number=Plur:
+  - jarním
+  Case=Dat|Degree=Pos|Gender=Masc|Number=Sing:
+  - jarnímu
+  Case=Dat|Degree=Pos|Gender=Neut|Number=Plur:
+  - jarním
+  Case=Dat|Degree=Pos|Gender=Neut|Number=Sing:
+  - jarnímu
+  Case=Gen|Degree=Pos|Gender=Fem|Number=Plur:
+  - jarních
+  Case=Gen|Degree=Pos|Gender=Fem|Number=Sing:
+  - jarní
+  Case=Gen|Degree=Pos|Gender=Masc|Number=Plur:
+  - jarních
+  Case=Gen|Degree=Pos|Gender=Masc|Number=Sing:
+  - jarního
+  Case=Gen|Degree=Pos|Gender=Neut|Number=Plur:
+  - jarních
+  Case=Gen|Degree=Pos|Gender=Neut|Number=Sing:
+  - jarního
+  Case=Ins|Degree=Pos|Gender=Fem|Number=Plur:
+  - jarními
+  Case=Ins|Degree=Pos|Gender=Fem|Number=Sing:
+  - jarní
+  Case=Ins|Degree=Pos|Gender=Masc|Number=Plur:
+  - jarními
+  Case=Ins|Degree=Pos|Gender=Masc|Number=Sing:
+  - jarním
+  Case=Ins|Degree=Pos|Gender=Neut|Number=Plur:
+  - jarními
+  Case=Ins|Degree=Pos|Gender=Neut|Number=Sing:
+  - jarním
+  Case=Loc|Degree=Pos|Gender=Fem|Number=Plur:
+  - jarních
+  Case=Loc|Degree=Pos|Gender=Fem|Number=Sing:
+  - jarní
+  Case=Loc|Degree=Pos|Gender=Masc|Number=Plur:
+  - jarních
+  Case=Loc|Degree=Pos|Gender=Masc|Number=Sing:
+  - jarním
+  Case=Loc|Degree=Pos|Gender=Neut|Number=Plur:
+  - jarních
+  Case=Loc|Degree=Pos|Gender=Neut|Number=Sing:
+  - jarním
+  Case=Nom|Degree=Pos|Gender=Fem|Number=Plur:
+  - jarní
+  Case=Nom|Degree=Pos|Gender=Fem|Number=Sing:
+  - jarní
+  Case=Nom|Degree=Pos|Gender=Masc|Number=Sing:
+  - jarní
+  Case=Nom|Degree=Pos|Gender=Neut|Number=Plur:
+  - jarní
+  Case=Nom|Degree=Pos|Gender=Neut|Number=Sing:
+  - jarní
+  Case=Voc|Degree=Pos|Gender=Fem|Number=Plur:
+  - jarní
+  Case=Voc|Degree=Pos|Gender=Fem|Number=Sing:
+  - jarní
+  Case=Voc|Degree=Pos|Gender=Masc|Number=Sing:
+  - jarní
+  Case=Voc|Degree=Pos|Gender=Neut|Number=Plur:
+  - jarní
+  Case=Voc|Degree=Pos|Gender=Neut|Number=Sing:
+  - jarní

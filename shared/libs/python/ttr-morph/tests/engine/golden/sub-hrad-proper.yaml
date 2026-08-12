@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: 'proper inanimate: locative -u only, never the free doublet'
+lemma: Kaufland
+vzor: hrad-proper
+flags: []
+table:
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Plur:
+  - Kauflandy
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Sing:
+  - Kaufland
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Plur:
+  - Kauflandům
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Sing:
+  - Kauflandu
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Plur:
+  - Kauflandů
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Sing:
+  - Kauflandu
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Plur:
+  - Kauflandy
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Sing:
+  - Kauflandem
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Plur:
+  - Kauflandech
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Sing:
+  - Kauflandu
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Plur:
+  - Kauflandy
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Sing:
+  - Kaufland
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Plur:
+  - Kauflandy
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Sing:
+  - Kauflande

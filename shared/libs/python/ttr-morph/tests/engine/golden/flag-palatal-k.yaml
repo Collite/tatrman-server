@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: k -> c, and the genitive plural inserts the vowel back — two flags on one word, which is the case
+  that pins the canonical order
+lemma: matka
+vzor: žena
+flags:
+- fleeting-e
+- palatal
+table:
+  Case=Acc|Gender=Fem|Number=Plur:
+  - matky
+  Case=Acc|Gender=Fem|Number=Sing:
+  - matku
+  Case=Dat|Gender=Fem|Number=Plur:
+  - matkám
+  Case=Dat|Gender=Fem|Number=Sing:
+  - matce
+  Case=Gen|Gender=Fem|Number=Plur:
+  - matek
+  Case=Gen|Gender=Fem|Number=Sing:
+  - matky
+  Case=Ins|Gender=Fem|Number=Plur:
+  - matkami
+  Case=Ins|Gender=Fem|Number=Sing:
+  - matkou
+  Case=Loc|Gender=Fem|Number=Plur:
+  - matkách
+  Case=Loc|Gender=Fem|Number=Sing:
+  - matce
+  Case=Nom|Gender=Fem|Number=Plur:
+  - matky
+  Case=Nom|Gender=Fem|Number=Sing:
+  - matka
+  Case=Voc|Gender=Fem|Number=Plur:
+  - matky
+  Case=Voc|Gender=Fem|Number=Sing:
+  - matko

@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: class 2, vowel stem
+lemma: minout
+vzor: minout
+flags: []
+table:
+  Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - minuli
+  Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - minuly
+  Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part:
+  - minuly
+  Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part:
+  - minula
+  Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part:
+  - minul
+  Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part:
+  - minula
+  Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part:
+  - minulo
+  Mood=Imp|Number=Plur|Person=1|VerbForm=Fin:
+  - miňme
+  Mood=Imp|Number=Plur|Person=2|VerbForm=Fin:
+  - miňte
+  Mood=Imp|Number=Sing|Person=2|VerbForm=Fin:
+  - miň
+  Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin:
+  - mineme
+  Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin:
+  - minete
+  Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin:
+  - minou
+  Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin:
+  - minu
+  Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin:
+  - mineš
+  Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin:
+  - mine
+  VerbForm=Inf:
+  - minout

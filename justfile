@@ -160,14 +160,19 @@ test-component:
     ./gradlew componentTest --continue
 
 # ── Python lane (uv + ruff + pytest) — services/nlp, services/golem-py, ───────
-#    workers/worker-polars, shared/libs/python/ttr-nlp ──────────────────────────
+#    workers/worker-polars, shared/libs/python/{ttr-nlp,ttr-morph} ──────────────
+#
+# `ttr-morph` is in these loops but deliberately NOT in `wheel_modules`: it is
+# not published (⚑LMP-D4). Its artifact is the morph/v* snapshot, cut by
+# publish-morph.yml, and the package itself only ever ships inside the
+# nlp-morph-tools image.
 
 # ruff lint every Python module, or one: `just lint-py` / `just lint-py nlp`.
 lint-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp; do just lint-py "$d"; done
+        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just lint-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -179,7 +184,7 @@ build-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp; do just build-py "$d"; done
+        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just build-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -191,7 +196,7 @@ test-py module="" *args:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp; do just test-py "$d" {{args}}; done
+        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just test-py "$d" {{args}}; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")

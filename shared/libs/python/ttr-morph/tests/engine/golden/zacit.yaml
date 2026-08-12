@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: class 1, -it with an -n- present
+lemma: začít
+vzor: začít
+flags: []
+table:
+  Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - začali
+  Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - začaly
+  Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part:
+  - začaly
+  Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part:
+  - začala
+  Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part:
+  - začal
+  Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part:
+  - začala
+  Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part:
+  - začalo
+  Mood=Imp|Number=Plur|Person=1|VerbForm=Fin:
+  - začněme
+  Mood=Imp|Number=Plur|Person=2|VerbForm=Fin:
+  - začněte
+  Mood=Imp|Number=Sing|Person=2|VerbForm=Fin:
+  - začni
+  Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin:
+  - začneme
+  Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin:
+  - začnete
+  Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin:
+  - začnou
+  Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin:
+  - začnu
+  Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin:
+  - začneš
+  Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin:
+  - začne
+  VerbForm=Inf:
+  - začít

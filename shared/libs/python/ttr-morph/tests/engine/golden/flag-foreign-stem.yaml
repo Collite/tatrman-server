@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: 'the Latin nominative marker is not part of the stem. On the narrowing rather than on the bare pattern:
+  the free locative doublet would otherwise produce a form nobody writes'
+lemma: cyklus
+vzor: hrad-foreign
+flags: []
+table:
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Plur:
+  - cykly
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Sing:
+  - cyklus
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Plur:
+  - cyklům
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Sing:
+  - cyklu
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Plur:
+  - cyklů
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Sing:
+  - cyklu
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Plur:
+  - cykly
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Sing:
+  - cyklem
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Plur:
+  - cyklech
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Sing:
+  - cyklu
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Plur:
+  - cykly
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Sing:
+  - cyklus
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Plur:
+  - cykly
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Sing:
+  - cykle
+classify_as:
+  vzor: hrad-proper
+  flags:
+  - foreign-stem

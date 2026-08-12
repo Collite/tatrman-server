@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: neuter in -i
+lemma: stavení
+vzor: stavení
+flags: []
+table:
+  Case=Acc|Gender=Neut|Number=Plur:
+  - stavení
+  Case=Acc|Gender=Neut|Number=Sing:
+  - stavení
+  Case=Dat|Gender=Neut|Number=Plur:
+  - stavením
+  Case=Dat|Gender=Neut|Number=Sing:
+  - stavení
+  Case=Gen|Gender=Neut|Number=Plur:
+  - stavení
+  Case=Gen|Gender=Neut|Number=Sing:
+  - stavení
+  Case=Ins|Gender=Neut|Number=Plur:
+  - staveními
+  Case=Ins|Gender=Neut|Number=Sing:
+  - stavením
+  Case=Loc|Gender=Neut|Number=Plur:
+  - staveních
+  Case=Loc|Gender=Neut|Number=Sing:
+  - stavení
+  Case=Nom|Gender=Neut|Number=Plur:
+  - stavení
+  Case=Nom|Gender=Neut|Number=Sing:
+  - stavení
+  Case=Voc|Gender=Neut|Number=Plur:
+  - stavení
+  Case=Voc|Gender=Neut|Number=Sing:
+  - stavení

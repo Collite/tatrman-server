@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: -a surnames and given names
+lemma: Kundera
+vzor: predseda-name
+flags: []
+table:
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Plur:
+  - Kundery
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing:
+  - Kunderu
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Plur:
+  - Kunderům
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Sing:
+  - Kunderovi
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Plur:
+  - Kunderů
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Sing:
+  - Kundery
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Plur:
+  - Kundery
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Sing:
+  - Kunderou
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Plur:
+  - Kunderech
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Sing:
+  - Kunderovi
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur:
+  - Kunderové
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Sing:
+  - Kundera
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur:
+  - Kunderové
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Sing:
+  - Kundero
+classify_as:
+  vzor: předseda
+  flags: []

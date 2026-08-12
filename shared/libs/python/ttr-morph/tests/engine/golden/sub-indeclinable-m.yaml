@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: the same word as the bare `indeclinable` flag case, reached through the narrowing the guesser proposes
+  instead
+lemma: atašé
+vzor: indeclinable-m
+flags: []
+table:
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Plur:
+  - atašé
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing:
+  - atašé
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Plur:
+  - atašé
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Sing:
+  - atašé
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Plur:
+  - atašé
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Sing:
+  - atašé
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Plur:
+  - atašé
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Sing:
+  - atašé
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Plur:
+  - atašé
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Sing:
+  - atašé
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur:
+  - atašé
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Sing:
+  - atašé
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur:
+  - atašé
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Sing:
+  - atašé
+classify_as:
+  vzor: pán
+  flags:
+  - indeclinable

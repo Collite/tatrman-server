@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: stem vowel shortens
+lemma: dům
+vzor: hrad
+flags:
+- shorten
+table:
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Plur:
+  - domy
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Sing:
+  - dům
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Plur:
+  - domům
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Sing:
+  - domu
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Plur:
+  - domů
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Sing:
+  - domu
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Plur:
+  - domy
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Sing:
+  - domem
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Plur:
+  - domech
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Sing:
+  - domu
+  - domě
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Plur:
+  - domy
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Sing:
+  - dům
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Plur:
+  - domy
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Sing:
+  - dome

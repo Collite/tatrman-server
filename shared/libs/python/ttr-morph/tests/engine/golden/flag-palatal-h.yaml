@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: h -> z before the dative/locative -e
+lemma: Praha
+vzor: žena
+flags:
+- palatal
+table:
+  Case=Acc|Gender=Fem|Number=Plur:
+  - Prahy
+  Case=Acc|Gender=Fem|Number=Sing:
+  - Prahu
+  Case=Dat|Gender=Fem|Number=Plur:
+  - Prahám
+  Case=Dat|Gender=Fem|Number=Sing:
+  - Praze
+  Case=Gen|Gender=Fem|Number=Plur:
+  - Prah
+  Case=Gen|Gender=Fem|Number=Sing:
+  - Prahy
+  Case=Ins|Gender=Fem|Number=Plur:
+  - Prahami
+  Case=Ins|Gender=Fem|Number=Sing:
+  - Prahou
+  Case=Loc|Gender=Fem|Number=Plur:
+  - Prahách
+  Case=Loc|Gender=Fem|Number=Sing:
+  - Praze
+  Case=Nom|Gender=Fem|Number=Plur:
+  - Prahy
+  Case=Nom|Gender=Fem|Number=Sing:
+  - Praha
+  Case=Voc|Gender=Fem|Number=Plur:
+  - Prahy
+  Case=Voc|Gender=Fem|Number=Sing:
+  - Praho

@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: class 4
+lemma: prosit
+vzor: prosit
+flags: []
+table:
+  Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - prosili
+  Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - prosily
+  Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part:
+  - prosily
+  Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part:
+  - prosila
+  Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part:
+  - prosil
+  Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part:
+  - prosila
+  Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part:
+  - prosilo
+  Mood=Imp|Number=Plur|Person=1|VerbForm=Fin:
+  - prosme
+  Mood=Imp|Number=Plur|Person=2|VerbForm=Fin:
+  - proste
+  Mood=Imp|Number=Sing|Person=2|VerbForm=Fin:
+  - pros
+  Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin:
+  - prosíme
+  Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin:
+  - prosíte
+  Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin:
+  - prosí
+  Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin:
+  - prosím
+  Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin:
+  - prosíš
+  Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin:
+  - prosí
+  VerbForm=Inf:
+  - prosit

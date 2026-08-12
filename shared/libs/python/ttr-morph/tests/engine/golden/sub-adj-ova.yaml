@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: the adjectival surname is the hard adjective's feminine table
+lemma: Nováková
+vzor: adj-ova
+flags: []
+table:
+  Case=Acc|Degree=Pos|Gender=Fem|Number=Plur:
+  - Novákové
+  Case=Acc|Degree=Pos|Gender=Fem|Number=Sing:
+  - Novákovou
+  Case=Dat|Degree=Pos|Gender=Fem|Number=Plur:
+  - Novákovým
+  Case=Dat|Degree=Pos|Gender=Fem|Number=Sing:
+  - Novákové
+  Case=Gen|Degree=Pos|Gender=Fem|Number=Plur:
+  - Novákových
+  Case=Gen|Degree=Pos|Gender=Fem|Number=Sing:
+  - Novákové
+  Case=Ins|Degree=Pos|Gender=Fem|Number=Plur:
+  - Novákovými
+  Case=Ins|Degree=Pos|Gender=Fem|Number=Sing:
+  - Novákovou
+  Case=Loc|Degree=Pos|Gender=Fem|Number=Plur:
+  - Novákových
+  Case=Loc|Degree=Pos|Gender=Fem|Number=Sing:
+  - Novákové
+  Case=Nom|Degree=Pos|Gender=Fem|Number=Plur:
+  - Novákové
+  Case=Nom|Degree=Pos|Gender=Fem|Number=Sing:
+  - Nováková
+  Case=Voc|Degree=Pos|Gender=Fem|Number=Plur:
+  - Novákové
+  Case=Voc|Degree=Pos|Gender=Fem|Number=Sing:
+  - Nováková

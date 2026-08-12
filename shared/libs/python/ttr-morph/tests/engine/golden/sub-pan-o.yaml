@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: animate in -o
+lemma: Hugo
+vzor: pan-o
+flags: []
+table:
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Plur:
+  - Hugy
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing:
+  - Huga
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Plur:
+  - Hugům
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Sing:
+  - Hugovi
+  - Hugu
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Plur:
+  - Hugů
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Sing:
+  - Huga
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Plur:
+  - Hugy
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Sing:
+  - Hugem
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Plur:
+  - Hugech
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Sing:
+  - Hugovi
+  - Hugu
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur:
+  - Hugové
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Sing:
+  - Hugo
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur:
+  - Hugové
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Sing:
+  - Hugo

@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: masculine animate in -a
+lemma: předseda
+vzor: předseda
+flags: []
+table:
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Plur:
+  - předsedy
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing:
+  - předsedu
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Plur:
+  - předsedům
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Sing:
+  - předsedovi
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Plur:
+  - předsedů
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Sing:
+  - předsedy
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Plur:
+  - předsedy
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Sing:
+  - předsedou
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Plur:
+  - předsedech
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Sing:
+  - předsedovi
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur:
+  - předsedové
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Sing:
+  - předseda
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur:
+  - předsedové
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Sing:
+  - předsedo

@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: declines AND stays invariant — both are written
+lemma: ČEZ
+vzor: acronym-m
+flags: []
+table:
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Plur:
+  - ČEZ
+  - ČEZy
+  Animacy=Inan|Case=Acc|Gender=Masc|Number=Sing:
+  - ČEZ
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Plur:
+  - ČEZ
+  - ČEZům
+  Animacy=Inan|Case=Dat|Gender=Masc|Number=Sing:
+  - ČEZ
+  - ČEZu
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Plur:
+  - ČEZ
+  - ČEZů
+  Animacy=Inan|Case=Gen|Gender=Masc|Number=Sing:
+  - ČEZ
+  - ČEZu
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Plur:
+  - ČEZ
+  - ČEZy
+  Animacy=Inan|Case=Ins|Gender=Masc|Number=Sing:
+  - ČEZ
+  - ČEZem
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Plur:
+  - ČEZ
+  - ČEZech
+  Animacy=Inan|Case=Loc|Gender=Masc|Number=Sing:
+  - ČEZ
+  - ČEZu
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Plur:
+  - ČEZ
+  - ČEZy
+  Animacy=Inan|Case=Nom|Gender=Masc|Number=Sing:
+  - ČEZ
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Plur:
+  - ČEZ
+  - ČEZy
+  Animacy=Inan|Case=Voc|Gender=Masc|Number=Sing:
+  - ČEZ
+  - ČEZe
+classify_as:
+  vzor: hrad-proper
+  flags:
+  - acronym

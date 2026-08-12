@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: masculine animate in -e
+lemma: soudce
+vzor: soudce
+flags: []
+table:
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Plur:
+  - soudce
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing:
+  - soudce
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Plur:
+  - soudcům
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Sing:
+  - soudci
+  - soudcovi
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Plur:
+  - soudců
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Sing:
+  - soudce
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Plur:
+  - soudci
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Sing:
+  - soudcem
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Plur:
+  - soudcích
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Sing:
+  - soudci
+  - soudcovi
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur:
+  - soudci
+  - soudcové
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Sing:
+  - soudce
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur:
+  - soudci
+  - soudcové
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Sing:
+  - soudce

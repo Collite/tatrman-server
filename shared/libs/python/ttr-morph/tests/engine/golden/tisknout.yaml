@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: class 2, consonant stem
+lemma: tisknout
+vzor: tisknout
+flags: []
+table:
+  Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - tiskli
+  Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - tiskly
+  Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part:
+  - tiskly
+  Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part:
+  - tiskla
+  Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part:
+  - tiskl
+  Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part:
+  - tiskla
+  Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part:
+  - tisklo
+  Mood=Imp|Number=Plur|Person=1|VerbForm=Fin:
+  - tiskněme
+  Mood=Imp|Number=Plur|Person=2|VerbForm=Fin:
+  - tiskněte
+  Mood=Imp|Number=Sing|Person=2|VerbForm=Fin:
+  - tiskni
+  Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin:
+  - tiskneme
+  Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin:
+  - tisknete
+  Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin:
+  - tisknou
+  Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin:
+  - tisknu
+  Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin:
+  - tiskneš
+  Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin:
+  - tiskne
+  VerbForm=Inf:
+  - tisknout

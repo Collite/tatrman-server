@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: soft feminine, zero nominative — the citation form carries the fleeting vowel
+lemma: píseň
+vzor: píseň
+flags:
+- fleeting-e
+table:
+  Case=Acc|Gender=Fem|Number=Plur:
+  - písně
+  Case=Acc|Gender=Fem|Number=Sing:
+  - píseň
+  Case=Dat|Gender=Fem|Number=Plur:
+  - písním
+  Case=Dat|Gender=Fem|Number=Sing:
+  - písni
+  Case=Gen|Gender=Fem|Number=Plur:
+  - písní
+  Case=Gen|Gender=Fem|Number=Sing:
+  - písně
+  Case=Ins|Gender=Fem|Number=Plur:
+  - písněmi
+  Case=Ins|Gender=Fem|Number=Sing:
+  - písní
+  Case=Loc|Gender=Fem|Number=Plur:
+  - písních
+  Case=Loc|Gender=Fem|Number=Sing:
+  - písni
+  Case=Nom|Gender=Fem|Number=Plur:
+  - písně
+  Case=Nom|Gender=Fem|Number=Sing:
+  - píseň
+  Case=Voc|Gender=Fem|Number=Plur:
+  - písně
+  Case=Voc|Gender=Fem|Number=Sing:
+  - písni

@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: neuter with the -et-/-at- extension
+lemma: kuře
+vzor: kuře
+flags: []
+table:
+  Case=Acc|Gender=Neut|Number=Plur:
+  - kuřata
+  Case=Acc|Gender=Neut|Number=Sing:
+  - kuře
+  Case=Dat|Gender=Neut|Number=Plur:
+  - kuřatům
+  Case=Dat|Gender=Neut|Number=Sing:
+  - kuřeti
+  Case=Gen|Gender=Neut|Number=Plur:
+  - kuřat
+  Case=Gen|Gender=Neut|Number=Sing:
+  - kuřete
+  Case=Ins|Gender=Neut|Number=Plur:
+  - kuřaty
+  Case=Ins|Gender=Neut|Number=Sing:
+  - kuřetem
+  Case=Loc|Gender=Neut|Number=Plur:
+  - kuřatech
+  Case=Loc|Gender=Neut|Number=Sing:
+  - kuřeti
+  Case=Nom|Gender=Neut|Number=Plur:
+  - kuřata
+  Case=Nom|Gender=Neut|Number=Sing:
+  - kuře
+  Case=Voc|Gender=Neut|Number=Plur:
+  - kuřata
+  Case=Voc|Gender=Neut|Number=Sing:
+  - kuře

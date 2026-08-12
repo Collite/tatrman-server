@@ -1,0 +1,100 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: hard adjective, positive degree
+lemma: mladý
+vzor: mladý
+flags: []
+table:
+  Animacy=Anim|Case=Acc|Degree=Pos|Gender=Masc|Number=Sing:
+  - mladého
+  Animacy=Anim|Case=Nom|Degree=Pos|Gender=Masc|Number=Plur:
+  - mladí
+  Animacy=Anim|Case=Voc|Degree=Pos|Gender=Masc|Number=Plur:
+  - mladí
+  Animacy=Inan|Case=Acc|Degree=Pos|Gender=Masc|Number=Sing:
+  - mladý
+  Animacy=Inan|Case=Nom|Degree=Pos|Gender=Masc|Number=Plur:
+  - mladé
+  Animacy=Inan|Case=Voc|Degree=Pos|Gender=Masc|Number=Plur:
+  - mladé
+  Case=Acc|Degree=Pos|Gender=Fem|Number=Plur:
+  - mladé
+  Case=Acc|Degree=Pos|Gender=Fem|Number=Sing:
+  - mladou
+  Case=Acc|Degree=Pos|Gender=Masc|Number=Plur:
+  - mladé
+  Case=Acc|Degree=Pos|Gender=Neut|Number=Plur:
+  - mladá
+  Case=Acc|Degree=Pos|Gender=Neut|Number=Sing:
+  - mladé
+  Case=Dat|Degree=Pos|Gender=Fem|Number=Plur:
+  - mladým
+  Case=Dat|Degree=Pos|Gender=Fem|Number=Sing:
+  - mladé
+  Case=Dat|Degree=Pos|Gender=Masc|Number=Plur:
+  - mladým
+  Case=Dat|Degree=Pos|Gender=Masc|Number=Sing:
+  - mladému
+  Case=Dat|Degree=Pos|Gender=Neut|Number=Plur:
+  - mladým
+  Case=Dat|Degree=Pos|Gender=Neut|Number=Sing:
+  - mladému
+  Case=Gen|Degree=Pos|Gender=Fem|Number=Plur:
+  - mladých
+  Case=Gen|Degree=Pos|Gender=Fem|Number=Sing:
+  - mladé
+  Case=Gen|Degree=Pos|Gender=Masc|Number=Plur:
+  - mladých
+  Case=Gen|Degree=Pos|Gender=Masc|Number=Sing:
+  - mladého
+  Case=Gen|Degree=Pos|Gender=Neut|Number=Plur:
+  - mladých
+  Case=Gen|Degree=Pos|Gender=Neut|Number=Sing:
+  - mladého
+  Case=Ins|Degree=Pos|Gender=Fem|Number=Plur:
+  - mladými
+  Case=Ins|Degree=Pos|Gender=Fem|Number=Sing:
+  - mladou
+  Case=Ins|Degree=Pos|Gender=Masc|Number=Plur:
+  - mladými
+  Case=Ins|Degree=Pos|Gender=Masc|Number=Sing:
+  - mladým
+  Case=Ins|Degree=Pos|Gender=Neut|Number=Plur:
+  - mladými
+  Case=Ins|Degree=Pos|Gender=Neut|Number=Sing:
+  - mladým
+  Case=Loc|Degree=Pos|Gender=Fem|Number=Plur:
+  - mladých
+  Case=Loc|Degree=Pos|Gender=Fem|Number=Sing:
+  - mladé
+  Case=Loc|Degree=Pos|Gender=Masc|Number=Plur:
+  - mladých
+  Case=Loc|Degree=Pos|Gender=Masc|Number=Sing:
+  - mladém
+  Case=Loc|Degree=Pos|Gender=Neut|Number=Plur:
+  - mladých
+  Case=Loc|Degree=Pos|Gender=Neut|Number=Sing:
+  - mladém
+  Case=Nom|Degree=Pos|Gender=Fem|Number=Plur:
+  - mladé
+  Case=Nom|Degree=Pos|Gender=Fem|Number=Sing:
+  - mladá
+  Case=Nom|Degree=Pos|Gender=Masc|Number=Sing:
+  - mladý
+  Case=Nom|Degree=Pos|Gender=Neut|Number=Plur:
+  - mladá
+  Case=Nom|Degree=Pos|Gender=Neut|Number=Sing:
+  - mladé
+  Case=Voc|Degree=Pos|Gender=Fem|Number=Plur:
+  - mladé
+  Case=Voc|Degree=Pos|Gender=Fem|Number=Sing:
+  - mladá
+  Case=Voc|Degree=Pos|Gender=Masc|Number=Sing:
+  - mladý
+  Case=Voc|Degree=Pos|Gender=Neut|Number=Plur:
+  - mladá
+  Case=Voc|Degree=Pos|Gender=Neut|Number=Sing:
+  - mladé
