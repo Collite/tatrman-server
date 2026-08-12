@@ -1,0 +1,157 @@
+{
+  "mode": "rules",
+  "lane": "default",
+  "total": 11,
+  "passed": 11,
+  "failed": 0,
+  "by_kind": {
+    "hero": {
+      "passed": 2,
+      "total": 2
+    },
+    "paraphrase": {
+      "passed": 3,
+      "total": 3
+    },
+    "decoy": {
+      "passed": 6,
+      "total": 6
+    }
+  },
+  "cases": [
+    {
+      "id": "hero-cs-invoices",
+      "kind": "hero",
+      "passed": true,
+      "reason": "",
+      "expected_query": "faktury_zakaznika",
+      "produced_query": "faktury_zakaznika",
+      "produced_params": {
+        "nazev_zakaznika": "Microsoft"
+      },
+      "messages": [
+        "NLS-NLP-011"
+      ]
+    },
+    {
+      "id": "hero-cs-role",
+      "kind": "hero",
+      "passed": true,
+      "reason": "",
+      "expected_query": "role",
+      "produced_query": "role",
+      "produced_params": {
+        "nazev_role": "obchodn\u00ed z\u00e1stupce"
+      },
+      "messages": []
+    },
+    {
+      "id": "para-cs-invoices-word-order",
+      "kind": "paraphrase",
+      "passed": true,
+      "reason": "",
+      "expected_query": "faktury_zakaznika",
+      "produced_query": "faktury_zakaznika",
+      "produced_params": {
+        "nazev_zakaznika": "Microsoft"
+      },
+      "messages": [
+        "NLS-NLP-011"
+      ]
+    },
+    {
+      "id": "para-cs-invoices-declined",
+      "kind": "paraphrase",
+      "passed": true,
+      "reason": "",
+      "expected_query": "faktury_zakaznika",
+      "produced_query": "faktury_zakaznika",
+      "produced_params": {
+        "nazev_zakaznika": "Microsoft"
+      },
+      "messages": [
+        "NLS-NLP-011"
+      ]
+    },
+    {
+      "id": "para-cs-role-inflected",
+      "kind": "paraphrase",
+      "passed": true,
+      "reason": "",
+      "expected_query": "role",
+      "produced_query": "role",
+      "produced_params": {
+        "nazev_role": "obchodn\u00edho z\u00e1stupce"
+      },
+      "messages": []
+    },
+    {
+      "id": "decoy-cs-invoices-no-customer",
+      "kind": "decoy",
+      "passed": true,
+      "reason": "",
+      "expected_query": null,
+      "produced_query": null,
+      "produced_params": {},
+      "messages": [
+        "NLS-NLP-011"
+      ]
+    },
+    {
+      "id": "decoy-cs-customer-no-invoices",
+      "kind": "decoy",
+      "passed": true,
+      "reason": "",
+      "expected_query": null,
+      "produced_query": null,
+      "produced_params": {},
+      "messages": [
+        "NLS-NLP-011"
+      ]
+    },
+    {
+      "id": "decoy-cs-wrong-order",
+      "kind": "decoy",
+      "passed": true,
+      "reason": "",
+      "expected_query": null,
+      "produced_query": null,
+      "produced_params": {},
+      "messages": [
+        "NLS-NLP-011"
+      ]
+    },
+    {
+      "id": "decoy-cs-unrelated",
+      "kind": "decoy",
+      "passed": true,
+      "reason": "",
+      "expected_query": null,
+      "produced_query": null,
+      "produced_params": {},
+      "messages": [
+        "NLS-NLP-011"
+      ]
+    },
+    {
+      "id": "decoy-cs-role-word-only",
+      "kind": "decoy",
+      "passed": true,
+      "reason": "",
+      "expected_query": null,
+      "produced_query": null,
+      "produced_params": {},
+      "messages": []
+    },
+    {
+      "id": "decoy-en-invoices",
+      "kind": "decoy",
+      "passed": true,
+      "reason": "",
+      "expected_query": null,
+      "produced_query": null,
+      "produced_params": {},
+      "messages": []
+    }
+  ]
+}
