@@ -163,7 +163,61 @@ def test_a_missing_file_is_a_diagnostic_not_a_crash(tmp_path: Path):
 def test_an_overlay_in_the_core_position_is_refused():
     with pytest.raises(LoadError) as excinfo:
         load_morph([OVERLAY, SNAPSHOT])
-    assert "must be a snapshot" in str(excinfo.value)
+    assert "the first source is the core snapshot" in str(excinfo.value)
+
+
+def test_a_core_member_after_an_overlay_is_refused():
+    """Core member files come before every overlay (C-F3).
+
+    The order of the members themselves means nothing — the compiler merged
+    them — but a member listed *after* a world would be shadowed by that world
+    or not depending on where it sat in a list nobody thinks of as ordered.
+    """
+    with pytest.raises(LoadError) as excinfo:
+        load_morph([SNAPSHOT, OVERLAY, SNAPSHOT])
+    assert "come before every overlay" in str(excinfo.value)
+
+
+def test_the_core_may_arrive_as_several_member_files(tmp_path: Path):
+    """A snapshot split in two loads as one core, with no shadow diagnostics.
+
+    Written here rather than only in `ttr-morph`'s cross-package test because
+    the wheel has to hold this up on its own: it is the runtime half of the
+    C-F3 separability proof, and the compiler that produces the split is in a
+    package this one does not depend on.
+    """
+    text = Path(SNAPSHOT).read_text(encoding="utf-8")
+    lines = text.splitlines()
+    columns = next(i for i, line in enumerate(lines) if line.startswith("form\t"))
+    rows = [line for line in lines[columns + 1 :] if line.count("\t") == 8]
+    headers = [line for line in lines[1 : columns] if line.startswith("#")]
+
+    def member(name: str, chosen: list[str]) -> str:
+        kept = [
+            line
+            for line in headers
+            if not line.startswith(("#content-hash", "#rows"))
+        ]
+        kept.append(f"#content-hash: {content_hash(chosen)}")
+        kept.append(f"#rows: {len(chosen)}")
+        path = tmp_path / name
+        path.write_text(
+            "\n".join([lines[0], *kept, lines[columns], *sorted(chosen)]) + "\n",
+            encoding="utf-8",
+        )
+        return str(path)
+
+    half = len(rows) // 2
+    first = member("body.morph.snap", rows[:half])
+    second = member("part.morph.part", rows[half:])
+
+    whole = load_morph([SNAPSHOT])
+    split = load_morph([first, second])
+
+    assert split.exact.keys() == whole.exact.keys()
+    assert split.stats().rows == whole.stats().rows
+    assert [d.code for d in split.diagnostics] == []
+    assert len(split.members) == 1
 
 
 def test_no_sources_at_all_is_refused():

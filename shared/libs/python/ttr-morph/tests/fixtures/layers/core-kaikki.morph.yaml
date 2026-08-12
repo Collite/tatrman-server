@@ -1,0 +1,29 @@
+# A share-alike layer. Everything about it is different from the hand seed in
+# exactly one way that matters: it compiles into a member file of its own, with
+# its own NOTICE section, and it may hold nothing but `wiktionary`/`cac`
+# provenance (C-F3, LM-MORPH-004).
+layer: core-kaikki
+version: 1
+language: cs
+license: CC-BY-SA-4.0
+attribution:
+  source: Wiktionary (English edition), via kaikki.org
+  url: https://kaikki.org/dictionary/Czech/
+  license: CC-BY-SA-4.0
+  license_url: https://creativecommons.org/licenses/by-sa/4.0/
+  extracted: "2026-08-11"
+  transformation: >-
+    Inflection tables were classified to a (vzor, flags) pair that reproduces
+    them exactly; the forms in this file are regenerated from that pair by the
+    Tatrman paradigm engine. Entries whose tables no pattern reproduced are
+    carried as full-form entries, verbatim.
+entries:
+  - lemma: zákazník
+    upos: NOUN
+    vzor: pán
+    provenance: wiktionary
+
+  - lemma: letošní
+    upos: ADJ
+    vzor: jarní
+    provenance: wiktionary

@@ -1,0 +1,300 @@
+name: Publish Morph Snapshot
+
+# Tag-driven release of the Czech morphology snapshot (LM contracts §10).
+#
+# What is published here is DATA, not code. `ttr-morph` itself stays off PyPI
+# (⚑LMP-D4) — the artifact is `cs.morph.snap`, its separable share-alike member
+# files, and the NOTICE that makes shipping them lawful. The runtime loads them
+# from a mounted volume; nothing about them is baked into a wheel or an image.
+#
+# Tag → artifact:
+#   morph/v<x.y.z>[-RELEASE]    cs.morph.snap + *.morph.part + NOTICE-morph.md
+#
+# RELEASE gating (the 2026-07-16 justfile-sync polarity, as in publish.yml and
+# publish-python.yml): a bare tag runs job 1 in full — validate, compile, verify
+# the hash through the *runtime* loader, check the licence boundary, run the
+# eval gate — and stops. That is the point of cutting one: it proves the layer
+# files compile into a loadable artifact without spending a version number.
+# `-RELEASE` gates jobs 2 and 3.
+#
+# ⚑ `release-image.yml` excludes `morph/v*` from its `*/v*` trigger. Without
+# that exclusion every snapshot tag would also start a module image build for a
+# module named "morph", fail, and leave a red X beside a green publish — the
+# same trap `python-nlp/v*` had to be excluded from.
+#
+# THREE JOBS, and the third is not decoration: C-O2 says the generation-expanded
+# gazetteer lists must never lag the lexicon. A snapshot that adds forms while
+# the exported lists still carry the old ones is a deployment where the morph
+# layer and the gazetteer disagree about what a word is.
+
+on:
+  push:
+    tags:
+      - 'morph/v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Compile and check only — never releases, even from a -RELEASE ref'
+        type: boolean
+        default: true
+      layers:
+        description: 'Glob of layer files to compile (blank = the repo lexicon)'
+        required: false
+        default: ''
+      skip_eval:
+        description: 'Skip the eval-harness gate (TEMPORARY — see the note on the step)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  MORPH_DIR: shared/libs/python/ttr-morph
+  # Where the compiled artifacts land. Not committed — they are release assets.
+  DIST: dist/morph
+
+jobs:
+  # ── job 1: validate → compile → verify → eval gate ────────────────────────
+  compile:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      public: ${{ steps.ver.outputs.public }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Derive version from the tag
+        id: ver
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            RAW="${GITHUB_REF_NAME#morph/v}"
+          else
+            RAW="0.0.0-dispatch"
+          fi
+          if [[ "$RAW" == *-RELEASE ]]; then
+            PUBLIC=true
+            VERSION="${RAW%-RELEASE}"
+          else
+            PUBLIC=false
+            VERSION="$RAW"
+          fi
+          # A manual run never publishes, whatever ref it was started from.
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            PUBLIC=false
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::could not derive a version from '$GITHUB_REF_NAME'"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "public=${PUBLIC}" >> "$GITHUB_OUTPUT"
+          echo "Compiling the cs snapshot as $VERSION (public=$PUBLIC)"
+
+      - name: Choose the layer files
+        id: layers
+        run: |
+          set -euo pipefail
+          GLOB="${{ github.event.inputs.layers }}"
+          if [ -z "$GLOB" ]; then
+            GLOB="${MORPH_DIR}/lexicon/cs/*.morph.yaml"
+          fi
+          # shellcheck disable=SC2086
+          FOUND=$(ls -1 $GLOB 2>/dev/null | sort | tr '\n' ' ' || true)
+          if [ -z "$FOUND" ]; then
+            if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+              # The lexicon lands at NLS-P8.3. Until then a manual run still has
+              # to be able to exercise this lane end to end, so it falls back to
+              # the test fixtures — which can never be released, because a
+              # dispatch is never `public`.
+              echo "::warning::no layer files at $GLOB — falling back to the test fixtures (dry run only)"
+              FOUND=$(ls -1 ${MORPH_DIR}/tests/fixtures/layers/core-*.morph.yaml | sort | tr '\n' ' ')
+            else
+              echo "::error::no layer files matched $GLOB — a morph/v* tag was cut before the lexicon exists"
+              exit 1
+            fi
+          fi
+          echo "files=${FOUND}" >> "$GITHUB_OUTPUT"
+          echo "Layers: ${FOUND}"
+
+      - name: Validate the layer files
+        working-directory: ${{ env.MORPH_DIR }}
+        run: |
+          set -euo pipefail
+          # Paths are repo-root relative; run the CLI from the package so uv
+          # resolves the ttr-nlp path dependency.
+          FILES=""
+          for f in ${{ steps.layers.outputs.files }}; do FILES="$FILES ${GITHUB_WORKSPACE}/$f"; done
+          # shellcheck disable=SC2086
+          uv run ttr-morph validate $FILES
+
+      # The licence boundary (LM-MORPH-004) is enforced inside `compile`, so a
+      # share-alike layer holding suite work fails here rather than in an audit.
+      - name: Compile the snapshot
+        working-directory: ${{ env.MORPH_DIR }}
+        run: |
+          set -euo pipefail
+          FILES=""
+          for f in ${{ steps.layers.outputs.files }}; do FILES="$FILES ${GITHUB_WORKSPACE}/$f"; done
+          mkdir -p "${GITHUB_WORKSPACE}/${DIST}"
+          # shellcheck disable=SC2086
+          uv run ttr-morph compile $FILES \
+            -o "${GITHUB_WORKSPACE}/${DIST}/cs.morph.snap" \
+            --snapshot-version "${{ steps.ver.outputs.version }}"
+
+      # The drift guard, run against the artifact rather than against the code
+      # that made it: the *runtime* loader re-hashes the rows and refuses the
+      # file if the compiler and it disagree about a single byte.
+      - name: Verify the artifact through the runtime loader
+        working-directory: ${{ env.MORPH_DIR }}
+        run: |
+          set -euo pipefail
+          uv run python - <<'PY'
+          import os, pathlib, sys
+          from ttrnlp.morph import load_morph
+
+          dist = pathlib.Path(os.environ["GITHUB_WORKSPACE"], os.environ["DIST"])
+          body = dist / "cs.morph.snap"
+          parts = sorted(dist.glob("*.morph.part"))
+          state = load_morph([str(body), *(str(p) for p in parts)])
+          stats = state.stats()
+          print(f"loaded {stats.rows} rows, {stats.forms} forms, "
+                f"layers={dict(stats.layers)}, hash={stats.content_hash}")
+          if stats.rows == 0:
+              print("::error::the compiled snapshot has no rows")
+              sys.exit(1)
+          if not (dist / "NOTICE-morph.md").exists():
+              print("::error::NOTICE-morph.md was not emitted")
+              sys.exit(1)
+          # Separability, checked in the artifact (C-F3): no share-alike layer
+          # may have rows in the main body.
+          share_alike = {
+              layer for layer, licence in stats.layers if licence != "suite"
+          }
+          for line in body.read_text(encoding="utf-8").splitlines():
+              cells = line.split("\t")
+              if len(cells) == 9 and cells[7] in share_alike:
+                  print(f"::error::share-alike layer {cells[7]!r} has rows in the main body")
+                  sys.exit(1)
+          print(f"separability: {len(parts)} member file(s), body is suite-only")
+          PY
+
+      # NLS-P8.4 brings the harness (coverage · lemma-in-set · head-of-list ·
+      # fold-collision rate, over the FROZEN CAC test split). ⚑ `--skip-eval` is
+      # TEMPORARY: it exists so this lane can be cut before the harness does,
+      # and NLS-P8.4 removes the branch rather than leaving a flag that lets a
+      # release skip its own quality gate.
+      - name: Eval-harness gate
+        working-directory: ${{ env.MORPH_DIR }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.inputs.skip_eval }}" == "true" ]; then
+            echo "::warning::eval gate skipped by request"
+            exit 0
+          fi
+          if [ ! -f eval/harness.py ]; then
+            echo "::warning::the eval harness does not exist yet (arrives at NLS-P8.4); gate skipped"
+            exit 0
+          fi
+          uv run python eval/harness.py --snapshot "${GITHUB_WORKSPACE}/${DIST}/cs.morph.snap" --gate
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: morph-snapshot
+          path: ${{ env.DIST }}/
+
+  # ── job 2: the release + the validation vehicle for world repos ───────────
+  release:
+    needs: compile
+    if: needs.compile.outputs.public == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write     # create the release
+      packages: write     # push nlp-morph-tools
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: morph-snapshot
+          path: ${{ env.DIST }}/
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Czech morphology snapshot ${{ needs.compile.outputs.version }}
+          body: |
+            Compiled from the layer files in `shared/libs/python/ttr-morph/lexicon/cs`.
+
+            **Assets are an aggregate.** `cs.morph.snap` is suite-licensed. Each
+            `*.morph.part` is a separable member file under its own licence, and
+            `NOTICE-morph.md` names the source, the licence and the modification
+            for each of them (S-2). Deploy them together: they are all core, and
+            the runtime takes the leading run of snapshot files as one core.
+          files: |
+            ${{ env.DIST }}/cs.morph.snap
+            ${{ env.DIST }}/*.morph.part
+            ${{ env.DIST }}/NOTICE-morph.md
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.TATRMAN_PKG_USER || github.actor }}
+          password: ${{ secrets.TATRMAN_PKG_TOKEN || secrets.GITHUB_TOKEN }}
+
+      # The CLI, containerized. World repos validate their own layer files with
+      # this (NLB-P5 T3) — it is the only way to get the exact validator this
+      # lane runs, since `ttr-morph` is not on PyPI.
+      - name: Build and push nlp-morph-tools
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: shared/libs/python/ttr-morph/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/collite/nlp-morph-tools:${{ needs.compile.outputs.version }}
+            ghcr.io/collite/nlp-morph-tools:latest
+
+  # ── job 3 (C-O2): expanded lists never lag the lexicon ────────────────────
+  expand:
+    needs: [compile, release]
+    if: needs.compile.outputs.public == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+
+      # The exporter re-run lives with the exporter (NLS-P4). Until that
+      # workflow exists this step says so and stops, rather than failing a
+      # release for a lane that has not been built — and it becomes fatal on its
+      # own, the day the file appears, without anyone remembering to come back.
+      - name: Dispatch the exporter re-run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          WORKFLOW=export-lists.yml
+          if [ ! -f ".github/workflows/${WORKFLOW}" ]; then
+            echo "::warning::${WORKFLOW} does not exist yet (NLS-P4 exporter lane) — C-O2 re-run not dispatched for ${{ github.ref_name }}"
+            exit 0
+          fi
+          gh workflow run "${WORKFLOW}" \
+            -f reason="morph snapshot ${{ needs.compile.outputs.version }}" \
+            -f open_pr=true
+          echo "Dispatched ${WORKFLOW}; the expanded-lists diff PR opens from there."

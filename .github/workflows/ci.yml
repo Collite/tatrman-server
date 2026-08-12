@@ -219,6 +219,46 @@ jobs:
       - name: build the wheel
         run: uv build --wheel shared/libs/python/ttr-nlp
 
+  # NLS-P8.2 — the Python unit gate for `ttr-morph` (the LM editorial toolchain:
+  # paradigm engine, layer models, snapshot compiler).
+  #
+  # No wheel-build step, unlike `ttr-nlp` above, and the difference is the whole
+  # point of ⚑LMP-D4: this package is never published, so there is no packaging
+  # to break. What it produces is the *snapshot*, and `publish-morph.yml`
+  # compiles and verifies that on its own lane.
+  #
+  # The job arrives one list later than the package. NLS-P8.1 wired the justfile
+  # loops and left CI unwired, which is a suite that runs on one laptop.
+  ttr-morph:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: ruff
+        working-directory: shared/libs/python/ttr-morph
+        run: uv run ruff check .
+
+      - name: pytest
+        working-directory: shared/libs/python/ttr-morph
+        run: uv run pytest -q
+
+      # The goldens are a frozen record of the paradigm tables (NLS-P8.1). This
+      # catches a tables edit that changed a paradigm nobody meant to touch —
+      # the test suite alone would pass, because the goldens are its oracle.
+      - name: golden paradigms are current
+        working-directory: shared/libs/python/ttr-morph
+        run: uv run python tests/engine/golden/regen.py --check
+
   # NLS-P3.3 — the Python unit gate for `services/nlp` (ruff + pytest).
   #
   # ⚑ This job did not exist before NLS-P3. `golem-py` and the `ttr-nlp` wheel had

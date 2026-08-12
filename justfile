@@ -202,6 +202,44 @@ test-py module="" *args:
     path=$(just _resolve "{{module}}")
     cd "$path" && uv run pytest {{args}}
 
+# ── Morphology lexicon (LM — the morph/v* artifact) ──────────────────────────
+#
+# The two recipes an analyst runs, and the two publish-morph.yml runs. Same
+# reader, same checks: a layer that validates here compiles in CI, which is the
+# only promise that makes local editing worth anything.
+#
+# Layer files live in `shared/libs/python/ttr-morph/lexicon/cs/` (the hand seed
+# and the importer output, from NLS-P8.3). Pass a glob to work on a subset.
+
+morph_dir := "shared/libs/python/ttr-morph"
+morph_layers := morph_dir + "/lexicon/cs/*.morph.yaml"
+
+# Validate layer files: schema, licence boundary, and whether each declared
+# pattern regenerates its declared forms. `just morph-validate 'path/*.yaml'`.
+morph-validate layers="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    glob="{{layers}}"; [ -n "$glob" ] || glob="{{morph_layers}}"
+    files=$(ls -1 $glob 2>/dev/null || true)
+    [ -n "$files" ] || { echo "no layer files matched: $glob"; exit 2; }
+    cd {{morph_dir}} && uv run ttr-morph validate $(echo "$files" | sed "s|^|$(git rev-parse --show-toplevel)/|")
+
+# Compile the snapshot into dist/morph/ — the body, one member file per
+# share-alike layer, and NOTICE-morph.md. Version is the morph/v* tag being
+# rehearsed; the real one comes from the tag in publish-morph.yml.
+morph-compile version="0.0.0" layers="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    root=$(git rev-parse --show-toplevel)
+    glob="{{layers}}"; [ -n "$glob" ] || glob="{{morph_layers}}"
+    files=$(ls -1 $glob 2>/dev/null || true)
+    [ -n "$files" ] || { echo "no layer files matched: $glob"; exit 2; }
+    mkdir -p "$root/dist/morph"
+    cd {{morph_dir}} && uv run ttr-morph compile \
+        $(echo "$files" | sed "s|^|$root/|") \
+        -o "$root/dist/morph/cs.morph.snap" \
+        --snapshot-version "{{version}}"
+
 # ── Conformance (RG-P6.S2 — the three-tier instrument) ───────────────────────
 
 # The grounding eval corpus (RG-P3.S2.T7): consolidate the per-service goldens

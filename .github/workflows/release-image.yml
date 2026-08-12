@@ -53,6 +53,12 @@ on:
       # nothing, which is worse than it sounds: a release lane that always shows
       # one failure is a release lane whose failures nobody reads.
       - '!python-nlp/v*'
+      # The morphology snapshot tag (publish-morph.yml). It publishes DATA —
+      # `cs.morph.snap` and its member files — and there is no module called
+      # "morph" to build. Excluded for the same reason as `python-nlp/v*`: a
+      # release lane that always shows one failure is a release lane whose
+      # failures nobody reads.
+      - '!morph/v*'
   workflow_dispatch:
     inputs:
       version:

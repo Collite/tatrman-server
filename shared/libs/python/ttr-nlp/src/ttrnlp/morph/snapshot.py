@@ -36,6 +36,17 @@ emitted them in set order would produce a different artifact on every run. Only
 data rows participate: ``#fold-index`` and ``#ne-exceptions`` are derived from
 the rows, so hashing them too would only prove they were copied.
 
+**The core may arrive as several files** (C-F3). Share-alike material compiles
+into separable member files of its own — ``core-kaikki.morph.part`` beside
+``cs.morph.snap`` — so that the CC BY-SA sources stay identifiable and
+separately licensed instead of mixing into one file of blended provenance. All
+of them are core: `load_morph` takes the leading run of snapshot-magic sources
+as core members and the rest as world overlays. Members do not shadow each
+other and are not ordered against each other, because the *compiler* already
+merged them: precedence between layers is decided once, at compile time, in the
+order the layers were compiled. Two deployments listing the member files in
+different orders therefore cannot answer differently.
+
 The structure below mirrors `packs/loader.py` — read, collect diagnostics, judge
 once — deliberately, and just as deliberately does not import it: packs and
 morph fail for different reasons in different code families, and a shared loader
@@ -486,6 +497,10 @@ class MorphState:
     #: folded key -> the true forms that fold to it.
     folded: Mapping[str, tuple[str, ...]]
     ne_exceptions: frozenset[str]
+    #: Further core member files beyond `manifest` — the separable share-alike
+    #: parts (C-F3). Core, not overlays: they shadow nothing and are ranked
+    #: against nothing, having been merged already by the compiler.
+    members: tuple[MorphManifest, ...] = ()
     overlays: tuple[MorphManifest, ...] = ()
     diagnostics: tuple[Diagnostic, ...] = ()
     fold_collisions: int = 0
@@ -561,9 +576,12 @@ class MorphState:
         return MorphStats(
             version=self.manifest.version,
             language=self.manifest.language,
-            rows=self.manifest.rows + sum(o.rows for o in self.overlays),
+            rows=self.manifest.rows
+            + sum(m.rows for m in self.members)
+            + sum(o.rows for o in self.overlays),
             forms=len(self.exact),
             layers=self.manifest.layers
+            + tuple(pair for source in self.members for pair in source.layers)
             + tuple(pair for overlay in self.overlays for pair in overlay.layers),
             worlds=tuple(o.world for o in self.overlays if o.world),
             fold_collisions=self.fold_collisions,
@@ -609,13 +627,69 @@ def _with_atom(analysis: Analysis, atom: str) -> Analysis:
 # ── loading ──────────────────────────────────────────────────────────────────
 
 
+def _out_of_order(kind: str, index: int, seen: Sequence[_Parsed]) -> str:
+    """Why source ``index`` may not be here, or ``""`` if it may.
+
+    The first source is the core. After it, either kind is legal — another core
+    member file or the first overlay — until an overlay appears, and from there
+    on everything must be an overlay. The rule is one-directional so that a
+    configuration cannot list a core member *after* a world: the world would
+    then be shadowing entries the core had not contributed yet, and whether it
+    shadowed them would depend on the order of a list nobody thinks of as
+    ordered.
+    """
+    if index == 0:
+        return "" if kind == "snapshot" else "the first source is the core snapshot"
+    if kind == "snapshot" and any(
+        p.manifest is not None and p.manifest.kind == "overlay" for p in seen
+    ):
+        return (
+            "core member files come before every overlay — a core listed after "
+            "a world would be shadowed by it or not depending on file order"
+        )
+    return ""
+
+
+def _merge_members(members: Sequence[_Parsed]) -> _Parsed:
+    """Fuse the core member files into one core (C-F3 separability).
+
+    No precedence and no shadow diagnostics between members: the compiler
+    decided precedence across layers before it routed rows to files, so two
+    members holding the same (lemma, upos) would be a compiler bug rather than
+    a configuration to arbitrate. The first member's manifest is the core's
+    identity — it is the artifact the release is named after — and the others
+    are reported through `MorphState.members`.
+    """
+    if not members:  # pragma: no cover — source 0 must be a snapshot
+        return _Parsed()
+    first = members[0]
+    if len(members) == 1:
+        return first
+
+    fold_index: dict[str, tuple[str, ...]] = {}
+    for member in members:
+        for key, forms in member.fold_index.items():
+            merged = dict.fromkeys(fold_index.get(key, ()) + forms)
+            fold_index[key] = tuple(merged)
+
+    return _Parsed(
+        manifest=first.manifest,
+        rows=[row for member in members for row in member.rows],
+        fold_index=fold_index,
+        ne_exceptions=frozenset().union(*(m.ne_exceptions for m in members)),
+    )
+
+
 def load_morph(sources: Sequence[str | Path]) -> MorphState:
     """Load a core snapshot and any world overlays (contracts §5).
 
     Args:
-        sources: The core snapshot first, then overlay files. The order is the
-            configuration's and it is meaningful: a later overlay shadows an
-            earlier one exactly as it shadows the core.
+        sources: The core snapshot first, then any further core member files
+            (the separable share-alike parts), then overlay files. The core
+            members are the leading run of snapshot-magic sources and their
+            order carries no meaning — the compiler merged them. Overlay order
+            does: a later overlay shadows an earlier one exactly as it shadows
+            the core.
 
     Returns:
         An immutable `MorphState`. Any ``LM-MORPH-002`` shadow notices are on
@@ -648,14 +722,13 @@ def load_morph(sources: Sequence[str | Path]) -> MorphState:
 
         result = _parse(text, name, diagnostics)
         if result.manifest is not None:
-            expected = "snapshot" if index == 0 else "overlay"
-            if result.manifest.kind != expected:
+            reason = _out_of_order(result.manifest.kind, index, parsed)
+            if reason:
                 diagnostics.append(
                     error(
                         LM_MORPH_001,
-                        f"{name}: this is a {result.manifest.kind} and source "
-                        f"{index} must be a {expected} — the first source is "
-                        "the core artifact, the rest are world overlays",
+                        f"{name}: source {index} is a {result.manifest.kind} — "
+                        f"{reason}",
                         source=name,
                     )
                 )
@@ -664,7 +737,8 @@ def load_morph(sources: Sequence[str | Path]) -> MorphState:
     if any(d.severity == "ERROR" for d in diagnostics):
         raise LoadError(diagnostics)
 
-    core = parsed[0]
+    members = [p for p in parsed if p.manifest and p.manifest.kind == "snapshot"]
+    core = _merge_members(members)
     if core.manifest is None:  # pragma: no cover — an ERROR would have been raised
         raise LoadError(
             diagnostics + [error(LM_MORPH_001, "core snapshot did not parse")]
@@ -682,7 +756,9 @@ def load_morph(sources: Sequence[str | Path]) -> MorphState:
     overlay_rows: list[_Row] = []
     ne_exceptions = set(core.ne_exceptions)
 
-    for overlay in parsed[1:]:
+    for overlay in [
+        p for p in parsed if p.manifest is not None and p.manifest.kind == "overlay"
+    ]:
         assert overlay.manifest is not None
         overlay_manifests.append(overlay.manifest)
         ne_exceptions |= overlay.ne_exceptions
@@ -738,6 +814,7 @@ def load_morph(sources: Sequence[str | Path]) -> MorphState:
         ),
         folded=MappingProxyType(folded_live),
         ne_exceptions=frozenset(ne_exceptions),
+        members=tuple(p.manifest for p in members[1:] if p.manifest is not None),
         overlays=tuple(overlay_manifests),
         diagnostics=tuple(diagnostics),
         fold_collisions=sum(1 for forms in folded_live.values() if len(forms) > 1),
