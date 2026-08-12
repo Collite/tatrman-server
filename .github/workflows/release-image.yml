@@ -46,6 +46,13 @@ on:
       - '!shared/v*'      # shared libs are Maven artifacts, not images
       - '!shared-proto/v*'
       - '!server-libs/v*' # the Maven library publish tag (publish.yml) — not an image
+      # The PyPI wheel tag (publish-python.yml) — not an image either. Without
+      # this, every `ttr-nlp` release also started an image build that failed on
+      # `could not resolve a buildable path for module 'python-nlp'`, so a
+      # successful publish left a red X beside it. It cost nothing and published
+      # nothing, which is worse than it sounds: a release lane that always shows
+      # one failure is a release lane whose failures nobody reads.
+      - '!python-nlp/v*'
   workflow_dispatch:
     inputs:
       version:
