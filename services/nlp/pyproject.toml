@@ -82,6 +82,5 @@ target-version = "py313"
 
 [tool.uv.sources]
 otel-config = { path = "../../shared/libs/python/otel-config", editable = true }
-# TODO(NLS-P4.T7): after the first PyPI publish, the IMAGE build installs
 # `ttr-nlp==0.1.0` from PyPI; this editable path stays for local development.
 ttr-nlp = { path = "../../shared/libs/python/ttr-nlp", editable = true }
