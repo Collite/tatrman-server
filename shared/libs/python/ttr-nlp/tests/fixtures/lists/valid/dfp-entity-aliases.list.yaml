@@ -49,3 +49,21 @@ entries:
       kind: value_alias
       attribute: role
       value: obchodni_zastupce
+
+  # The SAME value under MorphoDiTa's lemma. `matching: lemma` matches whatever
+  # the active lemmatizer produced, and the two lemmatizers disagree here:
+  # Stanza keeps `zástupce`, MorphoDiTa gives the MorfFlex canonical `zástupec`.
+  # Neither is wrong — but a list written by a human (or exported from a model
+  # lexicon) carries the form a Czech speaker actually writes, which is the
+  # first one, so under MorphoDiTa this entry is what makes the role hero fire
+  # at all.
+  #
+  # This is a MITIGATION, not the fix: it asks list authors to know every
+  # tagger's canonical forms, and `tools/export_lexicon.py` cannot produce
+  # variants at all. Tracked as #47, where the gazetteer grows a fallback for a
+  # missed lemma and lists declare the lemma space they were authored in.
+  - term: "obchodní zástupec"
+    features:
+      kind: value_alias
+      attribute: role
+      value: obchodni_zastupce
