@@ -35,11 +35,6 @@ COPY shared/libs/python/otel-config /build/shared/libs/python/otel-config
 # this front. The wheel is model-free, so this does not touch the engine-free
 # invariant (S3.T6, verified by tests/test_engine_free_front.py).
 #
-# TODO(NLS-P4.T7): once `ttr-nlp==0.1.0` is on PyPI, the IMAGE should install the
-# pinned release instead of this path dependency (drop the COPY and the
-# [tool.uv.sources] entry from the image's resolution); the editable path stays
-# for local development. Doing it before the publish would make the image
-# unbuildable.
 COPY shared/libs/python/ttr-nlp /build/shared/libs/python/ttr-nlp
 COPY services/nlp/pyproject.toml services/nlp/uv.lock ./
 RUN pip install --upgrade pip && pip install uv && uv sync --frozen
