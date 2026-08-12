@@ -280,7 +280,48 @@ run-morph-studio world="dfp":
     export MORPH_STUDIO_DB_URL="sqlite+pysqlite:///$root/dist/morph-studio/studio.db"
     export MORPH_STUDIO_OVERLAY_DIR="$root/dist/morph-studio/overlay"
     export MORPH_STUDIO_EXPORT_DIR="$root/dist/morph-studio/export"
+    # Serve the built FI-7 frontend from the same process if it has been built
+    # (`just fe-build`). Unset otherwise — the API alone is a supported way to
+    # run this, and the `dfp` world has no authoring UI at all by ruling (LM-12).
+    [ -d "$root/services/morph-studio/frontend/dist" ] \
+        && export MORPH_STUDIO_STATIC_DIR="$root/services/morph-studio/frontend/dist" \
+        || true
     cd services/morph-studio && uv run python src/main.py
+
+# ── morph-studio frontend (FI-7 — NLS-P9.3) ──────────────────────────────────
+
+# `services/morph-studio/frontend` is the only TypeScript in this repo. It is a
+# vite + Vue 3 app built to `frontend/dist`, which the BACKEND serves — one
+# deployable, no second web server (see `api._mount_frontend`).
+
+fe_dir := "services/morph-studio/frontend"
+
+# Install once; every other recipe assumes it.
+fe-install:
+    cd {{fe_dir}} && npm install
+
+# The dev server, proxying /v1 to a `just run-morph-studio` on :7290.
+fe-dev:
+    cd {{fe_dir}} && npm run dev
+
+# Type-check and bundle. `just run-morph-studio` picks the output up.
+fe-build:
+    cd {{fe_dir}} && npm run build
+
+# The component tier (vitest + @vue/test-utils, jsdom). No backend, no browser.
+fe-test *args:
+    cd {{fe_dir}} && npx vitest run {{args}}
+
+# Regenerate the API client from the service's OpenAPI document.
+#
+# ⚑ Two steps, and both matter: the document is dumped from the app (no server,
+# no database) and THEN the TypeScript is generated from it. The committed
+# `frontend/openapi.json` is what `tests/test_openapi.py` compares against, so a
+# backend change that skips this recipe fails the python suite rather than
+# silently shipping a stale client.
+fe-api:
+    cd services/morph-studio && uv run python scripts/dump_openapi.py frontend/openapi.json
+    cd {{fe_dir}} && npm run api
 
 # ── Conformance (RG-P6.S2 — the three-tier instrument) ───────────────────────
 

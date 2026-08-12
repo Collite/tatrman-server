@@ -275,3 +275,96 @@ def test_the_queue_item_keeps_its_link_to_the_entry(client, session):
     item = session.scalar(select(QueueItem))
     assert item.entry_id is not None
     assert session.get(Entry, item.entry_id).lemma == "Kaufland"
+
+
+# ── the bootstrap lane (NLS-P9.3 T6) ─────────────────────────────────────────
+
+
+def _bootstrap_row(token: str, **cascade) -> dict:
+    """A row as `ttr-morph bootstrap` writes one."""
+    body = {
+        "proposals": [
+            {
+                "lemma": "Kaufland",
+                "upos": "PROPN",
+                "vzor": "hrad-proper",
+                "flags": [],
+                "confidence": 0.85,
+                "source": "guesser",
+            }
+        ],
+        "tier": "guesser",
+        "agreed": False,
+        "notes": [],
+        "status": st.AUTO_VALIDATED,
+        "layer": LAYER_WORLD,
+    }
+    body.update(cascade)
+    return {
+        "world": WORLD,
+        "token": token,
+        "verdict": "bootstrap",
+        "count": 0,
+        "cascade": body,
+    }
+
+
+def test_a_bootstrap_row_lands_with_its_own_cascade(client, session):
+    """⚑ The batch already ran it; the studio stores what it was given.
+
+    Re-deriving would mean the report a person reviewed and the queue they are
+    now working came from two different runs — and the LLM leg is not a pure
+    function.
+    """
+    response = client.post("/v1/ingest", json={"reports": [_bootstrap_row("Kaufland")]})
+    assert response.status_code == 200
+
+    item = session.scalar(select(QueueItem).where(QueueItem.token == "Kaufland"))
+    assert item.status == st.AUTO_VALIDATED
+    assert item.layer == LAYER_WORLD
+    assert item.verdict == "bootstrap"
+    assert item.proposal["tier"] == "guesser"
+    # And the entry the cascade implies exists, exactly as for a live ingest.
+    entry = session.get(Entry, item.entry_id)
+    assert entry.lemma == "Kaufland"
+    assert entry.vzor == "hrad-proper"
+    assert entry.status == st.AUTO_VALIDATED
+
+
+def test_a_bootstrap_row_keeps_a_tier_the_live_cascade_would_not_reach(client, session):
+    """The point of carrying the result: an `llm` tier survives the trip.
+
+    This studio has no LLM leg configured. If it re-ran the cascade the tier
+    would come back `guesser`, silently disagreeing with the report.
+    """
+    row = _bootstrap_row("Kaufland", tier="llm", agreed=True)
+    client.post("/v1/ingest", json={"reports": [row]})
+
+    item = session.scalar(select(QueueItem).where(QueueItem.token == "Kaufland"))
+    assert item.proposal["tier"] == "llm"
+    assert item.proposal["agreed"] is True
+
+
+def test_a_bootstrap_row_cannot_walk_an_entry_past_the_export_gate(client):
+    """⚑ The status is checked, not trusted.
+
+    This body comes from a CLI run. A caller who could post `verified` would
+    put an unreviewed generated paradigm into the next artifact with one HTTP
+    request — the single thing the gate exists to prevent.
+    """
+    row = _bootstrap_row("Kaufland", status=st.VERIFIED)
+    response = client.post("/v1/ingest", json={"reports": [row]})
+    assert response.status_code == 400
+    assert "human act" in response.json()["detail"]
+
+
+def test_a_bootstrap_row_cannot_invent_a_layer(client):
+    row = _bootstrap_row("Kaufland", layer="everything")
+    assert client.post("/v1/ingest", json={"reports": [row]}).status_code == 400
+
+
+def test_an_ordinary_report_still_runs_the_cascade(client, session):
+    """The front sends a token and nothing else. Nothing about that changed."""
+    client.post("/v1/ingest", json={"reports": [report(KAUFLANDU)]})
+    item = session.scalar(select(QueueItem).where(QueueItem.token == KAUFLANDU))
+    assert item.proposal["proposals"], "the studio worked it out"

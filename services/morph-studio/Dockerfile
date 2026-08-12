@@ -35,6 +35,28 @@ COPY shared/libs/python/ttr-morph /build/shared/libs/python/ttr-morph
 COPY services/morph-studio/pyproject.toml services/morph-studio/uv.lock ./
 RUN pip install --upgrade pip && pip install uv && uv sync --frozen
 
+# ===== the FI-7 frontend (NLS-P9.3) =====
+#
+# Built here and served by the backend — one image, one process, one port. An
+# nginx sidecar would buy a chart, a Service, an ingress rule and a CORS policy
+# in order to serve files the API process can already read.
+#
+# `npm ci` needs the lockfile and nothing else from the repo, so this layer is
+# cached across every backend change.
+FROM node:24-slim AS frontend
+
+WORKDIR /fe
+COPY services/morph-studio/frontend/package.json services/morph-studio/frontend/package-lock.json ./
+RUN npm ci
+# ⚑ Named, not `COPY frontend/ ./`. The build context is the repo root and has
+# no .dockerignore, so a wildcard would drag a developer's `node_modules` and
+# `dist` into the image layer — hundreds of megabytes, and a `dist` from
+# whenever somebody last ran the build locally.
+COPY services/morph-studio/frontend/index.html services/morph-studio/frontend/env.d.ts ./
+COPY services/morph-studio/frontend/vite.config.ts services/morph-studio/frontend/tsconfig*.json ./
+COPY services/morph-studio/frontend/src ./src
+RUN npm run build-only
+
 # ===== runtime =====
 FROM base AS runtime
 
@@ -51,12 +73,14 @@ COPY --chown=appuser:appuser services/morph-studio/pyproject.toml \
                              services/morph-studio/alembic.ini ./
 COPY --chown=appuser:appuser services/morph-studio/src ./src
 COPY --chown=appuser:appuser services/morph-studio/migrations ./migrations
+COPY --from=frontend --chown=appuser:appuser /fe/dist ./frontend/dist
 
 ENV PATH="/build/services/morph-studio/.venv/bin:${PATH}"
 ENV PYTHONPATH=/app/src
 ENV MORPH_STUDIO_HOST=0.0.0.0 \
     MORPH_STUDIO_PORT=7290 \
-    MORPH_STUDIO_EXPORT_DIR=/var/lib/morph-studio/export
+    MORPH_STUDIO_EXPORT_DIR=/var/lib/morph-studio/export \
+    MORPH_STUDIO_STATIC_DIR=/app/frontend/dist
 
 EXPOSE 7290
 

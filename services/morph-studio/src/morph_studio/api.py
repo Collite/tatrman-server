@@ -21,13 +21,16 @@ UI ends up showing "500" for a reviewer double-clicking Verify.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from ttrmorph.engine.tables import load as load_tables
-from ttrmorph.enrich.cascade import LAYER_CORE, LAYER_WORLD
+from ttrmorph.enrich.cascade import LAYER_CORE, LAYER_WORLD, CascadeResult
 from ttrmorph.enrich.guesser import Proposal, paradigm, validates
 from ttrmorph.enrich.llm import LlmError, LlmLeg
 
@@ -48,6 +51,7 @@ from morph_studio.schemas import (
     IngestRequest,
     IngestResponse,
     LookupResponse,
+    MachineResponse,
     NewEntry,
     ParadigmModel,
     QueueItemModel,
@@ -57,6 +61,8 @@ from morph_studio.schemas import (
     TryPattern,
     Verdict,
     VerdictResponse,
+    VzorModel,
+    VzoryResponse,
 )
 from morph_studio.schemas import (
     ParadigmModel as ParadigmResponse,
@@ -152,8 +158,30 @@ def create_app(
             provisional=settings.provisional,
         )
 
-    @app.get("/v1/vzory")
-    def vzory() -> dict[str, object]:
+    @app.get("/v1/machine", response_model=MachineResponse)
+    def machine() -> MachineResponse:
+        """The LM-14 status machine, so the UI does not keep its own copy.
+
+        Same reasoning as `/v1/vzory`, applied to states instead of patterns:
+        a frontend holding its own list draws chips for states that do not
+        exist and offers a Verify button on an edge the machine refuses, and
+        the reviewer finds out by getting a 409. Served, the buttons *are* the
+        machine — a state added to `status.py` reaches them with no frontend
+        release, and an invented one cannot appear.
+        """
+        return MachineResponse(
+            statuses=list(st.STATUSES),
+            transitions={
+                current: sorted(nexts) for current, nexts in st.TRANSITIONS.items()
+            },
+            exportable=sorted(st.EXPORTABLE),
+            terminal=[s for s in st.STATUSES if not st.TRANSITIONS.get(s)],
+            actions=list(ACTIONS),
+            layers=[LAYER_CORE, LAYER_WORLD],
+        )
+
+    @app.get("/v1/vzory", response_model=VzoryResponse)
+    def vzory() -> VzoryResponse:
         """The closed inventory the UI's pattern picker is built from.
 
         Served rather than hard-coded in the frontend for the reason the
@@ -162,20 +190,20 @@ def create_app(
         analyst who needs it cannot choose it.
         """
         tables = load_tables("cs")
-        return {
-            "language": tables.language,
-            "flags": list(tables.flag_order),
-            "vzory": [
-                {
-                    "name": name,
-                    "upos": vzor.upos,
-                    "parent": vzor.parent,
-                    "implied_flags": list(vzor.implied_flags),
-                    "hints": dict(vzor.hints),
-                }
+        return VzoryResponse(
+            language=tables.language,
+            flags=list(tables.flag_order),
+            vzory=[
+                VzorModel(
+                    name=name,
+                    upos=vzor.upos,
+                    parent=vzor.parent,
+                    implied_flags=list(vzor.implied_flags),
+                    hints=dict(vzor.hints),
+                )
                 for name, vzor in tables.vzory.items()
             ],
-        }
+        )
 
     # ── FI-7 surface 1: look a word up ──────────────────────────────────────
 
@@ -355,6 +383,7 @@ def create_app(
                 last_seen=report.last_seen,
                 llm=app.state.llm,
                 vocabulary=settings.vocabulary,
+                cascade=_precomputed(report),
             )
             response.accepted += 1
             response.created += int(created)
@@ -525,7 +554,51 @@ def create_app(
         session.flush()
         return entry
 
+    _mount_frontend(app, settings)
     return app
+
+
+def _mount_frontend(app: FastAPI, settings: Settings) -> None:
+    """Serve the built FI-7 frontend from this service (NLS-P9.3 T1).
+
+    **One deployable.** The alternative — an nginx pod in front of a second pod
+    — buys nothing here: this is an internal tool with one backend, one origin
+    and no CDN, and the two-pod version costs a chart, a Service, an ingress
+    rule and a CORS policy to serve files the API process can already read.
+
+    ⚑ Registered LAST and after an explicit `v1/` guard. A catch-all that
+    answered `/v1/queeu` (a typo) with `index.html` would turn every mistyped
+    API path into a silent HTTP 200 of HTML, which a generated client reports
+    as a JSON parse error somewhere far away from the cause.
+    """
+    if not settings.static_dir:
+        return
+    root = Path(settings.static_dir)
+    index = root / "index.html"
+    if not index.is_file():
+        # Configured but absent: say so once, and serve the API. A studio whose
+        # UI failed to build should still take the bootstrap batch's ingests.
+        logger.warning(
+            "%s is set to %s but has no index.html — serving the API only",
+            "MORPH_STUDIO_STATIC_DIR",
+            root,
+        )
+        return
+
+    assets = root / "assets"
+    if assets.is_dir():
+        # The hashed bundle, by its own mount so it never reaches the fallback.
+        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str) -> FileResponse:
+        if path.startswith("v1/") or path in ("healthz", "readyz", "openapi.json"):
+            raise HTTPException(404, f"no such endpoint: /{path}")
+        candidate = root / path
+        if path and candidate.is_file() and root in candidate.resolve().parents:
+            return FileResponse(candidate)
+        # Every other path is a client-side route (`/queue`, `/entry/12`).
+        return FileResponse(index)
 
 
 # ── module-level helpers ─────────────────────────────────────────────────────
@@ -570,6 +643,35 @@ def _check_vzor(vzor: str, flags: list[str]) -> None:
     unknown = [flag for flag in flags if flag not in tables.flags]
     if unknown:
         raise HTTPException(400, f"unknown flags {unknown}")
+
+
+def _precomputed(report) -> CascadeResult | None:
+    """The bootstrap batch's own conclusions, as the cascade's own type.
+
+    ⚑ The status and the layer are checked here rather than trusted. This body
+    comes from a CLI run, and a caller who could post `status: "verified"` would
+    walk an entry past the export gate with an HTTP request — the one thing the
+    gate exists to prevent. A cascade reaches two statuses and no others.
+    """
+    body = getattr(report, "cascade", None)
+    if body is None:
+        return None
+    if body.status not in (st.PROPOSED, st.AUTO_VALIDATED):
+        raise HTTPException(
+            400,
+            f"a cascade reaches {st.PROPOSED!r} or {st.AUTO_VALIDATED!r}, not "
+            f"{body.status!r} — everything above those is a human act (LM-14)",
+        )
+    _check_layer(body.layer)
+    return CascadeResult(
+        token=report.token,
+        proposals=tuple(Proposal.from_dict(p.model_dump()) for p in body.proposals),
+        status=body.status,
+        layer=body.layer,
+        tier=body.tier,
+        agreed=body.agreed,
+        notes=tuple(body.notes),
+    )
 
 
 def _observed(session: Session, entry: Entry) -> str:

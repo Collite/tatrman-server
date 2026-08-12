@@ -12,6 +12,10 @@
 #   # the migrations are a JOB, not something the app does on boot:
 #   docker compose -f services/morph-studio/docker-compose.dev.yml run --rm migrate
 #
+#   # the FI-7 frontend is IN the image and served by the backend — open
+#   # http://localhost:7290/ once the stack is up. For frontend work, run
+#   # `just fe-dev` instead: vite on :7291 proxying /v1 to this stack.
+#
 #   # the queue, from the front's spool shape:
 #   curl -s localhost:7290/v1/ingest -H 'content-type: application/json' \
 #     -d '{"reports":[{"world":"dfp","token":"Kauflandu"}]}'

@@ -1,0 +1,1820 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "morph-studio",
+    "description": "Editorial service for the Czech morphology lexicon (LM). PG working store, enrichment cascade, layer-file export. One instance per world (LM-5).",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Healthz",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Healthz Healthz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Readyz",
+        "description": "Ready means the store answers. A studio that cannot reach its\ndatabase is not degraded, it is unusable — every endpoint writes.",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Readyz Readyz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "summary": "Status ",
+        "operationId": "status__v1_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/machine": {
+      "get": {
+        "summary": "Machine",
+        "description": "The LM-14 status machine, so the UI does not keep its own copy.\n\nSame reasoning as `/v1/vzory`, applied to states instead of patterns:\na frontend holding its own list draws chips for states that do not\nexist and offers a Verify button on an edge the machine refuses, and\nthe reviewer finds out by getting a 409. Served, the buttons *are* the\nmachine — a state added to `status.py` reaches them with no frontend\nrelease, and an invented one cannot appear.",
+        "operationId": "machine_v1_machine_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vzory": {
+      "get": {
+        "summary": "Vzory",
+        "description": "The closed inventory the UI's pattern picker is built from.\n\nServed rather than hard-coded in the frontend for the reason the\ninventory is data in the first place (LM-2): a sub-vzor added to\n`vzory.yaml` has to reach the picker without a frontend release, or the\nanalyst who needs it cannot choose it.",
+        "operationId": "vzory_v1_vzory_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VzoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/lookup/{form}": {
+      "get": {
+        "summary": "Lookup",
+        "operationId": "lookup_v1_lookup__form__get",
+        "parameters": [
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/entries": {
+      "get": {
+        "summary": "List Entries",
+        "operationId": "list_entries_v1_entries_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "layer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Layer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EntryModel"
+                  },
+                  "title": "Response List Entries V1 Entries Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Entry",
+        "operationId": "create_entry_v1_entries_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewEntry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/entries/{entry_id}": {
+      "get": {
+        "summary": "Get Entry",
+        "operationId": "get_entry_v1_entries__entry_id__get",
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/entries/{entry_id}/try-pattern": {
+      "post": {
+        "summary": "Try Pattern",
+        "description": "Generate a table for correction — contracts §7's `try-pattern`.",
+        "operationId": "try_pattern_v1_entries__entry_id__try_pattern_post",
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TryPattern"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParadigmModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/entries/{entry_id}/ask-llm": {
+      "post": {
+        "summary": "Ask Llm",
+        "description": "The classifier's proposal for an entry a human is looking at.",
+        "operationId": "ask_llm_v1_entries__entry_id__ask_llm_post",
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParadigmModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/entries/{entry_id}/forms": {
+      "post": {
+        "summary": "Correct Forms",
+        "operationId": "correct_forms_v1_entries__entry_id__forms_post",
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectForms"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/entries/{entry_id}/status": {
+      "post": {
+        "summary": "Set Entry Status",
+        "operationId": "set_entry_status_v1_entries__entry_id__status_post",
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetStatus"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ingest": {
+      "post": {
+        "summary": "Ingest",
+        "description": "The front's spool, or a direct POST (contracts §6/§7).",
+        "operationId": "ingest_v1_ingest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/queue": {
+      "get": {
+        "summary": "Queue",
+        "operationId": "queue_v1_queue_get",
+        "parameters": [
+          {
+            "name": "world",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "World"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/queue/{item_id}/verdict": {
+      "post": {
+        "summary": "Verdict",
+        "operationId": "verdict_v1_queue__item_id__verdict_post",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Verdict"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerdictResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export": {
+      "post": {
+        "summary": "Export ",
+        "operationId": "export__v1_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export/proposals": {
+      "post": {
+        "summary": "Export Proposals",
+        "operationId": "export_proposals_v1_export_proposals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CascadeModel": {
+        "properties": {
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalModel-Output"
+            },
+            "type": "array",
+            "title": "Proposals"
+          },
+          "tier": {
+            "type": "string",
+            "title": "Tier",
+            "default": "human"
+          },
+          "agreed": {
+            "type": "boolean",
+            "title": "Agreed",
+            "default": false
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "proposals",
+          "tier",
+          "agreed",
+          "notes"
+        ],
+        "title": "CascadeModel",
+        "description": "What the cascade concluded about a queue item."
+      },
+      "CorrectForms": {
+        "properties": {
+          "forms": {
+            "items": {
+              "$ref": "#/components/schemas/FormModel-Input"
+            },
+            "type": "array",
+            "title": "Forms"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": "human"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "forms"
+        ],
+        "title": "CorrectForms",
+        "description": "`POST /entries/{id}/forms` — the edited table (FI-7 surface 2).\n\nSending a corrected table converts the entry to a full-form one at export:\nthe pattern no longer describes it, and pretending otherwise is\n`LM-MORPH-005`."
+      },
+      "EntryModel": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "lemma": {
+            "type": "string",
+            "title": "Lemma"
+          },
+          "upos": {
+            "type": "string",
+            "title": "Upos"
+          },
+          "layer": {
+            "type": "string",
+            "title": "Layer"
+          },
+          "vzor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vzor"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "provenance": {
+            "type": "string",
+            "title": "Provenance"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "provisional": {
+            "type": "boolean",
+            "title": "Provisional"
+          },
+          "forms": {
+            "items": {
+              "$ref": "#/components/schemas/FormModel-Output"
+            },
+            "type": "array",
+            "title": "Forms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "lemma",
+          "upos",
+          "layer",
+          "vzor",
+          "flags",
+          "status",
+          "provenance",
+          "source",
+          "confidence",
+          "provisional",
+          "forms"
+        ],
+        "title": "EntryModel"
+      },
+      "ExportRequest": {
+        "properties": {
+          "write": {
+            "type": "boolean",
+            "title": "Write",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExportRequest"
+      },
+      "ExportResponse": {
+        "properties": {
+          "files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Files"
+          },
+          "written": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Written"
+          },
+          "exported": {
+            "type": "integer",
+            "title": "Exported",
+            "default": 0
+          },
+          "withheld": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Withheld"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "files",
+          "written",
+          "exported",
+          "withheld"
+        ],
+        "title": "ExportResponse"
+      },
+      "FormModel-Input": {
+        "properties": {
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "feats": {
+            "type": "string",
+            "title": "Feats",
+            "default": ""
+          },
+          "corrected": {
+            "type": "boolean",
+            "title": "Corrected",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "form"
+        ],
+        "title": "FormModel"
+      },
+      "FormModel-Output": {
+        "properties": {
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "feats": {
+            "type": "string",
+            "title": "Feats",
+            "default": ""
+          },
+          "corrected": {
+            "type": "boolean",
+            "title": "Corrected",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "form",
+          "feats",
+          "corrected"
+        ],
+        "title": "FormModel"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IngestRequest": {
+        "properties": {
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/Report"
+            },
+            "type": "array",
+            "title": "Reports"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reports"
+        ],
+        "title": "IngestRequest"
+      },
+      "IngestResponse": {
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted",
+            "default": 0
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created",
+            "default": 0
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated",
+            "default": 0
+          },
+          "rejected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rejected"
+          },
+          "overlay_emitted": {
+            "type": "boolean",
+            "title": "Overlay Emitted",
+            "default": false
+          },
+          "reload": {
+            "type": "string",
+            "title": "Reload",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "accepted",
+          "created",
+          "updated",
+          "rejected",
+          "overlay_emitted",
+          "reload"
+        ],
+        "title": "IngestResponse"
+      },
+      "LookupResponse": {
+        "properties": {
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "matched_via": {
+            "type": "string",
+            "title": "Matched Via"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/EntryModel"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "form",
+          "matched_via",
+          "entries"
+        ],
+        "title": "LookupResponse",
+        "description": "Contracts §1's `LookupResult`, over HTTP."
+      },
+      "MachineResponse": {
+        "properties": {
+          "statuses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Statuses"
+          },
+          "transitions": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Transitions"
+          },
+          "exportable": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exportable"
+          },
+          "terminal": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Terminal"
+          },
+          "actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "layers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Layers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "statuses",
+          "transitions",
+          "exportable",
+          "terminal",
+          "actions",
+          "layers"
+        ],
+        "title": "MachineResponse",
+        "description": "The LM-14 status machine, as data (contracts §8).\n\nServed for the same reason the pattern inventory is (`GET /v1/vzory`): a\nfrontend that hard-codes the states draws chips for states that do not\nexist and offers buttons for edges the backend refuses, and the p9-3 task\nlist asks for chips that \"match the §8 machine exactly (no invented\nstates)\". A copy cannot be exact — only the thing itself can. So the UI\nrenders what this returns, and a state added to `status.py` reaches the\nchips and the verdict buttons without a frontend release."
+      },
+      "NewEntry": {
+        "properties": {
+          "lemma": {
+            "type": "string",
+            "title": "Lemma"
+          },
+          "upos": {
+            "type": "string",
+            "title": "Upos"
+          },
+          "layer": {
+            "type": "string",
+            "title": "Layer",
+            "default": "core"
+          },
+          "vzor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vzor"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "forms": {
+            "items": {
+              "$ref": "#/components/schemas/FormModel-Input"
+            },
+            "type": "array",
+            "title": "Forms"
+          },
+          "provenance": {
+            "type": "string",
+            "title": "Provenance",
+            "default": "manual"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": "human"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lemma",
+          "upos"
+        ],
+        "title": "NewEntry",
+        "description": "`POST /entries` — the \"new word\" affordance of FI-7 surface 2.\n\nA `vzor` OR explicit `forms`, exactly as a layer file entry (contracts §3).\nNeither is required at creation: an analyst who has typed the word and its\npart of speech and wants to *try a pattern* next has entered something\nworth keeping."
+      },
+      "ParadigmModel": {
+        "properties": {
+          "vzor": {
+            "type": "string",
+            "title": "Vzor"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "forms": {
+            "items": {
+              "$ref": "#/components/schemas/FormModel-Output"
+            },
+            "type": "array",
+            "title": "Forms"
+          },
+          "validates": {
+            "type": "boolean",
+            "title": "Validates",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vzor",
+          "flags",
+          "forms",
+          "validates"
+        ],
+        "title": "ParadigmModel",
+        "description": "A generated table, for review."
+      },
+      "PrecomputedCascade": {
+        "properties": {
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalModel-Input"
+            },
+            "type": "array",
+            "title": "Proposals"
+          },
+          "tier": {
+            "type": "string",
+            "title": "Tier",
+            "default": "human"
+          },
+          "agreed": {
+            "type": "boolean",
+            "title": "Agreed",
+            "default": false
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "proposed"
+          },
+          "layer": {
+            "type": "string",
+            "title": "Layer",
+            "default": "core"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PrecomputedCascade",
+        "description": "A cascade that was already run — the NLS-P9.3 bootstrap batch's output.\n\n`CascadeModel` plus the two fields the batch decided and the service would\notherwise re-derive. They are separate here because on a *queue item* the\nstatus and the layer live on the item's own columns; this model is a\nrequest, and a request has to carry them."
+      },
+      "ProposalModel-Input": {
+        "properties": {
+          "lemma": {
+            "type": "string",
+            "title": "Lemma"
+          },
+          "upos": {
+            "type": "string",
+            "title": "Upos"
+          },
+          "vzor": {
+            "type": "string",
+            "title": "Vzor",
+            "default": ""
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "default": 0.0
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "guesser"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lemma",
+          "upos"
+        ],
+        "title": "ProposalModel",
+        "description": "Contracts §7's `proposal` jsonb, one element."
+      },
+      "ProposalModel-Output": {
+        "properties": {
+          "lemma": {
+            "type": "string",
+            "title": "Lemma"
+          },
+          "upos": {
+            "type": "string",
+            "title": "Upos"
+          },
+          "vzor": {
+            "type": "string",
+            "title": "Vzor",
+            "default": ""
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "default": 0.0
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "guesser"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lemma",
+          "upos",
+          "vzor",
+          "flags",
+          "confidence",
+          "source"
+        ],
+        "title": "ProposalModel",
+        "description": "Contracts §7's `proposal` jsonb, one element."
+      },
+      "QueueItemModel": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "world": {
+            "type": "string",
+            "title": "World"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "context_span": {
+            "type": "string",
+            "title": "Context Span"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "layer": {
+            "type": "string",
+            "title": "Layer"
+          },
+          "routed_by": {
+            "type": "string",
+            "title": "Routed By"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "cascade": {
+            "$ref": "#/components/schemas/CascadeModel"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "world",
+          "token",
+          "verdict",
+          "count",
+          "context_span",
+          "status",
+          "layer",
+          "routed_by",
+          "entry_id",
+          "cascade"
+        ],
+        "title": "QueueItemModel"
+      },
+      "QueueResponse": {
+        "properties": {
+          "world": {
+            "type": "string",
+            "title": "World"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/QueueItemModel"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "world",
+          "items",
+          "total"
+        ],
+        "title": "QueueResponse"
+      },
+      "Report": {
+        "properties": {
+          "world": {
+            "type": "string",
+            "title": "World"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict",
+            "default": "miss"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "default": 1
+          },
+          "context_span": {
+            "type": "string",
+            "title": "Context Span",
+            "default": ""
+          },
+          "first_seen": {
+            "type": "string",
+            "title": "First Seen",
+            "default": ""
+          },
+          "last_seen": {
+            "type": "string",
+            "title": "Last Seen",
+            "default": ""
+          },
+          "cascade": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PrecomputedCascade"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "world",
+          "token"
+        ],
+        "title": "Report",
+        "description": "One row of the front's spool (contracts §6), as `POST /ingest` takes it."
+      },
+      "SetStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": "human"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SetStatus"
+      },
+      "StatusResponse": {
+        "properties": {
+          "world": {
+            "type": "string",
+            "title": "World"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "ready": {
+            "type": "boolean",
+            "title": "Ready"
+          },
+          "entries": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Entries"
+          },
+          "queue": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Queue"
+          },
+          "llm": {
+            "type": "boolean",
+            "title": "Llm",
+            "default": false
+          },
+          "provisional": {
+            "type": "boolean",
+            "title": "Provisional",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "world",
+          "mode",
+          "ready",
+          "entries",
+          "queue",
+          "llm",
+          "provisional"
+        ],
+        "title": "StatusResponse"
+      },
+      "TryPattern": {
+        "properties": {
+          "vzor": {
+            "type": "string",
+            "title": "Vzor"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "apply": {
+            "type": "boolean",
+            "title": "Apply",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vzor"
+        ],
+        "title": "TryPattern",
+        "description": "`POST /entries/{id}/try-pattern` — generate, and optionally keep."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Verdict": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layer"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": "human"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "Verdict",
+        "description": "`POST /queue/{id}/verdict` — FI-7 surface 3's three buttons.\n\n`verify` promotes the entry (and makes any provisional overlay rows\npermanent); `reject` retracts; `route` is LM-10's human override and moves\nthe entry between the core queue and the world's layer without judging it."
+      },
+      "VerdictResponse": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/QueueItemModel"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntryModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "overlay_emitted": {
+            "type": "boolean",
+            "title": "Overlay Emitted",
+            "default": false
+          },
+          "reload": {
+            "type": "string",
+            "title": "Reload",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item",
+          "entry",
+          "overlay_emitted",
+          "reload"
+        ],
+        "title": "VerdictResponse"
+      },
+      "VzorModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "upos": {
+            "type": "string",
+            "title": "Upos"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "implied_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Implied Flags"
+          },
+          "hints": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Hints"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "upos",
+          "parent",
+          "implied_flags",
+          "hints"
+        ],
+        "title": "VzorModel",
+        "description": "One pattern of the closed inventory (LM-2, B-O5)."
+      },
+      "VzoryResponse": {
+        "properties": {
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "vzory": {
+            "items": {
+              "$ref": "#/components/schemas/VzorModel"
+            },
+            "type": "array",
+            "title": "Vzory"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "language",
+          "flags",
+          "vzory"
+        ],
+        "title": "VzoryResponse",
+        "description": "`GET /vzory` — the pattern picker's whole world.\n\nTyped rather than returned as a bare object: the picker is *constrained to\nthe engine inventory*, and a response that generates as an index signature\nmakes that a runtime hope instead of something the compiler checks."
+      }
+    }
+  }
+}

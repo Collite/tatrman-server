@@ -259,7 +259,145 @@ def _parser() -> argparse.ArgumentParser:
     )
     exp.set_defaults(run=_expand_lists)
 
+    boot = subs.add_parser(
+        "bootstrap",
+        help="run the enrichment cascade in bulk over target word lists",
+        description=(
+            "Drive the p9-2 cascade over the uncovered target vocabulary and "
+            "write two files: the ingest rows for a world's morph-studio, and a "
+            "report for a person to read BEFORE any of them reach a queue. "
+            "Nothing here verifies anything: the output is queue items at "
+            "`proposed` or `auto-validated`, and the human act is what follows."
+        ),
+    )
+    boot.add_argument(
+        "--targets",
+        type=Path,
+        action="append",
+        required=True,
+        metavar="LIST",
+        help="a target list (`groups:` YAML or one word per line); repeatable",
+    )
+    boot.add_argument(
+        "--world",
+        default="core",
+        help="the world these queue items belong to (LM-5); default `core`",
+    )
+    boot.add_argument(
+        "--snapshot",
+        type=Path,
+        action="append",
+        default=[],
+        help="skip targets this artifact already covers (thin still counts as "
+        "uncovered — see `bootstrap.uncovered`)",
+    )
+    boot.add_argument(
+        "--vocabulary",
+        default="",
+        help="the world's model vocabulary, comma-separated (LM-10 routing)",
+    )
+    boot.add_argument(
+        "--llm",
+        action="store_true",
+        help="use the classifier leg (MORPH_LLM_URL); without it the batch is "
+        "the deterministic guesser alone, which is a supported run",
+    )
+    boot.add_argument("--limit", type=int, default=0, help="stop after N targets")
+    boot.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=Path("dist/bootstrap"),
+        help="directory for bootstrap.jsonl + bootstrap-report.md",
+    )
+    boot.add_argument("--lang", default="cs")
+    boot.set_defaults(run=_bootstrap)
+
     return parser
+
+
+def _bootstrap(args) -> int:
+    from ttrmorph.enrich import bootstrap as bs
+    from ttrmorph.enrich.llm import LlmLeg
+
+    missing = [path for path in args.targets if not path.exists()]
+    if missing:
+        print(f"ttr-morph bootstrap: no such list: {missing}", file=sys.stderr)
+        return EXIT_USAGE
+
+    pairs: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for path in args.targets:
+        for word in bs.read_targets(path, lang=args.lang):
+            # A word in two lists is one target. Which list it is credited to is
+            # the first one, so the report's breakdown adds up to the total.
+            if word not in seen:
+                seen.add(word)
+                pairs.append((word, path.name))
+
+    state = None
+    if args.snapshot:
+        from ttrmorph.eval import harness
+
+        absent = [path for path in args.snapshot if not path.exists()]
+        if absent:
+            print(f"ttr-morph bootstrap: no such snapshot: {absent}", file=sys.stderr)
+            return EXIT_USAGE
+        state = harness.load_state(args.snapshot)
+
+    words = [word for word, _ in pairs]
+    wanted, covered = bs.uncovered(words, state)
+    wanted_set = set(wanted)
+    work = [(word, source) for word, source in pairs if word in wanted_set]
+    if args.limit > 0:
+        work = work[: args.limit]
+
+    leg = LlmLeg.from_env() if args.llm else None
+    if args.llm and leg is None:
+        print(
+            "ttr-morph bootstrap: --llm was asked for but MORPH_LLM_URL is not "
+            "set. Refusing rather than quietly running the guesser alone: a "
+            "batch you thought was classified and was not is worse than no "
+            "batch",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    total = len(work)
+    print(
+        f"{total} target(s) to work "
+        f"({len(covered)} already covered), llm={'on' if leg else 'off'}"
+    )
+
+    def progress(done: int, word: str) -> None:
+        if done % 100 == 0 or done == total:
+            print(f"  {done}/{total} … {word}", file=sys.stderr)
+
+    vocabulary = tuple(t.strip() for t in args.vocabulary.split(",") if t.strip())
+    batch = bs.run(
+        work,
+        world=args.world,
+        llm=leg,
+        vocabulary=vocabulary,
+        lang=args.lang,
+        progress=progress,
+    )
+    batch.covered = covered
+
+    rows_path = args.output / "bootstrap.jsonl"
+    report_path = args.output / "bootstrap-report.md"
+    bs.write_rows(batch, rows_path)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(bs.render(batch), encoding="utf-8")
+
+    print(
+        f"auto-validated {len(batch.auto_validated)} · "
+        f"proposed {len(batch.proposed)} · "
+        f"nothing {len(batch.empty)}"
+    )
+    print(f"wrote {rows_path}")
+    print(f"wrote {report_path} — read it before ingesting anything")
+    return EXIT_OK
 
 
 def _generate(args) -> int:

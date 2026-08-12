@@ -270,6 +270,7 @@ def ingest(
     llm: LlmLeg | None = None,
     vocabulary: Iterable[str] = (),
     run: bool = True,
+    cascade: CascadeResult | None = None,
 ) -> tuple[QueueItem, bool]:
     """One spool row into the queue. Returns `(item, is_new)`.
 
@@ -307,7 +308,7 @@ def ingest(
     audit(session, "queue_item", item.id, "ingested", world=world, token=token)
 
     if run:
-        apply_cascade(session, item, llm=llm, vocabulary=vocabulary)
+        apply_cascade(session, item, llm=llm, vocabulary=vocabulary, result=cascade)
     return item, True
 
 
@@ -317,9 +318,23 @@ def apply_cascade(
     *,
     llm: LlmLeg | None = None,
     vocabulary: Iterable[str] = (),
+    result: CascadeResult | None = None,
 ) -> CascadeResult:
-    """Run the cascade over a queue item and record what it concluded."""
-    result = run_cascade(
+    """Record what the cascade concluded, running it unless handed the answer.
+
+    ⚑ `result` is how the NLS-P9.3 bootstrap batch lands. It ran this same
+    cascade over a target list, a person read the report it produced, and the
+    rows they approved arrive carrying their own conclusions. Re-deriving them
+    here would mean the report somebody reviewed and the queue they are now
+    looking at came from two different runs — and the LLM leg is not a pure
+    function. It would also pay for every classification twice.
+
+    Nothing about the *rules* changes: the status a precomputed result carries
+    is one the cascade produces (`proposed` or `auto-validated`), and the
+    entry it creates goes through `entry_from_proposal` exactly as a live one
+    does. What is skipped is the computation, not the gate.
+    """
+    result = result or run_cascade(
         item.token,
         llm=llm,
         vocabulary=vocabulary,

@@ -166,3 +166,44 @@ def test_the_cascade_routes_what_it_decided_rather_than_the_raw_token():
     result = run_cascade("zákazníkovi")
     assert result.layer == LAYER_CORE
     assert run_cascade("Kauflandu").layer == LAYER_WORLD
+
+
+# ── the inflected-tail rule (NLS-P9.3 T6) ────────────────────────────────────
+
+
+def test_a_token_ending_in_an_inflectional_ending_does_not_auto_validate():
+    """⚑⚑ Found by the p9-3 bootstrap run, not by a unit test.
+
+    *pololetích* scored 0.95 − `INFLECTED_TAIL_PENALTY` = exactly 0.80 — the
+    auto-validate line, met rather than missed — and went through as
+    `muzeum-um` with the invented lemma *pololetum*. The penalty was reaching
+    for a categorical rule and expressing it as arithmetic.
+    """
+    result = run_cascade("pololetích")
+
+    assert result.status == STATUS_PROPOSED
+    assert result.tier == TIER_HUMAN
+    # Still proposed and still ranked — the rule withholds the pass, it does
+    # not withhold the guess.
+    assert result.proposals
+    assert any("inflectional ending" in note for note in result.notes)
+
+
+def test_the_hero_is_untouched_by_it():
+    """*Kauflandu* is the shape the whole enrichment loop was designed around.
+
+    Single-character endings are excluded from the set on purpose (`-u`, `-a`,
+    `-y`, `-e` are endings and are also how a great many citation forms end), so
+    the rule cannot reach it.
+    """
+    result = run_cascade("Kauflandu")
+
+    assert result.status == STATUS_AUTO_VALIDATED
+    assert result.best is not None
+    assert result.best.lemma == "Kaufland"
+    assert result.notes == ()
+
+
+def test_a_citation_form_is_untouched_by_it():
+    assert run_cascade("kvartál").status == STATUS_AUTO_VALIDATED
+    assert run_cascade("Kaufland").status == STATUS_AUTO_VALIDATED

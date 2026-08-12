@@ -60,12 +60,23 @@ cd "$(dirname "$0")/.."
 # allowlistable. Legitimate spellings are unaffected — the wheel lives at
 # `shared/libs/python/ttr-nlp`.
 #
+# `ttr-morph` (NLS-P8.1, ⚑LMP-D4) joins that third class with one difference
+# worth writing down: it is a distribution name owned by this repo that is
+# DELIBERATELY NEVER PUBLISHED. It lives at `shared/libs/python/ttr-morph`,
+# imports as `ttrmorph`, and ships only inside the `nlp-morph-tools` image and
+# `services/morph-studio`. Unpublished does not make it renameable — it is the
+# name in every `pyproject.toml` dependency, every `uv.lock`, both Dockerfiles
+# and the justfile loops — and the SERVICE built on it is bare-named
+# (`services/morph-studio`), exactly as ⚑RV-6 requires. ⚑ The gate has been red
+# on this branch since P8.1 created the package and nobody added the entry; the
+# wave's PR opens at P9.3, which is where that stopped being tolerable.
+#
 # The slash is written `\/` because ALLOW is interpolated into `s/…//` below; an
 # unescaped one would end the substitution and perl would refuse the pattern.
 #
 # Order matters: `nlp-routing` must precede bare `nlp` so the longer schema id
 # matches first.
-ALLOW='(?<!services\/)ttr-(metadata-git|metadata-adoption|metadata|translator-extraction|translator|plan-proto|parser|writer|semantics|server-proto|snapshot|lexicon|skill|operator-library|nlp-routing|nlp|server|umbrella-ci|umbrella|\*|\{)'
+ALLOW='(?<!services\/)ttr-(metadata-git|metadata-adoption|metadata|translator-extraction|translator|plan-proto|parser|writer|semantics|server-proto|snapshot|lexicon|skill|operator-library|nlp-routing|nlp|morph|server|umbrella-ci|umbrella|\*|\{)'
 
 hits="$(
   git grep -nI -P '(?<![A-Za-z0-9_])ttr-' -- . ':(exclude)scripts/check-name-prefix.sh' \

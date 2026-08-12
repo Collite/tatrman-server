@@ -297,6 +297,77 @@ jobs:
         working-directory: services/nlp
         run: uv run pytest -q
 
+  # NLS-P9.3 — the Python unit gate for `services/morph-studio` (the LM editorial
+  # service: working store, cascade, status machine, layer-file export).
+  #
+  # ⚑ Third time this repo has shipped a module whose suite ran only on a
+  # laptop — `services/nlp` (NLS-P3.3) and `ttr-morph` (NLS-P8.2) were the first
+  # two. This one arrives one list after the service, same as `ttr-morph` did.
+  #
+  # The component tier (`-m component`, alembic up and down against a real
+  # Postgres) stays out, matching every other Python job here: it needs a
+  # database daemon, and `component-test` is where real-dependency tiers live.
+  morph-studio:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: ruff
+        working-directory: services/morph-studio
+        run: uv run ruff check .
+
+      # `tests/test_openapi.py` is in here and is the codegen guard: it rebuilds
+      # the OpenAPI document from this commit's app and fails if
+      # `frontend/openapi.json` differs. That is what stops a backend change from
+      # shipping a stale TypeScript client — the frontend job below would still
+      # be green, because it type-checks against whatever is committed.
+      - name: pytest
+        working-directory: services/morph-studio
+        run: uv run pytest -q
+
+  # NLS-P9.3 — the FI-7 frontend. The only TypeScript in this repo.
+  morph-studio-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: services/morph-studio/frontend/package-lock.json
+
+      - name: install
+        working-directory: services/morph-studio/frontend
+        run: npm ci
+
+      - name: type-check
+        working-directory: services/morph-studio/frontend
+        run: npm run type-check
+
+      - name: vitest
+        working-directory: services/morph-studio/frontend
+        run: npm run test:unit
+
+      # The bundle the backend serves. A type-check that passes and a build that
+      # does not is a real combination (asset resolution, the vite config), and
+      # the failure would otherwise surface at image-build time.
+      - name: build
+        working-directory: services/morph-studio/frontend
+        run: npm run build-only
+
   # P2/RO-6 dependency rules (contracts §7). Passes trivially on the S1 skeleton;
   # its real bite is S4 once the spine services + protos have arrived.
   dependency-rules:

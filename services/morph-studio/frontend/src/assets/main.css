@@ -1,0 +1,76 @@
+/* An internal tool. No design system, no component library, one stylesheet.
+   The tokens exist so the status chips and provenance badges say the same
+   things in the same colours everywhere — that consistency is the only visual
+   requirement the FI-7 brief actually has. */
+
+:root {
+  --bg: #ffffff;
+  --wash: #f6f7f9;
+  --line: #d7dbe0;
+  --ink: #1c2024;
+  --ink-dim: #6b7480;
+  --accent: #3f6fd1;
+  --accent-ink: #294991;
+  --good: #4c9a5a;
+  --good-wash: #eef7ef;
+  --good-ink: #2f6b3a;
+  --warn: #d2a03c;
+  --warn-wash: #fdf6e6;
+  --warn-ink: #8a6516;
+  --bad: #c2564d;
+  --bad-wash: #fbeeed;
+  --bad-ink: #8d332c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+a {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font: inherit;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+button.ghost {
+  background: transparent;
+  color: var(--ink-dim);
+}
+button.danger:hover:not(:disabled) {
+  border-color: var(--bad);
+  color: var(--bad-ink);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+h2 {
+  font-size: 1.25rem;
+}

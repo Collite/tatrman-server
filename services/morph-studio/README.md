@@ -49,9 +49,13 @@ the SAME query now resolves
 | `POST /v1/export` | the layer files, gated |
 | `POST /v1/export/proposals` | the DFP lane (LM-12) — proposed-entry fragments for `ai-models` |
 | `GET /v1/vzory` | the closed pattern inventory the UI's picker is built from |
+| `GET /v1/machine` | the LM-14 status machine, so the UI keeps no copy of it |
 | `GET /v1/status`, `/healthz`, `/readyz` | |
 
-`GET /openapi.json` is the frontend's codegen input (NLS-P9.3 T1).
+`frontend/openapi.json` is the frontend's codegen input, dumped from this app by
+`just fe-api` and kept honest by `tests/test_openapi.py` — a backend change that
+skips the codegen step fails the python suite rather than shipping a stale
+client.
 
 ## The cascade
 
@@ -72,6 +76,32 @@ machine, the endpoints and the overlay lane around them.
 * **auto-validate** = the observed form is in the engine-generated paradigm
   (LM-14) **and** either the deterministic leg was confident or two independent
   legs named the same entry. Re-checked at every verdict, whoever proposed it.
+
+## The frontend (FI-7)
+
+`frontend/` — vite + Vue 3 + TypeScript, built to `frontend/dist`, **served by
+this service**. One deployable: an nginx sidecar would add a chart, a Service,
+an ingress rule and a CORS policy in order to serve files this process already
+reads.
+
+Three surfaces and nothing more: look a word up (`/word/:form`), the entry
+editor (`/entry/:id` — try a pattern, ask the LLM, type the forms), and the
+verification queue (`/queue`).
+
+Two things it deliberately does not own. The **pattern picker's options** come
+from `GET /v1/vzory`, so a sub-vzor added to `vzory.yaml` reaches the analyst
+without a frontend release. The **status chips and verdict buttons** come from
+`GET /v1/machine`, so they cannot show a state that does not exist or offer an
+edge the backend refuses — a copy of the machine can only ever be one that was
+correct once.
+
+```bash
+just fe-install                # once
+just fe-build                  # -> frontend/dist, which run-morph-studio serves
+just fe-dev                    # vite on :7291, proxying /v1 to :7290
+just fe-test                   # vitest + @vue/test-utils, jsdom, no backend
+just fe-api                    # regenerate openapi.json + src/api/schema.d.ts
+```
 
 ## Q-7, narrowly
 
@@ -97,6 +127,7 @@ entirely; `MORPH_STUDIO_OVERLAY_DIR` unset means no overlay is emitted at all
 | `MORPH_STUDIO_FRONT_TARGET` | the front's gRPC `host:port`, for `ReloadPacks` |
 | `MORPH_STUDIO_PROVISIONAL` | Q-7 on/off, default on |
 | `MORPH_STUDIO_VOCABULARY` | the world's model vocabulary, comma-separated (LM-10 routing) |
+| `MORPH_STUDIO_STATIC_DIR` | the built frontend to serve; unset ⇒ the API alone |
 | `MORPH_LLM_URL` / `_MODEL` / `_API_KEY` | the classifier leg; no URL ⇒ no leg |
 
 The schema is **alembic's**: `alembic upgrade head` runs as a job, and the
@@ -124,3 +155,6 @@ docker compose -f services/morph-studio/docker-compose.dev.yml up
 * `shared/libs/python/ttr-morph` — the engine, the compiler, and `enrich/`
 * `services/nlp` — the front: the morph pipeline, `ReportToken`, and the
   `morph.queue` sink that fills this queue
+* `shared/libs/python/ttr-morph/bootstrap/` — the bulk enrichment batch
+  (`ttr-morph bootstrap`) and its review block: the same cascade, over target
+  word lists instead of over the queue

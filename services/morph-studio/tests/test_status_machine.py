@@ -131,3 +131,45 @@ def test_verifying_clears_the_provisional_mark(session):
 
     store.set_status(session, entry, st.VERIFIED)
     assert entry.provisional == 0
+
+
+# ── the machine, served ──────────────────────────────────────────────────────
+
+
+def test_the_machine_is_served_so_the_ui_does_not_keep_a_copy(client):
+    """`GET /v1/machine` IS `status.py` — not a description of it.
+
+    The p9-3 task list asks for status chips that match §8 exactly. A frontend
+    list can only ever be a copy that was exact once; this endpoint makes the
+    chips and the machine the same object.
+    """
+    body = client.get("/v1/machine").json()
+
+    assert body["statuses"] == list(st.STATUSES)
+    assert body["transitions"] == {
+        current: sorted(nexts) for current, nexts in st.TRANSITIONS.items()
+    }
+    assert body["exportable"] == sorted(st.EXPORTABLE)
+    assert body["layers"] == ["core", "world"]
+    assert set(body["actions"]) == {"verify", "reject", "route"}
+
+
+def test_the_served_machine_has_no_edge_from_proposed_to_published(client):
+    """The export gate, as the UI sees it.
+
+    A "Publish" button on a `proposed` entry is unbuildable from this document,
+    which is the point of serving it rather than describing it.
+    """
+    transitions = client.get("/v1/machine").json()["transitions"]
+
+    assert st.PUBLISHED not in transitions[st.PROPOSED]
+    assert st.PUBLISHED not in transitions[st.AUTO_VALIDATED]
+    assert st.PUBLISHED in transitions[st.VERIFIED]
+
+
+def test_rejected_is_served_as_terminal(client):
+    """One verdict, one permanent answer — visible to the UI as no buttons."""
+    body = client.get("/v1/machine").json()
+
+    assert body["terminal"] == [st.REJECTED]
+    assert body["transitions"][st.REJECTED] == []

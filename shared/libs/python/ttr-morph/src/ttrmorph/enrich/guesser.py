@@ -382,8 +382,15 @@ def _inflectional_endings(lang: str) -> frozenset[str]:
     )
 
 
-def _ends_inflected(token: str, lang: str) -> bool:
+def ends_inflected(token: str, lang: str = "cs") -> bool:
+    """Does this token end in something the tables use as an ending?
+
+    Public because the *cascade* needs it, not just the score: a token the
+    engine's own tables say is inflected has no business auto-validating on the
+    deterministic leg alone (see `cascade.run_cascade`).
+    """
     return any(token.endswith(ending) for ending in _inflectional_endings(lang))
+
 
 
 def _score(
@@ -414,7 +421,7 @@ def _score(
 
     if lemma == token:
         score += (
-            INFLECTED_TAIL_PENALTY if _ends_inflected(token, lang) else CITATION_FORM
+            INFLECTED_TAIL_PENALTY if ends_inflected(token, lang) else CITATION_FORM
         )
     elif token.startswith(lemma):
         score += LEMMA_IS_A_PREFIX

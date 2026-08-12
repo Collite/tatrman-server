@@ -39,6 +39,7 @@ from ttrmorph.enrich.guesser import (
     AUTO_VALIDATE_CONFIDENCE,
     SOURCE_GUESSER,
     Proposal,
+    ends_inflected,
     guess,
     validates,
 )
@@ -61,6 +62,12 @@ TIER_GUESSER = "guesser"
 TIER_INFLECTOR = "inflector"  # Wave C (LM-6). Never produced in v1.
 TIER_LLM = "llm"
 TIER_HUMAN = "human"
+
+#: The prefix of the note a failed LLM leg leaves. A constant because the bulk
+#: batch reads it back (`bootstrap.run`): the cascade does not raise for a leg,
+#: so the note IS the failure signal, and a note nobody can match on is a
+#: failure nobody can count.
+LLM_UNAVAILABLE = "llm leg unavailable:"
 
 #: What a corroborated proposal is worth. Above the auto-validate line by
 #: construction: two independent sources naming the same (lemma, upos, vzor,
@@ -121,8 +128,29 @@ def run_cascade(
 
     # ── the deterministic leg alone ─────────────────────────────────────────
     top = proposals[0] if proposals else None
+    inflected = ends_inflected(token, lang)
+    if inflected:
+        # ⚑⚑ Categorical, not a score adjustment (NLS-P9.3 T6). The guesser
+        # already charges `INFLECTED_TAIL_PENALTY` for this, and the p9-3
+        # bootstrap run over a world glossary showed that charging is not
+        # enough: *pololetích* came out as `muzeum-um` with the invented lemma
+        # *pololetum*, scoring 0.95 − 0.15 = exactly 0.80 — the auto-validate
+        # line, met rather than missed. Tuning the constant so the arithmetic
+        # lands elsewhere would fix that word and nothing else.
+        #
+        # The rule the arithmetic was reaching for: if the engine's own tables
+        # say this token ends in one of their endings, then a pattern claiming
+        # it is a citation form has not earned an unreviewed pass. It still gets
+        # proposed and still gets ranked; it goes to a person or to the LLM leg.
+        # Single-character endings are excluded from that set on purpose, so
+        # *Kauflandu* — the hero of detailed-design §9 — is untouched.
+        notes.append(
+            f"{token!r} ends in an inflectional ending: the deterministic leg "
+            "may propose but not auto-validate"
+        )
     if (
         top is not None
+        and not inflected
         and top.confidence >= AUTO_VALIDATE_CONFIDENCE
         and validates(top, token, lang=lang)
     ):
@@ -143,7 +171,7 @@ def run_cascade(
             # Named, not swallowed: "the model was asked and could not answer"
             # and "there is no model here" are different facts about a queue
             # item, and only one of them is worth retrying later.
-            notes.append(f"llm leg unavailable: {exc}")
+            notes.append(f"{LLM_UNAVAILABLE} {exc}")
         else:
             # ⚑ Agreement is computed BEFORE the merge, because the merge drops
             # the deterministic twin of the model's answer — which is precisely
@@ -250,6 +278,7 @@ def _promote(proposals: Sequence[Proposal], agreed: Proposal) -> list[Proposal]:
 
 
 __all__ = [
+    "LLM_UNAVAILABLE",
     "AGREEMENT_CONFIDENCE",
     "LAYER_CORE",
     "LAYER_WORLD",

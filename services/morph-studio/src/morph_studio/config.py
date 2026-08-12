@@ -36,6 +36,7 @@ ENV_OVERLAY_DIR = "MORPH_STUDIO_OVERLAY_DIR"
 ENV_FRONT_TARGET = "MORPH_STUDIO_FRONT_TARGET"
 ENV_PROVISIONAL = "MORPH_STUDIO_PROVISIONAL"
 ENV_VOCABULARY = "MORPH_STUDIO_VOCABULARY"
+ENV_STATIC_DIR = "MORPH_STUDIO_STATIC_DIR"
 
 #: The two lanes of contracts §7. `studio` is the ordinary one: analysts work
 #: the queue in the UI and `POST /export` emits the world's layer file. `dfp` is
@@ -80,6 +81,12 @@ class Settings(BaseModel):
     #: The world's model vocabulary for LM-10 routing — a comma-separated list,
     #: or empty. Small on purpose: this is a routing prior, not a lexicon.
     vocabulary: tuple[str, ...] = ()
+    #: The built FI-7 frontend (`frontend/dist`), served by this service —
+    #: ONE deployable, not a second nginx (NLS-P9.3 T1). Empty ⇒ the API alone,
+    #: which is what the test suite, the bootstrap lane and `dfp` mode want:
+    #: the DFP world has no authoring UI by ruling (LM-12), so a studio with no
+    #: frontend directory is a supported deployment, not a broken one.
+    static_dir: str = ""
 
     @property
     def dfp(self) -> bool:
@@ -130,6 +137,7 @@ class Settings(BaseModel):
             front_target=(env.get(ENV_FRONT_TARGET) or "").strip(),
             provisional=_flag(env.get(ENV_PROVISIONAL), default=True),
             vocabulary=vocabulary,
+            static_dir=(env.get(ENV_STATIC_DIR) or "").strip(),
         )
 
 
@@ -147,6 +155,7 @@ __all__ = [
     "ENV_MODE",
     "ENV_OVERLAY_DIR",
     "ENV_PROVISIONAL",
+    "ENV_STATIC_DIR",
     "ENV_VOCABULARY",
     "ENV_WORLD",
     "MODE_DFP",
