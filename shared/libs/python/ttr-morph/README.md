@@ -151,16 +151,29 @@ uv run ttr-morph vzory
 
 uv run ttr-morph validate lexicon/cs/*.morph.yaml
 uv run ttr-morph compile lexicon/cs/*.morph.yaml -o dist/cs.morph.snap \
-    --snapshot-version 0.1.0 --freq eval/cac-freq.tsv
+    --snapshot-version 0.1.0 --freq lexicon/cs/cac-freq.tsv
 uv run ttr-morph compile world.morph.yaml -o dfp.morph.overlay \
     --overlay --world dfp
+
+uv run ttr-morph eval --snapshot dist/cs.morph.snap                 # cases + targets
+uv run ttr-morph eval --snapshot dist/cs.morph.snap --cac <UD-dir>  # + the metrics
+uv run ttr-morph expand-lists <lists-dir> --config export-morph.yaml \
+    --snapshot dist/cs.morph.snap
 ```
+
+⚑ **Never `lexicon/cs/*.morph.yaml` in anger.** The order of a compile is the
+precedence order, and a glob has no opinion about order — `lexicon/cs/LAYERS`
+does. `just morph-compile` and the publish lane both read it; read its header
+before changing what it says.
 
 Or, from the repo root:
 
 ```
 just morph-validate
 just morph-compile 0.1.0
+just morph-eval                      # the named cases + target coverage
+just morph-eval <UD-dir>             # + the contracts §11 corpus metrics
+just morph-eval "" gate              # what the morph/v* lane runs
 ```
 
 Exit codes: `0` the question had an answer / the files are valid · `1` the
@@ -175,6 +188,85 @@ image:
 docker run --rm -v "$PWD:/work" ghcr.io/collite/nlp-morph-tools:latest \
     validate /work/entities.morph.yaml
 ```
+
+## The frozen split — the ceremony, and why it only happens once
+
+> **UD_Czech-CAC (CC BY-SA 4.0) is the SOLE eval oracle.** `ttr-morph split
+> --seed 20260811` partitions CAC sentence ids into train/dev/test (80/10/10)
+> **once**; the split manifest (ids + seed + CAC version + sha256) is committed
+> at `shared/libs/python/ttr-morph/eval/cac-split.json` **before any CAC-derived
+> seeding runs**, and the Wave C LM-6 training task **MUST train on the train
+> side of this same manifest and evaluate on its test side — no re-split,
+> ever.** Seeding/frequency extraction reads the train side only.
+>
+> — LM contracts §11, verbatim
+
+The manifest is at `eval/cac-split.json`: UD_Czech-CAC r2.18, seed 20260811,
+24,709 sentences split 19,767 / 2,471 / 2,471. It was committed **alone**, in a
+commit that says so, and `tests/eval/test_frozen_manifest.py` pins its sha256 to
+a literal — so if that test ever fails the fix is `git checkout`, not a new
+literal.
+
+**The rule is enforced in the reader, not in its callers.** `ttr-morph split`
+refuses to overwrite an existing manifest; `importers.cac.sentences` refuses a
+sentence id outside the side it was asked for, refuses to run at all if the
+manifest does not exist, and refuses the TEST side unless the caller passes
+`allow_test=True` **in its own source** — which the eval harness does and
+nothing else may. `tests/test_test_side_guard.py` asserts that the flag appears
+in exactly one module. A caller can be written wrong once per caller; a reader
+can only be written wrong once.
+
+Why our own partition when UD ships train/dev/test files: those are a split for
+*parsing* benchmarks, drawn over documents whose composition we do not control
+and which changes between releases. A frozen manifest of sentence ids is
+reproducible from nothing but this file, and it pins the release it came from by
+sha256 — so "the corpus changed under us" is detectable rather than assumed away.
+
+## Eval — what the numbers mean
+
+Four metrics (contracts §11), and the denominators are the argument:
+
+| metric | denominator |
+|---|---|
+| coverage | **every** token — how much of running Czech the artifact knows |
+| lemma-in-set accuracy | **answered** tokens — the gold lemma is somewhere in the set |
+| head-of-list accuracy | **answered** tokens — the gold lemma is *first* |
+| fold-collision rate | **answered** tokens — the fold index produced two lemmas |
+
+Coverage is over every token because the honest answer in v1 is "the query
+domain, not the language" (FI-1/GI-1). The accuracies are over answered tokens
+because a token with no entry has no head of list to be wrong about — both are
+printed with the all-token denominator beside them so nobody has to take that on
+trust.
+
+**The coverage gap is the Wave C headroom, not a defect.** Every run uses the
+lexicon leg alone: the chain's statistical seam exists, defaults to `None`, and
+nothing in v1 passes one. The uncovered-forms table at the end of
+`eval/eval-report.md` is the brief for that work.
+
+**Two runs, and only one needs the corpus.** `--cac` produces the full
+measurement; `--gate` — what the `morph/v*` lane runs — checks the three S-7
+named acceptance cases, the target-vocabulary coverage, and the artifact against
+the committed `eval/baseline.json`, and reads no corpus at all. A release gate
+that downloaded the oracle on every tag would be reading the test side unwatched,
+on a schedule, forever.
+
+`eval/cases/*.case.yaml` are the acceptance criteria themselves (S-7 → NLS arc
+gate 7): the hero with its diacritics, the hero without them, and the NL hero's
+lemma path through the core lexicon — which is the NC-free proof. A case may
+expect a token to be **absent**, and one does: `Kaufland` is world vocabulary
+(FI-1), and a core artifact that answered for it would be a core artifact that
+had absorbed somebody's customer list.
+
+### Two UD conventions the scorer carries
+
+CAC collapses number in the lemma of a personal pronoun or a possessive — `já`
+and `ty` and `on`, never `my`/`vy`/`oni`; `můj` and `tvůj` and `jeho`, never
+`náš`/`váš`/`jejich`. We keep the citation form, because `lemma` is what a rule
+pack matches on and an analyst writing a rule for "we" would never write `já`.
+Neither side changes: the **scorer** carries it, on the gold side only, as a
+declared equivalence in `eval/metrics.py`, and every run prints how many tokens
+it scored that way.
 
 ## Development
 
@@ -199,3 +291,17 @@ a release before this package can see it.
   `*jablce`) need an entry-level narrowing that does not exist yet.
 - **The short adjectival plural** of `-ová` surnames ("sestry Novákovy") is not
   generated; `adj-ova` produces the long adjectival plural.
+- **Cell-scoped alternations.** `palatal` is a *stem*-level flag applied to every
+  cell whose ending triggers it, and two live gaps need an alternation scoped to
+  one cell instead: the `-ec` vocative (*otče*, while the locative is *otci*,
+  same stem) and the imperative of `-it` verbs (*koupit* → *kup*, while the
+  present is *koupím*). The second is most of the verbs the engine does not
+  reproduce. A design decision, not an import fix.
+- **Verb classes the tables do not have at all** — `nést`/`brát`/`mazat`/
+  `sázet`/`umřít`. Six patterns cover a lot of Czech and not all of it.
+- **Adverbs derived from adjectives** (*dobře*, *rychle*, *stále*) often rank
+  under the adjective they came from, where CAC lemmatizes them to themselves.
+  Roughly one point of overall head-of-list accuracy, and an editorial fix
+  (separate ADV entries) rather than an engine one — the studio's queue.
+- **Suppletive plurals.** CAC lemmatizes *let*/*letech* to `rok`; we say `léto`.
+  Both are defensible readings of the form and only one is the oracle's.

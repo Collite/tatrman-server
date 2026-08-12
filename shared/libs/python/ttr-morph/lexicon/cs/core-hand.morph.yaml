@@ -384,6 +384,17 @@ entries:
       - { form: budeme, feats: "Mood=Ind|Number=Plur|Person=1|Tense=Fut" }
       - { form: není,  feats: "Mood=Ind|Number=Sing|Person=3|Polarity=Neg|Tense=Pres" }
       - { form: nejsou, feats: "Mood=Ind|Number=Plur|Person=3|Polarity=Neg|Tense=Pres" }
+      # The conditional auxiliary, added at NLS-P8.4 after the eval harness put
+      # `by` at the head of the uncovered table with 169 tokens — the single
+      # commonest word the artifact could not analyse. It is a closed class of
+      # five forms and it was simply missing: the contractions (*abych*, *kdyby*)
+      # were seeded and the words they contract were not. Every Czech
+      # counterfactual — "which customers WOULD exceed" — contains one.
+      - { form: by,     feats: "Mood=Cnd|Person=3" }
+      - { form: bych,   feats: "Mood=Cnd|Number=Sing|Person=1" }
+      - { form: bys,    feats: "Mood=Cnd|Number=Sing|Person=2" }
+      - { form: bychom, feats: "Mood=Cnd|Number=Plur|Person=1" }
+      - { form: byste,  feats: "Mood=Cnd|Number=Plur|Person=2" }
   - lemma: mít
     upos: VERB
     provenance: manual
@@ -479,6 +490,26 @@ entries:
       - { form: jedl,  feats: "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part" }
       - { form: jedla, feats: "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part" }
       - { form: jedli, feats: "Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part" }
+
+  # ── the hero verb neither source carried (NLS-P8.4) ────────────────────────
+  # `zobrazit` is the first word of the NL hero and it arrived from CAC with a
+  # single attested form — the infinitive — because English Wiktionary has no
+  # entry for it and the corpus happens never to use its imperative. So *Zobraz*,
+  # the word the query actually starts with, had no analysis at all, while the
+  # target-coverage number read 147/149: the lemma resolved to itself, and a
+  # lemma that resolves to itself out of one form is a word the runtime cannot
+  # see in any sentence a user would write. The acceptance case found it; the
+  # harness now reports THIN targets so the next one is found by a number.
+  #
+  # It is a plain `prosit` verb, which is why it needs three words here and not
+  # a form table.
+  - { lemma: zobrazit, upos: VERB, vzor: prosit, provenance: manual }
+
+  # The same shape, found by the thin check rather than by a case: *pololetí*
+  # is syncretic in nine of its cells, so a corpus that used it once looks like
+  # a complete entry. It is not — *pololetím* and *pololetích* are the two
+  # forms a half-year query actually contains.
+  - { lemma: pololetí, upos: NOUN, vzor: stavení, provenance: manual }
 
   # ── the ne-exceptions ──────────────────────────────────────────────────────
   # Every one of these begins with the negation prefix and is not a negation.

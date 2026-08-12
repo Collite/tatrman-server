@@ -98,6 +98,10 @@ HAND = str(FIXTURES / "core-hand.morph.yaml")
 KAIKKI = str(FIXTURES / "core-kaikki.morph.yaml")
 WORLD = str(FIXTURES / "world" / "world-dfp.morph.yaml")
 
+#: A cases dir over the fixture layers. The three real ones (eval/cases) run
+#: against the real lexicon in `tests/eval/test_cases.py`.
+CASES = str(Path(__file__).resolve().parent / "fixtures" / "cases")
+
 
 def test_validate_accepts_the_fixture_layers(capsys):
     assert main(["validate", HAND, KAIKKI]) == EXIT_OK
@@ -186,3 +190,124 @@ def test_compile_takes_a_frequency_table(tmp_path):
         if line.count("\t") == 8 and line.split("\t")[1] == "rok"
     }
     assert ranks == {"1"}
+
+
+# ── the eval lane (P8.4) ─────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def compiled(tmp_path):
+    """A snapshot on disk, from the shipped fixture layers."""
+    out = tmp_path / "cs.morph.snap"
+    assert main(["compile", HAND, KAIKKI, "-o", str(out)]) == EXIT_OK
+    return [
+        arg
+        for path in [out, *sorted(tmp_path.glob("*.morph.part"))]
+        for arg in ("--snapshot", str(path))
+    ]
+
+
+def test_eval_runs_the_named_cases_and_writes_a_report(tmp_path, compiled, capsys):
+    report = tmp_path / "eval-report.md"
+    code = main(["eval", *compiled, "-o", str(report), "--cases", str(CASES)])
+    assert code == EXIT_OK
+    assert "cases 1/1" in capsys.readouterr().out
+    assert "Named acceptance cases" in report.read_text(encoding="utf-8")
+
+
+def test_a_failing_case_is_a_non_zero_exit_even_without_the_gate(
+    tmp_path, compiled, capsys
+):
+    """A run that printed 2/3 and exited 0 is a run somebody scripts around."""
+    cases = tmp_path / "cases"
+    cases.mkdir()
+    (cases / "x.case.yaml").write_text(
+        "case: x\ntext: tržby\ntokens:\n  - {form: tržby, lemma: nope}\n",
+        encoding="utf-8",
+    )
+    code = main(
+        ["eval", *compiled, "-o", str(tmp_path / "r.md"), "--cases", str(cases)]
+    )
+    assert code == EXIT_NO_ANSWER
+
+
+def test_eval_refuses_a_snapshot_that_is_not_there(tmp_path, capsys):
+    code = main(["eval", "--snapshot", str(tmp_path / "nope.snap")])
+    assert code == EXIT_USAGE
+    assert "no such snapshot" in capsys.readouterr().err
+
+
+def test_the_gate_names_every_failure_it_found(tmp_path, compiled, capsys):
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps({"artifact": {"rows": 10**9}, "targets": {}}), encoding="utf-8"
+    )
+    code = main(
+        [
+            "eval",
+            *compiled,
+            "-o",
+            str(tmp_path / "r.md"),
+            "--cases",
+            str(CASES),
+            "--gate",
+            "--baseline",
+            str(baseline),
+        ]
+    )
+    assert code == EXIT_NO_ANSWER
+    assert "GATE" in capsys.readouterr().err
+
+
+def test_write_baseline_says_to_read_it_before_committing(tmp_path, compiled, capsys):
+    baseline = tmp_path / "baseline.json"
+    main(
+        [
+            "eval",
+            *compiled,
+            "-o",
+            str(tmp_path / "r.md"),
+            "--cases",
+            str(CASES),
+            "--write-baseline",
+            "--baseline",
+            str(baseline),
+        ]
+    )
+    assert "read the numbers before committing" in capsys.readouterr().out
+    assert json.loads(baseline.read_text(encoding="utf-8"))["artifact"]["rows"] > 0
+
+
+# ── expand-lists (C-O2) ──────────────────────────────────────────────────────
+
+
+def test_expand_lists_rewrites_what_the_config_names(tmp_path, capsys):
+    out = tmp_path / "cs.morph.snap"
+    assert main(["compile", HAND, "-o", str(out)]) == EXIT_OK
+
+    lists = tmp_path / "lists"
+    lists.mkdir()
+    (lists / "lexicon-cs-ci.list.yaml").write_text(
+        "list: lexicon-cs-ci\nversion: 1\nmatching: ci\n"
+        "source: {world: tatrman, origin: lexicon@x}\n"
+        "entries:\n  - {term: tržba, features: {kind: entity_alias}}\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "morph.yaml"
+    config.write_text("lists:\n  lexicon-cs-ci: expand\n", encoding="utf-8")
+
+    code = main(
+        ["expand-lists", str(lists), "--config", str(config), "--snapshot", str(out)]
+    )
+    assert code == EXIT_OK
+    assert "lexicon-cs-ci\texpand" in capsys.readouterr().out
+    text = (lists / "lexicon-cs-ci.list.yaml").read_text(encoding="utf-8")
+    assert "tržbami" in text and "matching: exact" in text
+
+
+def test_expand_lists_refuses_a_directory_that_is_not_there(tmp_path, capsys):
+    config = tmp_path / "morph.yaml"
+    config.write_text("lists: {}\n", encoding="utf-8")
+    code = main(["expand-lists", str(tmp_path / "nope"), "--config", str(config)])
+    assert code == EXIT_USAGE
+    assert "no such directory" in capsys.readouterr().err

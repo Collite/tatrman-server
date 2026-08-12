@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# S-7 named acceptance case 2 of 3 (contracts §11 -> NLS arc gate 7).
+case: hero-folded
+title: the same hero, typed without diacritics
+text: "Porovnej trzby Kauflandu za lonsky rok s letosnim"
+note: >-
+  A Czech user on a foreign keyboard writes this, and it has to mean the same
+  thing. Every accented word arrives through the fold index (contracts §5) and
+  lands on the same lemma as case 1.
+
+  The law this case guards is the ORDERING: an exact hit is never reported as
+  folded. *za*, *rok* and *s* exist verbatim in the artifact and must answer
+  from themselves — the runner asserts that for every token of every case, so a
+  future artifact that started resolving a real word through somebody else's
+  fold key fails here rather than in a demo.
+tokens:
+  - form: Porovnej
+    lemma: porovnat
+    matched_via: folded
+    provenance: lexicon
+  - form: trzby
+    lemma: tržba
+    matched_via: folded
+    provenance: lexicon
+  - form: Kauflandu
+    absent: true
+  - form: za
+    lemma: za
+    matched_via: exact
+    provenance: lexicon
+  - form: lonsky
+    lemma: loňský
+    matched_via: folded
+    provenance: lexicon
+  - form: rok
+    lemma: rok
+    matched_via: exact
+    provenance: lexicon
+  - form: s
+    lemma: s
+    matched_via: exact
+    provenance: lexicon
+  - form: letosnim
+    lemma: letošní
+    matched_via: folded
+    provenance: lexicon

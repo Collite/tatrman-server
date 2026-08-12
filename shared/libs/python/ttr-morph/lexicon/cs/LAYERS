@@ -1,0 +1,29 @@
+# The cs core snapshot, layer by layer — and THE ORDER IS THE PRECEDENCE.
+#
+# `ttr-morph compile` merges entries by (lemma, upos) in argument order and the
+# LAST one wins, so this list runs weakest to strongest:
+#
+#   core-cac      a corpus row is evidence that a form EXISTS. Attested forms,
+#                 no paradigms, no guesses.
+#   core-kaikki   an independently authored inflection table the engine
+#                 reproduced exactly — so, a paradigm.
+#   core-hand     a human. Overrules both, and needs no re-import to do it.
+#
+# That last property is why precedence is a compile-time list rather than a
+# property of when a file was generated: adding one line to the hand seed must
+# fix the artifact without re-running an importer over a 193 MB extract.
+#
+# ⚑ This file exists because a glob does not have an opinion about order, and
+# because the glob it replaced (`lexicon/cs/*.morph.yaml`, sorted by `ls`) also
+# silently missed the hand seed, which lived elsewhere at the time — 196 curated
+# entries, every ne-exception among them, absent from a release nobody would
+# have looked at twice.
+#
+# One path per line, relative to this directory. `#` comments and blanks are
+# ignored. Read by `just morph-validate` / `just morph-compile` and by
+# `.github/workflows/publish-morph.yml`; `tests/test_publish_lane.py` asserts
+# that every file named here exists and that no layer file is missing from it.
+
+core-cac.morph.yaml
+core-kaikki.morph.yaml
+core-hand.morph.yaml

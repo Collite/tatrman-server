@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# S-7 named acceptance case 1 of 3 (contracts §11 -> NLS arc gate 7).
+case: hero-compare
+title: the compare hero, with its diacritics
+text: "Porovnej tržby Kauflandu za loňský rok s letošním"
+note: >-
+  The sentence the demo is built on. Every content word resolves from the CORE
+  artifact — no world layer, no statistical seam, no non-commercially-licensed
+  model anywhere in the path.
+
+  `Kaufland` is the exception and the point: an entity name is OPEN vocabulary
+  and belongs to a world layer (FI-1), so a core snapshot that answered here
+  would be a core snapshot that had absorbed somebody's customer list. The miss
+  is what feeds the enrichment loop (S-3); `03-hero-world.case.yaml` runs the
+  same sentence with the world overlay and expects the answer.
+tokens:
+  - form: Porovnej
+    lemma: porovnat
+    matched_via: folded
+    provenance: lexicon
+    note: >-
+      Folded because of the capital, not because of an accent: the imperative
+      is stored as `porovnej` and a sentence starts with a capital letter.
+  - form: tržby
+    lemma: tržba
+    matched_via: exact
+    provenance: lexicon
+  - form: Kauflandu
+    absent: true
+  - form: za
+    lemma: za
+    matched_via: exact
+    provenance: lexicon
+  - form: loňský
+    lemma: loňský
+    matched_via: exact
+    provenance: lexicon
+  - form: rok
+    lemma: rok
+    matched_via: exact
+    provenance: lexicon
+  - form: s
+    lemma: s
+    matched_via: exact
+    provenance: lexicon
+  - form: letošním
+    lemma: letošní
+    matched_via: exact
+    provenance: lexicon

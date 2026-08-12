@@ -18,15 +18,23 @@ does not score).
 `sentences` refuses a sentence id outside the requested side and refuses to run
 at all if the frozen manifest does not exist. The check is here rather than in
 callers because a caller can be written wrong once per caller. A caller that
-wants the test side has to ask for it by name, which is what the eval harness
-(p8-4) does and what nothing else may do.
+wants the test side has to ask for it by name *and* pass ``allow_test=True``,
+which is what the eval harness does and what nothing else may do —
+`tests/test_test_side_guard.py` asserts that the flag appears in exactly one
+module.
+
+**Why a second flag when ``side="test"`` is already explicit.** Because
+``side`` is a variable in real code (`--split test` reaches it as a string), and
+a string that arrives from an argument parser is not a decision anybody made
+about this corpus. The flag cannot arrive that way: it is written in the source
+of whichever module reads the test side, so reading it is a diff a reviewer sees.
 """
 
 from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -41,7 +49,7 @@ _ID, _FORM, _LEMMA, _UPOS, _XPOS, _FEATS = range(6)
 
 #: Rows that are not lexicon material. Punctuation has no paradigm, and a
 #: multiword-token line (``8-9``) is a range, not a token.
-_SKIP_UPOS = frozenset({"PUNCT", "SYM", "X"})
+SKIP_UPOS = frozenset({"PUNCT", "SYM", "X"})
 
 #: A lemma is a word: letters, plus the hyphen and apostrophe that live inside
 #: some of them. CAC anonymises figures as SGML-ish entities (``&camount;``,
@@ -84,14 +92,29 @@ def sentences(
     *,
     side: str = "train",
     manifest: SplitManifest | None = None,
+    allow_test: bool = False,
 ) -> Iterator[tuple[str, list[list[str]]]]:
     """Yield ``(sent_id, token rows)`` for sentences on ``side`` — and no others.
 
+    Args:
+        allow_test: Required to read ``side="test"``. See the module note: the
+            eval harness is the only module that may set it, and it sets it
+            in its source rather than passing a variable through.
+
     Raises:
-        SplitError: The frozen manifest does not exist. Nothing derived from
-            CAC may be read before the split is committed (LM-16/S-6).
+        SplitError: The frozen manifest does not exist (nothing derived from
+            CAC may be read before the split is committed — LM-16/S-6), or the
+            test side was asked for without the flag.
     """
     frozen = manifest or load_manifest()
+    if side == "test" and not allow_test:
+        raise SplitError(
+            "the TEST side is the eval oracle and reading it anywhere but the "
+            "eval harness makes every number it produces a measurement of "
+            "memorization (LM-16/S-6, contracts §11). If you are the harness, "
+            "pass allow_test=True in your source; if you are seeding a layer, "
+            "you want side='train'"
+        )
     allowed = frozen.side(side)
 
     for path in sorted(conllu_files):
@@ -120,11 +143,31 @@ def sentences(
             yield sent_id, rows
 
 
+def lexical_rows(rows: Iterable[Sequence[str]]) -> Iterator[tuple[str, str, str, str]]:
+    """``(form, lemma, upos, feats)`` for every row that is lexicon material.
+
+    One definition of that judgement, shared by the seeding importer and the
+    eval harness. If they disagreed about which rows count, the harness would be
+    scoring the artifact against a corpus with a different shape from the one it
+    was seeded from, and the difference would look like accuracy.
+    """
+    for cells in rows:
+        upos = cells[_UPOS]
+        if upos in SKIP_UPOS:
+            continue
+        form, lemma = cells[_FORM], cells[_LEMMA]
+        if not form or not lemma or not is_word(lemma):
+            continue
+        feats = cells[_FEATS] if cells[_FEATS] != "_" else ""
+        yield form, lemma, upos, _canonical(feats)
+
+
 def read(
     conllu_files: Sequence[Path],
     *,
     side: str = "train",
     manifest: SplitManifest | None = None,
+    allow_test: bool = False,
 ) -> tuple[dict[tuple[str, str, str, str], int], CacReport]:
     """Count every attested (form, lemma, upos, feats) on ``side``.
 
@@ -135,18 +178,13 @@ def read(
     report = CacReport()
     counts: Counter[tuple[str, str, str, str]] = Counter()
 
-    for _, rows in sentences(conllu_files, side=side, manifest=manifest):
+    for _, rows in sentences(
+        conllu_files, side=side, manifest=manifest, allow_test=allow_test
+    ):
         report.sentences_read += 1
-        for cells in rows:
-            report.tokens += 1
-            upos = cells[_UPOS]
-            if upos in _SKIP_UPOS:
-                continue
-            form, lemma = cells[_FORM], cells[_LEMMA]
-            if not form or not lemma or not is_word(lemma):
-                continue
-            feats = cells[_FEATS] if cells[_FEATS] != "_" else ""
-            counts[(form, lemma, upos, _canonical(feats))] += 1
+        report.tokens += len(rows)
+        for key in lexical_rows(rows):
+            counts[key] += 1
 
     report.rows = len(counts)
     report.lemmas = len({key[1] for key in counts})
@@ -207,8 +245,10 @@ def attested_for(
 
 
 __all__ = [
+    "SKIP_UPOS",
     "SOURCE",
     "is_word",
+    "lexical_rows",
     "Attested",
     "CacReport",
     "SplitError",

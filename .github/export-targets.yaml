@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# C-O2 re-export targets — what `export-lists.yml` regenerates when a
+# `morph/v*` snapshot is published (LM contracts §10, job 3).
+#
+# C-O2 is design law: generation-expanded gazetteer lists must never lag the
+# lexicon they were expanded from. A snapshot that adds forms while the exported
+# lists still carry the old ones is a deployment where the morph layer and the
+# gazetteer disagree about what a word is — and the disagreement shows up as a
+# query that stopped matching, not as an error.
+#
+# **This list is deliberately empty, and that is the current truth rather than
+# an omission.** tatrman-server owns no exported gazetteer lists: the exporter
+# is world-side (NL-17), a lexicon area belongs to a TTR-M model repo, and the
+# lists it produces are committed there. The re-export runs where the lists
+# live. What lands here is the *lane* — dispatchable, and green on an empty
+# target list — so that the day the demo estate's lists move into a repo this
+# workflow can reach, adding them is one entry rather than a workflow.
+#
+# Each target:
+#   lexicon:  a directory of `*.lex.yaml` (the authored TTR-M lexicon area)
+#   lists:    where the generated `*.list.yaml` are committed
+#   config:   the morph config — per list, `expand` / `lemma` / `keep`
+#             (see `services/nlp/tools/export-morph.yaml` for the reference one)
+
+version: 1
+targets: []

@@ -92,8 +92,15 @@ def test_only_the_requested_side_is_yielded(corpus, manifest):
 
 
 def test_the_test_side_has_to_be_asked_for_by_name(corpus, manifest):
+    """And by name is no longer enough — NLS-P8.4 added the flag.
+
+    `side` is a variable in real code (`--split test` reaches it as a string),
+    and a string that arrived from an argument parser is not a decision anybody
+    made about this corpus. `tests/test_test_side_guard.py` holds the other
+    half: the flag may be written in exactly one module."""
     assert list(sentences([corpus], side="dev", manifest=manifest)) != []
-    assert list(sentences([corpus], side="test", manifest=manifest)) == []
+    with pytest.raises(SplitError, match="memorization"):
+        list(sentences([corpus], side="test", manifest=manifest))
 
 
 def test_an_unknown_side_is_refused(corpus, manifest):

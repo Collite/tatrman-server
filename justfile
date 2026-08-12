@@ -210,19 +210,29 @@ test-py module="" *args:
 #
 # Layer files live in `shared/libs/python/ttr-morph/lexicon/cs/` (the hand seed
 # and the importer output, from NLS-P8.3). Pass a glob to work on a subset.
+#
+# ⚑ THE LAYER ORDER IS THE PRECEDENCE, and it lives in `lexicon/cs/LAYERS`
+# (NLS-P8.4) — read that file before changing anything here. It is a list rather
+# than a glob for two reasons that each cost an artifact once: a glob has no
+# opinion about order, and the glob this replaced silently missed the hand seed.
+# Both the recipes below and publish-morph.yml read the same file.
 
 morph_dir := "shared/libs/python/ttr-morph"
-morph_layers := morph_dir + "/lexicon/cs/*.morph.yaml"
+morph_lexicon := morph_dir + "/lexicon/cs"
+morph_freq := morph_lexicon + "/cac-freq.tsv"
 
 # Validate layer files: schema, licence boundary, and whether each declared
 # pattern regenerates its declared forms. `just morph-validate 'path/*.yaml'`.
 morph-validate layers="":
     #!/usr/bin/env bash
     set -euo pipefail
-    glob="{{layers}}"; [ -n "$glob" ] || glob="{{morph_layers}}"
-    files=$(ls -1 $glob 2>/dev/null || true)
-    [ -n "$files" ] || { echo "no layer files matched: $glob"; exit 2; }
-    cd {{morph_dir}} && uv run ttr-morph validate $(echo "$files" | sed "s|^|$(git rev-parse --show-toplevel)/|")
+    root=$(git rev-parse --show-toplevel)
+    # ⚑ NOT `ls`: it SORTS its arguments, which would re-order the layer list
+    # and therefore the precedence, without saying so.
+    files="{{layers}}"
+    [ -n "$files" ] || files=$(grep -v '^\s*\(#\|$\)' "$root/{{morph_lexicon}}/LAYERS" \
+        | sed "s|^|$root/{{morph_lexicon}}/|" | tr '\n' ' ')
+    cd {{morph_dir}} && uv run ttr-morph validate $files
 
 # Compile the snapshot into dist/morph/ — the body, one member file per
 # share-alike layer, and NOTICE-morph.md. Version is the morph/v* tag being
@@ -231,14 +241,31 @@ morph-compile version="0.0.0" layers="":
     #!/usr/bin/env bash
     set -euo pipefail
     root=$(git rev-parse --show-toplevel)
-    glob="{{layers}}"; [ -n "$glob" ] || glob="{{morph_layers}}"
-    files=$(ls -1 $glob 2>/dev/null || true)
-    [ -n "$files" ] || { echo "no layer files matched: $glob"; exit 2; }
+    files="{{layers}}"
+    [ -n "$files" ] || files=$(grep -v '^\s*\(#\|$\)' "$root/{{morph_lexicon}}/LAYERS" \
+        | sed "s|^|$root/{{morph_lexicon}}/|" | tr '\n' ' ')
     mkdir -p "$root/dist/morph"
     cd {{morph_dir}} && uv run ttr-morph compile \
-        $(echo "$files" | sed "s|^|$root/|") \
+        $files \
         -o "$root/dist/morph/cs.morph.snap" \
-        --snapshot-version "{{version}}"
+        --snapshot-version "{{version}}" \
+        --freq "$root/{{morph_freq}}"
+
+# Measure a compiled snapshot: the S-7 named cases and target coverage always,
+# the contracts §11 corpus metrics only with `cac=<dir>` (the TEST side of the
+# frozen split — read `eval/harness.py` before pointing this anywhere).
+morph-eval cac="" gate="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    root=$(git rev-parse --show-toplevel)
+    args=""
+    for f in "$root"/dist/morph/cs.morph.snap "$root"/dist/morph/*.morph.part; do
+        [ -f "$f" ] && args="$args --snapshot $f"
+    done
+    [ -n "$args" ] || { echo "nothing compiled — run `just morph-compile` first"; exit 2; }
+    [ -z "{{cac}}" ] || args="$args --cac {{cac}}"
+    [ -z "{{gate}}" ] || args="$args --gate"
+    cd {{morph_dir}} && uv run ttr-morph eval $args
 
 # ── Conformance (RG-P6.S2 — the three-tier instrument) ───────────────────────
 

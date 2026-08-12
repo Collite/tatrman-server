@@ -38,13 +38,9 @@ on:
         type: boolean
         default: true
       layers:
-        description: 'Glob of layer files to compile (blank = the repo lexicon)'
+        description: 'Layer files to compile, in PRECEDENCE order (blank = the repo lexicon)'
         required: false
         default: ''
-      skip_eval:
-        description: 'Skip the eval-harness gate (TEMPORARY — see the note on the step)'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -100,31 +96,34 @@ jobs:
           echo "public=${PUBLIC}" >> "$GITHUB_OUTPUT"
           echo "Compiling the cs snapshot as $VERSION (public=$PUBLIC)"
 
+      # ⚑ THE ORDER IS THE PRECEDENCE, and it is read from `lexicon/cs/LAYERS`
+      # — the one file `just morph-compile` reads too. Read its header before
+      # touching this step. It is a list rather than a glob because a glob has
+      # no opinion about order, and because the glob it replaced also silently
+      # missed the hand seed: 196 curated entries, every ne-exception among
+      # them, absent from a release nobody would have looked at twice.
       - name: Choose the layer files
         id: layers
         run: |
           set -euo pipefail
-          GLOB="${{ github.event.inputs.layers }}"
-          if [ -z "$GLOB" ]; then
-            GLOB="${MORPH_DIR}/lexicon/cs/*.morph.yaml"
-          fi
-          # shellcheck disable=SC2086
-          FOUND=$(ls -1 $GLOB 2>/dev/null | sort | tr '\n' ' ' || true)
+          LEXICON="${MORPH_DIR}/lexicon/cs"
+          FOUND="${{ github.event.inputs.layers }}"
           if [ -z "$FOUND" ]; then
-            if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-              # The lexicon lands at NLS-P8.3. Until then a manual run still has
-              # to be able to exercise this lane end to end, so it falls back to
-              # the test fixtures — which can never be released, because a
-              # dispatch is never `public`.
-              echo "::warning::no layer files at $GLOB — falling back to the test fixtures (dry run only)"
-              FOUND=$(ls -1 ${MORPH_DIR}/tests/fixtures/layers/core-*.morph.yaml | sort | tr '\n' ' ')
-            else
-              echo "::error::no layer files matched $GLOB — a morph/v* tag was cut before the lexicon exists"
-              exit 1
-            fi
+            FOUND=$(grep -v '^[[:space:]]*\(#\|$\)' "${LEXICON}/LAYERS" \
+                    | sed "s|^|${LEXICON}/|" | tr '\n' ' ')
+          fi
+          if [ -z "$FOUND" ]; then
+            echo "::error::${LEXICON}/LAYERS named no layer files"
+            exit 1
+          fi
+          MISSING=""
+          for f in $FOUND; do [ -f "$f" ] || MISSING="$MISSING $f"; done
+          if [ -n "$MISSING" ]; then
+            echo "::error::layer file(s) named in LAYERS do not exist:$MISSING"
+            exit 1
           fi
           echo "files=${FOUND}" >> "$GITHUB_OUTPUT"
-          echo "Layers: ${FOUND}"
+          echo "Layers, in precedence order: ${FOUND}"
 
       - name: Validate the layer files
         working-directory: ${{ env.MORPH_DIR }}
@@ -149,7 +148,8 @@ jobs:
           # shellcheck disable=SC2086
           uv run ttr-morph compile $FILES \
             -o "${GITHUB_WORKSPACE}/${DIST}/cs.morph.snap" \
-            --snapshot-version "${{ steps.ver.outputs.version }}"
+            --snapshot-version "${{ steps.ver.outputs.version }}" \
+            --freq "${GITHUB_WORKSPACE}/${MORPH_DIR}/lexicon/cs/cac-freq.tsv"
 
       # The drift guard, run against the artifact rather than against the code
       # that made it: the *runtime* loader re-hashes the rows and refuses the
@@ -188,24 +188,28 @@ jobs:
           print(f"separability: {len(parts)} member file(s), body is suite-only")
           PY
 
-      # NLS-P8.4 brings the harness (coverage · lemma-in-set · head-of-list ·
-      # fold-collision rate, over the FROZEN CAC test split). ⚑ `--skip-eval` is
-      # TEMPORARY: it exists so this lane can be cut before the harness does,
-      # and NLS-P8.4 removes the branch rather than leaving a flag that lets a
-      # release skip its own quality gate.
+      # The quality gate (contracts §11). There is no way to turn it off:
+      # NLS-P8.2 left a bypass input so this lane could exist before the harness
+      # did, and NLS-P8.4 deleted the branch rather than leave a flag that lets
+      # a release skip its own gate. A gate with an off switch is a gate that is
+      # off, and `tests/test_publish_lane.py` keeps the input from coming back.
+      #
+      # It runs the three S-7 named acceptance cases and compares the artifact
+      # against `eval/baseline.json`. It does NOT read the corpus: the oracle's
+      # test side is shared with Wave C training (LM-16/S-6), and a release lane
+      # that downloaded and read it on every tag would be doing that unwatched,
+      # forever. The corpus numbers are produced deliberately, with the corpus in
+      # hand, and committed — see the module note in `eval/harness.py`.
       - name: Eval-harness gate
         working-directory: ${{ env.MORPH_DIR }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event.inputs.skip_eval }}" == "true" ]; then
-            echo "::warning::eval gate skipped by request"
-            exit 0
-          fi
-          if [ ! -f eval/harness.py ]; then
-            echo "::warning::the eval harness does not exist yet (arrives at NLS-P8.4); gate skipped"
-            exit 0
-          fi
-          uv run python eval/harness.py --snapshot "${GITHUB_WORKSPACE}/${DIST}/cs.morph.snap" --gate
+          SNAPS="--snapshot ${GITHUB_WORKSPACE}/${DIST}/cs.morph.snap"
+          for part in "${GITHUB_WORKSPACE}/${DIST}"/*.morph.part; do
+            [ -f "$part" ] && SNAPS="$SNAPS --snapshot $part"
+          done
+          # shellcheck disable=SC2086
+          uv run ttr-morph eval $SNAPS --gate -o "${GITHUB_WORKSPACE}/${DIST}/eval-report.md"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -280,10 +284,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # The exporter re-run lives with the exporter (NLS-P4). Until that
-      # workflow exists this step says so and stops, rather than failing a
-      # release for a lane that has not been built — and it becomes fatal on its
-      # own, the day the file appears, without anyone remembering to come back.
+      # The exporter re-run lives with the exporter. A missing workflow is now a
+      # FAILED release rather than a warning: NLS-P8.2 left the soft branch so
+      # this lane could exist before the exporter's did, and NLS-P8.4 built it.
+      # A C-O2 dispatch that quietly does not happen is the exact failure C-O2
+      # exists to prevent — lists that lag the lexicon, discovered as a query
+      # that stopped matching.
       - name: Dispatch the exporter re-run
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -291,10 +297,11 @@ jobs:
           set -euo pipefail
           WORKFLOW=export-lists.yml
           if [ ! -f ".github/workflows/${WORKFLOW}" ]; then
-            echo "::warning::${WORKFLOW} does not exist yet (NLS-P4 exporter lane) — C-O2 re-run not dispatched for ${{ github.ref_name }}"
-            exit 0
+            echo "::error::${WORKFLOW} is missing — C-O2 requires the expanded lists to be re-run for every published snapshot"
+            exit 1
           fi
           gh workflow run "${WORKFLOW}" \
             -f reason="morph snapshot ${{ needs.compile.outputs.version }}" \
+            -f snapshot_tag="${{ github.ref_name }}" \
             -f open_pr=true
           echo "Dispatched ${WORKFLOW}; the expanded-lists diff PR opens from there."

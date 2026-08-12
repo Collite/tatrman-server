@@ -1,0 +1,29 @@
+{
+  "note": "The gate reference (NLS-P8.4 T5). Produced by `ttr-morph eval --snapshot <snap> --cac <dir> --write-baseline` with the corpus in hand, and committed. `--gate` in CI compares the artifact and the named cases against this; the corpus numbers are only re-checked by a run that has the corpus.",
+  "artifact": {
+    "version": "0.1.0",
+    "rows": 25097,
+    "forms": 24575,
+    "fold_collisions": 1400
+  },
+  "targets": {
+    "total": 149,
+    "covered": 147,
+    "missing": [
+      "kvartál",
+      "největší"
+    ],
+    "thin": []
+  },
+  "cases": {
+    "total": 3
+  },
+  "corpus": {
+    "source": "UD_Czech-CAC (test side of the frozen split)",
+    "tokens": 42944,
+    "coverage": 0.7962,
+    "lemma_in_set": 0.9825,
+    "head_of_list": 0.9717,
+    "fold_collision_rate": 0.0061
+  }
+}

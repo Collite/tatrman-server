@@ -7,16 +7,28 @@ commands in each section; the numbers are the ones a re-run should print.
 
 | | |
 |---|--:|
-| rows | 25,076 |
-| distinct forms | 24,554 |
+| rows | 25,097 |
+| distinct forms | 24,575 |
 | fold collisions | 1,400 |
-| entries (core-hand) | 196 — 62 compact, 134 full-form |
+| entries (core-hand) | 198 — 64 compact, 134 full-form |
 | entries (core-kaikki) | 2,415 — 1,879 compact, 536 full-form |
 | entries (core-cac) | 569 — all full-form, by design |
 
-The three layers are compiled in that order. `core-hand` is suite-licensed and
-lands in the main body; the two share-alike layers each compile into a separable
-member file with its own NOTICE section (C-F3).
+⚑ **The compile order is `core-cac`, `core-kaikki`, `core-hand`** — weakest to
+strongest, because the last layer wins. It is declared in `lexicon/cs/LAYERS`
+(NLS-P8.4) and read by both `just morph-compile` and the publish lane; before
+that it was a glob, which has no opinion about order and which also silently
+missed the hand seed. `core-hand` is suite-licensed and lands in the main body;
+the two share-alike layers each compile into a separable member file with its
+own NOTICE section (C-F3).
+
+**Four hand entries were added at NLS-P8.4**, each one found by the eval harness
+rather than by review: `zobrazit` (the NL hero's first word, which arrived from
+the corpus as a bare infinitive), `pololetí` (syncretic in nine cells, so one
+attested form looked like a complete entry), and the conditional auxiliary
+`by`/`bych`/`bys`/`bychom`/`byste` on `být` — the single commonest word the
+artifact could not analyse, at 169 tokens of the test side. See
+`eval/eval-report.md`.
 
 ## Target-list coverage
 
@@ -48,7 +60,7 @@ The S-7 hero resolves end to end from the core artifact alone:
 ttr-morph import-kaikki cs-enwiktionary.jsonl -o lexicon/cs/core-kaikki.morph.yaml \
     --targets src/ttrmorph/seed/data/cs/target-words.yaml \
     --targets-from-freq lexicon/cs/cac-freq.tsv --top 3000 \
-    --exclude src/ttrmorph/seed/data/cs/core-hand.morph.yaml
+    --exclude lexicon/cs/core-hand.morph.yaml
 ```
 
 | measure | value |

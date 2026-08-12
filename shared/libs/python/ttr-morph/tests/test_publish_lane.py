@@ -51,7 +51,7 @@ def test_the_lane_has_a_dry_run_input(publish):
     spending a version number."""
     inputs = triggers(publish)["workflow_dispatch"]["inputs"]
     assert inputs["dry_run"]["type"] == "boolean"
-    assert set(inputs) >= {"dry_run", "layers", "skip_eval"}
+    assert set(inputs) >= {"dry_run", "layers"}
 
 
 def test_a_dispatch_can_never_publish(publish):
@@ -106,3 +106,121 @@ def test_the_image_lane_ignores_the_morph_tag():
     leaves a red X beside a green publish."""
     tags = triggers(load(IMAGES))["push"]["tags"]
     assert "!morph/v*" in tags
+
+
+# ── the layer list, the gate, and C-O2 (NLS-P8.4) ────────────────────────────
+
+LEXICON = Path(__file__).resolve().parents[1] / "lexicon" / "cs"
+LAYERS = LEXICON / "LAYERS"
+EXPORT = WORKFLOWS / "export-lists.yml"
+JUSTFILE = WORKFLOWS.parents[1] / "justfile"
+
+
+def declared_layers() -> list[str]:
+    return [
+        line.strip()
+        for line in LAYERS.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+
+def test_every_layer_file_on_disk_is_named_in_LAYERS():
+    """⚑ The check that would have caught it: the glob this replaced sorted its
+    matches and missed the hand seed entirely, and the artifact it produced was
+    a valid snapshot without 196 curated entries in it."""
+    on_disk = {path.name for path in LEXICON.glob("*.morph.yaml")}
+    assert set(declared_layers()) == on_disk
+
+
+def test_the_layer_order_puts_the_human_last():
+    """Precedence: a corpus row is evidence a form exists, an inflection table
+    is a paradigm, a human overrules both — and must be able to do it by adding
+    one line rather than by re-running an importer."""
+    assert declared_layers()[-1] == "core-hand.morph.yaml"
+
+
+def test_the_lane_and_the_justfile_read_the_SAME_layer_list(publish):
+    step = next(
+        step
+        for step in publish["jobs"]["compile"]["steps"]
+        if step.get("id") == "layers"
+    )
+    assert "LAYERS" in step["run"]
+    assert "LAYERS" in JUSTFILE.read_text(encoding="utf-8")
+
+
+def test_the_eval_gate_has_no_off_switch(publish):
+    """NLS-P8.2 left `--skip-eval` so this lane could exist before the harness
+    did. A gate with an off switch is a gate that is off."""
+    text = PUBLISH.read_text(encoding="utf-8")
+    assert "skip_eval" not in text
+    assert "--skip-eval" not in text
+
+    step = next(
+        step
+        for step in publish["jobs"]["compile"]["steps"]
+        if step.get("name") == "Eval-harness gate"
+    )
+    assert "ttr-morph eval" in step["run"] and "--gate" in step["run"]
+
+
+def test_the_release_gate_does_not_read_the_oracle(publish):
+    """The test side is shared with Wave C training (LM-16/S-6). A release lane
+    that downloaded and read it on every tag would be doing that unwatched."""
+    step = next(
+        step
+        for step in publish["jobs"]["compile"]["steps"]
+        if step.get("name") == "Eval-harness gate"
+    )
+    assert "--cac" not in step["run"]
+
+
+def test_the_gate_reference_is_committed():
+    assert (Path(__file__).resolve().parents[1] / "eval" / "baseline.json").exists()
+
+
+def test_the_c_o2_dispatch_target_exists(publish):
+    """It used to be a warning-and-continue, because the workflow did not exist.
+    It does now, and a C-O2 dispatch that quietly does not happen is the exact
+    failure C-O2 exists to prevent."""
+    assert EXPORT.exists()
+    step = next(
+        step
+        for step in publish["jobs"]["expand"]["steps"]
+        if "gh workflow run" in str(step.get("run", ""))
+    )
+    assert "::error::" in step["run"]
+
+
+def test_the_dispatch_names_the_tag_it_was_cut_from(publish):
+    """The lists must be expanded from the artifact that was published, not
+    from a rebuild of the ref — ⚑ verify from the artifact."""
+    step = next(
+        step
+        for step in publish["jobs"]["expand"]["steps"]
+        if "gh workflow run" in str(step.get("run", ""))
+    )
+    assert "snapshot_tag" in step["run"]
+
+
+def test_the_export_lane_is_dispatchable_and_survives_zero_targets():
+    """An empty target list is the documented state — tatrman-server owns no
+    exported lists, because the exporter is world-side (NL-17)."""
+    export = load(EXPORT)
+    assert "workflow_dispatch" in triggers(export)
+    assert set(triggers(export)["workflow_dispatch"]["inputs"]) >= {
+        "reason",
+        "open_pr",
+        "snapshot_tag",
+    }
+    step = next(
+        step
+        for step in export["jobs"]["export"]["steps"]
+        if step.get("name") == "Nothing to re-export"
+    )
+    assert step["if"] == "steps.targets.outputs.count == '0'"
+
+
+def test_the_targets_file_parses_and_is_honest():
+    targets = load(WORKFLOWS.parent / "export-targets.yaml")
+    assert targets["targets"] == []

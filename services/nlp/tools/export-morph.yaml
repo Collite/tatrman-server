@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The morph decision, per gazetteer list (NLS-P8.4 T4, contracts §4).
+#
+# A Czech gazetteer list has to survive declension, and there are exactly two
+# ways for a deterministic longest-match trie to do that:
+#
+#   lemma    match on each token's `lemma` feature and let the morphology layer
+#            decline the word. One entry covers the paradigm, and a lexicon fix
+#            reaches this list with no re-export. Needs the cs morph snapshot
+#            loaded in the pipeline that uses the list — which is opt-in per
+#            pipeline in v1, so it is a real precondition and not a formality.
+#
+#   expand   emit every form the snapshot holds for the term and match `exact`.
+#            A bigger file that needs no runtime morphology at all, and the only
+#            option for a pipeline that runs without the snapshot.
+#
+#   keep     leave the mode the lexicon's own `method:` implied. The default,
+#            so that adding this file to a repo cannot change a list nobody
+#            made a decision about.
+#
+# This file is the REFERENCE copy — tatrman-server owns no production lists (see
+# `.github/export-targets.yaml`). A model repo copies it, names its own lists,
+# and points `--snapshot` at the `morph/v*` release assets it deploys.
+#
+#     uv run python tools/export_lexicon.py <lexicon-dir> -o <lists-dir> \
+#         --morph tools/export-morph.yaml --snapshot dist/morph/cs.morph.snap
+#
+# ⚑ The snapshot the lists were expanded from and the snapshot the runtime loads
+# must be the same one. That is what C-O2's dispatch is for, and it is why the
+# paths below are release assets rather than a local build.
+
+version: 1
+
+snapshots:
+  - dist/morph/cs.morph.snap
+  - dist/morph/core-cac.morph.part
+  - dist/morph/core-kaikki.morph.part
+
+default: keep
+
+lists:
+  # The Czech token lane: an alias list whose terms are single Czech words is
+  # exactly what `matching: lemma` was added for (LM-8), so this is the shape a
+  # deployment WITH the morph snapshot should use.
+  lexicon-cs-ci: lemma
+
+  # Codes, SKUs and anything authored `EXACT` stay exactly matched and are never
+  # expanded: a product code has no paradigm, and pretending otherwise would put
+  # invented strings in a trie.
+  lexicon-cs-exact: keep
+  lexicon-cs-en-exact: keep

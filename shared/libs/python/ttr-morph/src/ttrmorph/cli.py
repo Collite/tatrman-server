@@ -11,7 +11,10 @@ questions an analyst asks before assigning a vzor and the two an importer asks
 per row. ``validate`` and ``compile`` are the layer-file lane: the first is what
 a world repo runs against its own files (through the ``nlp-morph-tools`` image,
 since this package stays off PyPI — contracts §10), the second is what the
-``morph/v*`` tag lane runs to cut an artifact.
+``morph/v*`` tag lane runs to cut an artifact. ``eval`` measures what came out
+of it — the named acceptance cases always, the corpus metrics when the oracle is
+at hand — and ``expand-lists`` pushes the result back out to the gazetteer lists
+(C-O2), which is the only direction morphology travels at build time.
 
 ``validate`` deliberately reports in the same shape as ``ttr-nlp validate`` —
 same exit codes, same ``--json`` fields — so the DFP model-validator wraps both
@@ -40,9 +43,11 @@ from ttrnlp.packs.diag import SEVERITY_ERROR, Diagnostic
 from ttrmorph import __version__
 from ttrmorph.compile import compile_layers, read_frequencies, validate_layers
 from ttrmorph.engine import EngineError, classify, generate, load
-from ttrmorph.eval.split import FROZEN_SEED, MANIFEST_PATH, SplitError
+from ttrmorph.eval.cases import CaseError
+from ttrmorph.eval.split import FROZEN_SEED, MANIFEST_PATH, SIDES, SplitError
 from ttrmorph.eval.split import build as build_split
 from ttrmorph.eval.split import render as render_split
+from ttrmorph.export.expand import ExpandError
 from ttrmorph.importers.sources import PoisonedSource
 
 EXIT_OK = 0
@@ -58,7 +63,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except EngineError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE
-    except (SplitError, PoisonedSource) as exc:
+    except (SplitError, PoisonedSource, CaseError, ExpandError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE
     except OSError as exc:
@@ -198,6 +203,61 @@ def _parser() -> argparse.ArgumentParser:
     cac.add_argument("--min-count", type=int, default=2)
     cac.add_argument("--report", type=Path)
     cac.set_defaults(run=_import_cac)
+
+    ev = subs.add_parser(
+        "eval",
+        help="measure a snapshot against the oracle and the named cases",
+        description=(
+            "Run the named acceptance cases (S-7) and the target-vocabulary "
+            "coverage against a compiled snapshot; with --cac, also the "
+            "contracts §11 corpus metrics over the TEST side of the frozen "
+            "split. --gate compares everything against eval/baseline.json and "
+            "exits non-zero on a regression."
+        ),
+    )
+    ev.add_argument(
+        "--snapshot",
+        type=Path,
+        action="append",
+        required=True,
+        help="the artifact; repeat for member files and overlays",
+    )
+    ev.add_argument("--cac", type=Path, help="the extracted UD dir (test side)")
+    ev.add_argument("--split", default="test", choices=list(SIDES))
+    ev.add_argument("--cases", type=Path, help="a cases dir (default: eval/cases)")
+    ev.add_argument("-o", "--output", type=Path, help="write the report here")
+    ev.add_argument("--json", action="store_true", dest="as_json")
+    ev.add_argument("--gate", action="store_true", help="fail on a regression")
+    ev.add_argument(
+        "--baseline", type=Path, help="the gate reference (default: eval/baseline.json)"
+    )
+    ev.add_argument(
+        "--write-baseline",
+        action="store_true",
+        help="rewrite the gate reference from this run — commit the diff",
+    )
+    ev.set_defaults(run=_eval)
+
+    exp = subs.add_parser(
+        "expand-lists",
+        help="generation-expand gazetteer lists in place (C-O2)",
+        description=(
+            "Apply each list's morph decision: `expand` emits every form the "
+            "snapshot holds for a term and drops the mode to `exact`; `lemma` "
+            "leaves the terms alone and matches on the token lemma; `keep` "
+            "does nothing. Re-run after every morph/v* bump."
+        ),
+    )
+    exp.add_argument("lists", type=Path, metavar="LISTS-DIR")
+    exp.add_argument("--config", type=Path, required=True, help="the morph config")
+    exp.add_argument(
+        "--snapshot",
+        type=Path,
+        action="append",
+        default=[],
+        help="override the config's snapshots",
+    )
+    exp.set_defaults(run=_expand_lists)
 
     return parser
 
@@ -528,6 +588,91 @@ def _kaikki_report(report) -> str:
     ]
     lines += [f"- `{lemma}` ({upos})" for lemma, upos, _ in report.samples]
     return "\n".join(lines) + "\n"
+
+
+# ── the eval lane (P8.4) ─────────────────────────────────────────────────────
+
+
+def _eval(args) -> int:
+    from ttrmorph.eval import harness
+
+    missing = [path for path in args.snapshot if not Path(path).exists()]
+    if missing:
+        print(f"ttr-morph eval: no such snapshot: {missing}", file=sys.stderr)
+        return EXIT_USAGE
+
+    state = harness.load_state(args.snapshot)
+    report = harness.build_report(
+        state, cac=args.cac, cases_dir=args.cases, side=args.split
+    )
+
+    if args.as_json:
+        print(json.dumps(report.as_dict(), indent=2, ensure_ascii=False))
+    else:
+        print(
+            f"cases {report.cases_passed}/{len(report.cases)} · "
+            f"targets {report.targets_covered}/{report.targets_total} · "
+            f"{report.rows} rows, {report.forms} forms"
+        )
+        if report.metrics is not None:
+            total = report.metrics.total
+            print(
+                f"corpus: coverage {total.coverage:.1%} · "
+                f"lemma-in-set {total.lemma_in_set:.1%} · "
+                f"head-of-list {total.head_of_list:.1%} · "
+                f"fold-collision {total.fold_collision_rate:.1%}"
+            )
+
+    output = args.output or harness.REPORT_PATH
+    Path(output).parent.mkdir(parents=True, exist_ok=True)
+    Path(output).write_text(harness.render(report), encoding="utf-8")
+    if not args.as_json:
+        print(f"wrote {output}")
+
+    if args.write_baseline:
+        target = args.baseline or harness.BASELINE_PATH
+        Path(target).write_text(
+            json.dumps(harness.baseline_from(report), indent=2, ensure_ascii=False)
+            + "\n",
+            encoding="utf-8",
+        )
+        print(f"wrote {target} — read the numbers before committing them")
+
+    if not args.gate:
+        # Without --gate a failing case is still a failure: the cases are the
+        # acceptance criteria, not a statistic, and a run that printed "2/3"
+        # and exited 0 would be a run somebody scripted around.
+        return EXIT_OK if report.cases_passed == len(report.cases) else EXIT_NO_ANSWER
+
+    failures = harness.check(report, harness.read_baseline(args.baseline))
+    for failure in failures:
+        print(f"GATE {failure}", file=sys.stderr)
+    if failures:
+        print(f"\n{len(failures)} gate failure(s).", file=sys.stderr)
+        return EXIT_NO_ANSWER
+    print("gate: OK")
+    return EXIT_OK
+
+
+def _expand_lists(args) -> int:
+    from ttrmorph.export.expand import expand_lists, read_config
+
+    if not args.lists.is_dir():
+        print(
+            f"ttr-morph expand-lists: no such directory: {args.lists}",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    config = read_config(args.config)
+    reports = expand_lists(args.lists, config, snapshots=args.snapshot)
+    for report in reports:
+        print(
+            f"{report.list_id}\t{report.decision}\t"
+            f"{report.terms} term(s) -> {report.emitted} entr(ies)"
+            + (f"\t{len(report.unknown)} unknown" if report.unknown else "")
+        )
+    return EXIT_OK
 
 
 #: Attribution blocks, S-2 (contracts §10). Written here rather than in a data

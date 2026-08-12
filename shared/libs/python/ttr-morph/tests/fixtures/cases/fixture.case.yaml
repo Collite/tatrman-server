@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# A case over the FIXTURE layers, for the CLI tests. The three real acceptance
+# cases live in `eval/cases/` and run against the real lexicon — this one exists
+# so the CLI's exit codes can be tested without compiling 25,000 rows.
+case: fixture
+title: the fixture layer resolves its own vocabulary
+text: "tržby"
+note: A CLI fixture, not an acceptance criterion.
+tokens:
+  - form: tržby
+    lemma: tržba
+    matched_via: exact
+    provenance: lexicon

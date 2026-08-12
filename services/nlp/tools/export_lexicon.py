@@ -62,6 +62,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -225,13 +226,83 @@ def _read_entries(path: Path, document: dict[str, Any], export: Export) -> None:
             )
 
 
-def render_list(lang: str, mode: str, entries: list[Entry], *, origin: str) -> str:
-    """One `*.list.yaml`, sorted and header-stamped."""
+class MorphUnavailable(RuntimeError):
+    """`--morph` was asked for and `ttr-morph` is not importable."""
+
+
+@dataclass
+class Morph:
+    """The generation-expansion plug (NLS-P8.4 T4) — and the only place that
+    knows `ttr-morph` is optional.
+
+    **Why it is optional.** `ttr-morph` is the editorial toolchain and it stays
+    off PyPI (⚑LMP-D4), so a consumer running this exporter from an installed
+    wheel cannot have it. The exporter is world-side tooling meant to run in a
+    model repo (NL-17); making it hard-depend on an unpublishable package would
+    make it useless in exactly the place it is for. So the import happens here,
+    on demand, and its absence is an error message that names the two ways to
+    get it rather than a traceback about a missing module.
+    """
+
+    config: object
+    state: object
+    index: object
+    notes: list[Note] = field(default_factory=list)
+
+    @classmethod
+    def load(cls, config_path: Path, snapshots: Sequence[Path] = ()) -> Morph:
+        try:
+            from ttrmorph.export import expand
+        except ImportError as exc:  # pragma: no cover - exercised by hand
+            raise MorphUnavailable(
+                "--morph needs the `ttr-morph` package, which is deliberately "
+                "not on PyPI (contracts §10). Either run this exporter from a "
+                "tatrman-server checkout, where it is a path dependency, or run "
+                "it inside the `ghcr.io/collite/nlp-morph-tools` image, which "
+                "is published for exactly this reason."
+            ) from exc
+
+        config = expand.read_config(config_path)
+        state = expand.load_state(list(snapshots) or list(config.snapshots))
+        return cls(config=config, state=state, index=expand.build_index(state))
+
+    def apply(self, document: dict) -> tuple[dict, str]:
+        from ttrmorph.export import expand
+
+        decision = self.config.decision(str(document.get("list") or ""))
+        expanded, report = expand.expand_document(
+            document, self.state, self.index, decision=decision
+        )
+        if report.unknown:
+            self.notes.append(
+                Note(
+                    "INFO",
+                    f"{report.list_id}: {len(report.unknown)} term(s) the morph "
+                    f"snapshot cannot analyse were left unexpanded "
+                    f"({', '.join(report.unknown[:5])}) — they still match as "
+                    "written, and the gap belongs in the enrichment queue",
+                )
+            )
+        if report.multiword:
+            self.notes.append(
+                Note(
+                    "INFO",
+                    f"{report.list_id}: {len(report.multiword)} multi-token "
+                    "term(s) were left unexpanded — a phrase declines in "
+                    "agreement, which is not the cross product of its words'"
+                    " paradigms",
+                )
+            )
+        return expanded, expand.header_for(report)
+
+
+def build_document(lang: str, mode: str, entries: list[Entry], *, origin: str) -> dict:
+    """The list as data, before anything decides how it will be matched."""
     seen: dict[tuple, Entry] = {}
     for entry in sorted(entries, key=Entry.sort_key):
         seen.setdefault(entry.sort_key(), entry)
 
-    document = {
+    return {
         "list": list_id(lang, mode),
         "version": 1,
         "matching": mode,
@@ -242,6 +313,31 @@ def render_list(lang: str, mode: str, entries: list[Entry], *, origin: str) -> s
             for entry in seen.values()
         ],
     }
+
+
+def render_list(
+    lang: str,
+    mode: str,
+    entries: list[Entry],
+    *,
+    origin: str,
+    morph: Morph | None = None,
+) -> str:
+    """One `*.list.yaml`, sorted and header-stamped.
+
+    ``morph`` is the generation-expansion plug point (NLS-P8.4 T4, C-O2): with
+    it, a list whose decision is `expand` leaves here carrying every inflected
+    form of every term and `matching: exact`, and one whose decision is `lemma`
+    leaves with its terms untouched and the mode that asks the runtime to
+    decline them. Without it nothing changes — the exporter has to keep working
+    for someone who has only the wheel.
+    """
+    document = build_document(lang, mode, entries, origin=origin)
+    morph_header = ""
+    if morph is not None:
+        document, morph_header = morph.apply(document)
+        mode = document["matching"]
+
     body = yaml.safe_dump(
         document, allow_unicode=True, sort_keys=False, default_flow_style=False
     )
@@ -260,23 +356,33 @@ def render_list(lang: str, mode: str, entries: list[Entry], *, origin: str) -> s
             "# same vocabulary stays with lex-matcher, off the compiled archive.\n"
             "#\n"
         )
-    return header + body
+    return header + morph_header + body
 
 
-def write_lists(export: Export, out_dir: Path, *, origin: str) -> list[Path]:
+def write_lists(
+    export: Export, out_dir: Path, *, origin: str, morph: Morph | None = None
+) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     written = []
     for (lang, mode), entries in sorted(export.lists.items()):
         path = out_dir / f"{list_id(lang, mode)}.list.yaml"
-        path.write_text(render_list(lang, mode, entries, origin=origin), encoding="utf-8")
+        path.write_text(
+            render_list(lang, mode, entries, origin=origin, morph=morph),
+            encoding="utf-8",
+        )
         written.append(path)
     return written
 
 
-def export_lexicon(lexicon_dir: Path, out_dir: Path, *, origin: str) -> tuple[list[Path], list[Note]]:
+def export_lexicon(
+    lexicon_dir: Path, out_dir: Path, *, origin: str, morph: Morph | None = None
+) -> tuple[list[Path], list[Note]]:
     export = Export()
     read_lexicon(lexicon_dir, export)
-    return write_lists(export, out_dir, origin=origin), export.notes
+    written = write_lists(export, out_dir, origin=origin, morph=morph)
+    if morph is not None:
+        export.notes.extend(morph.notes)
+    return written, export.notes
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -294,6 +400,25 @@ def main(argv: list[str] | None = None) -> int:
         default="",
         help="provenance recorded in every list (default: lexicon@<dir name>)",
     )
+    parser.add_argument(
+        "--morph",
+        metavar="CONFIG",
+        type=Path,
+        help=(
+            "the morph config: per list, whether to generation-expand every "
+            "form (`expand`), match on the token lemma (`lemma`), or leave the "
+            "mode the lexicon implied (`keep`). Needs ttr-morph — see --help "
+            "output if it is missing."
+        ),
+    )
+    parser.add_argument(
+        "--snapshot",
+        metavar="SNAP",
+        type=Path,
+        action="append",
+        default=[],
+        help="override the morph config's snapshots",
+    )
     args = parser.parse_args(argv)
 
     if not args.lexicon.is_dir():
@@ -301,7 +426,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     origin = args.origin or f"lexicon@{args.lexicon.resolve().name}"
-    written, notes = export_lexicon(args.lexicon, args.out, origin=origin)
+    morph = None
+    if args.morph:
+        try:
+            morph = Morph.load(args.morph, args.snapshot)
+        except MorphUnavailable as exc:
+            print(exc, file=sys.stderr)
+            return 2
+    written, notes = export_lexicon(args.lexicon, args.out, origin=origin, morph=morph)
 
     for note in notes:
         print(note, file=sys.stderr)

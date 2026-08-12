@@ -46,6 +46,12 @@ dev = [
     # grpcio-tools carries protoc + the grpc_python plugin used by
     # `scripts/gen_proto.py` to (re)generate the stubs under `generated/`.
     "grpcio-tools>=1.68.0",
+    # DEV ONLY, and it has to stay that way: `ttr-morph` is not on PyPI
+    # (⚑LMP-D4), so a runtime dependency here would make this service
+    # uninstallable outside the monorepo. The exporter's `--morph` lane imports
+    # it lazily and says so when it is absent; this entry is what lets the
+    # round-trip test exercise that lane (NLS-P8.4 T1).
+    "ttr-morph",
 ]
 
 [tool.uv]
@@ -84,3 +90,5 @@ target-version = "py313"
 otel-config = { path = "../../shared/libs/python/otel-config", editable = true }
 # `ttr-nlp==0.1.0` from PyPI; this editable path stays for local development.
 ttr-nlp = { path = "../../shared/libs/python/ttr-nlp", editable = true }
+# Editable path only — never a version. See the dev-group note.
+ttr-morph = { path = "../../shared/libs/python/ttr-morph", editable = true }
