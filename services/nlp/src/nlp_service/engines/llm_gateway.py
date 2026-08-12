@@ -89,13 +89,20 @@ class LlmGatewayClient:
         last = ""
 
         for attempt in range(self.spec.max_retries + 1):
+            # Backing off after the LAST attempt buys nothing and is not free: it
+            # is dead time inside a request the caller is waiting on, and with a
+            # gateway that is simply down it is the whole of what the caller waits
+            # for beyond the transport failures themselves.
+            more_attempts = attempt < self.spec.max_retries
+
             try:
                 with httpx.Client(timeout=self.spec.timeout_seconds) as client:
                     response = client.post(url, json=payload, headers=headers)
             except Exception as exc:  # noqa: BLE001 — httpx's tree, plus DNS
                 last = f"transport: {exc}"
                 logger.debug("llm-gateway %s attempt %d: %s", purpose, attempt, last)
-                time.sleep(0.2 * (attempt + 1))
+                if more_attempts:
+                    time.sleep(0.2 * (attempt + 1))
                 continue
 
             if response.status_code == 200:
@@ -107,7 +114,8 @@ class LlmGatewayClient:
                 # rejected, a model this key may not use. Retrying spends money
                 # to get the same answer.
                 raise GatewayUnavailable(f"llm-gateway refused the request ({last})")
-            time.sleep(0.2 * (attempt + 1))
+            if more_attempts:
+                time.sleep(0.2 * (attempt + 1))
 
         raise GatewayUnavailable(f"llm-gateway did not answer ({last})")
 

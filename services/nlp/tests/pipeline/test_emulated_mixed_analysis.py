@@ -29,13 +29,21 @@ from nlp_service.config import (
     LlmEmulatedConfig,
     load_config,
 )
-from nlp_service.diagnostics import RG_NLP_002, RG_NLP_010, RV_NLP_022
+from nlp_service.diagnostics import (
+    RG_NLP_002,
+    RG_NLP_010,
+    RV_NLP_020,
+    RV_NLP_021,
+    RV_NLP_022,
+    split_code,
+)
 from nlp_service.engines import EngineRegistry
 from nlp_service.engines.base import EngineResult, NlpOp, Token
 from nlp_service.engines.llm_emulated_engine import (
     EMULATED_ENGINE_NAME,
     LlmEmulatedEngine,
 )
+from nlp_service.engines.llm_gateway import GatewayUnavailable
 from nlp_service.pipeline.orchestrator import Orchestrator
 
 TEXT = "Zobraz faktury zákazníka Microsoft"
@@ -166,21 +174,45 @@ class TestTheMergeRule:
     """
 
     def test_an_entity_on_a_span_no_tokeniser_produced_attaches_to_nothing_and_says_nothing(self):
-        offset_by_one = json.dumps({"entities": [{"text": "icrosoft", "label": "ORGANIZATION"}]})
-        registry, _ = a_registry(emulation=True, reply=offset_by_one)
+        """A MULTI-TOKEN entity is the honest version of this: `faktury zákazníka`
+        is a real span of the text that no single token occupies.
+
+        It is served, and NOTHING in the response is about that: the only messages
+        are the standing cautions every emulated route carries, which would be
+        there for a correct answer too. This is the merge rule's actual cost and
+        it is not fixable in the engine — the engine cannot know which spans the
+        tokeniser will produce.
+        """
+        phrase = json.dumps({"entities": [{"text": "faktury zákazníka", "label": "MISC"}]})
+        registry, _ = a_registry(emulation=True, reply=phrase)
         response = Orchestrator(registry._config, registry).analyze(
             TEXT, "cs", {NlpOp.TOKENIZE, NlpOp.NER}
         )
 
-        # It is served, and it is wrong, and NOTHING in the response is about
-        # that: the only messages are the standing cautions every emulated route
-        # carries, which would be there for a correct answer too. The engine is
-        # what has to prevent this — which is why it locates spans in the source
-        # text itself instead of letting a model report them.
         entity = response.entities[0]
         spans = {(t.char_start, t.char_end) for t in response.tokens}
         assert (entity.char_start, entity.char_end) not in spans
         assert {m["code"] for m in response.messages} == {RG_NLP_002, RV_NLP_022}
+
+    def test_a_truncated_surface_is_refused_by_the_engine_rather_than_served(self):
+        """The half of this that IS the engine's to prevent, and used not to be.
+
+        `icrosoft` locates cleanly inside `Microsoft` with a plain `find`, lands on
+        a span no token occupies, and used to arrive exactly like the phrase above
+        — served, wrong, unremarked. It is the shape a Czech base form takes
+        (`Microsoft` for `Microsoftu`), which is the mistake this engine exists to
+        make likeliest. Now the engine refuses the whole analysis and the response
+        carries `RV-NLP-021` **by code**, not only inside a human message.
+        """
+        truncated = json.dumps({"entities": [{"text": "icrosoft", "label": "ORGANIZATION"}]})
+        registry, _ = a_registry(emulation=True, reply=truncated)
+        response = Orchestrator(registry._config, registry).analyze(
+            TEXT, "cs", {NlpOp.TOKENIZE, NlpOp.NER}
+        )
+
+        assert response.entities == []
+        assert RV_NLP_021 in {m["code"] for m in response.messages}
+        assert any("icrosoft" in m["message"] for m in response.messages)
 
     def test_two_engines_on_matching_spans_merge_into_one_token_stream(self):
         """The other half of the same rule, and the reason it exists: matching
@@ -190,6 +222,56 @@ class TestTheMergeRule:
             TEXT, "cs", {NlpOp.TOKENIZE, NlpOp.LEMMATIZE, NlpOp.NER}
         )
         assert len(response.tokens) == len(MORPH_TOKENS)
+
+
+class TestTheFailureCodesReachTheWire:
+    """`RV-NLP-020` and `RV-NLP-021` are registered codes, so a caller must be
+    able to FILTER on them.
+
+    An engine reports failure as one string on `EngineResult.error`, and the
+    orchestrator used to wrap every one of those as `code: "engine_error"` with
+    the real code buried in the human message. A consumer reading
+    `messages[].code` therefore could not tell a gateway outage — wait, retry,
+    page nobody — from a model answering nonsense, which is a prompt or a model
+    change and will not fix itself.
+    """
+
+    def test_a_gateway_outage_arrives_as_its_own_code(self):
+        registry, _ = a_registry(emulation=True)
+        registry._engines[EMULATED_ENGINE_NAME] = LlmEmulatedEngine(
+            registry._config.engines.llm_emulated, client=_DeadGateway()
+        )
+        response = Orchestrator(registry._config, registry).analyze(
+            TEXT, "cs", {NlpOp.TOKENIZE, NlpOp.NER}
+        )
+
+        codes = {m["code"] for m in response.messages}
+        assert RV_NLP_020 in codes
+        assert "engine_error" not in codes
+        # The engine is still named — the code says what happened, the message
+        # says to whom.
+        assert any(EMULATED_ENGINE_NAME in m["message"] for m in response.messages)
+
+    def test_unusable_model_output_arrives_as_the_other_code(self):
+        registry, _ = a_registry(emulation=True, reply="not json at all")
+        response = Orchestrator(registry._config, registry).analyze(
+            TEXT, "cs", {NlpOp.TOKENIZE, NlpOp.NER}
+        )
+        assert RV_NLP_021 in {m["code"] for m in response.messages}
+
+    def test_an_untyped_engine_failure_still_reads_as_engine_error(self):
+        """Only a REGISTERED code is promoted. An engine that happens to put a
+        colon in its error message must not invent a diagnostic."""
+        assert split_code("connection reset by peer: retrying") == ("", "connection reset by peer: retrying")
+        assert split_code(f"{RV_NLP_020}: llm-gateway did not answer") == (
+            RV_NLP_020,
+            "llm-gateway did not answer",
+        )
+
+
+class _DeadGateway:
+    def chat(self, *, system: str, user: str, purpose: str = "") -> str:
+        raise GatewayUnavailable("llm-gateway did not answer (transport: no route to host)")
 
 
 class TestTheSameConfigWithEmulationOff:

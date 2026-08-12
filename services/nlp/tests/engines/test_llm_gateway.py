@@ -134,6 +134,29 @@ class TestRetryPosture:
             a_client(max_retries=1).chat(system="s", user="u")
         assert len(FakeClient.calls) == 2
 
+    @pytest.mark.parametrize(
+        "outcome", [httpx.ConnectError("no route to host"), FakeResponse(503)],
+        ids=["transport", "5xx"],
+    )
+    def test_the_backoff_never_runs_after_the_final_attempt(self, monkeypatch, outcome):
+        """Backing off before giving up is dead time inside a live request.
+
+        Against a gateway that is simply down it was also the MAJORITY of the
+        wait: three attempts fail immediately on connect, and the shipped
+        `max_retries: 2` then spent 0.2 + 0.4 + 0.6 s, the last of which bought
+        nothing because there was no further attempt to space out. Two gaps
+        between three attempts, never three.
+        """
+        slept: list[float] = []
+        monkeypatch.setattr("time.sleep", lambda seconds: slept.append(seconds))
+        FakeClient.script = [outcome]
+
+        with pytest.raises(GatewayUnavailable):
+            a_client(max_retries=2).chat(system="s", user="u")
+
+        assert len(FakeClient.calls) == 3
+        assert slept == [0.2, 0.4]
+
 
 class TestTheResponse:
     def test_a_200_with_no_content_is_a_failure_not_an_empty_analysis(self):

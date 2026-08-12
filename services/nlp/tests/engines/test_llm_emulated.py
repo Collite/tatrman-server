@@ -25,6 +25,7 @@ import pytest
 from nlp_service.config import (
     AppConfig,
     BackendConfig,
+    EngineConfigError,
     EnginesConfig,
     LangidEngineConfig,
     LlmEmulatedConfig,
@@ -229,6 +230,87 @@ class TestMalformedOutputNeverFabricates:
         assert result.error == ""
         assert len(result.tokens) == 4
 
+    def test_a_partial_word_is_not_in_the_text_however_well_find_locates_it(self):
+        """The failure `str.find` cannot see, and the likeliest one in Czech.
+
+        `Microsoft` IS a substring of `Microsoftu` — a model that answered with
+        the base form of an inflected word located cleanly, produced a span that
+        is not a word, attached to no token the orchestrator merged, and was
+        served as a confident wrong answer. Nothing about the reply is malformed;
+        the only evidence is the stranded `u`.
+        """
+        text = "Microsoftu patří Praha"
+        reply = json.dumps(
+            {
+                "tokens": [
+                    {"text": "Microsoft", "lemma": "Microsoft", "upos": "PROPN"},
+                    {"text": "patří", "lemma": "patřit", "upos": "VERB"},
+                    {"text": "Praha", "lemma": "Praha", "upos": "PROPN"},
+                ]
+            }
+        )
+        engine, _ = an_engine(reply)
+        result = engine.analyze(text, "cs", {NlpOp.LEMMATIZE})
+        assert result.tokens == []
+        assert RV_NLP_021 in result.error
+        assert "'u'" in result.error  # the stranded character, named
+
+    def test_a_token_stream_that_drops_the_end_of_the_text_fails(self):
+        """Same rule from the other side: the prompt asks for every token in
+        order, punctuation included, so a token stream that stops early has
+        dropped content — and dropped content is exactly as unserveable as
+        invented content."""
+        text = "Zobraz faktury zákazníka Microsoft."
+        engine, _ = an_engine(LEMMA_REPLY)  # the same four tokens, no final "."
+        result = engine.analyze(text, "cs", {NlpOp.LEMMATIZE})
+        assert result.tokens == []
+        assert RV_NLP_021 in result.error
+
+    def test_a_legitimate_split_inside_a_word_is_still_accepted(self):
+        """What the coverage rule buys over a word-boundary rule: adjacent spans.
+
+        A tokeniser that splits `don't` into `do` + `n't` cuts a word in half and
+        is right to — UD does exactly this. Contiguity accepts it and still
+        rejects the truncation above, which a boundary rule could not do.
+        """
+        text = "I don't know"
+        reply = json.dumps(
+            {
+                "tokens": [
+                    {"text": "I", "lemma": "I", "upos": "PRON"},
+                    {"text": "do", "lemma": "do", "upos": "AUX"},
+                    {"text": "n't", "lemma": "not", "upos": "PART"},
+                    {"text": "know", "lemma": "know", "upos": "VERB"},
+                ]
+            }
+        )
+        engine, _ = an_engine(reply)
+        result = engine.analyze(text, "en", {NlpOp.LEMMATIZE})
+        assert result.error == ""
+        assert [(t.char_start, t.char_end) for t in result.tokens] == [
+            (0, 1), (2, 4), (4, 7), (8, 12)
+        ]
+
+    def test_an_entity_that_is_only_part_of_a_word_is_refused(self):
+        """Entities are sparse — nothing covers the gaps, so coverage cannot be
+        the check. Word boundaries are: an alphanumeric may not sit against an
+        alphanumeric edge of the surface."""
+        engine, _ = an_engine(
+            json.dumps({"entities": [{"text": "Microsoft", "label": "ORGANIZATION"}]})
+        )
+        result = engine.analyze("Faktury Microsoftu za leden", "cs", {NlpOp.NER})
+        assert result.entities == []
+        assert RV_NLP_021 in result.error
+        assert "only inside a longer word" in result.error
+
+    def test_an_entity_ending_on_punctuation_is_not_a_boundary_violation(self):
+        """The rule catches a word cut short, not entities that fail to be
+        surrounded by spaces — `Praze` before a full stop is an ordinary
+        entity."""
+        engine, _ = an_engine(json.dumps({"entities": [{"text": "Praze", "label": "LOCATION"}]}))
+        result = engine.analyze("Tržby v Praze.", "cs", {NlpOp.NER})
+        assert [e.text for e in result.entities] == ["Praze"]
+
     def test_a_token_that_is_not_in_the_text_fails_the_whole_analysis(self):
         """A token the source text does not contain is the model inventing
         content, and there is no honest way to serve the rest of an answer that
@@ -251,6 +333,131 @@ class TestMalformedOutputNeverFabricates:
         assert result.tokens == []
         assert RV_NLP_021 in result.error
         assert "Siemens" in result.error  # named, not merely counted
+
+
+# ── entities are not a stream ────────────────────────────────────────────────
+
+
+class TestEntitiesAreLocatedIndependently:
+    """A shared forward cursor is right for tokens and wrong for entities.
+
+    The prompt asks for document order and models routinely ignore it — and with
+    one cursor, one entity arriving early cost EVERY entity on the request, which
+    is a full `RV-NLP-021` for a reply that was merely unsorted. Tokens keep the
+    cursor: a stream is ordered by construction, and the cursor is what makes a
+    repeated word land on its own occurrence.
+    """
+
+    TEXT = "Praha a Microsoft"
+
+    def test_entities_out_of_document_order_are_located_not_refused(self):
+        engine, _ = an_engine(
+            json.dumps(
+                {
+                    "entities": [
+                        {"text": "Microsoft", "label": "ORGANIZATION"},
+                        {"text": "Praha", "label": "LOCATION"},
+                    ]
+                }
+            )
+        )
+        result = engine.analyze(self.TEXT, "cs", {NlpOp.NER})
+        assert result.error == ""
+        assert [(e.text, e.char_start, e.char_end) for e in result.entities] == [
+            ("Microsoft", 8, 17),
+            ("Praha", 0, 5),
+        ]
+
+    def test_a_repeated_entity_still_lands_on_its_own_occurrence(self):
+        """What the cursor used to buy, kept: two mentions are two spans, not the
+        same span twice (the orchestrator dedups on the span, so they would
+        collapse into one entity)."""
+        text = "Praha a Praha"
+        engine, _ = an_engine(
+            json.dumps(
+                {
+                    "entities": [
+                        {"text": "Praha", "label": "LOCATION"},
+                        {"text": "Praha", "label": "LOCATION"},
+                    ]
+                }
+            )
+        )
+        result = engine.analyze(text, "cs", {NlpOp.NER})
+        assert [(e.char_start, e.char_end) for e in result.entities] == [(0, 5), (8, 13)]
+
+    def test_more_mentions_than_the_text_carries_is_still_a_named_failure(self):
+        """Searching from zero must not turn into "every entity finds something":
+        a third `Praha` in a text with two is the model inventing a mention, and
+        that is the invention rule, unchanged."""
+        engine, _ = an_engine(
+            json.dumps({"entities": [{"text": "Praha", "label": "LOCATION"}] * 2})
+        )
+        result = engine.analyze("Praha", "cs", {NlpOp.NER})
+        assert result.entities == []
+        assert RV_NLP_021 in result.error
+        assert "claimed more often" in result.error
+
+    def test_a_nested_entity_can_have_its_own_span(self):
+        engine, _ = an_engine(
+            json.dumps(
+                {
+                    "entities": [
+                        {"text": "Univerzita Karlova", "label": "ORGANIZATION"},
+                        {"text": "Karlova", "label": "PERSON"},
+                    ]
+                }
+            )
+        )
+        result = engine.analyze("Univerzita Karlova v Praze", "cs", {NlpOp.NER})
+        assert [(e.char_start, e.char_end) for e in result.entities] == [(0, 18), (11, 18)]
+
+
+# ── an enabled engine has to be able to reach a model ────────────────────────
+
+
+class TestEnabledMeansServiceable:
+    """RV-P8.2's rule — a config that cannot serve must not load half-way —
+    applied to the engine's own config rather than only to routing.
+
+    Helm's `required` guards the chart and nothing else. Every other way in
+    (`NLP_LLM_EMULATED_ENABLED=true` from compose, a dev shell, a bare env) left
+    the engine registered with no address: `supports()` reads the templates on
+    disk and says yes, `validate_routing` passes, and the estate boots green to
+    spend three transport failures per request discovering what the config knew.
+    """
+
+    def test_enabled_without_a_url_is_a_boot_error(self):
+        cfg = _app_config(enabled=True)
+        cfg.engines.llm_emulated.url = ""
+        with pytest.raises(EngineConfigError, match="url"):
+            EngineRegistry(cfg)
+
+    def test_enabled_without_a_model_is_a_boot_error(self):
+        """`model` is the S-1 echo as much as it is the call: an engine with no
+        model id cannot name what produced an analysis."""
+        cfg = _app_config(enabled=True)
+        cfg.engines.llm_emulated.model = "  "
+        with pytest.raises(EngineConfigError, match="model"):
+            EngineRegistry(cfg)
+
+    def test_a_missing_key_warns_rather_than_refusing_to_boot(self, caplog):
+        """The asymmetry is deliberate. A gateway with no address cannot be
+        called at all; a keyless one is an ordinary local deployment, and failing
+        on it would make a working setup unbootable to pre-empt a 401 the gateway
+        reports perfectly well itself."""
+        cfg = _app_config(enabled=True)
+        cfg.engines.llm_emulated.api_key = ""
+        with caplog.at_level("WARNING"):
+            registry = EngineRegistry(cfg)
+        assert EMULATED_ENGINE_NAME in registry.list_engines()
+        assert "api_key" in caplog.text
+
+    def test_a_disabled_engine_is_not_held_to_any_of_it(self):
+        """Off is off: the shipped config has an empty url and must keep booting."""
+        cfg = _app_config(enabled=False)
+        cfg.engines.llm_emulated.url = ""
+        assert EMULATED_ENGINE_NAME not in EngineRegistry(cfg).list_engines()
 
 
 # ── (d) + T4: temperature 0, the model class, and deployment determinism ─────

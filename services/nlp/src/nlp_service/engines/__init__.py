@@ -18,7 +18,13 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
-from nlp_service.config import AppConfig, BackendConfig, LangidEngineConfig, load_config
+from nlp_service.config import (
+    AppConfig,
+    BackendConfig,
+    LangidEngineConfig,
+    load_config,
+    validate_llm_emulated,
+)
 from nlp_service.diagnostics import RG_NLP_002, RG_NLP_003, RG_NLP_010, RV_NLP_022
 from nlp_service.engines.base import NlpEngine, NlpOp
 from nlp_service.engines.langid_engine import LangidEngine
@@ -98,6 +104,12 @@ class EngineRegistry:
         # to it, withholds it or degrades without it using the machinery that
         # was already there.
         if e.llm_emulated.enabled and EMULATED_ENGINE_NAME not in self._withheld:
+            # Checked here rather than at parse time because the enable switch is
+            # an env var: the config object is mutated after construction, and
+            # this is the first moment the *effective* one is known. Checked only
+            # when it will actually register, for the reason `validate_routing`
+            # is per-lane — another lane's engine config is that lane's business.
+            validate_llm_emulated(e.llm_emulated)
             self._engines[EMULATED_ENGINE_NAME] = LlmEmulatedEngine(e.llm_emulated)
 
     def withheld_engines(self) -> set[str]:

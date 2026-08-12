@@ -95,6 +95,24 @@ def meaning(code: str) -> str:
     return _MEANING.get(code, code)
 
 
+def split_code(text: str) -> tuple[str, str]:
+    """`("RV-NLP-020", "detail")` for a `CODE: detail` string, `("", text)` else.
+
+    An engine reports a failure as one string on `EngineResult.error`, which is
+    the right shape for a log and the wrong one for a caller: a consumer filters
+    `messages[].code`, and a code that only ever appears inside a human message
+    is not in the registry in any sense the wire can see. This is how the
+    orchestrator gets it back out — matched against `_SEVERITY` rather than a
+    prefix pattern, so only a REGISTERED code is ever promoted, and an engine that
+    happens to start a sentence with a colon still reads as an untyped failure.
+    """
+    code, separator, detail = text.partition(":")
+    code = code.strip()
+    if separator and code in _SEVERITY:
+        return code, detail.strip()
+    return "", text
+
+
 def message(code: str, detail: str = "") -> dict:
     """Build a ResponseMessage-shaped dict for `code`, optionally suffixing
     `detail` (e.g. the offending language/op)."""

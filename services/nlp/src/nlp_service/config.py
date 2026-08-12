@@ -225,6 +225,53 @@ class AppConfig(BaseModel):
         return gated - admitted
 
 
+class EngineConfigError(ValueError):
+    """An engine is switched on with a configuration that cannot serve.
+
+    The sibling of `RoutingConfigError`, and raised at the same moment for the
+    same reason: a config that cannot serve must not load half-way. Routing is
+    only half the question — an engine can be routed correctly, register, pass
+    `validate_routing`, and still be unable to answer because it has no address.
+    """
+
+
+def validate_llm_emulated(config: LlmEmulatedConfig) -> None:
+    """An ENABLED emulated engine must be able to reach a model, or refuse to boot.
+
+    Helm's `required` covers the chart path and nothing else, so
+    `NLP_LLM_EMULATED_ENABLED=true` from compose, a dev shell or a bare env left
+    `url` empty, the engine registered, `supports()` answered true (the templates
+    are on disk, which is all it reads), routing validated — and every routed
+    request then spent its transport failures and its backoff discovering what the
+    config already knew. That is precisely the "boots green, cannot serve" state
+    RV-P8.2 made a boot error everywhere else.
+
+    `api_key` is a warning, not an error, and the asymmetry is deliberate: a
+    gateway with no address cannot be called at all, whereas a keyless one is an
+    ordinary local setup. Failing on it would make a working dev deployment
+    unbootable to guard against a 401 the gateway itself reports.
+    """
+    if not config.enabled:
+        return
+    missing = [
+        name
+        for name, value in (("url", config.url), ("model", config.model))
+        if not value.strip()
+    ]
+    if missing:
+        env = ", ".join(f"NLP_LLM_EMULATED_{name.upper()}" for name in missing)
+        raise EngineConfigError(
+            f"`engines.llm_emulated` is ENABLED but has no {' and no '.join(missing)} — "
+            f"set {env} (or the matching `engines.llm_emulated` keys), or turn the "
+            "engine off. An engine that cannot reach a model must not boot green."
+        )
+    if not config.api_key.strip():
+        logger.warning(
+            "engines.llm_emulated is enabled with no api_key — the gateway will "
+            "reject every call unless it is deployed without key validation"
+        )
+
+
 # Lindat dev/eval endpoints (the REMOTE_UNPINNED tier — RG-NLP-002). Selected by
 # NLP_UFAL_ENDPOINT_MODE=lindat; the pinned model ids stay explicit (S-1).
 _LINDAT_MORPHODITA = "https://lindat.mff.cuni.cz/services/morphodita/api/tag"

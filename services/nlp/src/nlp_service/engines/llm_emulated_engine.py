@@ -29,6 +29,31 @@ invented content, and the tokens around an invented one are exactly as
 trustworthy as it is. This is the whole posture — *a wrong lemma delivered
 confidently is the failure mode this engine must never have silently*.
 
+**"In the text" means the whole word, and that needs two different rules.**
+`str.find` alone is not the check it looks like: `Microsoft` IS in `Microsoftu`,
+so a model returning the base form of an inflected entity — the exact mistake
+Czech makes likeliest, and the reason this engine exists — would locate cleanly
+on a span that is not a word, attach to no token the orchestrator merged, and be
+served as a confident wrong answer. So:
+
+* a TOKEN STREAM must **cover the text**. The prompts ask for every token in
+  order, punctuation included, so the gaps between located spans can only be
+  whitespace. That admits a legitimate split (`do` + `n't`, adjacent spans) and
+  rejects a truncated one (`Microsoft` leaving a stranded `u`) without either
+  needing a word-boundary rule.
+* an ENTITY is sparse — nothing covers the gaps — so it is located on **word
+  boundaries** instead: an alphanumeric may not sit against an alphanumeric edge
+  of the surface.
+
+**Entities are located anywhere, tokens only forward.** A token stream is
+ordered by construction and a shared cursor is what makes a repeated word land on
+its own occurrence. Entities are not: models emit them out of document order
+routinely, and a shared cursor turned that into `RV-NLP-021` for the whole
+request — every entity lost because one arrived early. Each entity is therefore
+searched from the start of the text and claims the first free occurrence, which
+keeps "must exist in the text" intact, still separates repeats, and lets a nested
+entity have its own span.
+
 **Determinism is conditional, and says so.** Temperature 0 is necessary and not
 sufficient: a provider can change what a model name serves. So results are cached
 per `(template_version, model, purpose, language, text)` — same input, same
@@ -165,7 +190,7 @@ class LlmEmulatedEngine:
     def _morph(self, text: str, lang: str) -> list[Token]:
         body = self._ask("morph", text, lang)
         raw = _require_list(body, "tokens")
-        located = _locate([_require_str(item, "text", "a token") for item in raw], text)
+        located = _locate_tokens([_require_str(item, "text", "a token") for item in raw], text)
 
         tokens: list[Token] = []
         for item, (start, end) in zip(raw, located, strict=True):
@@ -182,7 +207,7 @@ class LlmEmulatedEngine:
         body = self._ask("ner", text, lang)
         raw = _require_list(body, "entities")
         vocabulary = _LABELS_CS if lang == "cs" else _LABELS_EN
-        located = _locate([_require_str(item, "text", "an entity") for item in raw], text)
+        located = _locate_entities([_require_str(item, "text", "an entity") for item in raw], text)
 
         entities: list[NerEntity] = []
         for item, (start, end) in zip(raw, located, strict=True):
@@ -264,13 +289,19 @@ def _require_str(item: dict, key: str, what: str) -> str:
     return value
 
 
-def _locate(surfaces: list[str], text: str) -> list[tuple[int, int]]:
-    """Spans for each surface form, found in order with a forward cursor.
+def _locate_tokens(surfaces: list[str], text: str) -> list[tuple[int, int]]:
+    """Spans for a token stream: found in order, and covering the text.
 
     In order, because that is what makes a repeated word land on its own
     occurrence rather than all of them on the first. A surface the text does not
     contain from the cursor onward is the model inventing content, and there is
     no honest partial answer to give: the whole analysis fails, naming it.
+
+    Then the coverage check, which is what makes "in the text" mean the whole
+    word. Located spans may only be separated by whitespace, because the prompt
+    asks for every token of the input in order, punctuation included. A model
+    that answered `Microsoft` for `Microsoftu` locates fine and strands a `u`, and
+    the stranded character is the only evidence that the span is not a word.
     """
     spans: list[tuple[int, int]] = []
     cursor = 0
@@ -283,7 +314,93 @@ def _locate(surfaces: list[str], text: str) -> list[tuple[int, int]]:
             )
         spans.append((found, found + len(surface)))
         cursor = found + len(surface)
+
+    covered = 0
+    for start, end in [*spans, (len(text), len(text))]:
+        if (dropped := text[covered:start]).strip():
+            raise EmulationError(
+                f"the tokens do not cover the text: {dropped.strip()!r} at offset "
+                f"{covered} belongs to no token — the model dropped or truncated it "
+                "(a partial word locates cleanly and is still the wrong span)"
+            )
+        covered = end
     return spans
+
+
+def _locate_entities(surfaces: list[str], text: str) -> list[tuple[int, int]]:
+    """Spans for entity surfaces: each claims the first free occurrence.
+
+    Searched from the start of the text rather than from a shared cursor. Entities
+    are not a stream — a model listing them out of document order is ordinary, and
+    a cursor made that fail the whole request rather than the one entity. Repeats
+    still land on distinct occurrences (an occurrence already claimed is skipped),
+    and a nested entity can still have its own span.
+
+    Word boundaries do here what coverage does for tokens: nothing fills the gaps
+    between entities, so the only evidence that `Microsoft` in `Microsoftu` is not
+    the entity is the alphanumeric sitting against the surface's alphanumeric edge.
+    """
+    spans: list[tuple[int, int]] = []
+    taken: set[tuple[int, int]] = set()
+    for surface in surfaces:
+        span = _first_free_occurrence(surface, text, taken)
+        taken.add(span)
+        spans.append(span)
+    return spans
+
+
+def _first_free_occurrence(
+    surface: str, text: str, taken: set[tuple[int, int]]
+) -> tuple[int, int]:
+    """The first whole-word occurrence of `surface` not already claimed.
+
+    The three ways this fails are three different mistakes and are named as such:
+    a form the text does not contain at all, a form that occurs only inside longer
+    words (the inflection case), and more mentions claimed than the text has.
+    """
+    occurrences = 0
+    whole_word = 0
+    start = text.find(surface)
+    while start >= 0:
+        occurrences += 1
+        span = (start, start + len(surface))
+        if _on_word_boundaries(text, *span):
+            whole_word += 1
+            if span not in taken:
+                return span
+        start = text.find(surface, start + 1)
+
+    if not occurrences:
+        raise EmulationError(
+            f"{surface!r} is not in the text — the model returned a form the input "
+            "does not contain"
+        )
+    if not whole_word:
+        raise EmulationError(
+            f"{surface!r} occurs in the text only inside a longer word — the model "
+            "returned a base or truncated form, not the surface form the text carries"
+        )
+    raise EmulationError(
+        f"{surface!r} is claimed more often than the text mentions it "
+        f"({whole_word} occurrence(s)) — the model returned a duplicate entity"
+    )
+
+
+def _on_word_boundaries(text: str, start: int, end: int) -> bool:
+    """Whether `text[start:end]` is a whole word rather than part of one.
+
+    Only alphanumeric-against-alphanumeric is a violation, so a surface that
+    begins or ends on punctuation (`leden 2025.`, a quoted name) is unaffected —
+    the rule exists to catch an inflected word being cut short, not to require
+    that entities be surrounded by spaces.
+    """
+    before = text[start - 1] if start > 0 else ""
+    after = text[end] if end < len(text) else ""
+    if before.isalnum() and text[start].isalnum():
+        return False
+    if after.isalnum() and text[end - 1].isalnum():
+        return False
+    return True
 
 
 def _parse_ops(names: list[str]) -> set[NlpOp]:

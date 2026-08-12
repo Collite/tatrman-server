@@ -49,6 +49,17 @@ from typing import Any
 
 import httpx
 
+# The exclusion rule is `nlp_service.emulation`'s, not this script's. It was
+# reimplemented here once — same idea, different key access and different op
+# handling — which meant the module's tests guarded a predicate nothing shipped
+# ran. This directory is a script dir run as `python eval/run_eval.py` and the
+# service package is deliberately not installed (`package = false`), so its `src/`
+# goes on the path rather than the rule going in two places.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from nlp_service.emulation import emulated_routes, exclusions  # noqa: E402
+from nlp_service.engines.llm_emulated_engine import EMULATED_ENGINE_NAME  # noqa: E402
+
 
 @dataclass
 class EvalEntry:
@@ -322,7 +333,10 @@ def compute_ner_metrics(
     return f1
 
 
-EMULATED = "llm_emulated"
+#: The engine's own name for itself, not a second copy of the string — the
+#: harness drops its output and reports on it, and a rename that missed here
+#: would silently score emulated output into the table again.
+EMULATED = EMULATED_ENGINE_NAME
 
 
 def fetch_capabilities(base_url: str, timeout: int = 30) -> list[dict[str, Any]]:
@@ -337,13 +351,6 @@ def fetch_capabilities(base_url: str, timeout: int = 30) -> list[dict[str, Any]]
         resp = client.get(f"{base_url}/version")
         resp.raise_for_status()
         return resp.json().get("capabilities", [])
-
-
-def emulated_pairs(capabilities: list[dict[str, Any]]) -> set[tuple[str, str]]:
-    """`{(language, op)}` served by the emulated engine, per the matrix."""
-    return {
-        (row["language"], row["op"]) for row in capabilities if row.get("engine") == EMULATED
-    }
 
 
 def asserted_ops(entry: EvalEntry) -> set[str]:
@@ -377,19 +384,26 @@ def run_evaluation(
     """Run evaluation on corpus and return per-engine metrics."""
     entries = load_corpus(corpus_path)
     emulated = emulated or set()
+
+    # Named, never silently passed: a green run containing an emulated assertion
+    # is worse than a red one, because it reads as a determinism claim it is not.
+    reasons = {
+        case.case_id: case.reason
+        for case in exclusions(
+            cases=[(entry.id, entry.lang, asserted_ops(entry)) for entry in entries],
+            emulated=emulated,
+        )
+    }
     excluded: list[dict[str, str]] = []
+    #: Cases the emulated engine answered anyway — see below.
+    fanned_out = 0
 
     # Track metrics per engine
     engine_metrics: dict[str, EngineMetrics] = {}
     all_engine_names: set[str] = set()
 
     for entry in entries:
-        hit = sorted(op for op in asserted_ops(entry) if (entry.lang, op) in emulated)
-        if hit:
-            # Named, never silently passed: a green run containing an emulated
-            # assertion is worse than a red one, because it reads as a
-            # determinism claim it is not.
-            reason = f"emulated: {'/'.join(hit)}/{entry.lang}"
+        if (reason := reasons.get(entry.id)) is not None:
             print(f"SKIP {entry.id}: {reason}")
             excluded.append({"id": entry.id, "reason": reason})
             continue
@@ -402,8 +416,24 @@ def run_evaluation(
             print(f"  Error: {response['error']}")
             continue
 
-        # Get all engines that returned results
-        by_engine = response.get("byEngine", {})
+        # Every engine that returned results — except the emulated one.
+        #
+        # The exclusion above is keyed on ROUTING, and this lane runs in COMPARE
+        # mode, which ignores routing entirely: every engine whose `supports()` is
+        # true answers, routed or not. Enabling the engine and routing an op at it
+        # are two decisions (`config.yaml` says so), so an estate that made only
+        # the first produces no exclusions at all — and `llm_emulated` was then
+        # scored into the per-engine table like a pinned engine, inside a report
+        # advertising that emulated output is excluded. Dropped here so the table
+        # cannot carry emulated output under ANY config, not only routed ones.
+        #
+        # Dropped rather than never requested, because COMPARE has no engine
+        # filter: the call was made and the gateway billed for it. That cost is
+        # reported (`emulated_fanout`) rather than absorbed silently.
+        returned = response.get("byEngine", {})
+        if EMULATED in returned:
+            fanned_out += 1
+        by_engine = {name: result for name, result in returned.items() if name != EMULATED}
         all_engine_names.update(by_engine.keys())
 
         # Initialize metrics for new engines
@@ -445,6 +475,7 @@ def run_evaluation(
         "corpus_size": len(entries),
         "excluded": excluded,
         "scored": len(entries) - len(excluded),
+        "emulated_fanout": fanned_out,
         "engines": {},
     }
 
@@ -488,6 +519,24 @@ def generate_markdown_report(summary: dict[str, Any], output_path: Path | None =
             "| Case | Reason |",
             "|------|--------|",
             *(f"| {e['id']} | {e['reason']} |" for e in excluded),
+            "",
+        ])
+
+    if summary.get("emulated_fanout"):
+        # The other half of the same honesty, and it survives a config with ZERO
+        # exclusions: routing is what the section above reads, and COMPARE does
+        # not obey routing.
+        lines.extend([
+            "## Emulated output reached this run (RV-6)",
+            "",
+            f"`llm_emulated` answered **{summary['emulated_fanout']}** of the scored cases. This lane",
+            "runs in COMPARE mode, which fans every op out to every engine that supports it —",
+            "routed or not — so an *enabled* emulated engine answers even where the routing table",
+            "never sends it. Those answers are **discarded before scoring**: no number below is",
+            "computed from emulated output.",
+            "",
+            "They were still paid for. COMPARE has no engine filter, so the calls were made and",
+            "llm-gateway billed them. Turn the engine off for a scoring run that costs nothing.",
             "",
         ])
 
@@ -549,6 +598,8 @@ def run_emulation_quality(base_url: str, corpus_path: Path) -> dict[str, Any]:
     entries = load_corpus(corpus_path)
     per_engine: dict[str, EngineMetrics] = {}
     agreement: dict[str, list[float]] = {"LEMMATIZE": [], "POS_TAG": [], "NER": []}
+    #: Which engine each op's agreement was measured against — see below.
+    incumbent_by_op: dict[str, set[str]] = {"LEMMATIZE": set(), "POS_TAG": set(), "NER": set()}
     latencies: list[int] = []
     missing = 0
 
@@ -567,9 +618,10 @@ def run_emulation_quality(base_url: str, corpus_path: Path) -> dict[str, Any]:
             missing += 1
             continue
 
-        # The incumbent = every other engine that answered. There is normally
-        # one per op; when there are more, the first is used and the rest are
-        # reported as such rather than averaged into a number nobody can read.
+        # The incumbents = every other engine that answered. Which one stands in
+        # for which op is decided below, per op; when two produce the same op the
+        # first is used rather than averaged into a number nobody can read, and
+        # the report names the one that was used.
         incumbents = {k: v for k, v in by_engine.items() if k != EMULATED and not v.get("error")}
         for name, result in {**incumbents, EMULATED: emulated}.items():
             metrics = per_engine.setdefault(name, EngineMetrics(name=name))
@@ -590,18 +642,29 @@ def run_emulation_quality(base_url: str, corpus_path: Path) -> dict[str, Any]:
             metrics.pos_f1 = (metrics.pos_f1 * (n - 1) + pos_f1) / n
             metrics.ner_f1 = (metrics.ner_f1 * (n - 1) + ner_f1) / n
 
-        for name, result in incumbents.items():
-            ref_tokens = result.get("tokens", [])
-            emu_tokens = emulated.get("tokens", [])
-            if ref_tokens and emu_tokens:
-                _, lemma_agree = compute_token_metrics(ref_tokens, emu_tokens)
-                agreement["LEMMATIZE"].append(lemma_agree)
-                agreement["POS_TAG"].append(compute_pos_metrics(ref_tokens, emu_tokens))
-            if result.get("entities"):
-                agreement["NER"].append(
-                    compute_ner_metrics(result["entities"], emulated.get("entities", []))
-                )
-            break  # first incumbent only — see the docstring
+        # The incumbent is chosen PER OP, not once per case. In the cs fan-out
+        # there are two of them and they do not overlap — morphodita produces
+        # tokens and no entities, nametag3 entities and no tokens — so taking the
+        # first incumbent for all three ops left whichever family the other engine
+        # owns permanently unmeasured, printed as `—`. That dash reads as "not
+        # measured on this corpus", not "we asked the wrong engine", and one of
+        # the two numbers the switch decision rests on was always the wrong one.
+        emu_tokens = emulated.get("tokens", [])
+        morph_name, morph_ref = _first_carrying(incumbents, "tokens")
+        ner_name, ner_ref = _first_carrying(incumbents, "entities")
+
+        if morph_ref and emu_tokens:
+            ref_tokens = morph_ref["tokens"]
+            _, lemma_agree = compute_token_metrics(ref_tokens, emu_tokens)
+            agreement["LEMMATIZE"].append(lemma_agree)
+            agreement["POS_TAG"].append(compute_pos_metrics(ref_tokens, emu_tokens))
+            incumbent_by_op["LEMMATIZE"].add(morph_name)
+            incumbent_by_op["POS_TAG"].add(morph_name)
+        if ner_ref:
+            agreement["NER"].append(
+                compute_ner_metrics(ner_ref["entities"], emulated.get("entities", []))
+            )
+            incumbent_by_op["NER"].add(ner_name)
 
     return {
         "corpus_size": len(entries),
@@ -620,12 +683,28 @@ def run_emulation_quality(base_url: str, corpus_path: Path) -> dict[str, Any]:
         "agreement_with_incumbent": {
             op: (round(sum(v) / len(v), 4) if v else None) for op, v in agreement.items()
         },
+        "incumbent_by_op": {op: sorted(names) for op, names in incumbent_by_op.items()},
         "latency_ms": {
             "n": len(latencies),
             "mean": round(sum(latencies) / len(latencies), 1) if latencies else None,
             "max": max(latencies) if latencies else None,
         },
     }
+
+
+def _first_carrying(
+    incumbents: dict[str, dict[str, Any]], field: str
+) -> tuple[str, dict[str, Any] | None]:
+    """The first incumbent whose result actually carries `field`.
+
+    "First" is a real choice only when two engines produce the same field; when
+    they divide the work between them — the cs case — it is the only choice that
+    measures anything at all.
+    """
+    for name, result in incumbents.items():
+        if result.get(field):
+            return name, result
+    return "", None
 
 
 def generate_quality_report(summary: dict[str, Any], output_path: Path | None = None) -> str:
@@ -652,10 +731,15 @@ def generate_quality_report(summary: dict[str, Any], output_path: Path | None = 
         "What CHANGES if an estate switches. Read beside the table above: agreement is not",
         "correctness, and two engines wrong in the same way agree perfectly.",
         "",
-        "| Op | Agreement |",
-        "|----|-----------|",
+        "The incumbent is named per op, because in cs there are two and they divide the work",
+        "(morphodita tokens, nametag3 entities). A `—` means no incumbent produced that op on",
+        "this corpus — nothing to compare against, not a zero.",
+        "",
+        "| Op | Agreement | Incumbent |",
+        "|----|-----------|-----------|",
         *(
-            f"| {op} | {'—' if v is None else f'{v:.4f}'} |"
+            f"| {op} | {'—' if v is None else f'{v:.4f}'} | "
+            f"{', '.join(summary.get('incumbent_by_op', {}).get(op) or []) or '—'} |"
             for op, v in summary["agreement_with_incumbent"].items()
         ),
         "",
@@ -737,7 +821,7 @@ def main():
     # unreachable front is "unknown", not "no emulation" — failing here is right,
     # because the alternative is a full-looking run whose exclusions were all
     # silently switched off.
-    emulated = emulated_pairs(fetch_capabilities(args.url))
+    emulated = emulated_routes(fetch_capabilities(args.url))
     if emulated:
         print(f"Emulated routes in the active config: {sorted(emulated)}")
     summary = run_evaluation(args.url, corpus_path, emulated=emulated)

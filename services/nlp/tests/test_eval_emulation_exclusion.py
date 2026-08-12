@@ -25,6 +25,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 # `eval/` is a script directory, not a package (it is run with `python
 # eval/run_eval.py`), so it is loaded by path. It must be registered in
 # `sys.modules` BEFORE execution: `@dataclass` resolves its own module through
@@ -39,6 +41,22 @@ _spec.loader.exec_module(run_eval)
 
 def a_case(case_id: str, lang: str, expected: dict):
     return run_eval.EvalEntry(id=case_id, question="?", lang=lang, expected=expected)
+
+
+def _token(text: str, start: int, end: int, lemma: str = "", upos: str = "") -> dict:
+    return {"text": text, "charStart": start, "charEnd": end, "lemma": lemma, "upos": upos}
+
+
+def _entity(text: str, start: int, end: int, label: str) -> dict:
+    return {"text": text, "charStart": start, "charEnd": end, "label": label}
+
+
+def _run_against(monkeypatch, *, by_engine: dict, emulated: set) -> dict:
+    """`run_evaluation` over one case, with the front's answer supplied."""
+    case = a_case("cs-q-001", "cs", {"tokens": [_token("Praha", 0, 5, "Praha", "PROPN")]})
+    monkeypatch.setattr(run_eval, "load_corpus", lambda _path: [case])
+    monkeypatch.setattr(run_eval, "analyze_text", lambda *a, **k: {"byEngine": by_engine})
+    return run_eval.run_evaluation("http://front", Path("unused.jsonl"), emulated=emulated)
 
 
 MATRIX_WITH_EMULATION = [
@@ -75,19 +93,33 @@ class TestAssertedOps:
         assert "LEMMATIZE" in run_eval.asserted_ops(case)
 
 
-class TestEmulatedPairs:
+class TestEmulatedRoutes:
+    """The predicate is `nlp_service.emulation`'s — the harness imports it.
+
+    It used to be reimplemented inline here, which is why these tests are worth
+    keeping where they are: they run against the name the harness actually calls,
+    so a rule that changes in the module and not in the script (or the reverse)
+    fails rather than passes twice over two different predicates.
+    """
+
     def test_it_reads_the_engine_column(self):
-        assert run_eval.emulated_pairs(MATRIX_WITH_EMULATION) == {("cs", "NER")}
+        assert run_eval.emulated_routes(MATRIX_WITH_EMULATION) == {("cs", "NER")}
 
     def test_no_emulated_row_means_no_pairs(self):
-        assert run_eval.emulated_pairs(MATRIX_WITHOUT) == set()
+        assert run_eval.emulated_routes(MATRIX_WITHOUT) == set()
 
     def test_an_empty_matrix_means_no_pairs_and_the_caller_must_not_treat_that_as_fine(self):
         """`fetch_capabilities` raises on an unreachable front rather than
         returning `[]`, precisely so this can never be reached by accident: a
         silent empty matrix switches every exclusion off at the moment the run is
         least trustworthy."""
-        assert run_eval.emulated_pairs([]) == set()
+        assert run_eval.emulated_routes([]) == set()
+
+    def test_the_harness_calls_the_module_rather_than_a_copy_of_it(self):
+        from nlp_service import emulation
+
+        assert run_eval.emulated_routes is emulation.emulated_routes
+        assert run_eval.exclusions is emulation.exclusions
 
 
 class TestTheReport:
@@ -117,6 +149,51 @@ class TestTheReport:
         assert report.index("Excluded cases") < report.index("Per-Engine Metrics")
 
 
+class TestTheFanOutThatRoutingCannotSee:
+    """The exclusion is keyed on ROUTING; this lane runs in COMPARE, which ignores
+    routing entirely and asks every engine that supports the op.
+
+    Enabling the engine and routing an op at it are two decisions — `config.yaml`
+    says so in as many words — so an estate that made only the first got zero
+    exclusions AND a `llm_emulated` row in the per-engine table, inside a report
+    advertising that emulated output is excluded.
+    """
+
+    def test_emulated_output_is_dropped_from_the_scored_table(self, monkeypatch):
+        summary = _run_against(
+            monkeypatch,
+            by_engine={
+                "morphodita": {"tokens": [_token("Praha", 0, 5, "Praha", "PROPN")]},
+                "llm_emulated": {"tokens": [_token("Praha", 0, 5, "wrong", "NOUN")]},
+            },
+            emulated=set(),  # NOTHING is routed at it — the case this exists for
+        )
+        assert summary["excluded"] == []
+        assert "llm_emulated" not in summary["engines"]
+        assert "morphodita" in summary["engines"]
+
+    def test_the_run_reports_the_calls_it_paid_for(self):
+        """Dropped, not un-asked: COMPARE has no engine filter, so the gateway was
+        called and billed. Reporting zero exclusions AND nothing else would read
+        as a run that never touched emulation."""
+        summary = {
+            "corpus_size": 2, "excluded": [], "scored": 2,
+            "emulated_fanout": 2, "engines": {},
+        }
+        report = run_eval.generate_markdown_report(summary)
+        assert "Emulated output reached this run" in report
+        assert "discarded before scoring" in report
+        assert "billed" in report
+
+    def test_a_run_with_emulation_off_says_nothing_about_any_of_it(self):
+        summary = {
+            "corpus_size": 2, "excluded": [], "scored": 2,
+            "emulated_fanout": 0, "engines": {},
+        }
+        report = run_eval.generate_markdown_report(summary)
+        assert "Emulated output reached this run" not in report
+
+
 class TestTheQualityReport:
     def test_it_separates_agreement_from_correctness(self):
         """The distinction the snapshot exists to hold: two engines wrong in the
@@ -142,3 +219,78 @@ class TestTheQualityReport:
         assert "mean=812.4 ms" in report
         # Cost is the gateway's to report; a second price table is a second drift.
         assert "does not price calls" in report
+
+
+class TestTheIncumbentIsChosenPerOp:
+    """In the cs fan-out there are two incumbents and they do not overlap:
+    morphodita produces tokens and no entities, nametag3 entities and no tokens.
+
+    Taking the first incumbent for all three ops left whichever family the other
+    engine owns permanently unmeasured and printed as `—` — and which one that
+    was depended on the order the front happened to serialize `byEngine`. One of
+    the two numbers the switch decision rests on was always the wrong one, and it
+    read as "not measured on this corpus" rather than "we asked an engine that
+    does not do this".
+    """
+
+    CASE_TOKENS = [_token("Praha", 0, 5, "Praha", "PROPN")]
+    CASE_ENTITIES = [_entity("Praha", 0, 5, "LOCATION")]
+
+    def _quality(self, monkeypatch, by_engine: dict) -> dict:
+        case = a_case(
+            "cs-q-001", "cs", {"tokens": self.CASE_TOKENS, "entities": self.CASE_ENTITIES}
+        )
+        monkeypatch.setattr(run_eval, "load_corpus", lambda _path: [case])
+        monkeypatch.setattr(
+            run_eval, "analyze_text", lambda *a, **k: {"byEngine": by_engine, "elapsedMs": 10}
+        )
+        return run_eval.run_emulation_quality("http://front", Path("unused.jsonl"))
+
+    def _split_incumbents(self, first: str) -> dict:
+        """The two cs incumbents, in a given serialization order."""
+        engines = {
+            "morphodita": {"tokens": self.CASE_TOKENS, "entities": []},
+            "nametag3": {"tokens": [], "entities": self.CASE_ENTITIES},
+        }
+        ordered = {first: engines[first], **engines}
+        return {
+            **ordered,
+            "llm_emulated": {"tokens": self.CASE_TOKENS, "entities": self.CASE_ENTITIES},
+        }
+
+    @pytest.mark.parametrize("first", ["morphodita", "nametag3"])
+    def test_both_agreement_families_are_measured_whatever_the_order(self, monkeypatch, first):
+        quality = self._quality(monkeypatch, self._split_incumbents(first))
+
+        agreement = quality["agreement_with_incumbent"]
+        assert agreement["LEMMATIZE"] is not None
+        assert agreement["POS_TAG"] is not None
+        assert agreement["NER"] is not None
+
+    @pytest.mark.parametrize("first", ["morphodita", "nametag3"])
+    def test_each_op_names_the_engine_it_was_actually_compared_against(self, monkeypatch, first):
+        quality = self._quality(monkeypatch, self._split_incumbents(first))
+
+        assert quality["incumbent_by_op"]["LEMMATIZE"] == ["morphodita"]
+        assert quality["incumbent_by_op"]["POS_TAG"] == ["morphodita"]
+        assert quality["incumbent_by_op"]["NER"] == ["nametag3"]
+
+    def test_a_dash_still_means_nothing_produced_that_op(self, monkeypatch):
+        """The honest empty case has to stay empty: with no incumbent carrying
+        entities there is genuinely nothing to compare NER against."""
+        quality = self._quality(
+            monkeypatch,
+            {
+                "morphodita": {"tokens": self.CASE_TOKENS, "entities": []},
+                "llm_emulated": {"tokens": self.CASE_TOKENS, "entities": self.CASE_ENTITIES},
+            },
+        )
+        assert quality["agreement_with_incumbent"]["NER"] is None
+        assert quality["incumbent_by_op"]["NER"] == []
+
+    def test_the_report_names_the_incumbent_beside_the_number(self, monkeypatch):
+        report = run_eval.generate_quality_report(
+            self._quality(monkeypatch, self._split_incumbents("nametag3"))
+        )
+        assert "| Incumbent |" in report
+        assert "morphodita" in report and "nametag3" in report
