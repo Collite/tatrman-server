@@ -1,0 +1,70 @@
+# morph-studio — the LM editorial service (⚑LMP-D5).
+#
+# One instance per world (LM-5): `MORPH_WORLD` is required and the container
+# refuses to start without it.
+#
+# Build from the repo root — the uv path dependencies (`ttr-morph`, `ttr-nlp`)
+# resolve there and nowhere else:
+#   docker build -t morph-studio:dev -f services/morph-studio/Dockerfile .
+#
+# ⚑ `ttr-morph` is NOT on PyPI (⚑LMP-D4) and neither is this image's ability to
+# build outside the monorepo. That is deliberate: the studio proposes what the
+# compiler will accept, which means running the compiler's own code.
+
+FROM python:3.13-slim-bookworm AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# ===== dependencies layer =====
+FROM base AS deps
+
+WORKDIR /build/services/morph-studio
+# The two workspace libraries this service is built on. `psycopg[binary]` means
+# no libpq build stage — the wheel carries it.
+COPY shared/libs/python/ttr-nlp /build/shared/libs/python/ttr-nlp
+COPY shared/libs/python/ttr-morph /build/shared/libs/python/ttr-morph
+COPY services/morph-studio/pyproject.toml services/morph-studio/uv.lock ./
+RUN pip install --upgrade pip && pip install uv && uv sync --frozen
+
+# ===== runtime =====
+FROM base AS runtime
+
+RUN useradd -ms /bin/bash appuser
+WORKDIR /app
+
+COPY --from=deps /usr/local /usr/local
+COPY --from=deps /build/services/morph-studio/.venv /build/services/morph-studio/.venv
+COPY --from=deps /build/shared /build/shared
+
+USER appuser
+COPY --chown=appuser:appuser services/morph-studio/pyproject.toml \
+                             services/morph-studio/README.md \
+                             services/morph-studio/alembic.ini ./
+COPY --chown=appuser:appuser services/morph-studio/src ./src
+COPY --chown=appuser:appuser services/morph-studio/migrations ./migrations
+
+ENV PATH="/build/services/morph-studio/.venv/bin:${PATH}"
+ENV PYTHONPATH=/app/src
+ENV MORPH_STUDIO_HOST=0.0.0.0 \
+    MORPH_STUDIO_PORT=7290 \
+    MORPH_STUDIO_EXPORT_DIR=/var/lib/morph-studio/export
+
+EXPOSE 7290
+
+# ⚑ The schema is alembic's, not the service's: `alembic upgrade head` runs as a
+# migration job (or an init container), and the app never creates tables. A
+# service that quietly created them on boot would let a missing migration go
+# unnoticed until the first environment that had an older database.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:${MORPH_STUDIO_PORT:-7290}/healthz || exit 1
+
+CMD ["python", "src/main.py"]

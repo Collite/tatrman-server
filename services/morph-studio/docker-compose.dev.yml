@@ -1,0 +1,76 @@
+# morph-studio — local bring-up with a real Postgres (NLS-P9.2 T1).
+#
+# The unit suite runs on SQLite and proves the logic; this is where the schema
+# a deployment actually gets is exercised. It is also the stack the NLS-P9.3
+# frontend develops against, and the base of the arc-gate-7 lifecycle run
+# (p9-3 T7), which adds the front and the shared overlay volume.
+#
+#   # from the repo root:
+#   docker build -t morph-studio:dev -f services/morph-studio/Dockerfile .
+#   docker compose -f services/morph-studio/docker-compose.dev.yml up
+#
+#   # the migrations are a JOB, not something the app does on boot:
+#   docker compose -f services/morph-studio/docker-compose.dev.yml run --rm migrate
+#
+#   # the queue, from the front's spool shape:
+#   curl -s localhost:7290/v1/ingest -H 'content-type: application/json' \
+#     -d '{"reports":[{"world":"dfp","token":"Kauflandu"}]}'
+#   curl -s localhost:7290/v1/queue | jq
+#
+# ⚑ `morph-overlay` is the volume the Q-7 lane writes into. In a cluster the
+# FRONT mounts the same volume (or its own copy of the same files) and is told
+# to reload — the studio writes files, it does not push rows over a wire.
+
+name: morph-studio
+
+services:
+  morph-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: morph
+      POSTGRES_PASSWORD: morph
+      POSTGRES_DB: morph_studio
+    ports:
+      - "55433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U morph -d morph_studio"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    image: morph-studio:dev
+    depends_on:
+      morph-db:
+        condition: service_healthy
+    environment:
+      MORPH_STUDIO_DB_URL: postgresql+psycopg://morph:morph@morph-db:5432/morph_studio
+    command: ["alembic", "upgrade", "head"]
+
+  studio:
+    image: morph-studio:dev
+    depends_on:
+      morph-db:
+        condition: service_healthy
+    environment:
+      # LM-5: one instance, one world. There is no default and no guess.
+      MORPH_WORLD: dfp
+      MORPH_STUDIO_DB_URL: postgresql+psycopg://morph:morph@morph-db:5432/morph_studio
+      MORPH_STUDIO_OVERLAY_DIR: /var/lib/morph-studio/overlay
+      MORPH_STUDIO_EXPORT_DIR: /var/lib/morph-studio/export
+      # The front's gRPC target, when there is one in the stack. Empty here: the
+      # overlay is still written, and nothing is told about it.
+      MORPH_STUDIO_FRONT_TARGET: ""
+      # The LLM leg is OFF unless a gateway is configured — guesser → human is a
+      # supported arrangement, not a degraded one (air-gapped worlds run it).
+      # MORPH_LLM_URL: http://llm-gateway:7280
+      # MORPH_LLM_API_KEY: ttrk-...
+    ports:
+      - "7290:7290"
+    volumes:
+      - morph-overlay:/var/lib/morph-studio/overlay
+      - morph-export:/var/lib/morph-studio/export
+
+volumes:
+  morph-overlay:
+  morph-export:

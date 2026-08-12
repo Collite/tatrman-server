@@ -184,7 +184,7 @@ build-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just build-py "$d"; done
+        for d in services/nlp services/golem-py services/morph-studio workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just build-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -196,7 +196,7 @@ test-py module="" *args:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just test-py "$d" {{args}}; done
+        for d in services/nlp services/golem-py services/morph-studio workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just test-py "$d" {{args}}; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -266,6 +266,21 @@ morph-eval cac="" gate="":
     [ -z "{{cac}}" ] || args="$args --cac {{cac}}"
     [ -z "{{gate}}" ] || args="$args --gate"
     cd {{morph_dir}} && uv run ttr-morph eval $args
+
+# Run morph-studio locally (NLS-P9.2): SQLite under `dist/`, Q-7 writing into
+# `dist/morph-studio/overlay`, no front to reload. `world=` is passed through —
+# one instance serves one world (LM-5), and the service refuses to boot without
+# one.
+run-morph-studio world="dfp":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    root=$(git rev-parse --show-toplevel)
+    mkdir -p "$root/dist/morph-studio"
+    export MORPH_WORLD="{{world}}"
+    export MORPH_STUDIO_DB_URL="sqlite+pysqlite:///$root/dist/morph-studio/studio.db"
+    export MORPH_STUDIO_OVERLAY_DIR="$root/dist/morph-studio/overlay"
+    export MORPH_STUDIO_EXPORT_DIR="$root/dist/morph-studio/export"
+    cd services/morph-studio && uv run python src/main.py
 
 # ── Conformance (RG-P6.S2 — the three-tier instrument) ───────────────────────
 
