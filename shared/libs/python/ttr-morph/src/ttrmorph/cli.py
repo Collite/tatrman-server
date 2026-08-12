@@ -40,6 +40,10 @@ from ttrnlp.packs.diag import SEVERITY_ERROR, Diagnostic
 from ttrmorph import __version__
 from ttrmorph.compile import compile_layers, read_frequencies, validate_layers
 from ttrmorph.engine import EngineError, classify, generate, load
+from ttrmorph.eval.split import FROZEN_SEED, MANIFEST_PATH, SplitError
+from ttrmorph.eval.split import build as build_split
+from ttrmorph.eval.split import render as render_split
+from ttrmorph.importers.sources import PoisonedSource
 
 EXIT_OK = 0
 EXIT_NO_ANSWER = 1
@@ -52,6 +56,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         return args.run(args)
     except EngineError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except (SplitError, PoisonedSource) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE
     except OSError as exc:
@@ -131,6 +138,66 @@ def _parser() -> argparse.ArgumentParser:
     com.add_argument("--world", default="", help="world id, with --overlay")
     com.add_argument("--json", action="store_true", dest="as_json")
     com.set_defaults(run=_compile)
+
+    spl = subs.add_parser(
+        "split",
+        help="freeze the CAC train/dev/test partition (CEREMONY — read §11)",
+        description=(
+            "Partition UD_Czech-CAC sentence ids 80/10/10 and write the "
+            "manifest. This happens ONCE, before any CAC-derived read, and the "
+            "manifest is committed alone. Wave C's training task must use this "
+            "same file — no re-split, ever (LM-16/S-6, contracts §11)."
+        ),
+    )
+    spl.add_argument("--cac", type=Path, required=True, help="the extracted UD dir")
+    spl.add_argument("--archive", type=Path, required=True, help="its .tar.gz, hashed")
+    spl.add_argument("--release", required=True, help="the UD release tag, e.g. r2.18")
+    spl.add_argument("--seed", type=int, default=FROZEN_SEED)
+    spl.add_argument("-o", "--output", type=Path, default=None)
+    spl.set_defaults(run=_split)
+
+    kai = subs.add_parser(
+        "import-kaikki", help="build a layer from a kaikki.org Wiktionary extract"
+    )
+    kai.add_argument("jsonl", type=Path)
+    kai.add_argument("-o", "--output", type=Path, required=True)
+    kai.add_argument("--lang", default="cs")
+    kai.add_argument("--targets", type=Path, help="target-word list (YAML)")
+    kai.add_argument(
+        "--targets-from-freq",
+        type=Path,
+        help="also target the most frequent lemmas of this lemma<TAB>count table",
+    )
+    kai.add_argument("--top", type=int, default=3000)
+    kai.add_argument(
+        "--exclude",
+        type=Path,
+        action="append",
+        default=[],
+        help="a layer whose entries this importer must not compete with",
+    )
+    kai.add_argument("--report", type=Path, help="write the counts here too")
+    kai.set_defaults(run=_import_kaikki)
+
+    cac = subs.add_parser(
+        "import-cac", help="attested forms + the frequency table, train side only"
+    )
+    cac.add_argument("cac", type=Path, help="the extracted UD dir")
+    cac.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        help="the layer file; omit to emit only the frequency table",
+    )
+    cac.add_argument("--lang", default="cs")
+    cac.add_argument("--freq", type=Path, help="write lemma<TAB>count here")
+    cac.add_argument("--targets", type=Path)
+    cac.add_argument("--targets-from-freq", type=Path)
+    cac.add_argument("--top", type=int, default=3000)
+    cac.add_argument("--exclude", type=Path, action="append", default=[])
+    cac.add_argument("--min-count", type=int, default=2)
+    cac.add_argument("--report", type=Path)
+    cac.set_defaults(run=_import_cac)
 
     return parser
 
@@ -271,6 +338,229 @@ def _report(diagnostics: list[Diagnostic], paths: Sequence[str], as_json: bool) 
             note = f" ({other} note(s))" if other else ""
             print(f"OK — {scope}{note}.")
     return EXIT_NO_ANSWER if errors else EXIT_OK
+
+
+# ── the lexicon lane (P8.3) ──────────────────────────────────────────────────
+
+
+def _split(args) -> int:
+    """THE CEREMONY. Read contracts §11 before changing anything here."""
+    files = sorted(Path(args.cac).glob("*.conllu"))
+    if not files:
+        print(f"ttr-morph split: no .conllu files in {args.cac}", file=sys.stderr)
+        return EXIT_USAGE
+
+    target = args.output or MANIFEST_PATH
+    if Path(target).exists():
+        # Not a convenience check. The manifest is shared with Wave C's
+        # training task, and overwriting it silently re-partitions a corpus a
+        # model is being evaluated against.
+        print(
+            f"error: {target} already exists — the split is frozen (LM-16/S-6, "
+            "contracts §11). There is no re-split: not for a new UD release, "
+            "not for a bigger corpus, not because a number would look better",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    manifest = build_split(
+        files, release=args.release, archive=Path(args.archive), seed=args.seed
+    )
+    Path(target).parent.mkdir(parents=True, exist_ok=True)
+    Path(target).write_text(render_split(manifest), encoding="utf-8")
+    print(f"wrote {target}")
+    print(f"  corpus  {manifest.corpus} {manifest.release}")
+    print(f"  sha256  {manifest.sha256}")
+    print(f"  seed    {manifest.seed}")
+    for side, count in manifest.counts.items():
+        print(f"  {side:<7} {count}")
+    print(
+        "\nCommit this file ALONE, message:\n"
+        "  LM: freeze CAC split (shared with Wave C training — no re-split)"
+    )
+    return EXIT_OK
+
+
+def _identities(paths: Sequence[Path]) -> set[tuple[str, str]]:
+    """(lemma, upos) already claimed by the layers an importer must not fight."""
+    from ttrmorph.compile.layers import read_layer
+
+    taken: set[tuple[str, str]] = set()
+    for path in paths:
+        layer, _ = read_layer(path)
+        if layer is not None:
+            taken |= {entry.identity for entry in layer.entries}
+    return taken
+
+
+def _target_lemmas(args) -> list[str]:
+    from ttrmorph.importers.kaikki import read_targets, targets_from_frequencies
+
+    lemmas: list[str] = []
+    if getattr(args, "targets", None):
+        lemmas.extend(read_targets(Path(args.targets)))
+    if getattr(args, "targets_from_freq", None):
+        lemmas.extend(
+            targets_from_frequencies(Path(args.targets_from_freq), args.top)
+        )
+    return lemmas
+
+
+def _import_kaikki(args) -> int:
+    from ttrmorph.importers.emit import LayerHeader, render_layer
+    from ttrmorph.importers.kaikki import do_import
+
+    lemmas = _target_lemmas(args)
+    if not lemmas:
+        print("ttr-morph import-kaikki: no target lemmas", file=sys.stderr)
+        return EXIT_USAGE
+
+    entries, report = do_import(
+        Path(args.jsonl), lemmas, exclude=_identities(args.exclude)
+    )
+    header = LayerHeader(
+        layer="core-kaikki",
+        language=args.lang,
+        license="CC-BY-SA-4.0",
+        attribution=KAIKKI_ATTRIBUTION,
+        note=(
+            "GENERATED — do not hand-edit; correct the source or the target "
+            "list and re-run.\n"
+            f"  ttr-morph import-kaikki {Path(args.jsonl).name} "
+            f"-o {Path(args.output).name}\n"
+            f"Targets: {len(set(lemmas))} lemmas. Of the entries found, "
+            f"{report.classified} classified to a pattern and "
+            f"{report.full_form} became full-form entries."
+        ),
+    )
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.output).write_text(render_layer(header, entries), encoding="utf-8")
+    _print_kaikki(report, args.output)
+    if args.report:
+        Path(args.report).write_text(_kaikki_report(report), encoding="utf-8")
+    return EXIT_OK
+
+
+def _import_cac(args) -> int:
+    from ttrmorph.importers.cac import attested_for, frequency_table, read
+    from ttrmorph.importers.emit import LayerHeader, forms_entry, render_layer
+
+    files = sorted(Path(args.cac).glob("*.conllu"))
+    if not files:
+        print(f"ttr-morph import-cac: no .conllu files in {args.cac}", file=sys.stderr)
+        return EXIT_USAGE
+
+    counts, report = read(files, side="train")
+    if args.freq:
+        Path(args.freq).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.freq).write_text(frequency_table(counts), encoding="utf-8")
+        print(f"wrote {args.freq} ({report.lemmas} lemmas)")
+    if not args.output:
+        # Frequency-table-only run. The target list for the importers is built
+        # from this table, so it has to exist before either importer runs.
+        return EXIT_OK
+
+    lemmas = _target_lemmas(args)
+    taken = _identities(args.exclude)
+    grouped = attested_for(counts, lemmas, min_count=args.min_count)
+    entries = [
+        forms_entry(
+            lemma,
+            upos,
+            [(row.form, row.feats) for row in rows],
+            "cac",
+        )
+        for (lemma, upos), rows in sorted(grouped.items())
+        if (lemma, upos) not in taken
+    ]
+    header = LayerHeader(
+        layer="core-cac",
+        language=args.lang,
+        license="CC-BY-SA-4.0",
+        attribution=CAC_ATTRIBUTION,
+        note=(
+            "GENERATED — attested forms only, from the TRAIN side of the frozen "
+            "split.\n"
+            "Nothing here is classified: a corpus row is evidence that a form "
+            "exists, not a paradigm.\n"
+            f"  ttr-morph import-cac <dir> -o {Path(args.output).name} "
+            f"--min-count {args.min_count}\n"
+            f"{report.sentences_read} sentences, {report.tokens} tokens, "
+            f"{len(entries)} entries."
+        ),
+    )
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.output).write_text(render_layer(header, entries), encoding="utf-8")
+    print(
+        f"wrote {args.output}: {len(entries)} entries from "
+        f"{report.sentences_read} train-side sentences"
+    )
+    return EXIT_OK
+
+
+def _print_kaikki(report, output) -> None:
+    print(f"wrote {output}")
+    print(f"  entries read      {report.entries_read}")
+    print(f"  in target list    {report.entries_in_target}")
+    print(f"  classified        {report.classified}")
+    print(f"  full-form         {report.full_form}")
+    print(f"  no usable table   {report.no_table}")
+    print(f"  forms dropped     {report.dropped_forms}")
+    print(f"  reproduce rate    {report.reproduce_rate:.0%}")
+
+
+def _kaikki_report(report) -> str:
+    lines = [
+        "# kaikki import — D-F1-alpha conformance run",
+        "",
+        "| measure | value |",
+        "|---|--:|",
+        f"| entries read | {report.entries_read} |",
+        f"| entries in the target list | {report.entries_in_target} |",
+        f"| classified to a pattern | {report.classified} |",
+        f"| full-form (no pattern reproduced) | {report.full_form} |",
+        f"| no usable table | {report.no_table} |",
+        f"| forms dropped (register / outside / unmapped) | {report.dropped_forms} |",
+        f"| reproduce rate | {report.reproduce_rate:.1%} |",
+        "",
+        "## Sample mismatches",
+        "",
+    ]
+    lines += [f"- `{lemma}` ({upos})" for lemma, upos, _ in report.samples]
+    return "\n".join(lines) + "\n"
+
+
+#: Attribution blocks, S-2 (contracts §10). Written here rather than in a data
+#: file because they are claims about what WE did to somebody else's material,
+#: and the importer is what did it.
+KAIKKI_ATTRIBUTION = {
+    "source": "Wiktionary (English edition), via kaikki.org",
+    "url": "https://kaikki.org/dictionary/Czech/",
+    "license": "CC-BY-SA-4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "extracted": "2026-08-12",
+    "transformation": (
+        "Inflection tables were read from the extract, restricted to the cells "
+        "this project generates, and matched against the Tatrman paradigm "
+        "engine. Where a pattern reproduces the table exactly the entry is "
+        "carried as a (vzor, flags) pair and its forms are regenerated; "
+        "otherwise the extracted forms are carried verbatim. Entries are "
+        "restricted to a target vocabulary."
+    ),
+}
+
+CAC_ATTRIBUTION = {
+    "source": "UD_Czech-CAC (Universal Dependencies)",
+    "url": "https://github.com/UniversalDependencies/UD_Czech-CAC",
+    "license": "CC-BY-SA-4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "extracted": "2026-08-12",
+    "transformation": (
+        "Attested (form, lemma, upos, feats) rows were counted over the train "
+        "side of the frozen split manifest and carried as full-form entries "
+        "for target-vocabulary lemmas. No sentence text is reproduced."
+    ),
+}
 
 
 if __name__ == "__main__":  # pragma: no cover
