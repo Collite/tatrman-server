@@ -53,7 +53,13 @@ ttr-nlp = { path = "../../shared/libs/python/ttr-nlp", editable = true }
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-pythonpath = ["src"]
+# ⚑ The wheel's generated `org.tatrman.{nlp,common}.v1` stubs ride along. They
+# are gitignored, and in a SOURCE checkout `ttr-nlp[grpc]`'s extra cannot supply
+# them — the extra bundles `src/ttrnlp/_proto`, which only a wheel BUILD
+# produces. Without this the Q-7 reload leg (`provisional.reload_front`) cannot
+# even be imported outside a container, which is precisely where the gate-7
+# component test runs. `conftest.py` generates them when they are absent.
+pythonpath = ["src", "../../shared/libs/python/ttr-nlp/generated"]
 # The unit tier runs the whole service — every endpoint, the status machine,
 # the cascade, export — against SQLite. The component tier runs the SAME suite's
 # schema and migrations against a real Postgres and is opt-in, because a unit

@@ -503,3 +503,62 @@ def test_the_wheels_miss_sink_shape_is_what_annotate_morph_calls(spool):
     a request, one token in."""
     spool.miss_sink()(WORLD, "Kauflandu", "miss")
     assert [r.token for r in spool.pending()] == ["Kauflandu"]
+
+
+# ── the answer never pays for the queue (NLS-P9.3 T7) ────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_an_unwritable_spool_does_not_take_the_answer_down(tmp_path, clock, caplog):
+    """⛑⛑ Found on the arc-gate-7 stack, and it was the whole failure.
+
+    `RunPipeline` awaits `drain()` before it answers. The image's
+    `/var/lib/nlp` was root-owned, the spool write raised `PermissionError`,
+    and **every Czech query came back UNKNOWN** — the lexicon loaded, the
+    answer computed, the request dead while writing a record of what it had
+    missed.
+
+    The queue is a side effect of answering. Losing a miss costs a repeat the
+    next time somebody types the word; losing the answer is a fault.
+    """
+    unwritable = tmp_path / "nope"
+    unwritable.mkdir(mode=0o500)
+    sink = SpoolSink(unwritable / "queue", worlds(), clock=clock)
+    sink.report(WORLD, "Kauflandu")
+
+    try:
+        sink.flush()
+        await sink.drain()  # must not raise
+    finally:
+        unwritable.chmod(0o700)
+
+    # The rows are still held, so the next flush retries rather than losing them.
+    assert [r.token for r in sink.pending()] == ["Kauflandu"]
+    assert "could not write" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_the_rows_survive_to_be_written_once_the_volume_appears(
+    tmp_path, clock
+):
+    """The failure is transient by nature — a mount that has not happened yet."""
+    parent = tmp_path / "blocked"
+    parent.mkdir(mode=0o500)
+    sink = SpoolSink(parent / "queue", worlds(), clock=clock)
+    sink.report(WORLD, "Kauflandu")
+    sink.flush()
+    await sink.drain()
+    assert sink.pending(), "the report must survive the failed write"
+
+    # The volume mounts.
+    try:
+        parent.chmod(0o700)
+        sink.flush()
+        await sink.drain()
+    finally:
+        parent.chmod(0o700)
+
+    rows = (parent / "queue" / f"{WORLD}.jsonl").read_text(
+        encoding="utf-8"
+    ).splitlines()
+    assert json.loads(rows[0])["token"] == "Kauflandu"

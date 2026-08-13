@@ -411,8 +411,30 @@ class SpoolSink(QueueSink):
         # `_drain` loops until nothing is dirty, so anything still marked here
         # is a write that failed and logged. Retrying inline gives the caller a
         # definite answer either way rather than a silently empty file.
+        #
+        # ⛑⛑ And the retry is GUARDED, because `RunPipeline` awaits this before
+        # it answers (`grpc_server.py`). Unguarded, a spool directory the process
+        # cannot write — a volume that did not mount, a read-only filesystem, an
+        # image whose `/var/lib/nlp` is root-owned — came out of the retry as a
+        # `PermissionError` and turned **every Czech query into UNKNOWN**. Found
+        # on the arc-gate-7 stack (NLS-P9.3 T7), where it was the whole failure:
+        # the lexicon was loaded, the answer was computed, and the request died
+        # writing a record of what it had missed.
+        #
+        # The queue is a SIDE EFFECT of answering. Losing a miss is a cost —
+        # the word is reported again the next time somebody types it — and
+        # losing the answer is a fault. `_drain` already took this posture; the
+        # inline path had simply not been given it.
         if self._dirty:
-            self._flush_now()
+            try:
+                self._flush_now()
+            except Exception:  # noqa: BLE001 — never at the answer's expense
+                logger.exception(
+                    "morph spool: could not write %s — the reports stay in "
+                    "memory and the next flush retries. The pipeline's answer "
+                    "is unaffected",
+                    ", ".join(sorted(self._dirty)),
+                )
 
     async def _drain(self) -> None:
         """Write dirty worlds until there are none, one batch at a time.

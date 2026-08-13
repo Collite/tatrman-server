@@ -35,6 +35,28 @@ COPY shared/libs/python/ttr-morph /build/shared/libs/python/ttr-morph
 COPY services/morph-studio/pyproject.toml services/morph-studio/uv.lock ./
 RUN pip install --upgrade pip && pip install uv && uv sync --frozen
 
+# ===== proto generation layer (org.tatrman.{nlp,common}.v1 stubs) =====
+#
+# ⛑⛑ Without this the Q-7 RELOAD LEG DOES NOT WORK — the one place this service
+# touches the estate. `ttr-nlp[grpc]` is supposed to carry the stubs, and for a
+# PyPI wheel it does: `hatch_build.py` bundles them into `ttrnlp/_proto` at wheel
+# BUILD time. This image installs `ttr-nlp` from a path, so that hook never runs
+# and `NlpClient()` raises "the org.tatrman.nlp.v1 proto stubs are not available"
+# — lazily, inside `reload_front`, which catches everything and reports it as a
+# reload failure. So the overlay was written, the front was never told, and the
+# enrichment loop silently took as long as the front's own reload schedule.
+#
+# Nothing before the arc-gate-7 tier could see it: every unit test leaves
+# `MORPH_STUDIO_FRONT_TARGET` empty, which is a supported deployment and returns
+# before the client is ever constructed.
+FROM deps AS protogen
+ENV PATH="/build/services/morph-studio/.venv/bin:${PATH}"
+# Pinned to the version in `services/nlp`'s lock, so both images' stubs come
+# from the same compiler.
+RUN uv pip install "grpcio-tools==1.81.1"
+COPY shared/proto/src/main/proto /build/shared/proto/src/main/proto
+RUN python /build/shared/libs/python/ttr-nlp/scripts/gen_proto.py
+
 # ===== the FI-7 frontend (NLS-P9.3) =====
 #
 # Built here and served by the backend — one image, one process, one port. An
@@ -61,11 +83,23 @@ RUN npm run build-only
 FROM base AS runtime
 
 RUN useradd -ms /bin/bash appuser
+
+# ⛑ The two writable directories, created and owned BEFORE the volumes are
+# mounted over them (NLS-P9.3 T7). Docker initialises an empty named volume from
+# the image's contents at that path — ownership included — so a path that does
+# not exist in the image produces a root-owned volume that the unprivileged
+# process cannot write. Found on the gate stack, where it cost the Q-7 overlay
+# ("Permission denied: /var/lib/morph-studio/overlay/.emit-…") and would have
+# cost `POST /export?write=true` the same way.
+RUN mkdir -p /var/lib/morph-studio/overlay /var/lib/morph-studio/export \
+    && chown -R appuser:appuser /var/lib/morph-studio
+
 WORKDIR /app
 
 COPY --from=deps /usr/local /usr/local
 COPY --from=deps /build/services/morph-studio/.venv /build/services/morph-studio/.venv
 COPY --from=deps /build/shared /build/shared
+COPY --from=protogen /build/shared/libs/python/ttr-nlp/generated ./generated
 
 USER appuser
 COPY --chown=appuser:appuser services/morph-studio/pyproject.toml \
@@ -76,7 +110,7 @@ COPY --chown=appuser:appuser services/morph-studio/migrations ./migrations
 COPY --from=frontend --chown=appuser:appuser /fe/dist ./frontend/dist
 
 ENV PATH="/build/services/morph-studio/.venv/bin:${PATH}"
-ENV PYTHONPATH=/app/src
+ENV PYTHONPATH=/app/src:/app/generated
 ENV MORPH_STUDIO_HOST=0.0.0.0 \
     MORPH_STUDIO_PORT=7290 \
     MORPH_STUDIO_EXPORT_DIR=/var/lib/morph-studio/export \

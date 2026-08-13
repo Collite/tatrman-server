@@ -1,0 +1,134 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# ARC GATE 7 (NLS-P9.3 T7) — the enrichment loop, whole, in four containers.
+#
+# `docker-compose.dev.yml` beside this file brings up the studio alone, for
+# working on it. This one brings up the LOOP: the front that misses a word, the
+# studio that works it out, the shared directory the overlay travels through,
+# and the gRPC call that tells the front to read it again. It is also the
+# reference for a per-world deployment — see `docs/morph-studio.md`.
+#
+#   front  ──(1) a query misses `Kauflandu`
+#          ──(2) POST /v1/ingest ─────────────▶  morph-studio
+#                                                (3) guesser → auto-validated
+#                                                (4) writes dfp.morph.overlay
+#          ◀─(5) ReloadPacks ──────────────────  into the SHARED volume
+#   the same query now resolves, `provenance: provisional`
+#                                                (6) a reviewer verifies
+#          ◀─(7) ReloadPacks ──────────────────  the rows are permanent now
+#
+# ⚑⚑ `morph-artifacts` and `morph-overlay` are TWO mounts and that is the whole
+# deployment lesson of this arc. The core snapshot is a released artifact:
+# read-only, versioned, the same bytes on every deployment of a `morph/v*`. The
+# overlay is one world's live file, written by that world's studio. They cannot
+# share a directory, and the front needs both.
+#
+# Prerequisites (from the repo root):
+#   just morph-compile                      # dist/morph — the core artifact
+#   just fe-build                           # the FI-7 bundle, into the image
+#   docker build -t nlp:dev          -f services/nlp/Dockerfile .
+#   docker build -t morph-studio:dev -f services/morph-studio/Dockerfile .
+#
+# Run:
+#   docker compose -f services/morph-studio/docker-compose.gate7.yml up -d
+#   GATE7_FRONT=localhost:7371 GATE7_STUDIO=http://localhost:7390 \
+#     just test-py services/morph-studio -m component
+#
+# The UI is on http://localhost:7390/ while the stack is up.
+
+name: morph-gate7
+
+services:
+  morph-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: morph
+      POSTGRES_PASSWORD: morph
+      POSTGRES_DB: morph_studio
+    # Published so the OTHER component tests — the alembic up/down pair in
+    # `tests/component/test_postgres.py` — can run against the same stack. One
+    # `-m component` run then covers both tiers instead of needing two
+    # arrangements. 55434, not the dev compose's 55433, so the two can coexist.
+    ports:
+      - "55434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U morph -d morph_studio"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # The schema is alembic's, and it runs as a JOB. A service that created its
+  # own tables on boot would let a missing migration go unnoticed until the
+  # first environment that had an older database.
+  migrate:
+    image: morph-studio:dev
+    depends_on:
+      morph-db:
+        condition: service_healthy
+    environment:
+      MORPH_STUDIO_DB_URL: postgresql+psycopg://morph:morph@morph-db:5432/morph_studio
+    command: ["alembic", "upgrade", "head"]
+
+  morph-studio:
+    image: morph-studio:dev
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      # LM-5: one instance, one world. No default, no guess.
+      MORPH_WORLD: dfp
+      MORPH_STUDIO_DB_URL: postgresql+psycopg://morph:morph@morph-db:5432/morph_studio
+      MORPH_STUDIO_OVERLAY_DIR: /var/lib/morph-studio/overlay
+      MORPH_STUDIO_EXPORT_DIR: /var/lib/morph-studio/export
+      # The reload leg. This is the only place the studio speaks to the estate,
+      # and it speaks outward: `ReloadPacks`, over the wheel's own client.
+      MORPH_STUDIO_FRONT_TARGET: front:7271
+      # No LLM leg: guesser → human, which is a supported arrangement and is
+      # what makes an air-gapped world possible. The gate proves the loop
+      # closes without one.
+      # MORPH_LLM_URL: http://llm-gateway:7280
+    ports:
+      - "7390:7290"
+    volumes:
+      - morph-overlay:/var/lib/morph-studio/overlay
+      - morph-export:/var/lib/morph-studio/export
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:7290/healthz || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  front:
+    image: nlp:dev
+    depends_on:
+      # ⚑ Not decoration. The front declares the overlay among its morph sources
+      # and loads them fail-all, so it must not boot before the studio has
+      # written one — otherwise the whole Czech lexicon is unloaded until
+      # something else triggers a reload.
+      morph-studio:
+        condition: service_healthy
+    environment:
+      CONFIG_FILE: /etc/nlp/gate7-config.yaml
+      NLP_SERVICE_GRPC_PORT: "7271"
+      NLP_SERVICE_PORT: "7270"
+    volumes:
+      - ./gate7/nlp-config.yaml:/etc/nlp/gate7-config.yaml:ro
+      # Pack content is never part of the suite (NL-17); the wheel's fixtures
+      # are what make this runnable from a clean checkout with nothing to fetch.
+      - ../../shared/libs/python/ttr-nlp/tests/fixtures/packs/valid:/etc/nlp/packs:ro
+      - ../../shared/libs/python/ttr-nlp/tests/fixtures/lists/valid:/etc/nlp/lists:ro
+      # (1) The released core artifact — a build output, read-only.
+      - ../../dist/morph:/etc/nlp/morph:ro
+      # (2) The world's live overlay, written by the studio. THE SHARED VOLUME.
+      - morph-overlay:/etc/nlp/overlay:ro
+    # ⚑ Published on 737x, not on the front's own 727x. A developer's box very
+    # often already has the offline nlp stack (or an ssh tunnel) on 7270/7271,
+    # and a gate that cannot come up beside the thing it is a gate for is a gate
+    # nobody runs. Inside the network the ports are unchanged.
+    ports:
+      - "7371:7271"
+      - "7370:7270"
+
+volumes:
+  morph-overlay:
+  morph-export:
