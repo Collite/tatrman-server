@@ -79,6 +79,11 @@ def resolve(
         state: The loaded snapshot.
         statistical: The Wave-C seam. **Nothing in the wheel passes this.**
         miss_sink: Called ``(world, form, "miss")`` for any non-lexicon answer.
+            ⚑ *Any* — a common noun as much as a name. LM-10 routing (core vs
+            the world's entity layer) is decided studio-side when the miss is
+            ingested, because it needs a proposal and the world's model
+            vocabulary, neither of which exists on the query path. Reaching
+            this sink means "unanswered here", not "owned by this world".
         world: The world the miss belongs to. Queues never cross worlds
             (LM-5/S-4), so an empty world with a sink configured is still
             reported — the sink decides what to do with it — rather than

@@ -8,6 +8,22 @@ answer rather than a missing one. Both land here, and both are world-scoped:
 **queues never cross worlds** (LM-5/S-4), because a world's vocabulary is the
 world's own data and a shared queue is a data leak with an editorial UI on it.
 
+**⚑ This queue is a collection point, not an ownership claim — LM-10 routing is
+decided studio-side, by design.** Every non-lexicon answer is reported to the
+one world this front serves, including ordinary common nouns that LM-10 will
+route to the *core* analytical lexicon. That is not the routing rule leaking:
+`route()` runs in `morph_studio.store.apply_cascade`, once, when the miss is
+ingested — and it has to, because routing needs what the front does not have.
+It needs a proposal (which part of speech the guesser reached) and it needs the
+world's model vocabulary; the front has neither, and giving it both would mean
+shipping the cascade into the query path to answer a question nobody asks until
+curation.
+
+So a token's presence in this spool says "this front could not answer it", never
+"this belongs to this world". The layer is decided later, it is stamped on the
+queue item as `layer`/`routed_by`, and a human can overrule it (`reroute`).
+Read `ttrmorph.enrich.cascade.route` for the rule itself.
+
 Three sinks, chosen by one config line:
 
 ``none``
