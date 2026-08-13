@@ -268,11 +268,11 @@ class MetadataServiceImpl(
             // Per PF-1: the free-SQL planner needs the full physical schema.
             val packageTables =
                 dbSchema?.tables?.values?.filter { it.sourceFile.contains(packageRoot) } ?: emptyList()
-            bundleBuilder.addAllTables(packageTables.map { it.toModelBundleTable() })
+            bundleBuilder.addAllTables(packageTables.map { it.toModelBundleTable(options) })
 
             val packageViews =
                 dbSchema?.views?.values?.filter { it.sourceFile.contains(packageRoot) } ?: emptyList()
-            bundleBuilder.addAllViews(packageViews.map { it.toModelBundleView() })
+            bundleBuilder.addAllViews(packageViews.map { it.toModelBundleView(options) })
 
             // A3: pattern iff search.patterns is non-empty. Discrimination happens on the
             // domain object, so it is unaffected by include_search_hints stripping later.
@@ -291,7 +291,11 @@ class MetadataServiceImpl(
             if (request.includeRoles) {
                 val packageRoles =
                     cncSchema?.roles?.values?.filter { it.sourceFile.contains(packageRoot) } ?: emptyList()
-                bundleBuilder.addAllRoles(packageRoles.map { it.toRoleDetail().applyBundleOptions(options) })
+                bundleBuilder.addAllRoles(
+                    // NLS-P10: a role's description rides RoleDetail, not an ObjectDescriptor,
+                    // so it needs the chain applied explicitly here.
+                    packageRoles.map { it.toRoleDetail(options.locale).applyBundleOptions(options) },
+                )
             }
 
             // v2.2 — drill maps (Stage 03). Filter to maps contributed by this package's
@@ -982,7 +986,41 @@ private fun ParseStatusFilter.matches(status: DomainParseStatus): Boolean =
         ParseStatusFilter.UNRECOGNIZED -> true
     }
 
-private fun ModelObject.toObjectDescriptor(): ObjectDescriptor =
+/**
+ * NLS-P10 (⚑GXP-D7, grammar 0.13) — pick the description text to serve for [locale].
+ *
+ * TTR 0.13 lets an author write `description:` either as a plain string or as a
+ * localised map. The WIRE did not follow: `meta.v1.ObjectDescriptor.description` is
+ * still one `string`, so the choice is made here, at the edge, and exactly once per
+ * response. The chain (D7, contracts):
+ *
+ *  1. the requested locale, when the map carries it;
+ *  2. the plain-string form (an author who wrote one string meant it for everyone);
+ *  3. `en`;
+ *  4. the first entry **by language code** — sorted, so the served text does not
+ *     depend on the order the author happened to write the block in;
+ *  5. `""`.
+ *
+ * An EMPTY [locale] means the caller expressed no preference and gets today's
+ * behaviour: the plain form, or `""` when only a map was authored. The "empty locale
+ * = all locales" rule that governs `LocalizedString` fields (`display_label`, search
+ * hints — see [BundleOptions]) does NOT apply to a single-string field: there is no
+ * way to return "all" of it, and guessing one would make the bytes a caller receives
+ * depend on authoring order.
+ */
+private fun ModelObject.selectDescription(locale: String): String {
+    if (locale.isEmpty()) return description
+    descriptionLocalized.byLanguage[locale]?.let { return it }
+    if (description.isNotEmpty()) return description
+    descriptionLocalized.byLanguage["en"]?.let { return it }
+    return descriptionLocalized.byLanguage
+        .toSortedMap()
+        .values
+        .firstOrNull()
+        ?: ""
+}
+
+private fun ModelObject.toObjectDescriptor(locale: String = ""): ObjectDescriptor =
     ObjectDescriptor
         .newBuilder()
         .setInternalId(internalId)
@@ -992,7 +1030,7 @@ private fun ModelObject.toObjectDescriptor(): ObjectDescriptor =
         // fuzzy-matcher need just the trailing segment as a SQL identifier;
         // mirrors the DbColumn.localName() helper at the bottom of this file.
         .setLocalName(qname.name.substringAfterLast('.'))
-        .setDescription(description)
+        .setDescription(selectDescription(locale))
         .addAllTags(tags)
         .setSchemaCode(qname.schemaCode.toProto())
         .setKind(kind)
@@ -1098,15 +1136,15 @@ private fun Entity.toEntityDetail(): EntityDetail =
 private fun Entity.toModelBundleEntity(opts: BundleOptions): ModelBundleEntity =
     ModelBundleEntity
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(opts.locale))
         .setDetail(toEntityDetail().applyBundleOptions(opts))
-        .addAllAttributes(attributes.map { it.toModelBundleAttribute() })
+        .addAllAttributes(attributes.map { it.toModelBundleAttribute(opts) })
         .build()
 
-private fun Attribute.toModelBundleAttribute(): ModelBundleAttribute =
+private fun Attribute.toModelBundleAttribute(opts: BundleOptions): ModelBundleAttribute =
     ModelBundleAttribute
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(opts.locale))
         .setDetail(toAttributeDetail())
         .build()
 
@@ -1123,7 +1161,7 @@ private fun Query.toModelBundleQuery(
     val builder =
         ModelBundleQuery
             .newBuilder()
-            .setObjectDescriptor(toObjectDescriptor())
+            .setObjectDescriptor(toObjectDescriptor(opts.locale))
             .setQueryDescriptor(toQueryDescriptor(parseStatus).applyBundleOptions(opts))
             .setSourceLanguage(sourceLanguage.toProtoLanguage())
             .setSourceText(sourceText)
@@ -1154,10 +1192,10 @@ private fun Attribute.toAttributeDetail(): AttributeDetail =
         .also { s -> semantics?.let { s.semantics = it.toProto(entity) } }
         .build()
 
-private fun Role.toRoleDetail(): RoleDetail =
+private fun Role.toRoleDetail(locale: String = ""): RoleDetail =
     RoleDetail
         .newBuilder()
-        .setDescription(description)
+        .setDescription(selectDescription(locale))
         .also { if (!label.isEmpty) it.label = label.toProto() }
         .also { if (!search.isEmpty) it.search = search.toProto() }
         .build()
@@ -1325,17 +1363,17 @@ private fun DbView.toDbViewDetail(): DbViewDetail =
         .setDefinitionSql(definitionSql)
         .build()
 
-private fun DbTable.toModelBundleTable(): ModelBundleTable =
+private fun DbTable.toModelBundleTable(opts: BundleOptions): ModelBundleTable =
     ModelBundleTable
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(opts.locale))
         .setDetail(toDbTableDetail())
         .build()
 
-private fun DbView.toModelBundleView(): ModelBundleView =
+private fun DbView.toModelBundleView(opts: BundleOptions): ModelBundleView =
     ModelBundleView
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(opts.locale))
         .setDetail(toDbViewDetail())
         .build()
 

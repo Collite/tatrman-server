@@ -24,11 +24,19 @@
 # `@grammar-version: 0.12` in TTR.g4). RV-44 changes the `ttr-lexicon/v1` YAML schema and
 # the compiled artifact, not the .g4, so the grammar minor does not move and a 0.13.0 tag
 # would fail that gate outright.
-tatrman-grammar           = "0.12.2"
+# NLS-P10 (2026-08-13): 0.13.0 — the grammar minor MOVES this time. `description:`
+# gained the localised map form in TTR.g4, and tatrman's publish.yml enforces
+# "tag minor == @grammar-version", so the localised-description bundle can only be
+# cut as 0.13.0. Veles reads `descriptionLocalized` off `ModelObject` (the D7
+# locale chain in MetadataServiceImpl) and does not compile against 0.12.x.
+# ⚑ This pin resolves from Maven Local until `grammar/v0.13.0` is pushed (Bora,
+# NLS-P10 T5) — CI on this branch is red until then, by design of the
+# land-then-bump choreography (plan §5).
+tatrman-grammar           = "0.13.0"
 # Moves WITH the grammar ref, always: they are one `api` closure (ttr-snapshot api's
 # ttr-metadata, ttr-lexicon-compile's POM names it exactly), and the `bundle grammar` lane
 # publishes them at one version. Two versions here is the 0.10.3/0.10.4 failure.
-tatrman-ttr-metadata      = "0.12.2"
+tatrman-ttr-metadata      = "0.13.0"
 tatrman-ttr-translator    = "0.10.1"
 tatrman-ttr-plan-proto    = "0.10.1"
 # SV-P1 S4 — Maven Central publishing via the Central Portal.
