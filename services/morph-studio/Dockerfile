@@ -33,7 +33,11 @@ WORKDIR /build/services/morph-studio
 COPY shared/libs/python/ttr-nlp /build/shared/libs/python/ttr-nlp
 COPY shared/libs/python/ttr-morph /build/shared/libs/python/ttr-morph
 COPY services/morph-studio/pyproject.toml services/morph-studio/uv.lock ./
-RUN pip install --upgrade pip && pip install uv && uv sync --frozen
+# `--no-dev`: a runtime image has no business carrying pytest, ruff and a
+# protobuf compiler. The one build tool this image needs is installed in the
+# stage that needs it, below — the same shape `services/nlp` uses, and the
+# reason its image had stopped building at all.
+RUN pip install --upgrade pip && pip install uv && uv sync --frozen --no-dev
 
 # ===== proto generation layer (org.tatrman.{nlp,common}.v1 stubs) =====
 #

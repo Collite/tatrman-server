@@ -25,6 +25,7 @@ report must still be there afterwards.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -562,3 +563,57 @@ async def test_the_rows_survive_to_be_written_once_the_volume_appears(
         encoding="utf-8"
     ).splitlines()
     assert json.loads(rows[0])["token"] == "Kauflandu"
+
+
+@pytest.mark.asyncio
+async def test_a_report_arriving_mid_delivery_goes_out_in_the_same_round(tmp_path, clock):
+    """⛑⛑ The arc-gate-7 flake, in one test (NLS-P9.3 T7).
+
+    `_schedule` is a no-op while a delivery is in flight — by design, because
+    `deliver` was documented as looping until the spool is empty. It did not
+    loop, so a report that arrived during a POST waited for the NEXT pipeline
+    run to flush it. On the gate stack that made the first word learned always
+    arrive promptly and the second one — reported while the first one's
+    delivery and overlay reload were still in flight — take three more queries.
+    """
+    arrived: list[list[str]] = []
+    gate = asyncio.Event()
+
+    async def sender(endpoint: str, payload: list[dict]) -> None:
+        arrived.append([row["token"] for row in payload])
+        if len(arrived) == 1:
+            # The second report lands while this POST is still in flight.
+            sink.report(WORLD, "Microsoft")
+            await gate.wait()
+
+    spool = SpoolSink(tmp_path / "queue", worlds(), clock=clock)
+    sink = HttpSink("http://studio:7290", spool, sender=sender)
+
+    sink.report(WORLD, "Kauflandu")
+    task = asyncio.create_task(sink.deliver())
+    await asyncio.sleep(0)
+    gate.set()
+    delivered = await task
+
+    assert arrived == [["Kauflandu"], ["Microsoft"]], arrived
+    assert delivered == 2
+    assert spool.pending() == []
+
+
+@pytest.mark.asyncio
+async def test_delivery_does_not_spin_on_a_report_that_stays_spooled(tmp_path, clock):
+    """A report `drop_delivered` keeps must not make the loop round forever."""
+    rounds = 0
+
+    async def sender(endpoint: str, payload: list[dict]) -> None:
+        nonlocal rounds
+        rounds += 1
+        # It changed while in flight, so `drop_delivered` will keep it.
+        sink.report(WORLD, "Kauflandu")
+
+    spool = SpoolSink(tmp_path / "queue", worlds(), clock=clock)
+    sink = HttpSink("http://studio:7290", spool, sender=sender)
+    sink.report(WORLD, "Kauflandu")
+
+    await sink.deliver()
+    assert rounds == 1

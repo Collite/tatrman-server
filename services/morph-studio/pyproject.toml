@@ -38,6 +38,13 @@ dev = [
     "ruff>=0.9.4",
     # The FastAPI test client's transport.
     "httpx>=0.27.0",
+    # protoc + the grpc_python plugin, for the ARC-GATE-7 component test alone:
+    # it drives the front over gRPC, and in a source checkout `ttr-nlp[grpc]`'s
+    # extra cannot supply the stubs (they are bundled by a wheel BUILD hook).
+    # ⚑ Nothing in the unit suite touches this — `test_gate7._ensure_stubs`
+    # skips with the command when it is absent rather than failing collection,
+    # which is what this entry being missing once cost.
+    "grpcio-tools>=1.68.0",
 ]
 
 [tool.uv]

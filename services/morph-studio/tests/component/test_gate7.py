@@ -39,6 +39,7 @@ import asyncio
 import json
 import os
 import time
+from pathlib import Path
 
 import httpx
 import pytest
@@ -68,8 +69,66 @@ def endpoints() -> tuple[str, str]:
             "bring the stack up with `docker compose -f "
             "services/morph-studio/docker-compose.gate7.yml up -d`"
         )
+    _ensure_stubs()
     _await_ready(front, studio)
     return front, studio
+
+
+#: The wheel's generated `org.tatrman.{nlp,common}.v1` stubs, which are
+#: gitignored and produced from `shared/proto`.
+_WHEEL = Path(__file__).resolve().parents[4] / "shared" / "libs" / "python" / "ttr-nlp"
+_STUB_MARKER = (
+    _WHEEL / "generated" / "org" / "tatrman" / "nlp" / "v1" / "nlp_pb2_grpc.py"
+)
+
+
+def _ensure_stubs() -> None:
+    """Generate the proto stubs, here and nowhere earlier.
+
+    ⛑ This used to run at COLLECTION, in `tests/conftest.py`, the way `ttr-nlp`
+    and `services/nlp` do it — and it turned morph-studio's CI job red:
+    `grpcio-tools` is not in this service's dev group, so importing the conftest
+    raised `ModuleNotFoundError: No module named 'grpc_tools'` and **the whole
+    unit suite failed to load** over a dependency only this one component test
+    needs. It passed locally only because `ttr-nlp`'s own suite had already
+    written the stubs, so the `if not exists` guard never fired.
+
+    Two things follow, and they are the fix:
+
+    * It belongs **in the fixture that needs it**, not at import time. CI
+      deselects `-m component`, so it now never runs there at all — which is
+      right: generating protobuf stubs to *not* run a test is pure waste.
+    * A missing compiler is a **skip with the command**, not an error. Somebody
+      running the gate without the dev group has a setup problem, not a failure.
+    """
+    if _STUB_MARKER.exists():
+        return
+    try:
+        import grpc_tools  # noqa: F401
+    except ImportError:
+        pytest.skip(
+            "the org.tatrman.nlp.v1 stubs are absent and grpcio-tools is not "
+            "installed — run `uv sync` in services/morph-studio, or generate "
+            "them once with `cd shared/libs/python/ttr-nlp && uv run python "
+            "scripts/gen_proto.py`"
+        )
+    import importlib
+    import runpy
+
+    try:
+        runpy.run_path(str(_WHEEL / "scripts" / "gen_proto.py"), run_name="__main__")
+    except SystemExit:
+        # The script ends in `raise SystemExit(main())`; under `runpy` that
+        # arrives here rather than exiting the interpreter.
+        pass
+    finally:
+        # MANDATORY, and in a `finally` so a partial generation cannot skip it.
+        # `pythonpath` puts `generated/` on `sys.path` before this runs; when
+        # the directory does not exist yet the path finder caches that absence,
+        # and creating it a moment later does not invalidate the cache — so
+        # `import org.tatrman…` fails with `No module named 'org'` while the
+        # stubs sit on disk in plain sight.
+        importlib.invalidate_caches()
 
 
 def _await_ready(front: str, studio: str, deadline: float = 90.0) -> None:
@@ -86,10 +145,17 @@ def _await_ready(front: str, studio: str, deadline: float = 90.0) -> None:
     while time.monotonic() < end:
         try:
             httpx.get(f"{studio}/readyz", timeout=5.0).raise_for_status()
-            # A trivial pipeline run is the honest readiness check for the
-            # front: its port opens before the snapshot has finished loading.
-            run_pipeline(front, "rok")
-            return
+            # ⚑ Not "does it answer" but "is it SERVING THE LEXICON". The port
+            # opens before the 25k-row snapshot has loaded, and a `morph: true`
+            # pipeline that answers at all is not yet proof — a core word coming
+            # back `statistical` means the fallback is answering and the lexicon
+            # is not there. Probing for that once, here, is what keeps the walk
+            # from starting against a half-ready front and then failing thirty
+            # seconds later somewhere unrelated.
+            probe = analysis(run_pipeline(front, "rok"), "rok")
+            if probe and probe.get("provenance") == "lexicon":
+                return
+            last = f"the front answers but is not serving the lexicon yet: {probe}"
         except Exception as exc:  # noqa: BLE001 — grpc's tree, plus httpx's
             last = f"{type(exc).__name__}: {exc}"
             time.sleep(1.0)

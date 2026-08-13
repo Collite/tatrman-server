@@ -34,6 +34,9 @@
 #   GATE7_FRONT=localhost:7371 GATE7_STUDIO=http://localhost:7390 \
 #     just test-py services/morph-studio -m component
 #
+# The alembic up/down pair is the OTHER component tier and wants its own
+# database — `docker-compose.dev.yml` (55433), not this stack's.
+#
 # The UI is on http://localhost:7390/ while the stack is up.
 
 name: morph-gate7
@@ -45,12 +48,13 @@ services:
       POSTGRES_USER: morph
       POSTGRES_PASSWORD: morph
       POSTGRES_DB: morph_studio
-    # Published so the OTHER component tests — the alembic up/down pair in
-    # `tests/component/test_postgres.py` — can run against the same stack. One
-    # `-m component` run then covers both tiers instead of needing two
-    # arrangements. 55434, not the dev compose's 55433, so the two can coexist.
-    ports:
-      - "55434:5432"
+    # ⚑ NOT published, deliberately. It was, briefly, so that one `-m component`
+    # run could cover the alembic pair as well — and on the machine this gate was
+    # first run on, an ssh tunnel already held the port. Both listeners answered
+    # and which one a connection reached was timing-dependent, so the migration
+    # test (which CREATEs and DROPs databases) was sometimes talking to a server
+    # nobody chose. Two tiers, two arrangements: this stack is the LOOP, and
+    # `docker-compose.dev.yml` publishes a Postgres on 55433 for the migrations.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U morph -d morph_studio"]
       interval: 3s

@@ -654,7 +654,7 @@ class HttpSink(QueueSink):
 
         No loop (a synchronous test, a CLI) means the reports stay spooled until
         something asks; a delivery already in flight means this one is a no-op,
-        because the next `deliver` reads the spool afresh and will pick up
+        because `deliver` loops until the spool is empty and will pick up
         whatever arrived meanwhile.
         """
         try:
@@ -666,37 +666,61 @@ class HttpSink(QueueSink):
         self._task = loop.create_task(self.deliver())
 
     async def deliver(self) -> int:
-        """POST everything spooled. Returns how many reports were delivered."""
-        pending = self._spool.pending()
-        if not pending:
-            return 0
-        payload = [report.as_dict() for report in pending]
-        # What was sent, as values rather than as the mutable rows themselves —
-        # see `drop_delivered`. Taken here, before the await, because after it
-        # the objects may no longer describe what went over the wire.
-        sent = [(report.key, report.count, report.verdict) for report in pending]
-        try:
-            await self._sender(self.endpoint, payload)
-        except Exception as exc:  # noqa: BLE001 — every failure means "keep them"
-            logger.warning(
-                "morph queue: %d report(s) could not be delivered to %s (%s) — "
-                "they stay spooled and will be retried",
-                len(payload),
-                self.endpoint,
-                exc,
+        """POST everything spooled, until nothing new is left.
+
+        ⛑⛑ **The loop is the fix, and `_schedule` depends on it.** A report that
+        arrives while a POST is in flight finds `_schedule` a no-op — the task is
+        not done — so if `deliver` returned after one round that report would sit
+        spooled until the *next* pipeline run happened to flush, which on a quiet
+        deployment is however long until somebody types another unknown word.
+
+        Found by the arc-gate-7 walk (NLS-P9.3 T7), where it was ~50% flaky and
+        looked like nothing at all: the FIRST word learned always arrived
+        promptly, and the second one — reported while the first one's delivery
+        and the overlay reload it triggers were still in flight — took three more
+        queries to turn up. `_schedule`'s docstring already described this loop;
+        only the loop was missing.
+
+        Rounds are bounded by what has been attempted, not by a count: a report
+        `drop_delivered` legitimately KEEPS (it changed while in flight) must not
+        make this spin.
+        """
+        delivered = 0
+        attempted: set = set()
+        while True:
+            pending = [
+                report for report in self._spool.pending() if report.key not in attempted
+            ]
+            if not pending:
+                return delivered
+            attempted.update(report.key for report in pending)
+            payload = [report.as_dict() for report in pending]
+            # What was sent, as values rather than as the mutable rows themselves
+            # — see `drop_delivered`. Taken here, before the await, because after
+            # it the objects may no longer describe what went over the wire.
+            sent = [(report.key, report.count, report.verdict) for report in pending]
+            try:
+                await self._sender(self.endpoint, payload)
+            except Exception as exc:  # noqa: BLE001 — every failure means "keep them"
+                logger.warning(
+                    "morph queue: %d report(s) could not be delivered to %s (%s) — "
+                    "they stay spooled and will be retried",
+                    len(payload),
+                    self.endpoint,
+                    exc,
+                )
+                return delivered
+            kept = self._spool.drop_delivered(sent)
+            delivered += len(payload)
+            logger.info(
+                "morph queue: delivered %d report(s) to %s", len(payload), self.endpoint
             )
-            return 0
-        kept = self._spool.drop_delivered(sent)
-        logger.info(
-            "morph queue: delivered %d report(s) to %s", len(payload), self.endpoint
-        )
-        if kept:
-            logger.debug(
-                "morph queue: %d report(s) changed while in flight and stay "
-                "spooled for the next delivery",
-                kept,
-            )
-        return len(payload)
+            if kept:
+                logger.debug(
+                    "morph queue: %d report(s) changed while in flight and stay "
+                    "spooled for the next delivery",
+                    kept,
+                )
 
     def close(self) -> None:
         self._spool.close()

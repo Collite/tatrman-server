@@ -135,7 +135,6 @@ docker build -t morph-studio:dev -f services/morph-studio/Dockerfile .
 
 docker compose -f services/morph-studio/docker-compose.gate7.yml up -d
 
-MORPH_STUDIO_PG_URL=postgresql+psycopg://morph:morph@localhost:55434/morph_studio \
 GATE7_FRONT=localhost:7371 GATE7_STUDIO=http://localhost:7390 \
   just test-py services/morph-studio -m component
 ```
@@ -148,6 +147,12 @@ expanded world — and then runs the S-7 named cases and the export gate against
 the same served stack.
 
 The UI is on <http://localhost:7390/> while the stack is up.
+
+⚑ The stack does **not** publish its Postgres. The other component tier — the
+alembic up/down pair — creates and drops databases, so it wants a database of
+its own: `docker-compose.dev.yml` publishes one on 55433 for it. (The gate's
+ports are 737x/7390 rather than the front's own 727x for the same family of
+reason: a developer's machine usually already has something there.)
 
 ## What is not here yet
 

@@ -21,35 +21,6 @@ from ttrmorph.enrich.llm import LlmLeg, LlmSpec
 from morph_studio.api import create_app
 from morph_studio.config import Settings
 
-# ── the proto-stub bootstrap ─────────────────────────────────────────────────
-#
-# Same shape as `ttr-nlp`'s own conftest and for the same reason: the stubs the
-# front's client needs are generated from `shared/proto` and gitignored, so
-# generating them at collection keeps `just test-py` self-contained rather than
-# depending on a remembered manual step whose absence looks like a missing
-# feature. Only the gate-7 component test needs them, and it needs them on a
-# developer's machine, which is the one place a wheel build has not run.
-_WHEEL = Path(__file__).resolve().parents[3] / "shared" / "libs" / "python" / "ttr-nlp"
-_STUBS = _WHEEL / "generated" / "org" / "tatrman" / "nlp" / "v1" / "nlp_pb2_grpc.py"
-
-if not _STUBS.exists():  # pragma: no cover - one-time bootstrap
-    import importlib
-    import runpy
-
-    try:
-        runpy.run_path(str(_WHEEL / "scripts" / "gen_proto.py"), run_name="__main__")
-    except SystemExit:
-        pass
-    finally:
-        # MANDATORY, and in a `finally`. `pythonpath` puts `generated/` on
-        # `sys.path` before this file runs; when the directory does not exist
-        # yet the path finder caches that absence, and creating it a moment
-        # later does not invalidate the cache — so `import org.tatrman…` fails
-        # with `No module named 'org'` while the stubs sit on disk in plain
-        # sight.
-        importlib.invalidate_caches()
-
-
 WORLD = "dfp"
 
 FIXTURES = Path(__file__).parent / "fixtures"
