@@ -1,0 +1,20 @@
+# A world's own layer — compiled with `--overlay --world dfp`. This is the only
+# place a `provisional` entry is legal (Q-7 narrow): an entity name the studio
+# generated and nobody has confirmed yet may serve in the world that asked for
+# it, and never in the published core.
+layer: world-dfp
+version: 1
+language: cs
+license: world:dfp
+attribution: null
+entries:
+  - lemma: Kaufland
+    upos: PROPN
+    vzor: hrad-proper
+    provenance: manual
+
+  - lemma: Tatrman
+    upos: PROPN
+    vzor: hrad-proper
+    provenance: llm
+    provisional: true

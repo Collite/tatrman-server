@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
@@ -129,23 +130,148 @@ class RuleRef(BaseModel):
     phase: str
 
 
+#: The two in-process steps a `morph: true` pipeline runs instead of calling a
+#: backend (LM contracts §5). They are step NAMES, not `NlpOp`s, and that is the
+#: point: an `NlpOp` is a thing routing resolves to an engine, and these resolve
+#: to a function call inside this process. Putting them in the enum would make
+#: them routable, and there is nothing to route them to.
+STEP_MORPH_TOKENIZE = "MORPH_TOKENIZE"
+STEP_MORPH_ANNOTATE = "MORPH_ANNOTATE"
+
+#: Engine ops the morph front actually replaces. Deliberately just these two.
+#:
+#: `SENTENCE_SPLIT` is **not** here — the morph tokenizer does not split
+#: sentences and says so in its own docstring (the rule engine matches within
+#: the document, and a second, worse splitter is a second opinion nobody asked
+#: for). Neither is `POS_TAG`: the annotator writes `analyses` carrying `upos`
+#: per reading, but it does not write the flat `upos` feature a pack matches on
+#: with `upos: NOUN`, so claiming coverage would silently drop a feature rules
+#: are written against. `DEP_PARSE` and `NER` are not morphology at all.
+MORPH_COVERED_OPS = frozenset({"TOKENIZE", "LEMMATIZE"})
+
+
 class PipelineConfig(BaseModel):
     """A named pipeline (contracts §7): engine ops, then gazetteer lists, then
-    rule phases — in that order, and in the order written."""
+    rule phases — in that order, and in the order written.
+
+    `morph: true` (LM, NLS-P9.1) swaps the front of that for the in-process
+    Czech morphology: our own tokenizer and the snapshot annotator, replacing
+    the ops in `MORPH_COVERED_OPS`. It is a per-pipeline switch rather than a
+    global one because a deployment serves more than one pipeline and only the
+    Czech ones have a snapshot to run against — and it degrades to the engine
+    path, silently and correctly, for any language the snapshot is not in.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     ops: List[str] = Field(default_factory=list)
     gazetteer: List[str] = Field(default_factory=list)
     rules: List[RuleRef] = Field(default_factory=list)
+    morph: bool = False
 
-    def steps(self) -> List[str]:
-        """The step names `GetStatus` reports (contracts §2.4 `PipelineInfo`)."""
+    def engine_ops(self) -> List[str]:
+        """The ops that still go to a backend when the morph front runs."""
+        return [op for op in self.ops if op not in MORPH_COVERED_OPS]
+
+    def steps(self, *, morph: bool | None = None) -> List[str]:
+        """The step names `GetStatus` reports (contracts §2.4 `PipelineInfo`).
+
+        `morph` overrides the pipeline's own flag so a caller can ask what the
+        steps would be either way; `GetStatus` passes nothing and gets the
+        configured answer.
+        """
+        use_morph = self.morph if morph is None else morph
+        ops = (
+            [STEP_MORPH_TOKENIZE, STEP_MORPH_ANNOTATE, *self.engine_ops()]
+            if use_morph
+            else list(self.ops)
+        )
         return [
-            *self.ops,
+            *ops,
             *self.gazetteer,
             *(f"{ref.pack}:{ref.phase}" for ref in self.rules),
         ]
+
+
+#: A world id has to be safe to use as a filename: the `dir:` sink spools one
+#: JSONL per world, because retention is per-world config and a single mixed
+#: file cannot be swept per policy. Worlds are authored in config, never taken
+#: from a request — but `ReportToken.world` IS taken from a request and is
+#: matched against these keys, so a `../../etc/cron.d/x` in the table would turn
+#: a config typo into a path traversal with a helpful error message.
+_WORLD_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+SINK_NONE = "none"
+SINK_DIR_PREFIX = "dir:"
+SINK_URL_PREFIX = "url:"
+
+
+class MorphQueueConfig(BaseModel):
+    """Where token reports go (LM contracts §6).
+
+    `none` — the sink is off and `ReportToken` answers `accepted=false` with
+    `LM-MORPH-007`, which is the honest answer rather than an error.
+    `dir:<path>` — a JSONL spool per world, deduped on (world, token).
+    `url:<addr>` — POSTed to morph-studio's `/ingest`, spooling to
+    `spool_dir` whenever the POST cannot be delivered. Never lose a miss.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sink: str = SINK_NONE
+    #: Fallback spool for a `url:` sink. Empty means the reports live in memory
+    #: until a POST succeeds — fine for a dev box, wrong for a cluster, so a
+    #: `url:` sink without one is a WARNING at boot rather than silence.
+    spool_dir: str = ""
+    #: How often the retention sweep runs (contracts §6: retention is world
+    #: config). Also runs once at boot, which is what catches a service that was
+    #: down for longer than the retention window.
+    sweep_interval_seconds: int = 24 * 60 * 60
+
+
+class MorphWorldConfig(BaseModel):
+    """One world's queue policy (LM contracts §6, S-4).
+
+    `spans: false` is the default and the whole of the S-4 posture: a
+    lemmatizer queue that collected the surrounding text by default would be
+    collecting user data by default. Turning it on is a world's own decision,
+    recorded in that world's config, and the front DROPS the span before it is
+    ever written when the answer is no.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    spans: bool = False
+    retention_days: int = 90
+
+
+class MorphConfig(BaseModel):
+    """The morph snapshot and its queue (LM contracts §5–§6, NLS contracts §7).
+
+    `sources` follows the pack loader's fail-all posture (NL-15): the core
+    snapshot first, then its separable member files, then world overlays — and
+    one unreadable source loads nothing at all, reported as `LM-MORPH-001` on
+    `GetStatus.morph_state` rather than crashing the front. `Analyze` and
+    `BatchLemmatize` need no snapshot and keep serving either way.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sources: List[str] = Field(default_factory=list)
+    #: THIS deployment's world — the one a pipeline's misses belong to.
+    #:
+    #: It is deployment config and not a request field because `RunPipeline` has
+    #: no `world` on the wire and adding one would be a second proto window
+    #: (⚑LMP-D3) to carry something a front already knows: each world mounts its
+    #: own packs (NL-17), so a front IS a world's front. `ReportToken` does name
+    #: a world, because its caller is a consumer that saw a wrong answer and may
+    #: not be the same deployment.
+    world: str = ""
+    queue: MorphQueueConfig = Field(default_factory=MorphQueueConfig)
+    worlds: Dict[str, MorphWorldConfig] = Field(default_factory=dict)
+
+    def world_config(self, world: str) -> Optional[MorphWorldConfig]:
+        return self.worlds.get(world)
 
 
 class AppConfig(BaseModel):
@@ -158,6 +284,7 @@ class AppConfig(BaseModel):
     lane_overrides: Dict[str, Dict[str, str]] = Field(default_factory=dict)
     packs: SourcesConfig = Field(default_factory=SourcesConfig)
     lists: SourcesConfig = Field(default_factory=SourcesConfig)
+    morph: MorphConfig = Field(default_factory=MorphConfig)
     pipelines: Dict[str, PipelineConfig] = Field(default_factory=dict)
     default_language: str = "cs"
     log_level: str = "INFO"
@@ -272,6 +399,100 @@ def validate_llm_emulated(config: LlmEmulatedConfig) -> None:
         )
 
 
+class MorphConfigError(ValueError):
+    """The morph block cannot serve as written. Boot refuses.
+
+    The sibling of `EngineConfigError`, and the line between this and a
+    `GetStatus` diagnostic is the line between a *typo* and a *mount*. A
+    pipeline that says `morph: true` while nothing declares a snapshot source
+    can never run, on any cluster, and no amount of waiting fixes it — so it is
+    a boot error. A source that is declared and unreadable is nearly always a
+    volume that did not mount: the front comes up, says `LM-MORPH-001` on
+    `GetStatus.morph_state`, keeps serving `Analyze`, and starts working the
+    moment the volume appears (`morph_state.py`).
+    """
+
+
+def validate_morph(config: AppConfig) -> None:
+    """Check the morph block at boot. Raises `MorphConfigError`."""
+    morph = config.morph
+
+    wants_morph = sorted(
+        name for name, spec in config.pipelines.items() if spec.morph
+    )
+    if wants_morph and not morph.sources:
+        raise MorphConfigError(
+            f"pipeline(s) {', '.join(wants_morph)} declare `morph: true` but "
+            "`morph.sources` is empty — there is no snapshot for them to run "
+            "against, on any cluster. Point `morph.sources` at a "
+            "`cs.morph.snap` (plus any world overlay), or drop the flag."
+        )
+
+    for world in sorted(morph.worlds):
+        if not _WORLD_ID.match(world):
+            raise MorphConfigError(
+                f"morph.worlds key {world!r} is not a usable world id — the "
+                "`dir:` sink spools one file per world, so an id has to be "
+                "safe as a filename (letters, digits, '.', '_', '-')"
+            )
+
+    if morph.world and morph.world not in morph.worlds:
+        known = ", ".join(sorted(morph.worlds)) or "none declared"
+        raise MorphConfigError(
+            f"morph.world is {morph.world!r} but `morph.worlds` has no block "
+            f"for it (declared: {known}). Retention and the span opt-in are "
+            "world config (LM contracts §6); a world with none would spool "
+            "reports no policy ever sweeps."
+        )
+
+    sink = morph.queue.sink.strip()
+
+    if wants_morph and not morph.world and sink and sink != SINK_NONE:
+        # ⚑ The unset world, which the check above cannot see: it asks whether
+        # a *named* world was declared, and `""` names nothing. Left to boot,
+        # every leg of the enrichment loop is wired and the loop is dead —
+        # `SpoolSink.report("")` finds no policy, returns False, and `miss_sink`
+        # discards it, so a cluster that set `NLP_MORPH_SOURCES` and the sink
+        # but forgot `NLP_MORPH_WORLD` comes up green, answers queries, and
+        # silently learns nothing. That is the failure this whole block exists
+        # to make impossible, and it was the one shape that got through.
+        known = ", ".join(sorted(morph.worlds)) or "none declared"
+        raise MorphConfigError(
+            f"pipeline(s) {', '.join(wants_morph)} declare `morph: true` and "
+            f"`morph.queue.sink` is {sink!r}, but `morph.world` is empty "
+            f"(declared worlds: {known}). Queues are world-scoped (LM-5/S-4), "
+            "so a report with no world belongs to nobody and is dropped — the "
+            "enrichment loop would be fully wired and collect nothing. Set "
+            "`morph.world` (NLP_MORPH_WORLD) to one of the declared worlds, or "
+            f"set the sink to {SINK_NONE!r} if this front is not meant to feed "
+            "a studio."
+        )
+
+    if sink and sink != SINK_NONE:
+        if sink.startswith(SINK_DIR_PREFIX):
+            if not sink[len(SINK_DIR_PREFIX) :].strip():
+                raise MorphConfigError("morph.queue.sink `dir:` has no path")
+        elif sink.startswith(SINK_URL_PREFIX):
+            if not sink[len(SINK_URL_PREFIX) :].strip():
+                raise MorphConfigError("morph.queue.sink `url:` has no address")
+            if not morph.queue.spool_dir.strip():
+                # Not fatal: a dev box with no volume is a legitimate setup, and
+                # the sink still holds reports in memory and retries. On a
+                # cluster it means a morph-studio outage costs every miss
+                # collected during it, which is worth saying out loud.
+                logger.warning(
+                    "morph.queue.sink is %r with no `spool_dir` — reports that "
+                    "cannot be POSTed are held in memory only and are lost on "
+                    "restart",
+                    sink,
+                )
+        else:
+            raise MorphConfigError(
+                f"morph.queue.sink {sink!r} is not one of `none`, "
+                "`dir:<path>`, `url:<address>`"
+            )
+
+
 # Lindat dev/eval endpoints (the REMOTE_UNPINNED tier — RG-NLP-002). Selected by
 # NLP_UFAL_ENDPOINT_MODE=lindat; the pinned model ids stay explicit (S-1).
 _LINDAT_MORPHODITA = "https://lindat.mff.cuni.cz/services/morphodita/api/tag"
@@ -332,6 +553,19 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
         emulated.model = model
     if key := os.getenv("NLP_LLM_EMULATED_API_KEY"):
         emulated.api_key = key
+
+    # LM (NLS-P9.1). Deployment decisions, exactly like the lane: the snapshot
+    # is a mounted volume whose path differs per cluster, the world IS the
+    # deployment, and the sink points at that estate's morph-studio. The
+    # alternative is a per-cluster copy of config.yaml differing in three lines.
+    if sources := os.getenv("NLP_MORPH_SOURCES"):
+        config.morph.sources = [s.strip() for s in sources.split(",") if s.strip()]
+    if world := os.getenv("NLP_MORPH_WORLD"):
+        config.morph.world = world.strip()
+    if sink := os.getenv("NLP_MORPH_QUEUE_SINK"):
+        config.morph.queue.sink = sink.strip()
+    if spool := os.getenv("NLP_MORPH_QUEUE_SPOOL_DIR"):
+        config.morph.queue.spool_dir = spool.strip()
 
     return config
 

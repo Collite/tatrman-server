@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: soft feminine place names
+lemma: Florencie
+vzor: ruze-proper
+flags: []
+table:
+  Case=Acc|Gender=Fem|Number=Plur:
+  - Florencie
+  Case=Acc|Gender=Fem|Number=Sing:
+  - Florencii
+  Case=Dat|Gender=Fem|Number=Plur:
+  - Florenciím
+  Case=Dat|Gender=Fem|Number=Sing:
+  - Florencii
+  Case=Gen|Gender=Fem|Number=Plur:
+  - Florencií
+  Case=Gen|Gender=Fem|Number=Sing:
+  - Florencie
+  Case=Ins|Gender=Fem|Number=Plur:
+  - Florenciemi
+  Case=Ins|Gender=Fem|Number=Sing:
+  - Florencií
+  Case=Loc|Gender=Fem|Number=Plur:
+  - Florenciích
+  Case=Loc|Gender=Fem|Number=Sing:
+  - Florencii
+  Case=Nom|Gender=Fem|Number=Plur:
+  - Florencie
+  Case=Nom|Gender=Fem|Number=Sing:
+  - Florencie
+  Case=Voc|Gender=Fem|Number=Plur:
+  - Florencie
+  Case=Voc|Gender=Fem|Number=Sing:
+  - Florencie
+classify_as:
+  vzor: růže
+  flags: []

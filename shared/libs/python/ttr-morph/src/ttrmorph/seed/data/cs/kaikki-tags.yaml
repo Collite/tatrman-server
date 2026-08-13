@@ -1,0 +1,209 @@
+# kaikki.org form tags → UD feature atoms. DATA, like everything else about
+# one language (LM-2): the importer contains no tag name.
+#
+# Source: the English-edition Czech extract (`cs-enwiktionary.jsonl`), which
+# D-O1 chose — 79% of the target vocabulary has a real inflection table there
+# and 60% of sampled noun tables regenerate exactly, against 70%/28% for the
+# Czech edition, whose extracts are mostly missing the vocative.
+#
+# The three lists below are three different judgements and they are worth
+# keeping apart:
+#
+#   `ignore`  — structural rows in the extract. Not features, not forms.
+#   `reject`  — a REGISTER marker. The form exists; it is not the neutral
+#               paradigm cell, and importing it would make a textbook table
+#               fail to classify. It belongs to the enrichment loop as a
+#               full-form entry, not here.
+#   `outside` — a cell the engine deliberately does not generate (GI-1: the
+#               query-relevant subset). A form carrying one of these is dropped
+#               from the table *and its absence is not a defect* — see the
+#               projection rule in `importers/kaikki.py`.
+
+# kaikki `pos` → upos. Only these are imported; a `pos` not listed here is a
+# part of speech whose entries have no paradigm we can use.
+pos:
+  noun: NOUN
+  name: PROPN
+  proper-noun: PROPN
+  verb: VERB
+  adj: ADJ
+  adv: ADV
+  num: NUM
+  pron: PRON
+  det: DET
+  prep: ADP
+  conj: CCONJ
+  particle: PART
+  intj: INTJ
+
+atoms:
+  # case
+  nominative: Case=Nom
+  genitive: Case=Gen
+  dative: Case=Dat
+  accusative: Case=Acc
+  vocative: Case=Voc
+  locative: Case=Loc
+  instrumental: Case=Ins
+  # number
+  singular: Number=Sing
+  plural: Number=Plur
+  # gender + animacy
+  masculine: Gender=Masc
+  feminine: Gender=Fem
+  neuter: Gender=Neut
+  animate: Animacy=Anim
+  inanimate: Animacy=Inan
+  # person
+  first-person: Person=1
+  second-person: Person=2
+  third-person: Person=3
+  # verb
+  infinitive: VerbForm=Inf
+  indicative: Mood=Ind
+  imperative: Mood=Imp
+  present: Tense=Pres
+  past: Tense=Past
+  participle: VerbForm=Part
+  # degree
+  positive: Degree=Pos
+  comparative: Degree=Cmp
+  superlative: Degree=Sup
+
+ignore:
+  - table-tags
+  - inflection-template
+  - class
+  - error-unrecognized-form
+
+reject:
+  - rare
+  - dated
+  - dialectal
+  - obsolete
+  - archaic
+  - colloquial
+  - informal
+  - alternative
+  - abbreviation
+  - proscribed
+  - nonstandard
+  - literary
+  - poetic
+
+outside:
+  # verbs: GI-1 generates infinitive + present + imperative + l-participle.
+  # Everything below is real Czech the runtime does not need to look up.
+  - transgressive
+  - passive
+  - adjectival
+  - active
+  - noun-from-verb
+  - verbal-noun
+  # aspect partners are a DIFFERENT LEXEME listed on the entry, not a cell.
+  - perfective
+  - imperfective
+  - iterative
+  # adjectives: the short form and the possessive are separate paradigms.
+  - short-form
+  - possessive
+  - adverb
+  # derivations the extract hangs off the noun entry.
+  - diminutive
+  - augmentative
+  - relational
+  - adjective
+  - feminine-form
+  - male-equivalent
+
+# ── where the entry-level features live ──────────────────────────────────────
+#
+# ⚑ A Czech noun's GENDER is a property of the lexeme, not of its cells, so the
+# extract states it once on the entry and never on a form. The engine's feats,
+# by contrast, carry it in every cell — because a consumer asking "what is
+# `tržby`" needs the answer, not a pointer to the entry. So the importer injects
+# it, and the two editions hide it in two different places: the Czech one in the
+# entry's own `tags`, the English one in the first argument of the headword
+# template. Reading only one of them scored the English edition at zero usable
+# entries in the D-O1 spike, and reading NEITHER scores every noun as a mismatch
+# — which is what the first p8-3 import run did.
+
+# Which parts of speech take their gender from the entry.
+gender_from_entry: [NOUN, PROPN]
+
+# `head_templates[0].args["1"]` (English edition).
+head_gender:
+  f: [Gender=Fem]
+  n: [Gender=Neut]
+  m: [Gender=Masc]
+  m-an: [Animacy=Anim, Gender=Masc]
+  m-anml: [Animacy=Anim, Gender=Masc]
+  m-pr: [Animacy=Anim, Gender=Masc]
+  m-in: [Animacy=Inan, Gender=Masc]
+
+# the entry's own `tags` (Czech edition).
+entry_gender:
+  feminine: [Gender=Fem]
+  neuter: [Gender=Neut]
+  masculine: [Gender=Masc]
+  animate: [Animacy=Anim]
+  inanimate: [Animacy=Inan]
+
+# Atoms every cell of a part of speech carries unless the form says otherwise.
+# A Wiktionary adjective table is the positive degree and does not say so; the
+# engine says so in every cell, because `Degree` is what separates *mladý* from
+# *mladší* and a cell that omitted it would collide with one that did not.
+defaults:
+  ADJ: [Degree=Pos]
+
+# Atoms dropped from BOTH sides before cells are compared. Not a loosening of
+# the match — a removal of two tagset conventions that disagree about what is
+# worth saying. The engine writes `VerbForm=Fin` on every finite form and
+# Wiktionary writes none; Wiktionary writes `Tense=Pres` on the imperative and
+# the engine writes none. Neither distinguishes a cell from another cell, and
+# leaving them in would reject every verb in the source for spelling.
+compare_ignore:
+  - VerbForm=Fin
+  - Tense=Pres
+  - Polarity=Pos
+  - Voice=Act
+
+# Cells the SOURCE systematically does not list, per part of speech. An engine
+# cell carrying one of these atoms is not required to be present — but if it is
+# present it must still agree.
+#
+# ⚑ This is a fact about the source's table design, not a defect in an entry,
+# and the difference matters: D-O1's whole argument for the English edition was
+# that its tables are COMPLETE, and an incomplete one cannot be classified. A
+# Wiktionary adjective table has no vocative because Czech adjectives do not
+# have a distinct one — every adjective in the source would otherwise be
+# rejected for a cell nobody disputes.
+absent:
+  ADJ:
+    - [Case=Voc]
+    # The English edition's adjective table carries exactly ONE masculine
+    # plural cell — the animate nominative (*noví*). Everything else masculine
+    # and plural is folded into rows tagged only for case, so the engine's
+    # masculine plural cells have nothing to be compared against.
+    - [Gender=Masc, Number=Plur]
+  DET:
+    - [Case=Voc]
+    - [Gender=Masc, Number=Plur]
+  NUM:
+    - [Case=Voc]
+
+# Feature NAMES a source cell must carry to be usable, per part of speech.
+# Wiktionary's extracted tables carry header artefacts — a row tagged
+# `inanimate|nominative` with no number, which is comparable with both the
+# singular and the plural and agrees with neither. Dropping them where the table
+# is built is better than teaching the matcher to distrust its own input.
+# ⚑ ADJ asks only for Case. The adjective table tags its feminine plural as
+# `feminine|nominative` with no `plural` at all, so demanding Number would drop
+# the very cell the engine needs to be compared against — and did, in the second
+# p8-3 import run: every adjective in the source failed on one orphan cell.
+require:
+  NOUN: [Case, Number]
+  PROPN: [Case, Number]
+  ADJ: [Case]
+  DET: [Case]
+  NUM: [Case]

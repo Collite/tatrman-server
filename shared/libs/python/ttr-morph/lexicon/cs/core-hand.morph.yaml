@@ -1,0 +1,561 @@
+# The hand seed — the part of Czech no importer can be trusted with.
+#
+# HAND-AUTHORED from school grammar, and it stays that way: `license: suite`,
+# `provenance: manual`, no Wiktionary and no corpus anywhere in its history.
+# This file is the reason the cs path can be called NC-free without an asterisk.
+#
+# What lives here and why:
+#
+# * **Closed classes.** Prepositions, conjunctions and particles have no
+#   paradigm to import — D-O1 measured 0% table coverage for ADP/CCONJ/PART in
+#   both Wiktionary editions, which is not a defect in the source. A preposition
+#   is a form, and the only thing a lexicon can say about it is that it exists.
+# * **Pronouns and numerals.** Suppletive: *já/mě/mně/mnou* is not a stem plus
+#   endings, and no vzor will ever produce it. Full-form entries, every one.
+# * **The irregular verbs.** *být, mít, jít, jíst, chtít, moci, vědět* — the
+#   seven the language leans on hardest, and the seven no pattern covers.
+# * **The contractions** (B-O4), carrying `parts:` so *abych* resolves to
+#   *aby* + *bych* rather than to a word nobody looked up.
+# * **The ne-exceptions.** *nemoc* is not *ne* + *moc*. Only the lexicon knows
+#   that, and without these the runtime's ne-strip turns "illness" into "not
+#   power" with a straight face and a lemma that will match a rule.
+# * **The vzor lemmas themselves**, so the words the patterns are named after
+#   are in the lexicon they define.
+#
+# ⚑ **Case government is not recorded on prepositions.** Which case *na* takes
+# is a fact about a phrase, not about the word, and the lexicon that claimed
+# otherwise would have to claim it twice for every preposition that governs two.
+#
+# ⚑ **This seed is deliberately incomplete**, and the gaps are named in
+# `importers-report.md` rather than half-filled. A pronoun paradigm that is 80%
+# right is worse than an absent one: the missing fifth returns a confident wrong
+# lemma instead of a miss the enrichment queue would pick up (LM-5).
+
+layer: core-hand
+version: 1
+language: cs
+license: suite
+attribution: null
+
+entries:
+
+  # ── prepositions (ADP) ─────────────────────────────────────────────────────
+  # Vocalised variants (`ve`, `se`, `ze`, `ke`, `beze`…) are FORMS of the same
+  # lemma, not lemmas: *ve smlouvě* and *v roce* are one word choosing a shape
+  # to fit the next one.
+  - { lemma: v, upos: ADP, provenance: manual, forms: [{form: v, feats: "AdpType=Prep"}, {form: ve, feats: "AdpType=Prep"}] }
+  - { lemma: s, upos: ADP, provenance: manual, forms: [{form: s, feats: "AdpType=Prep"}, {form: se, feats: "AdpType=Prep"}] }
+  - { lemma: z, upos: ADP, provenance: manual, forms: [{form: z, feats: "AdpType=Prep"}, {form: ze, feats: "AdpType=Prep"}] }
+  - { lemma: k, upos: ADP, provenance: manual, forms: [{form: k, feats: "AdpType=Prep"}, {form: ke, feats: "AdpType=Prep"}, {form: ku, feats: "AdpType=Prep"}] }
+  - { lemma: bez, upos: ADP, provenance: manual, forms: [{form: bez, feats: "AdpType=Prep"}, {form: beze, feats: "AdpType=Prep"}] }
+  - { lemma: nad, upos: ADP, provenance: manual, forms: [{form: nad, feats: "AdpType=Prep"}, {form: nade, feats: "AdpType=Prep"}] }
+  - { lemma: pod, upos: ADP, provenance: manual, forms: [{form: pod, feats: "AdpType=Prep"}, {form: pode, feats: "AdpType=Prep"}] }
+  - { lemma: před, upos: ADP, provenance: manual, forms: [{form: před, feats: "AdpType=Prep"}, {form: přede, feats: "AdpType=Prep"}] }
+  - { lemma: přes, upos: ADP, provenance: manual, forms: [{form: přes, feats: "AdpType=Prep"}, {form: přese, feats: "AdpType=Prep"}] }
+  - { lemma: od, upos: ADP, provenance: manual, forms: [{form: od, feats: "AdpType=Prep"}, {form: ode, feats: "AdpType=Prep"}] }
+  - { lemma: na, upos: ADP, provenance: manual, forms: [{form: na, feats: "AdpType=Prep"}] }
+  - { lemma: za, upos: ADP, provenance: manual, forms: [{form: za, feats: "AdpType=Prep"}] }
+  - { lemma: do, upos: ADP, provenance: manual, forms: [{form: do, feats: "AdpType=Prep"}] }
+  - { lemma: po, upos: ADP, provenance: manual, forms: [{form: po, feats: "AdpType=Prep"}] }
+  - { lemma: pro, upos: ADP, provenance: manual, forms: [{form: pro, feats: "AdpType=Prep"}] }
+  - { lemma: při, upos: ADP, provenance: manual, forms: [{form: při, feats: "AdpType=Prep"}] }
+  - { lemma: o, upos: ADP, provenance: manual, forms: [{form: o, feats: "AdpType=Prep"}] }
+  - { lemma: u, upos: ADP, provenance: manual, forms: [{form: u, feats: "AdpType=Prep"}] }
+  - { lemma: mezi, upos: ADP, provenance: manual, forms: [{form: mezi, feats: "AdpType=Prep"}] }
+  - { lemma: proti, upos: ADP, provenance: manual, forms: [{form: proti, feats: "AdpType=Prep"}] }
+  - { lemma: podle, upos: ADP, provenance: manual, forms: [{form: podle, feats: "AdpType=Prep"}, {form: dle, feats: "AdpType=Prep"}] }
+  - { lemma: během, upos: ADP, provenance: manual, forms: [{form: během, feats: "AdpType=Prep"}] }
+  - { lemma: kromě, upos: ADP, provenance: manual, forms: [{form: kromě, feats: "AdpType=Prep"}] }
+  - { lemma: vedle, upos: ADP, provenance: manual, forms: [{form: vedle, feats: "AdpType=Prep"}] }
+  - { lemma: místo, upos: ADP, provenance: manual, forms: [{form: místo, feats: "AdpType=Prep"}] }
+  - { lemma: díky, upos: ADP, provenance: manual, forms: [{form: díky, feats: "AdpType=Prep"}] }
+  - { lemma: mimo, upos: ADP, provenance: manual, forms: [{form: mimo, feats: "AdpType=Prep"}] }
+  - { lemma: okolo, upos: ADP, provenance: manual, forms: [{form: okolo, feats: "AdpType=Prep"}] }
+  - { lemma: kolem, upos: ADP, provenance: manual, forms: [{form: kolem, feats: "AdpType=Prep"}] }
+  - { lemma: vůči, upos: ADP, provenance: manual, forms: [{form: vůči, feats: "AdpType=Prep"}] }
+  - { lemma: ohledně, upos: ADP, provenance: manual, forms: [{form: ohledně, feats: "AdpType=Prep"}] }
+
+  # ── conjunctions ───────────────────────────────────────────────────────────
+  - { lemma: a, upos: CCONJ, provenance: manual, forms: [{form: a, feats: ""}] }
+  - { lemma: i, upos: CCONJ, provenance: manual, forms: [{form: i, feats: ""}] }
+  - { lemma: ale, upos: CCONJ, provenance: manual, forms: [{form: ale, feats: ""}] }
+  - { lemma: nebo, upos: CCONJ, provenance: manual, ne_exception: true, forms: [{form: nebo, feats: ""}] }
+  - { lemma: ani, upos: CCONJ, provenance: manual, forms: [{form: ani, feats: ""}] }
+  - { lemma: však, upos: CCONJ, provenance: manual, forms: [{form: však, feats: ""}] }
+  - { lemma: nýbrž, upos: CCONJ, provenance: manual, forms: [{form: nýbrž, feats: ""}] }
+  - { lemma: tedy, upos: CCONJ, provenance: manual, forms: [{form: tedy, feats: ""}, {form: teda, feats: ""}] }
+  - { lemma: takže, upos: SCONJ, provenance: manual, forms: [{form: takže, feats: ""}] }
+  - { lemma: že, upos: SCONJ, provenance: manual, forms: [{form: že, feats: ""}] }
+  - { lemma: protože, upos: SCONJ, provenance: manual, forms: [{form: protože, feats: ""}] }
+  - { lemma: když, upos: SCONJ, provenance: manual, forms: [{form: když, feats: ""}] }
+  - { lemma: jestli, upos: SCONJ, provenance: manual, forms: [{form: jestli, feats: ""}, {form: jestliže, feats: ""}] }
+  - { lemma: pokud, upos: SCONJ, provenance: manual, forms: [{form: pokud, feats: ""}] }
+  - { lemma: zda, upos: SCONJ, provenance: manual, forms: [{form: zda, feats: ""}, {form: zdali, feats: ""}] }
+  - { lemma: než, upos: SCONJ, provenance: manual, forms: [{form: než, feats: ""}] }
+  - { lemma: jako, upos: SCONJ, provenance: manual, forms: [{form: jako, feats: ""}] }
+  - { lemma: přestože, upos: SCONJ, provenance: manual, forms: [{form: přestože, feats: ""}] }
+  - { lemma: ačkoli, upos: SCONJ, provenance: manual, forms: [{form: ačkoli, feats: ""}, {form: ačkoliv, feats: ""}] }
+  - { lemma: dokud, upos: SCONJ, provenance: manual, forms: [{form: dokud, feats: ""}] }
+  - { lemma: jakmile, upos: SCONJ, provenance: manual, forms: [{form: jakmile, feats: ""}] }
+  - { lemma: až, upos: SCONJ, provenance: manual, forms: [{form: až, feats: ""}] }
+  - { lemma: aby, upos: SCONJ, provenance: manual, forms: [{form: aby, feats: "Mood=Cnd"}] }
+  - { lemma: kdyby, upos: SCONJ, provenance: manual, forms: [{form: kdyby, feats: "Mood=Cnd"}] }
+
+  # ── the contractions (B-O4) ────────────────────────────────────────────────
+  # Each is a conjunction fused with a conditional auxiliary. `parts:` is what
+  # lets a consumer see both halves; without it *abych* is a word the lexicon
+  # knows and the grammar cannot use.
+  - { lemma: abych, upos: SCONJ, provenance: manual, parts: [aby, bych], forms: [{form: abych, feats: "Mood=Cnd|Number=Sing|Person=1"}] }
+  - { lemma: abys, upos: SCONJ, provenance: manual, parts: [aby, bys], forms: [{form: abys, feats: "Mood=Cnd|Number=Sing|Person=2"}] }
+  - { lemma: abychom, upos: SCONJ, provenance: manual, parts: [aby, bychom], forms: [{form: abychom, feats: "Mood=Cnd|Number=Plur|Person=1"}, {form: abysme, feats: "Mood=Cnd|Number=Plur|Person=1"}] }
+  - { lemma: abyste, upos: SCONJ, provenance: manual, parts: [aby, byste], forms: [{form: abyste, feats: "Mood=Cnd|Number=Plur|Person=2"}] }
+  - { lemma: kdybych, upos: SCONJ, provenance: manual, parts: [kdyby, bych], forms: [{form: kdybych, feats: "Mood=Cnd|Number=Sing|Person=1"}] }
+  - { lemma: kdybys, upos: SCONJ, provenance: manual, parts: [kdyby, bys], forms: [{form: kdybys, feats: "Mood=Cnd|Number=Sing|Person=2"}] }
+  - { lemma: kdybychom, upos: SCONJ, provenance: manual, parts: [kdyby, bychom], forms: [{form: kdybychom, feats: "Mood=Cnd|Number=Plur|Person=1"}] }
+  - { lemma: kdybyste, upos: SCONJ, provenance: manual, parts: [kdyby, byste], forms: [{form: kdybyste, feats: "Mood=Cnd|Number=Plur|Person=2"}] }
+
+  # ── particles ──────────────────────────────────────────────────────────────
+  - { lemma: ne, upos: PART, provenance: manual, forms: [{form: ne, feats: "Polarity=Neg"}] }
+  - { lemma: ano, upos: PART, provenance: manual, forms: [{form: ano, feats: ""}, {form: jo, feats: ""}] }
+  - { lemma: jen, upos: PART, provenance: manual, forms: [{form: jen, feats: ""}, {form: jenom, feats: ""}] }
+  - { lemma: už, upos: PART, provenance: manual, forms: [{form: už, feats: ""}, {form: již, feats: ""}] }
+  - { lemma: ještě, upos: PART, provenance: manual, forms: [{form: ještě, feats: ""}] }
+  - { lemma: také, upos: PART, provenance: manual, forms: [{form: také, feats: ""}, {form: taky, feats: ""}] }
+  - { lemma: právě, upos: PART, provenance: manual, forms: [{form: právě, feats: ""}] }
+  - { lemma: asi, upos: PART, provenance: manual, forms: [{form: asi, feats: ""}] }
+  - { lemma: snad, upos: PART, provenance: manual, forms: [{form: snad, feats: ""}] }
+  - { lemma: možná, upos: PART, provenance: manual, forms: [{form: možná, feats: ""}] }
+  - { lemma: prý, upos: PART, provenance: manual, forms: [{form: prý, feats: ""}] }
+  - { lemma: přece, upos: PART, provenance: manual, forms: [{form: přece, feats: ""}] }
+  - { lemma: aspoň, upos: PART, provenance: manual, forms: [{form: aspoň, feats: ""}, {form: alespoň, feats: ""}] }
+  - { lemma: zhruba, upos: PART, provenance: manual, forms: [{form: zhruba, feats: ""}] }
+  - { lemma: přibližně, upos: PART, provenance: manual, forms: [{form: přibližně, feats: ""}] }
+
+  # ── adverbs the query domain leans on ──────────────────────────────────────
+  # Interrogatives and time/quantity words. An adverb has no paradigm worth
+  # generating; the comparatives that matter are listed as forms.
+  - { lemma: kde, upos: ADV, provenance: manual, forms: [{form: kde, feats: "PronType=Int,Rel"}] }
+  - { lemma: kdy, upos: ADV, provenance: manual, forms: [{form: kdy, feats: "PronType=Int,Rel"}] }
+  - { lemma: jak, upos: ADV, provenance: manual, forms: [{form: jak, feats: "PronType=Int,Rel"}] }
+  - { lemma: proč, upos: ADV, provenance: manual, forms: [{form: proč, feats: "PronType=Int,Rel"}] }
+  - { lemma: kolik, upos: ADV, provenance: manual, forms: [{form: kolik, feats: "PronType=Int,Rel"}] }
+  - { lemma: dnes, upos: ADV, provenance: manual, forms: [{form: dnes, feats: ""}] }
+  - { lemma: včera, upos: ADV, provenance: manual, forms: [{form: včera, feats: ""}] }
+  - { lemma: zítra, upos: ADV, provenance: manual, forms: [{form: zítra, feats: ""}] }
+  - { lemma: teď, upos: ADV, provenance: manual, forms: [{form: teď, feats: ""}, {form: nyní, feats: ""}] }
+  - { lemma: tady, upos: ADV, provenance: manual, forms: [{form: tady, feats: ""}, {form: zde, feats: ""}] }
+  - { lemma: tam, upos: ADV, provenance: manual, forms: [{form: tam, feats: ""}] }
+  - { lemma: vždy, upos: ADV, provenance: manual, forms: [{form: vždy, feats: ""}, {form: vždycky, feats: ""}] }
+  - { lemma: nikdy, upos: ADV, provenance: manual, forms: [{form: nikdy, feats: ""}] }
+  - { lemma: často, upos: ADV, provenance: manual, forms: [{form: často, feats: "Degree=Pos"}, {form: častěji, feats: "Degree=Cmp"}] }
+  - { lemma: hodně, upos: ADV, provenance: manual, forms: [{form: hodně, feats: "Degree=Pos"}, {form: více, feats: "Degree=Cmp"}, {form: víc, feats: "Degree=Cmp"}, {form: nejvíce, feats: "Degree=Sup"}, {form: nejvíc, feats: "Degree=Sup"}] }
+  - { lemma: málo, upos: ADV, provenance: manual, forms: [{form: málo, feats: "Degree=Pos"}, {form: méně, feats: "Degree=Cmp"}, {form: míň, feats: "Degree=Cmp"}, {form: nejméně, feats: "Degree=Sup"}, {form: nejmíň, feats: "Degree=Sup"}] }
+  - { lemma: celkem, upos: ADV, provenance: manual, forms: [{form: celkem, feats: ""}] }
+  - { lemma: průměrně, upos: ADV, provenance: manual, forms: [{form: průměrně, feats: ""}] }
+  - { lemma: meziročně, upos: ADV, provenance: manual, forms: [{form: meziročně, feats: ""}] }
+  - { lemma: dohromady, upos: ADV, provenance: manual, forms: [{form: dohromady, feats: ""}] }
+  - { lemma: naposledy, upos: ADV, provenance: manual, forms: [{form: naposledy, feats: ""}] }
+
+  # ── personal pronouns ──────────────────────────────────────────────────────
+  # Suppletive throughout, and the short/long pairs (*mě*/*mne*, *ho*/*jeho*)
+  # are both in use — a lexicon that carried one would miss half the queries.
+  - lemma: já
+    upos: PRON
+    provenance: manual
+    forms:
+      - { form: já,    feats: "Case=Nom|Number=Sing|Person=1|PronType=Prs" }
+      - { form: mě,    feats: "Case=Acc|Number=Sing|Person=1|PronType=Prs" }
+      - { form: mne,   feats: "Case=Gen|Number=Sing|Person=1|PronType=Prs" }
+      - { form: mi,    feats: "Case=Dat|Number=Sing|Person=1|PronType=Prs" }
+      - { form: mně,   feats: "Case=Dat|Number=Sing|Person=1|PronType=Prs" }
+      - { form: mnou,  feats: "Case=Ins|Number=Sing|Person=1|PronType=Prs" }
+  - lemma: ty
+    upos: PRON
+    provenance: manual
+    forms:
+      - { form: ty,    feats: "Case=Nom|Number=Sing|Person=2|PronType=Prs" }
+      - { form: tě,    feats: "Case=Acc|Number=Sing|Person=2|PronType=Prs" }
+      - { form: tebe,  feats: "Case=Gen|Number=Sing|Person=2|PronType=Prs" }
+      - { form: ti,    feats: "Case=Dat|Number=Sing|Person=2|PronType=Prs" }
+      - { form: tobě,  feats: "Case=Dat|Number=Sing|Person=2|PronType=Prs" }
+      - { form: tebou, feats: "Case=Ins|Number=Sing|Person=2|PronType=Prs" }
+  - lemma: my
+    upos: PRON
+    provenance: manual
+    forms:
+      - { form: my,   feats: "Case=Nom|Number=Plur|Person=1|PronType=Prs" }
+      - { form: nás,  feats: "Case=Acc|Number=Plur|Person=1|PronType=Prs" }
+      - { form: nám,  feats: "Case=Dat|Number=Plur|Person=1|PronType=Prs" }
+      - { form: námi, feats: "Case=Ins|Number=Plur|Person=1|PronType=Prs" }
+  - lemma: vy
+    upos: PRON
+    provenance: manual
+    forms:
+      - { form: vy,   feats: "Case=Nom|Number=Plur|Person=2|PronType=Prs" }
+      - { form: vás,  feats: "Case=Acc|Number=Plur|Person=2|PronType=Prs" }
+      - { form: vám,  feats: "Case=Dat|Number=Plur|Person=2|PronType=Prs" }
+      - { form: vámi, feats: "Case=Ins|Number=Plur|Person=2|PronType=Prs" }
+  - lemma: "on"
+    upos: PRON
+    provenance: manual
+    forms:
+      - { form: "on", feats: "Case=Nom|Gender=Masc|Number=Sing|Person=3|PronType=Prs" }
+      - { form: ho,   feats: "Case=Acc|Gender=Masc|Number=Sing|Person=3|PronType=Prs" }
+      - { form: jeho, feats: "Case=Gen|Gender=Masc|Number=Sing|Person=3|PronType=Prs" }
+      - { form: jej,  feats: "Case=Acc|Gender=Masc|Number=Sing|Person=3|PronType=Prs" }
+      - { form: mu,   feats: "Case=Dat|Gender=Masc|Number=Sing|Person=3|PronType=Prs" }
+      - { form: jemu, feats: "Case=Dat|Gender=Masc|Number=Sing|Person=3|PronType=Prs" }
+      - { form: něm,  feats: "Case=Loc|Gender=Masc|Number=Sing|Person=3|PronType=Prs" }
+      - { form: jím,  feats: "Case=Ins|Gender=Masc|Number=Sing|Person=3|PronType=Prs" }
+      - { form: ona,  feats: "Case=Nom|Gender=Fem|Number=Sing|Person=3|PronType=Prs" }
+      - { form: ji,   feats: "Case=Acc|Gender=Fem|Number=Sing|Person=3|PronType=Prs" }
+      - { form: jí,   feats: "Case=Dat|Gender=Fem|Number=Sing|Person=3|PronType=Prs" }
+      - { form: ní,   feats: "Case=Loc|Gender=Fem|Number=Sing|Person=3|PronType=Prs" }
+      - { form: ono,  feats: "Case=Nom|Gender=Neut|Number=Sing|Person=3|PronType=Prs" }
+      - { form: oni,  feats: "Case=Nom|Gender=Masc|Number=Plur|Person=3|PronType=Prs" }
+      - { form: ony,  feats: "Case=Nom|Gender=Fem|Number=Plur|Person=3|PronType=Prs" }
+      - { form: je,   feats: "Case=Acc|Number=Plur|Person=3|PronType=Prs" }
+      - { form: jich, feats: "Case=Gen|Number=Plur|Person=3|PronType=Prs" }
+      - { form: jim,  feats: "Case=Dat|Number=Plur|Person=3|PronType=Prs" }
+      - { form: nich, feats: "Case=Loc|Number=Plur|Person=3|PronType=Prs" }
+      - { form: jimi, feats: "Case=Ins|Number=Plur|Person=3|PronType=Prs" }
+  - lemma: se
+    upos: PRON
+    provenance: manual
+    forms:
+      - { form: se,   feats: "Case=Acc|PronType=Prs|Reflex=Yes" }
+      - { form: si,   feats: "Case=Dat|PronType=Prs|Reflex=Yes" }
+      - { form: sebe, feats: "Case=Gen|PronType=Prs|Reflex=Yes" }
+      - { form: sobě, feats: "Case=Dat|PronType=Prs|Reflex=Yes" }
+      - { form: sebou, feats: "Case=Ins|PronType=Prs|Reflex=Yes" }
+
+  # ── interrogative / relative pronouns ──────────────────────────────────────
+  - lemma: kdo
+    upos: PRON
+    provenance: manual
+    forms:
+      - { form: kdo,  feats: "Case=Nom|PronType=Int,Rel" }
+      - { form: koho, feats: "Case=Gen|PronType=Int,Rel" }
+      - { form: komu, feats: "Case=Dat|PronType=Int,Rel" }
+      - { form: kom,  feats: "Case=Loc|PronType=Int,Rel" }
+      - { form: kým,  feats: "Case=Ins|PronType=Int,Rel" }
+  - lemma: co
+    upos: PRON
+    provenance: manual
+    forms:
+      - { form: co,   feats: "Case=Nom|PronType=Int,Rel" }
+      - { form: čeho, feats: "Case=Gen|PronType=Int,Rel" }
+      - { form: čemu, feats: "Case=Dat|PronType=Int,Rel" }
+      - { form: čem,  feats: "Case=Loc|PronType=Int,Rel" }
+      - { form: čím,  feats: "Case=Ins|PronType=Int,Rel" }
+  - { lemma: který, upos: DET, vzor: mladý, provenance: manual }
+  - { lemma: jaký, upos: DET, vzor: mladý, provenance: manual }
+  - { lemma: každý, upos: DET, vzor: mladý, provenance: manual }
+  - { lemma: žádný, upos: DET, vzor: mladý, provenance: manual }
+  - { lemma: nějaký, upos: DET, vzor: mladý, provenance: manual }
+  - { lemma: takový, upos: DET, vzor: mladý, provenance: manual }
+  - { lemma: jiný, upos: DET, vzor: mladý, provenance: manual }
+  - { lemma: samý, upos: DET, vzor: mladý, provenance: manual }
+
+  # ── demonstratives ─────────────────────────────────────────────────────────
+  - lemma: ten
+    upos: DET
+    provenance: manual
+    forms:
+      - { form: ten,   feats: "Case=Nom|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: toho,  feats: "Case=Gen|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: tomu,  feats: "Case=Dat|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: tom,   feats: "Case=Loc|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: tím,   feats: "Case=Ins|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: ta,    feats: "Case=Nom|Gender=Fem|Number=Sing|PronType=Dem" }
+      - { form: té,    feats: "Case=Gen|Gender=Fem|Number=Sing|PronType=Dem" }
+      - { form: tu,    feats: "Case=Acc|Gender=Fem|Number=Sing|PronType=Dem" }
+      - { form: tou,   feats: "Case=Ins|Gender=Fem|Number=Sing|PronType=Dem" }
+      - { form: to,    feats: "Case=Nom|Gender=Neut|Number=Sing|PronType=Dem" }
+      - { form: ti,    feats: "Case=Nom|Gender=Masc|Number=Plur|PronType=Dem" }
+      - { form: ty,    feats: "Case=Nom|Gender=Fem|Number=Plur|PronType=Dem" }
+      - { form: těch,  feats: "Case=Gen|Number=Plur|PronType=Dem" }
+      - { form: těm,   feats: "Case=Dat|Number=Plur|PronType=Dem" }
+      - { form: těmi,  feats: "Case=Ins|Number=Plur|PronType=Dem" }
+
+  # ⚑ `tento` is its OWN lemma, not a form of `ten`. Folding it in was the
+  # first cut and the simplemma QA pass caught it: CAC — the eval oracle —
+  # lemmatizes *tento* to *tento*, and a lexicon that answers *ten* loses the
+  # head-of-list accuracy metric on 150 tokens of the train side alone.
+  - lemma: tento
+    upos: DET
+    provenance: manual
+    forms:
+      - { form: tento,  feats: "Case=Nom|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: tato,   feats: "Case=Nom|Gender=Fem|Number=Sing|PronType=Dem" }
+      - { form: toto,   feats: "Case=Nom|Gender=Neut|Number=Sing|PronType=Dem" }
+      - { form: tohoto, feats: "Case=Gen|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: tomuto, feats: "Case=Dat|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: tomto,  feats: "Case=Loc|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: tímto,  feats: "Case=Ins|Gender=Masc|Number=Sing|PronType=Dem" }
+      - { form: této,   feats: "Case=Gen|Gender=Fem|Number=Sing|PronType=Dem" }
+      - { form: tuto,   feats: "Case=Acc|Gender=Fem|Number=Sing|PronType=Dem" }
+      - { form: touto,  feats: "Case=Ins|Gender=Fem|Number=Sing|PronType=Dem" }
+      - { form: tito,   feats: "Case=Nom|Gender=Masc|Number=Plur|PronType=Dem" }
+      - { form: tyto,   feats: "Case=Nom|Gender=Fem|Number=Plur|PronType=Dem" }
+      - { form: těchto, feats: "Case=Gen|Number=Plur|PronType=Dem" }
+      - { form: těmto,  feats: "Case=Dat|Number=Plur|PronType=Dem" }
+      - { form: těmito, feats: "Case=Ins|Number=Plur|PronType=Dem" }
+
+  # ── possessives ────────────────────────────────────────────────────────────
+  - lemma: můj
+    upos: DET
+    provenance: manual
+    forms:
+      - { form: můj,   feats: "Case=Nom|Gender=Masc|Number=Sing|Poss=Yes|PronType=Prs" }
+      - { form: mého,  feats: "Case=Gen|Gender=Masc|Number=Sing|Poss=Yes|PronType=Prs" }
+      - { form: mému,  feats: "Case=Dat|Gender=Masc|Number=Sing|Poss=Yes|PronType=Prs" }
+      - { form: mém,   feats: "Case=Loc|Gender=Masc|Number=Sing|Poss=Yes|PronType=Prs" }
+      - { form: mým,   feats: "Case=Ins|Gender=Masc|Number=Sing|Poss=Yes|PronType=Prs" }
+      - { form: moje,  feats: "Case=Nom|Gender=Fem|Number=Sing|Poss=Yes|PronType=Prs" }
+      - { form: má,    feats: "Case=Nom|Gender=Fem|Number=Sing|Poss=Yes|PronType=Prs" }
+      - { form: mé,    feats: "Case=Gen|Gender=Fem|Number=Sing|Poss=Yes|PronType=Prs" }
+      - { form: mou,   feats: "Case=Acc|Gender=Fem|Number=Sing|Poss=Yes|PronType=Prs" }
+      - { form: mí,    feats: "Case=Nom|Gender=Masc|Number=Plur|Poss=Yes|PronType=Prs" }
+      - { form: mých,  feats: "Case=Gen|Number=Plur|Poss=Yes|PronType=Prs" }
+      - { form: mými,  feats: "Case=Ins|Number=Plur|Poss=Yes|PronType=Prs" }
+  - { lemma: náš, upos: DET, provenance: manual, forms: [{form: náš, feats: "Case=Nom|Gender=Masc|Number=Sing|Poss=Yes|PronType=Prs"}, {form: naše, feats: "Case=Nom|Gender=Fem|Number=Sing|Poss=Yes|PronType=Prs"}, {form: našeho, feats: "Case=Gen|Gender=Masc|Number=Sing|Poss=Yes|PronType=Prs"}, {form: našich, feats: "Case=Gen|Number=Plur|Poss=Yes|PronType=Prs"}, {form: našim, feats: "Case=Dat|Number=Plur|Poss=Yes|PronType=Prs"}] }
+  - { lemma: váš, upos: DET, provenance: manual, forms: [{form: váš, feats: "Case=Nom|Gender=Masc|Number=Sing|Poss=Yes|PronType=Prs"}, {form: vaše, feats: "Case=Nom|Gender=Fem|Number=Sing|Poss=Yes|PronType=Prs"}, {form: vašeho, feats: "Case=Gen|Gender=Masc|Number=Sing|Poss=Yes|PronType=Prs"}, {form: vašich, feats: "Case=Gen|Number=Plur|Poss=Yes|PronType=Prs"}] }
+  - { lemma: jeho, upos: DET, provenance: manual, forms: [{form: jeho, feats: "Poss=Yes|PronType=Prs"}] }
+  - { lemma: její, upos: DET, provenance: manual, forms: [{form: její, feats: "Poss=Yes|PronType=Prs"}, {form: jejího, feats: "Case=Gen|Gender=Masc|Poss=Yes|PronType=Prs"}, {form: jejím, feats: "Case=Ins|Poss=Yes|PronType=Prs"}] }
+  - { lemma: jejich, upos: DET, provenance: manual, forms: [{form: jejich, feats: "Poss=Yes|PronType=Prs"}] }
+  - { lemma: svůj, upos: DET, provenance: manual, forms: [{form: svůj, feats: "Case=Nom|Gender=Masc|Number=Sing|Poss=Yes|Reflex=Yes"}, {form: svého, feats: "Case=Gen|Gender=Masc|Number=Sing|Poss=Yes|Reflex=Yes"}, {form: svému, feats: "Case=Dat|Gender=Masc|Number=Sing|Poss=Yes|Reflex=Yes"}, {form: svá, feats: "Case=Nom|Gender=Fem|Number=Sing|Poss=Yes|Reflex=Yes"}, {form: svou, feats: "Case=Acc|Gender=Fem|Number=Sing|Poss=Yes|Reflex=Yes"}, {form: své, feats: "Case=Gen|Gender=Fem|Number=Sing|Poss=Yes|Reflex=Yes"}, {form: svých, feats: "Case=Gen|Number=Plur|Poss=Yes|Reflex=Yes"}] }
+  - { lemma: všechen, upos: DET, provenance: manual, forms: [{form: všechen, feats: "Case=Nom|Gender=Masc|Number=Sing|PronType=Tot"}, {form: všechna, feats: "Case=Nom|Gender=Fem|Number=Sing|PronType=Tot"}, {form: všechno, feats: "Case=Nom|Gender=Neut|Number=Sing|PronType=Tot"}, {form: všichni, feats: "Case=Nom|Gender=Masc|Number=Plur|PronType=Tot"}, {form: všech, feats: "Case=Gen|Number=Plur|PronType=Tot"}, {form: všem, feats: "Case=Dat|Number=Plur|PronType=Tot"}, {form: všemi, feats: "Case=Ins|Number=Plur|PronType=Tot"}] }
+
+  # ── numerals 1–10, plus the scale words a business query needs ─────────────
+  - { lemma: jeden, upos: NUM, provenance: manual, forms: [{form: jeden, feats: "Case=Nom|Gender=Masc|Number=Sing|NumType=Card"}, {form: jedna, feats: "Case=Nom|Gender=Fem|Number=Sing|NumType=Card"}, {form: jedno, feats: "Case=Nom|Gender=Neut|Number=Sing|NumType=Card"}, {form: jednoho, feats: "Case=Gen|Gender=Masc|Number=Sing|NumType=Card"}, {form: jednomu, feats: "Case=Dat|Gender=Masc|Number=Sing|NumType=Card"}, {form: jedné, feats: "Case=Gen|Gender=Fem|Number=Sing|NumType=Card"}, {form: jedním, feats: "Case=Ins|Gender=Masc|Number=Sing|NumType=Card"}] }
+  - { lemma: dva, upos: NUM, provenance: manual, forms: [{form: dva, feats: "Case=Nom|Gender=Masc|NumType=Card"}, {form: dvě, feats: "Case=Nom|Gender=Fem|NumType=Card"}, {form: dvou, feats: "Case=Gen|NumType=Card"}, {form: dvěma, feats: "Case=Ins|NumType=Card"}] }
+  - { lemma: tři, upos: NUM, provenance: manual, forms: [{form: tři, feats: "Case=Nom|NumType=Card"}, {form: tří, feats: "Case=Gen|NumType=Card"}, {form: třem, feats: "Case=Dat|NumType=Card"}, {form: třemi, feats: "Case=Ins|NumType=Card"}] }
+  - { lemma: čtyři, upos: NUM, provenance: manual, forms: [{form: čtyři, feats: "Case=Nom|NumType=Card"}, {form: čtyř, feats: "Case=Gen|NumType=Card"}, {form: čtyřem, feats: "Case=Dat|NumType=Card"}, {form: čtyřmi, feats: "Case=Ins|NumType=Card"}] }
+  - { lemma: pět, upos: NUM, provenance: manual, forms: [{form: pět, feats: "Case=Nom|NumType=Card"}, {form: pěti, feats: "Case=Gen|NumType=Card"}] }
+  - { lemma: šest, upos: NUM, provenance: manual, forms: [{form: šest, feats: "Case=Nom|NumType=Card"}, {form: šesti, feats: "Case=Gen|NumType=Card"}] }
+  - { lemma: sedm, upos: NUM, provenance: manual, forms: [{form: sedm, feats: "Case=Nom|NumType=Card"}, {form: sedmi, feats: "Case=Gen|NumType=Card"}] }
+  - { lemma: osm, upos: NUM, provenance: manual, forms: [{form: osm, feats: "Case=Nom|NumType=Card"}, {form: osmi, feats: "Case=Gen|NumType=Card"}] }
+  - { lemma: devět, upos: NUM, provenance: manual, forms: [{form: devět, feats: "Case=Nom|NumType=Card"}, {form: devíti, feats: "Case=Gen|NumType=Card"}] }
+  - { lemma: deset, upos: NUM, provenance: manual, forms: [{form: deset, feats: "Case=Nom|NumType=Card"}, {form: deseti, feats: "Case=Gen|NumType=Card"}] }
+  - { lemma: sto, upos: NUM, vzor: město, provenance: manual }
+  - { lemma: tisíc, upos: NUM, vzor: stroj, provenance: manual }
+  - { lemma: milion, upos: NUM, vzor: hrad, provenance: manual }
+  - { lemma: miliarda, upos: NUM, vzor: žena, provenance: manual }
+  - { lemma: procento, upos: NOUN, vzor: město, provenance: manual }
+
+  # ── ordinals (adjectival — the patterns do carry these) ────────────────────
+  - { lemma: první, upos: ADJ, vzor: jarní, provenance: manual }
+  - { lemma: druhý, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: třetí, upos: ADJ, vzor: jarní, provenance: manual }
+  - { lemma: čtvrtý, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: pátý, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: šestý, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: sedmý, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: osmý, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: devátý, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: desátý, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: poslední, upos: ADJ, vzor: jarní, provenance: manual }
+
+  # ── the irregular verbs ────────────────────────────────────────────────────
+  # GI-1's subset: infinitive, present, imperative, l-participle. No
+  # transgressives, no passives — the runtime does not look those up.
+  - lemma: být
+    upos: AUX
+    provenance: manual
+    forms:
+      - { form: být,   feats: "VerbForm=Inf" }
+      - { form: jsem,  feats: "Mood=Ind|Number=Sing|Person=1|Tense=Pres" }
+      - { form: jsi,   feats: "Mood=Ind|Number=Sing|Person=2|Tense=Pres" }
+      - { form: je,    feats: "Mood=Ind|Number=Sing|Person=3|Tense=Pres" }
+      - { form: jsme,  feats: "Mood=Ind|Number=Plur|Person=1|Tense=Pres" }
+      - { form: jste,  feats: "Mood=Ind|Number=Plur|Person=2|Tense=Pres" }
+      - { form: jsou,  feats: "Mood=Ind|Number=Plur|Person=3|Tense=Pres" }
+      - { form: buď,   feats: "Mood=Imp|Number=Sing|Person=2" }
+      - { form: buďte, feats: "Mood=Imp|Number=Plur|Person=2" }
+      - { form: byl,   feats: "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: byla,  feats: "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: bylo,  feats: "Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: byli,  feats: "Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part" }
+      - { form: byly,  feats: "Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part" }
+      - { form: bude,  feats: "Mood=Ind|Number=Sing|Person=3|Tense=Fut" }
+      - { form: budou, feats: "Mood=Ind|Number=Plur|Person=3|Tense=Fut" }
+      - { form: budu,  feats: "Mood=Ind|Number=Sing|Person=1|Tense=Fut" }
+      - { form: budeme, feats: "Mood=Ind|Number=Plur|Person=1|Tense=Fut" }
+      - { form: není,  feats: "Mood=Ind|Number=Sing|Person=3|Polarity=Neg|Tense=Pres" }
+      - { form: nejsou, feats: "Mood=Ind|Number=Plur|Person=3|Polarity=Neg|Tense=Pres" }
+      # The conditional auxiliary, added at NLS-P8.4 after the eval harness put
+      # `by` at the head of the uncovered table with 169 tokens — the single
+      # commonest word the artifact could not analyse. It is a closed class of
+      # five forms and it was simply missing: the contractions (*abych*, *kdyby*)
+      # were seeded and the words they contract were not. Every Czech
+      # counterfactual — "which customers WOULD exceed" — contains one.
+      - { form: by,     feats: "Mood=Cnd|Person=3" }
+      - { form: bych,   feats: "Mood=Cnd|Number=Sing|Person=1" }
+      - { form: bys,    feats: "Mood=Cnd|Number=Sing|Person=2" }
+      - { form: bychom, feats: "Mood=Cnd|Number=Plur|Person=1" }
+      - { form: byste,  feats: "Mood=Cnd|Number=Plur|Person=2" }
+  - lemma: mít
+    upos: VERB
+    provenance: manual
+    forms:
+      - { form: mít,   feats: "VerbForm=Inf" }
+      - { form: mám,   feats: "Mood=Ind|Number=Sing|Person=1|Tense=Pres" }
+      - { form: máš,   feats: "Mood=Ind|Number=Sing|Person=2|Tense=Pres" }
+      - { form: má,    feats: "Mood=Ind|Number=Sing|Person=3|Tense=Pres" }
+      - { form: máme,  feats: "Mood=Ind|Number=Plur|Person=1|Tense=Pres" }
+      - { form: máte,  feats: "Mood=Ind|Number=Plur|Person=2|Tense=Pres" }
+      - { form: mají,  feats: "Mood=Ind|Number=Plur|Person=3|Tense=Pres" }
+      - { form: měj,   feats: "Mood=Imp|Number=Sing|Person=2" }
+      - { form: mějte, feats: "Mood=Imp|Number=Plur|Person=2" }
+      - { form: měl,   feats: "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: měla,  feats: "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: mělo,  feats: "Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: měli,  feats: "Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part" }
+      - { form: měly,  feats: "Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part" }
+  - lemma: jít
+    upos: VERB
+    provenance: manual
+    forms:
+      - { form: jít,   feats: "VerbForm=Inf" }
+      - { form: jdu,   feats: "Mood=Ind|Number=Sing|Person=1|Tense=Pres" }
+      - { form: jdeš,  feats: "Mood=Ind|Number=Sing|Person=2|Tense=Pres" }
+      - { form: jde,   feats: "Mood=Ind|Number=Sing|Person=3|Tense=Pres" }
+      - { form: jdeme, feats: "Mood=Ind|Number=Plur|Person=1|Tense=Pres" }
+      - { form: jdete, feats: "Mood=Ind|Number=Plur|Person=2|Tense=Pres" }
+      - { form: jdou,  feats: "Mood=Ind|Number=Plur|Person=3|Tense=Pres" }
+      - { form: jdi,   feats: "Mood=Imp|Number=Sing|Person=2" }
+      - { form: jděte, feats: "Mood=Imp|Number=Plur|Person=2" }
+      - { form: šel,   feats: "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: šla,   feats: "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: šlo,   feats: "Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: šli,   feats: "Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part" }
+      - { form: šly,   feats: "Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part" }
+  - lemma: chtít
+    upos: VERB
+    provenance: manual
+    forms:
+      - { form: chtít,  feats: "VerbForm=Inf" }
+      - { form: chci,   feats: "Mood=Ind|Number=Sing|Person=1|Tense=Pres" }
+      - { form: chceš,  feats: "Mood=Ind|Number=Sing|Person=2|Tense=Pres" }
+      - { form: chce,   feats: "Mood=Ind|Number=Sing|Person=3|Tense=Pres" }
+      - { form: chceme, feats: "Mood=Ind|Number=Plur|Person=1|Tense=Pres" }
+      - { form: chcete, feats: "Mood=Ind|Number=Plur|Person=2|Tense=Pres" }
+      - { form: chtějí, feats: "Mood=Ind|Number=Plur|Person=3|Tense=Pres" }
+      - { form: chtěl,  feats: "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: chtěla, feats: "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: chtěli, feats: "Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part" }
+  - lemma: moci
+    upos: VERB
+    provenance: manual
+    forms:
+      - { form: moci,   feats: "VerbForm=Inf" }
+      - { form: moct,   feats: "VerbForm=Inf" }
+      - { form: mohu,   feats: "Mood=Ind|Number=Sing|Person=1|Tense=Pres" }
+      - { form: můžu,   feats: "Mood=Ind|Number=Sing|Person=1|Tense=Pres" }
+      - { form: můžeš,  feats: "Mood=Ind|Number=Sing|Person=2|Tense=Pres" }
+      - { form: může,   feats: "Mood=Ind|Number=Sing|Person=3|Tense=Pres" }
+      - { form: můžeme, feats: "Mood=Ind|Number=Plur|Person=1|Tense=Pres" }
+      - { form: můžete, feats: "Mood=Ind|Number=Plur|Person=2|Tense=Pres" }
+      - { form: mohou,  feats: "Mood=Ind|Number=Plur|Person=3|Tense=Pres" }
+      - { form: mohl,   feats: "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: mohla,  feats: "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: mohli,  feats: "Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part" }
+  - lemma: vědět
+    upos: VERB
+    provenance: manual
+    forms:
+      - { form: vědět, feats: "VerbForm=Inf" }
+      - { form: vím,   feats: "Mood=Ind|Number=Sing|Person=1|Tense=Pres" }
+      - { form: víš,   feats: "Mood=Ind|Number=Sing|Person=2|Tense=Pres" }
+      - { form: ví,    feats: "Mood=Ind|Number=Sing|Person=3|Tense=Pres" }
+      - { form: víme,  feats: "Mood=Ind|Number=Plur|Person=1|Tense=Pres" }
+      - { form: víte,  feats: "Mood=Ind|Number=Plur|Person=2|Tense=Pres" }
+      - { form: vědí,  feats: "Mood=Ind|Number=Plur|Person=3|Tense=Pres" }
+      - { form: věz,   feats: "Mood=Imp|Number=Sing|Person=2" }
+      - { form: věděl, feats: "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: věděla, feats: "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: věděli, feats: "Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part" }
+  - lemma: jíst
+    upos: VERB
+    provenance: manual
+    forms:
+      - { form: jíst,  feats: "VerbForm=Inf" }
+      - { form: jím,   feats: "Mood=Ind|Number=Sing|Person=1|Tense=Pres" }
+      - { form: jíš,   feats: "Mood=Ind|Number=Sing|Person=2|Tense=Pres" }
+      - { form: jí,    feats: "Mood=Ind|Number=Sing|Person=3|Tense=Pres" }
+      - { form: jíme,  feats: "Mood=Ind|Number=Plur|Person=1|Tense=Pres" }
+      - { form: jíte,  feats: "Mood=Ind|Number=Plur|Person=2|Tense=Pres" }
+      - { form: jedí,  feats: "Mood=Ind|Number=Plur|Person=3|Tense=Pres" }
+      - { form: jedl,  feats: "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: jedla, feats: "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part" }
+      - { form: jedli, feats: "Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part" }
+
+  # ── the hero verb neither source carried (NLS-P8.4) ────────────────────────
+  # `zobrazit` is the first word of the NL hero and it arrived from CAC with a
+  # single attested form — the infinitive — because English Wiktionary has no
+  # entry for it and the corpus happens never to use its imperative. So *Zobraz*,
+  # the word the query actually starts with, had no analysis at all, while the
+  # target-coverage number read 147/149: the lemma resolved to itself, and a
+  # lemma that resolves to itself out of one form is a word the runtime cannot
+  # see in any sentence a user would write. The acceptance case found it; the
+  # harness now reports THIN targets so the next one is found by a number.
+  #
+  # It is a plain `prosit` verb, which is why it needs three words here and not
+  # a form table.
+  - { lemma: zobrazit, upos: VERB, vzor: prosit, provenance: manual }
+
+  # The same shape, found by the thin check rather than by a case: *pololetí*
+  # is syncretic in nine of its cells, so a corpus that used it once looks like
+  # a complete entry. It is not — *pololetím* and *pololetích* are the two
+  # forms a half-year query actually contains.
+  - { lemma: pololetí, upos: NOUN, vzor: stavení, provenance: manual }
+
+  # ── the ne-exceptions ──────────────────────────────────────────────────────
+  # Every one of these begins with the negation prefix and is not a negation.
+  # `ne_exception: true` puts the WHOLE paradigm into the snapshot's
+  # `#ne-exceptions` section, because the runtime tests the surface form it was
+  # handed and *nemocí* is exactly as un-strippable as *nemoc*.
+  - { lemma: nemoc, upos: NOUN, vzor: kost, ne_exception: true, provenance: manual }
+  - { lemma: nemocnice, upos: NOUN, vzor: růže, ne_exception: true, provenance: manual }
+  - { lemma: nemocný, upos: ADJ, vzor: mladý, ne_exception: true, provenance: manual }
+  - { lemma: nebe, upos: NOUN, vzor: moře, ne_exception: true, provenance: manual }
+  - { lemma: neděle, upos: NOUN, vzor: růže, ne_exception: true, provenance: manual }
+  - { lemma: nehoda, upos: NOUN, vzor: žena, ne_exception: true, provenance: manual }
+  - { lemma: nenávist, upos: NOUN, vzor: kost, ne_exception: true, provenance: manual }
+  - { lemma: nerv, upos: NOUN, vzor: hrad, ne_exception: true, provenance: manual }
+  - { lemma: nevěsta, upos: NOUN, vzor: žena, ne_exception: true, provenance: manual }
+  - { lemma: nezávislost, upos: NOUN, vzor: kost, ne_exception: true, provenance: manual }
+  - { lemma: nemovitost, upos: NOUN, vzor: kost, ne_exception: true, provenance: manual }
+  - { lemma: nezaměstnanost, upos: NOUN, vzor: kost, ne_exception: true, provenance: manual }
+  - { lemma: nedostatek, upos: NOUN, vzor: hrad, flags: [fleeting-e], ne_exception: true, provenance: manual }
+  - { lemma: negativní, upos: ADJ, vzor: jarní, ne_exception: true, provenance: manual }
+  - { lemma: nejistota, upos: NOUN, vzor: žena, ne_exception: true, provenance: manual }
+  - { lemma: němec, upos: NOUN, vzor: muž, flags: [fleeting-e], ne_exception: true, provenance: manual }
+  - { lemma: německý, upos: ADJ, vzor: mladý, ne_exception: true, provenance: manual }
+
+  # ── the vzor lemmas themselves ─────────────────────────────────────────────
+  # The words the patterns are named after belong in the lexicon those patterns
+  # define. `pán` is the exception it always was: its vocative is irregularly
+  # short (*pane*, not *páne*), which contracts §3 handles as forms, not a flag.
+  - { lemma: žena, upos: NOUN, vzor: žena, provenance: manual }
+  - { lemma: růže, upos: NOUN, vzor: růže, provenance: manual }
+  - { lemma: píseň, upos: NOUN, vzor: píseň, provenance: manual }
+  - { lemma: kost, upos: NOUN, vzor: kost, provenance: manual }
+  - { lemma: hrad, upos: NOUN, vzor: hrad, provenance: manual }
+  - { lemma: stroj, upos: NOUN, vzor: stroj, provenance: manual }
+  - { lemma: muž, upos: NOUN, vzor: muž, provenance: manual }
+  - { lemma: předseda, upos: NOUN, vzor: předseda, provenance: manual }
+  - { lemma: soudce, upos: NOUN, vzor: soudce, provenance: manual }
+  - { lemma: město, upos: NOUN, vzor: město, provenance: manual }
+  - { lemma: moře, upos: NOUN, vzor: moře, provenance: manual }
+  - { lemma: kuře, upos: NOUN, vzor: kuře, provenance: manual }
+  - { lemma: stavení, upos: NOUN, vzor: stavení, provenance: manual }
+  - { lemma: mladý, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: jarní, upos: ADJ, vzor: jarní, provenance: manual }
+  - { lemma: dělat, upos: VERB, vzor: dělat, provenance: manual }
+  - { lemma: prosit, upos: VERB, vzor: prosit, provenance: manual }
+  - { lemma: kupovat, upos: VERB, vzor: kupovat, provenance: manual }
+  - { lemma: tisknout, upos: VERB, vzor: tisknout, provenance: manual }
+  - { lemma: minout, upos: VERB, vzor: minout, provenance: manual }
+  - { lemma: začít, upos: VERB, vzor: začít, provenance: manual }

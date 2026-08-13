@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: feminine place names
+lemma: Ostrava
+vzor: zena-proper
+flags: []
+table:
+  Case=Acc|Gender=Fem|Number=Plur:
+  - Ostravy
+  Case=Acc|Gender=Fem|Number=Sing:
+  - Ostravu
+  Case=Dat|Gender=Fem|Number=Plur:
+  - Ostravám
+  Case=Dat|Gender=Fem|Number=Sing:
+  - Ostravě
+  Case=Gen|Gender=Fem|Number=Plur:
+  - Ostrav
+  Case=Gen|Gender=Fem|Number=Sing:
+  - Ostravy
+  Case=Ins|Gender=Fem|Number=Plur:
+  - Ostravami
+  Case=Ins|Gender=Fem|Number=Sing:
+  - Ostravou
+  Case=Loc|Gender=Fem|Number=Plur:
+  - Ostravách
+  Case=Loc|Gender=Fem|Number=Sing:
+  - Ostravě
+  Case=Nom|Gender=Fem|Number=Plur:
+  - Ostravy
+  Case=Nom|Gender=Fem|Number=Sing:
+  - Ostrava
+  Case=Voc|Gender=Fem|Number=Plur:
+  - Ostravy
+  Case=Voc|Gender=Fem|Number=Sing:
+  - Ostravo
+classify_as:
+  vzor: žena
+  flags: []

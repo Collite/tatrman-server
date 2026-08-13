@@ -1,0 +1,143 @@
+name: Export Gazetteer Lists (C-O2)
+
+# Re-export the generation-expanded gazetteer lists after a morph snapshot bump.
+#
+# C-O2 is design law: expanded lists must never lag the lexicon they were
+# expanded from. `publish-morph.yml`'s third job dispatches this one after every
+# `morph/v*-RELEASE`, so the two artifacts move together or the diff says why.
+#
+# **An empty run is a correct run.** The targets live in
+# `.github/export-targets.yaml` and that file is currently empty on purpose:
+# the exporter is world-side (NL-17), so a lexicon area and the lists it
+# produces belong to a model repo, and the re-export runs where the lists are.
+# What is here is the lane — dispatchable, and green with nothing to do — so
+# that adding a target later is one entry rather than a workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why this run was dispatched (recorded in the PR body)'
+        required: false
+        default: 'manual'
+      open_pr:
+        description: 'Open a PR with the diff (off = report it and stop)'
+        type: boolean
+        default: false
+      snapshot_tag:
+        description: 'morph/v* release to expand from (blank = compile from the repo)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  MORPH_DIR: shared/libs/python/ttr-morph
+  DIST: dist/morph
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the targets
+        id: targets
+        run: |
+          set -euo pipefail
+          FILE=.github/export-targets.yaml
+          COUNT=$(python3 - "$FILE" <<'PY'
+          import sys, yaml
+          document = yaml.safe_load(open(sys.argv[1], encoding="utf-8")) or {}
+          print(len(document.get("targets") or []))
+          PY
+          )
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "${COUNT} re-export target(s) in ${FILE}"
+
+      - name: Nothing to re-export
+        if: steps.targets.outputs.count == '0'
+        run: |
+          echo "::notice::C-O2 ran with 0 targets — tatrman-server owns no exported gazetteer lists. This is the documented state, not a skipped step; see .github/export-targets.yaml."
+
+      - uses: astral-sh/setup-uv@v5
+        if: steps.targets.outputs.count != '0'
+        with:
+          enable-cache: true
+
+      - name: Get the snapshot
+        if: steps.targets.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${DIST}"
+          if [ -n "${{ github.event.inputs.snapshot_tag }}" ]; then
+            # The published artifact, not a rebuild of it: the lists have to be
+            # expanded from the same bytes the runtime will load (⚑ verify from
+            # the artifact, never from the source it was built from).
+            gh release download "${{ github.event.inputs.snapshot_tag }}" \
+              --dir "${DIST}" --pattern 'cs.morph.snap' --pattern '*.morph.part'
+          else
+            just morph-compile 0.0.0-export
+          fi
+          ls -l "${DIST}"
+
+      - name: Re-export every target
+        if: steps.targets.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > targets.txt
+          import yaml
+          document = yaml.safe_load(open(".github/export-targets.yaml", encoding="utf-8"))
+          for target in document.get("targets") or []:
+              print(target["lexicon"], target["lists"], target["config"], sep="\t")
+          PY
+          while IFS=$'\t' read -r LEXICON LISTS CONFIG; do
+            echo "::group::${LEXICON} -> ${LISTS}"
+            SNAPS=""
+            for f in "${DIST}"/cs.morph.snap "${DIST}"/*.morph.part; do
+              [ -f "$f" ] && SNAPS="$SNAPS --snapshot ${GITHUB_WORKSPACE}/$f"
+            done
+            # shellcheck disable=SC2086
+            (cd services/nlp && uv run python tools/export_lexicon.py \
+              "${GITHUB_WORKSPACE}/${LEXICON}" -o "${GITHUB_WORKSPACE}/${LISTS}" \
+              --morph "${GITHUB_WORKSPACE}/${CONFIG}" $SNAPS)
+            echo "::endgroup::"
+          done < targets.txt
+          rm -f targets.txt
+
+      - name: Report the diff
+        if: steps.targets.outputs.count != '0'
+        id: diff
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::the exported lists already match the snapshot — nothing to do"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git --no-pager diff --stat
+          fi
+
+      - name: Open the diff PR
+        if: steps.diff.outputs.changed == 'true' && github.event.inputs.open_pr == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: c-o2/expanded-lists
+          title: 'C-O2: re-expand gazetteer lists'
+          commit-message: 'C-O2: re-expand gazetteer lists after a morph snapshot bump'
+          body: |
+            Generated by `export-lists.yml`.
+
+            **Reason:** ${{ github.event.inputs.reason }}
+            **Snapshot:** ${{ github.event.inputs.snapshot_tag || 'compiled from this ref' }}
+
+            Expanded lists must never lag the lexicon they were expanded from
+            (C-O2). Review the diff as vocabulary, not as code: every added term
+            is a form the morph snapshot now holds, and every removed one is a
+            form it no longer does.

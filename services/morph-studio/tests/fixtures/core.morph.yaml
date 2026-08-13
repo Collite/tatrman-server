@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P9.2 — a minimal CORE snapshot for the Q-7 tests.
+#
+# `load_morph` requires the first source to be a core snapshot and every later
+# one to be an overlay (NL-15), which is the rule that keeps a deployment from
+# serving a world's vocabulary as though it were the published lexicon. So the
+# provisional tests need a core to hang their overlay on, and this is the
+# smallest one that is still a real artifact.
+#
+# It deliberately does NOT contain Kaufland or Microsoft: proper nouns are a
+# world's data (LM-10), and the whole of what those tests assert is that the
+# name is reachable only through the overlay the studio wrote.
+layer: core-test
+version: 1
+language: cs
+license: suite
+attribution: null
+entries:
+  - { lemma: tržba, upos: NOUN, vzor: žena, provenance: manual }
+  - { lemma: faktura, upos: NOUN, vzor: žena, provenance: manual }

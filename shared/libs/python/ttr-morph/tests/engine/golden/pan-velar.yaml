@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: masculine animate, velar stem — the single largest class of noun mismatches in the D-O1 sample (pracovníku,
+  not *pracovníce)
+lemma: zákazník
+vzor: pan-velar
+flags: []
+table:
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Plur:
+  - zákazníky
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing:
+  - zákazníka
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Plur:
+  - zákazníkům
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Sing:
+  - zákazníkovi
+  - zákazníku
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Plur:
+  - zákazníků
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Sing:
+  - zákazníka
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Plur:
+  - zákazníky
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Sing:
+  - zákazníkem
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Plur:
+  - zákaznících
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Sing:
+  - zákazníkovi
+  - zákazníku
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur:
+  - zákazníci
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Sing:
+  - zákazník
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur:
+  - zákazníci
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Sing:
+  - zákazníku

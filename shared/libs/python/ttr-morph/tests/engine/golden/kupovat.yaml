@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: class 3, -ovat
+lemma: kupovat
+vzor: kupovat
+flags: []
+table:
+  Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - kupovali
+  Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - kupovaly
+  Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part:
+  - kupovaly
+  Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part:
+  - kupovala
+  Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part:
+  - kupoval
+  Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part:
+  - kupovala
+  Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part:
+  - kupovalo
+  Mood=Imp|Number=Plur|Person=1|VerbForm=Fin:
+  - kupujme
+  Mood=Imp|Number=Plur|Person=2|VerbForm=Fin:
+  - kupujte
+  Mood=Imp|Number=Sing|Person=2|VerbForm=Fin:
+  - kupuj
+  Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin:
+  - kupujeme
+  Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin:
+  - kupujete
+  Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin:
+  - kupují
+  Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin:
+  - kupuji
+  Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin:
+  - kupuješ
+  Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin:
+  - kupuje
+  VerbForm=Inf:
+  - kupovat

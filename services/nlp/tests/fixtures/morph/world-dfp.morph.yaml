@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P9.1 — the `dfp` world's entity overlay.
+#
+# The names. LM-10 routes a proper noun or a model-vocabulary match to the
+# world's own entity layer rather than to the core queue, and this file is what
+# that produces: two customers, declined, so *Kauflandu* in the genitive resolves
+# to *Kaufland* and the hero's `nazev_zakaznika` comes out as a lemma rather than
+# as whatever case the writer happened to use.
+#
+# ⚑ This is why the default lane still answers. The hero pack's fallback rule
+# matches `upos: PROPN`; the core lexicon does not know these words and a stem
+# guess answers `X` (UD's "no idea"). Without an overlay, a cs deployment with no
+# NER engine and no world entity layer reaches no QueryPattern at all — which is
+# a correct outcome, and one worth having a fixture prove rather than discover
+# on a cluster.
+layer: dfp-entities
+version: 1
+language: cs
+license: suite
+attribution: null
+entries:
+  - { lemma: Kaufland, upos: PROPN, vzor: hrad, provenance: manual }
+  - { lemma: Microsoft, upos: PROPN, vzor: hrad, provenance: manual }

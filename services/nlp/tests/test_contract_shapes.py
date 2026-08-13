@@ -283,6 +283,11 @@ WIRE_SHAPES: dict[str, list[tuple[str, int, str]]] = {
         ("lane", 3, "string"),
         ("pipelines", 4, "repeated PipelineInfo"),
         ("pack_state", 5, "PackState"),
+        # NLS-P9.1 (LM). Written down here because this table is the review
+        # moment for a proto edit — fields 1-5 above are byte-for-byte what they
+        # were, which is the whole of ⚑LMP-D3's additive rule, and this line is
+        # the diff somebody has to have read.
+        ("morph_state", 6, "MorphState"),
     ],
     # ── NLS additions (contracts §2.1-§2.4) ─────────────────────────────────
     "FeatureValue": [
@@ -366,6 +371,17 @@ WIRE_SHAPES: dict[str, list[tuple[str, int, str]]] = {
     ],
     "ReportTokenResponse": [
         ("accepted", 1, "bool"),
+    ],
+    # ── LM (NLS-P9.1) — the loaded snapshot, on the wire ────────────────────
+    "MorphState": [
+        ("version", 1, "string"),
+        ("language", 2, "string"),
+        ("rows", 3, "int32"),
+        ("forms", 4, "int32"),
+        ("worlds", 5, "repeated string"),
+        ("content_hash", 6, "string"),
+        ("fold_collisions", 7, "int32"),
+        ("diagnostics", 8, "repeated PackDiagnostic"),
     ],
 }
 

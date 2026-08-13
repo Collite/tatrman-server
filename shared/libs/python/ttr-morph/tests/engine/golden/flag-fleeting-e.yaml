@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: vowel drops out
+lemma: pes
+vzor: pán
+flags:
+- fleeting-e
+table:
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Plur:
+  - psy
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing:
+  - psa
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Plur:
+  - psům
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Sing:
+  - psovi
+  - psu
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Plur:
+  - psů
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Sing:
+  - psa
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Plur:
+  - psy
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Sing:
+  - psem
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Plur:
+  - psech
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Sing:
+  - psovi
+  - psu
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur:
+  - psi
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Sing:
+  - pes
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur:
+  - psi
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Sing:
+  - pse

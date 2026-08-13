@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: 'the -é animate nominative plural: a closed class the stem cannot predict'
+lemma: Athéňan
+vzor: pan-e
+flags: []
+table:
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Plur:
+  - Athéňany
+  Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing:
+  - Athéňana
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Plur:
+  - Athéňanům
+  Animacy=Anim|Case=Dat|Gender=Masc|Number=Sing:
+  - Athéňanovi
+  - Athéňanu
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Plur:
+  - Athéňanů
+  Animacy=Anim|Case=Gen|Gender=Masc|Number=Sing:
+  - Athéňana
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Plur:
+  - Athéňany
+  Animacy=Anim|Case=Ins|Gender=Masc|Number=Sing:
+  - Athéňanem
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Plur:
+  - Athéňanech
+  Animacy=Anim|Case=Loc|Gender=Masc|Number=Sing:
+  - Athéňanovi
+  - Athéňanu
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur:
+  - Athéňané
+  Animacy=Anim|Case=Nom|Gender=Masc|Number=Sing:
+  - Athéňan
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur:
+  - Athéňané
+  Animacy=Anim|Case=Voc|Gender=Masc|Number=Sing:
+  - Athéňane

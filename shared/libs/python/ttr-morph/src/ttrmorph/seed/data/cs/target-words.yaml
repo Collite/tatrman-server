@@ -1,0 +1,195 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The target vocabulary of the LM core lexicon: the closed analytical
+# vocabulary of the query domain (design §6 / detailed-design §1), plus every
+# word the NLS heroes actually contain.
+#
+# This is a **coverage target**, not a lexicon. It says which words the core
+# layers must be able to analyse; what their entries look like is decided by
+# the seeding pipeline (hand seed -> kaikki -> CAC -> LLM bootstrap). The
+# D-O1 spike measures a source against this list, and NLS-P8.3/P8.4 measure
+# the compiled snapshot against it.
+#
+# Boundaries that keep it honest (FI-1): no general speech, no domain data.
+# Entity names, measure and dimension aliases and client terms are the *open*
+# vocabulary and belong to world layers, which is why "Kaufland" and
+# "Microsoft" are absent here and present in the hero fixtures.
+
+language: cs
+version: 1
+
+groups:
+  # Every content word the NLS hero fixtures contain, lemmatized. These are the
+  # words the acceptance cases (S-7) resolve through, so a source that misses
+  # them fails the only test that is not a statistic.
+  hero:
+    - zobrazit      # "Zobraz vsechny faktury od zakaznika Microsoft"
+    - všechen
+    - faktura
+    - od
+    - zákazník
+    - najít         # "Najdi roli obchodni zastupce"
+    - role
+    - obchodní
+    - zástupce
+    - porovnat      # "Porovnej trzby Kauflandu za lonsky rok s letosnim"
+    - tržba
+    - za
+    - loňský
+    - rok
+    - s
+    - letošní
+
+  # What a user asks the data to DO. The verb is the part the rule packs match
+  # on, so a missing imperative is a query that does not parse at all.
+  action:
+    - ukázat
+    - vypsat
+    - spočítat
+    - sečíst
+    - seřadit
+    - filtrovat
+    - vybrat
+    - omezit
+    - rozdělit
+    - shrnout
+    - vyhledat
+    - přidat
+    - odebrat
+    - změnit
+    - začít
+    - skončit
+    - pokračovat
+
+  # The measures and dimensions of a business query, as words rather than as
+  # model entities. A world's own glossary names its columns; these are what a
+  # user says instead of naming them.
+  measure:
+    - součet
+    - průměr
+    - počet
+    - množství
+    - částka
+    - cena
+    - sleva
+    - marže
+    - náklad
+    - výnos
+    - zisk
+    - obrat
+    - podíl
+    - růst
+    - pokles
+    - rozdíl
+    - hodnota
+    - sazba
+    - kurz
+
+  business:
+    - objednávka
+    - položka
+    - produkt
+    - zboží
+    - sklad
+    - dodavatel
+    - odběratel
+    - platba
+    - daň
+    - měna
+    - smlouva
+    - pobočka
+    - region
+    - oblast
+    - trh
+    - kampaň
+    - projekt
+    - středisko
+    - účet
+    - doklad
+    - zásoba
+    - prodej
+    - nákup
+
+  # Time is where Czech morphology hurts most: every one of these is asked for
+  # in three or four cases in a single sentence.
+  time:
+    - den
+    - týden
+    - měsíc
+    - čtvrtletí
+    - kvartál
+    - pololetí
+    - období
+    - datum
+    - dnes
+    - včera
+    - zítra
+    - leden
+    - únor
+    - březen
+    - duben
+    - květen
+    - červen
+    - červenec
+    - srpen
+    - září
+    - říjen
+    - listopad
+    - prosinec
+
+  qualifier:
+    - minulý
+    - poslední
+    - předchozí
+    - následující
+    - celkový
+    - průměrný
+    - měsíční
+    - roční
+    - denní
+    - týdenní
+    - nový
+    - starý
+    - velký
+    - malý
+    - vysoký
+    - nízký
+    - hlavní
+    - největší
+    - nejmenší
+    - nejvyšší
+    - nejnižší
+    - český
+
+  # The closed class. Small, finite, and hand-seeded first (design §6) — but a
+  # source that cannot supply it is a source that cannot supply the easy part.
+  function:
+    - do
+    - podle
+    - mezi
+    - přes
+    - pro
+    - bez
+    - při
+    - na
+    - v
+    - o
+    - k
+    - u
+    - který
+    - jaký
+    - kolik
+    - každý
+    - žádný
+    - nějaký
+    - tento
+    - ten
+    - a
+    - nebo
+    - ale
+    - než
+    - jako
+    - kde
+    - kdy
+    - jak
+    - proč

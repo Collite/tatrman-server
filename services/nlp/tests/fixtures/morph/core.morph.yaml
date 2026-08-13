@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P9.1 — the core lexicon the service pipeline tests run against.
+#
+# Hand-authored, `license: suite`, small on purpose: every word in the two hero
+# sentences EXCEPT the proper nouns, which are not core vocabulary and belong to
+# a world's own entity layer (LM-10, `world-dfp.morph.yaml`). That split is the
+# fixture's whole subject — a service test that put *Microsoft* in here would
+# prove the pipeline works and hide the reason overlays exist.
+#
+# Deliberately NOT the real `shared/libs/python/ttr-morph/lexicon/cs` tree: that
+# artifact is 25k rows, is built by a release lane, and would make this suite's
+# assertions depend on which words a corpus importer happened to cover this
+# month. The component tier (`-m component`) runs against the real one.
+layer: core-hand
+version: 1
+language: cs
+license: suite
+attribution: null
+entries:
+  # ── the invoices hero ──────────────────────────────────────────────────────
+  - { lemma: zobrazit, upos: VERB, vzor: prosit, provenance: manual }
+  - { lemma: faktura, upos: NOUN, vzor: žena, provenance: manual }
+  - { lemma: zákazník, upos: NOUN, vzor: pán, provenance: manual }
+  - { lemma: od, upos: ADP, provenance: manual,
+      forms: [{ form: od, feats: "Case=Gen" }] }
+  # Full-form, because *všechen* is a pronominal declension no vzor covers —
+  # the same reason the real hand seed carries the pronouns whole.
+  - { lemma: všechen, upos: DET, provenance: manual,
+      forms: [{ form: všechen, feats: "Case=Nom|Gender=Masc|Number=Sing" },
+              { form: všechny, feats: "Case=Acc|Gender=Fem|Number=Plur" },
+              { form: všechna, feats: "Case=Nom|Gender=Neut|Number=Plur" }] }
+
+  # ── the compare hero ───────────────────────────────────────────────────────
+  # Full-form: *porovnat* is a class-5 (`dělat`) verb and the seed vzor tables
+  # carry no `dělat` yet — the gap is real, it belongs to the lexicon effort,
+  # and a fixture that papered over it with the wrong pattern would generate
+  # forms Czech does not have.
+  - { lemma: porovnat, upos: VERB, provenance: manual,
+      forms: [{ form: porovnat, feats: "VerbForm=Inf" },
+              { form: porovnej, feats: "Mood=Imp|Number=Sing|Person=2" }] }
+  - { lemma: tržba, upos: NOUN, vzor: žena, provenance: manual }
+  - { lemma: rok, upos: NOUN, vzor: hrad, provenance: manual }
+  - { lemma: loňský, upos: ADJ, vzor: mladý, provenance: manual }
+  - { lemma: letošní, upos: ADJ, vzor: jarní, provenance: manual }
+  - { lemma: za, upos: ADP, provenance: manual,
+      forms: [{ form: za, feats: "Case=Acc" }] }
+  - { lemma: s, upos: ADP, provenance: manual,
+      forms: [{ form: s, feats: "Case=Ins" }] }
+
+  # ── one deliberate fold collision ──────────────────────────────────────────
+  # *byt* and *být* fold to the same key, which is what the match-if-any
+  # gazetteer (LM-8) and the exact-before-folded rule (contracts §5) are for.
+  - { lemma: byt, upos: NOUN, vzor: hrad, provenance: manual }
+  - { lemma: být, upos: AUX, provenance: manual,
+      forms: [{ form: být, feats: "VerbForm=Inf" }] }

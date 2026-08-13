@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P7.3.T6 — the LM hero, end to end at the wheel tier.
+#
+#   "Porovnej tržby Kauflandu za loňský rok s letošním"
+#
+# Two phases, for the reason the invoices hero states at length: `input:` is
+# per-phase and a `Lookup` laid over a `Token` shares its start offset, so a
+# phase listing both never reaches the Lookup. The token-level signal is lifted
+# into the matching layer first.
+#
+# ── What makes this hero an LM hero ──────────────────────────────────────────
+#
+# The lift rule matches on `morph_provenance: statistical` — a token the curated
+# lexicon could not answer. In this sentence that is exactly one word,
+# "Kauflandu", and it is the word the query is about. The miss IS the entity
+# candidate: the same event that puts the token on the enrichment queue (the
+# NLS-P9 loop) also lets the query match today, before anyone has curated
+# anything. That is the whole design in one rule.
+#
+# It works identically on the diacritics-less twin, because every other word
+# resolves through the fold index and comes back `lexicon`.
+pack: lm-hero
+version: 1
+phases:
+  - phase: name-candidates
+    input: [Token]
+    control: brill
+    rules:
+      - rule: AnUnknownWordIsANameCandidate
+        lhs:
+          - { ann: Token, features: { morph_provenance: statistical } }
+        rhs:
+          - add:
+              type: NameCandidate
+              features:
+                source: morph-miss
+
+  - phase: query-match
+    input: [Lookup, NameCandidate]
+    control: appelt
+    rules:
+      - rule: PorovnaniTrzeb
+        lhs:
+          - { ann: Lookup, features: { kind: entity_alias, entity: trzba } }
+          - { ann: NameCandidate, bind: name }
+          - { ann: Lookup, features: { kind: entity_alias, entity: rok } }
+        rhs:
+          - add:
+              type: QueryPattern
+              features:
+                query: porovnani_trzeb
+                nazev_subjektu: { from: name, get: "@string" }

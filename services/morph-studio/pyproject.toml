@@ -1,0 +1,85 @@
+[project]
+name = "morph-studio"
+version = "0.1.0"
+description = "morph-studio — the editorial service for the Czech morphology lexicon (LM): PG working store, enrichment cascade, layer-file export"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.128.0",
+    "uvicorn[standard]>=0.40.0",
+    "pydantic>=2.0.0",
+    # The working store (contracts §7). SQLAlchemy 2.x ORM over psycopg 3;
+    # alembic owns the schema. `psycopg[binary]` so the image needs no libpq
+    # build stage — this service is small and its Dockerfile should stay so.
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2.3",
+    "alembic>=1.14.0",
+    # The LLM leg's transport, and nothing else uses it.
+    "httpx>=0.27.0",
+    # ⚑ THE ENGINE. The guesser, the cascade, the paradigm generator and the
+    # layer-file writer all live in `ttr-morph` and are imported, not
+    # reimplemented: the studio proposes what the compiler will accept and
+    # nothing else, and the only way to guarantee that is to run the compiler's
+    # own code. `ttr-morph` is not on PyPI (⚑LMP-D4), so this is a workspace
+    # path dependency and this service builds only inside the monorepo — the
+    # same posture `nlp-morph-tools` takes.
+    "ttr-morph",
+    # The front's gRPC client, for the Q-7 reload trigger. The `[grpc]` extra
+    # carries the bundled `org.tatrman.nlp.v1` stubs, so this service does NOT
+    # generate its own — one fewer build step, and no second copy of a
+    # generated module in one process (see `ttrnlp.proto`).
+    "ttr-nlp[grpc]",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.0",
+    "ruff>=0.9.4",
+    # The FastAPI test client's transport.
+    "httpx>=0.27.0",
+    # protoc + the grpc_python plugin, for the ARC-GATE-7 component test alone:
+    # it drives the front over gRPC, and in a source checkout `ttr-nlp[grpc]`'s
+    # extra cannot supply the stubs (they are bundled by a wheel BUILD hook).
+    # ⚑ Nothing in the unit suite touches this — `test_gate7._ensure_stubs`
+    # skips with the command when it is absent rather than failing collection,
+    # which is what this entry being missing once cost.
+    "grpcio-tools>=1.68.0",
+]
+
+[tool.uv]
+# Not an installable package (no build-system); deps-only, like services/nlp
+# and services/golem-py. Tests import `morph_studio` via the pytest
+# `pythonpath` below.
+package = false
+
+[tool.uv.sources]
+ttr-morph = { path = "../../shared/libs/python/ttr-morph", editable = true }
+ttr-nlp = { path = "../../shared/libs/python/ttr-nlp", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# ⚑ The wheel's generated `org.tatrman.{nlp,common}.v1` stubs ride along. They
+# are gitignored, and in a SOURCE checkout `ttr-nlp[grpc]`'s extra cannot supply
+# them — the extra bundles `src/ttrnlp/_proto`, which only a wheel BUILD
+# produces. Without this the Q-7 reload leg (`provisional.reload_front`) cannot
+# even be imported outside a container, which is precisely where the gate-7
+# component test runs. `conftest.py` generates them when they are absent.
+pythonpath = ["src", "../../shared/libs/python/ttr-nlp/generated"]
+# The unit tier runs the whole service — every endpoint, the status machine,
+# the cascade, export — against SQLite. The component tier runs the SAME suite's
+# schema and migrations against a real Postgres and is opt-in, because a unit
+# suite that needs a database daemon is a unit suite people stop running.
+addopts = ["-m", "not component"]
+markers = [
+    "component: needs a real Postgres (MORPH_STUDIO_PG_URL); no cluster",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

@@ -1,0 +1,73 @@
+[project]
+name = "ttr-morph"
+# STAYS 0.0.0 AND STAYS OFF PyPI (⚑LMP-D4). The published artifact of this
+# effort is the *snapshot* — `morph/v<x.y.z>` (contracts §10) — not this
+# package. What ships is the compiled `cs.morph.snap` plus, for world repos
+# that need to validate their own layer files, the `nlp-morph-tools` image with
+# this CLI baked in. There is deliberately no `publish-morph-wheel` lane: a
+# published editorial toolchain is a compatibility promise nobody asked for.
+version = "0.0.0"
+description = "Czech paradigm engine, lexicon importers and snapshot compiler for the Tatrman morphology layer (LM)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Collite" }]
+keywords = ["morphology", "czech", "lemmatization", "paradigm", "ttr"]
+
+dependencies = [
+    # THE fold definition lives in the wheel and is re-exported here
+    # (contracts §4). The compiler and the runtime must fold identically or
+    # every folded lookup silently misses, and the only way to guarantee that
+    # is to have one implementation — so this package depends on the wheel
+    # rather than the other way round.
+    "ttr-nlp",
+    "pydantic>=2",
+    "pyyaml>=6",
+    # CoNLL-U reader for the UD_Czech-CAC lane (P8.3 importer, P8.4 eval).
+    "conllu>=4.5",
+]
+
+[project.scripts]
+ttr-morph = "ttrmorph.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Collite/tatrman-server"
+Source = "https://github.com/Collite/tatrman-server/tree/master/shared/libs/python/ttr-morph"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Ships every file under src/ttrmorph, which is what puts `seed/data/cs/*.yaml`
+# inside the package. The vzor tables are DATA (LM-2) but they are not
+# *external* data: the engine is useless without them, and a containerized CLI
+# that had to be handed its own paradigm tables would be a footgun.
+packages = ["src/ttrmorph"]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+# The wheel is a sibling in this repo, not a PyPI release we chase. A version
+# pin here would mean every ttr-nlp change needs a release before this package
+# can see it, and the two move together through the whole LM arc.
+ttr-nlp = { path = "../ttr-nlp", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "ruff>=0.9.4",
+    "simplemma>=2.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

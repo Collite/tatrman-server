@@ -160,14 +160,19 @@ test-component:
     ./gradlew componentTest --continue
 
 # ── Python lane (uv + ruff + pytest) — services/nlp, services/golem-py, ───────
-#    workers/worker-polars, shared/libs/python/ttr-nlp ──────────────────────────
+#    workers/worker-polars, shared/libs/python/{ttr-nlp,ttr-morph} ──────────────
+#
+# `ttr-morph` is in these loops but deliberately NOT in `wheel_modules`: it is
+# not published (⚑LMP-D4). Its artifact is the morph/v* snapshot, cut by
+# publish-morph.yml, and the package itself only ever ships inside the
+# nlp-morph-tools image.
 
 # ruff lint every Python module, or one: `just lint-py` / `just lint-py nlp`.
 lint-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp; do just lint-py "$d"; done
+        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just lint-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -179,7 +184,7 @@ build-py module="":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp; do just build-py "$d"; done
+        for d in services/nlp services/golem-py services/morph-studio workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just build-py "$d"; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
@@ -191,11 +196,132 @@ test-py module="" *args:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{module}}" ]; then
-        for d in services/nlp services/golem-py workers/worker-polars shared/libs/python/ttr-nlp; do just test-py "$d" {{args}}; done
+        for d in services/nlp services/golem-py services/morph-studio workers/worker-polars shared/libs/python/ttr-nlp shared/libs/python/ttr-morph; do just test-py "$d" {{args}}; done
         exit 0
     fi
     path=$(just _resolve "{{module}}")
     cd "$path" && uv run pytest {{args}}
+
+# ── Morphology lexicon (LM — the morph/v* artifact) ──────────────────────────
+#
+# The two recipes an analyst runs, and the two publish-morph.yml runs. Same
+# reader, same checks: a layer that validates here compiles in CI, which is the
+# only promise that makes local editing worth anything.
+#
+# Layer files live in `shared/libs/python/ttr-morph/lexicon/cs/` (the hand seed
+# and the importer output, from NLS-P8.3). Pass a glob to work on a subset.
+#
+# ⚑ THE LAYER ORDER IS THE PRECEDENCE, and it lives in `lexicon/cs/LAYERS`
+# (NLS-P8.4) — read that file before changing anything here. It is a list rather
+# than a glob for two reasons that each cost an artifact once: a glob has no
+# opinion about order, and the glob this replaced silently missed the hand seed.
+# Both the recipes below and publish-morph.yml read the same file.
+
+morph_dir := "shared/libs/python/ttr-morph"
+morph_lexicon := morph_dir + "/lexicon/cs"
+morph_freq := morph_lexicon + "/cac-freq.tsv"
+
+# Validate layer files: schema, licence boundary, and whether each declared
+# pattern regenerates its declared forms. `just morph-validate 'path/*.yaml'`.
+morph-validate layers="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    root=$(git rev-parse --show-toplevel)
+    # ⚑ NOT `ls`: it SORTS its arguments, which would re-order the layer list
+    # and therefore the precedence, without saying so.
+    files="{{layers}}"
+    [ -n "$files" ] || files=$(grep -v '^\s*\(#\|$\)' "$root/{{morph_lexicon}}/LAYERS" \
+        | sed "s|^|$root/{{morph_lexicon}}/|" | tr '\n' ' ')
+    cd {{morph_dir}} && uv run ttr-morph validate $files
+
+# Compile the snapshot into dist/morph/ — the body, one member file per
+# share-alike layer, and NOTICE-morph.md. Version is the morph/v* tag being
+# rehearsed; the real one comes from the tag in publish-morph.yml.
+morph-compile version="0.0.0" layers="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    root=$(git rev-parse --show-toplevel)
+    files="{{layers}}"
+    [ -n "$files" ] || files=$(grep -v '^\s*\(#\|$\)' "$root/{{morph_lexicon}}/LAYERS" \
+        | sed "s|^|$root/{{morph_lexicon}}/|" | tr '\n' ' ')
+    mkdir -p "$root/dist/morph"
+    cd {{morph_dir}} && uv run ttr-morph compile \
+        $files \
+        -o "$root/dist/morph/cs.morph.snap" \
+        --snapshot-version "{{version}}" \
+        --freq "$root/{{morph_freq}}"
+
+# Measure a compiled snapshot: the S-7 named cases and target coverage always,
+# the contracts §11 corpus metrics only with `cac=<dir>` (the TEST side of the
+# frozen split — read `eval/harness.py` before pointing this anywhere).
+morph-eval cac="" gate="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    root=$(git rev-parse --show-toplevel)
+    args=""
+    for f in "$root"/dist/morph/cs.morph.snap "$root"/dist/morph/*.morph.part; do
+        [ -f "$f" ] && args="$args --snapshot $f"
+    done
+    [ -n "$args" ] || { echo "nothing compiled — run `just morph-compile` first"; exit 2; }
+    [ -z "{{cac}}" ] || args="$args --cac {{cac}}"
+    [ -z "{{gate}}" ] || args="$args --gate"
+    cd {{morph_dir}} && uv run ttr-morph eval $args
+
+# Run morph-studio locally (NLS-P9.2): SQLite under `dist/`, Q-7 writing into
+# `dist/morph-studio/overlay`, no front to reload. `world=` is passed through —
+# one instance serves one world (LM-5), and the service refuses to boot without
+# one.
+run-morph-studio world="dfp":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    root=$(git rev-parse --show-toplevel)
+    mkdir -p "$root/dist/morph-studio"
+    export MORPH_WORLD="{{world}}"
+    export MORPH_STUDIO_DB_URL="sqlite+pysqlite:///$root/dist/morph-studio/studio.db"
+    export MORPH_STUDIO_OVERLAY_DIR="$root/dist/morph-studio/overlay"
+    export MORPH_STUDIO_EXPORT_DIR="$root/dist/morph-studio/export"
+    # Serve the built FI-7 frontend from the same process if it has been built
+    # (`just fe-build`). Unset otherwise — the API alone is a supported way to
+    # run this, and the `dfp` world has no authoring UI at all by ruling (LM-12).
+    [ -d "$root/services/morph-studio/frontend/dist" ] \
+        && export MORPH_STUDIO_STATIC_DIR="$root/services/morph-studio/frontend/dist" \
+        || true
+    cd services/morph-studio && uv run python src/main.py
+
+# ── morph-studio frontend (FI-7 — NLS-P9.3) ──────────────────────────────────
+
+# `services/morph-studio/frontend` is the only TypeScript in this repo. It is a
+# vite + Vue 3 app built to `frontend/dist`, which the BACKEND serves — one
+# deployable, no second web server (see `api._mount_frontend`).
+
+fe_dir := "services/morph-studio/frontend"
+
+# Install once; every other recipe assumes it.
+fe-install:
+    cd {{fe_dir}} && npm install
+
+# The dev server, proxying /v1 to a `just run-morph-studio` on :7290.
+fe-dev:
+    cd {{fe_dir}} && npm run dev
+
+# Type-check and bundle. `just run-morph-studio` picks the output up.
+fe-build:
+    cd {{fe_dir}} && npm run build
+
+# The component tier (vitest + @vue/test-utils, jsdom). No backend, no browser.
+fe-test *args:
+    cd {{fe_dir}} && npx vitest run {{args}}
+
+# Regenerate the API client from the service's OpenAPI document.
+#
+# ⚑ Two steps, and both matter: the document is dumped from the app (no server,
+# no database) and THEN the TypeScript is generated from it. The committed
+# `frontend/openapi.json` is what `tests/test_openapi.py` compares against, so a
+# backend change that skips this recipe fails the python suite rather than
+# silently shipping a stale client.
+fe-api:
+    cd services/morph-studio && uv run python scripts/dump_openapi.py frontend/openapi.json
+    cd {{fe_dir}} && npm run api
 
 # ── Conformance (RG-P6.S2 — the three-tier instrument) ───────────────────────
 

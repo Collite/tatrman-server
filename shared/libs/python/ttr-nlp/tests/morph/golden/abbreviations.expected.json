@@ -1,0 +1,74 @@
+[
+  {
+    "text": "Faktura",
+    "start": 0,
+    "end": 7,
+    "kind": "word"
+  },
+  {
+    "text": "č.",
+    "start": 8,
+    "end": 10,
+    "kind": "abbrev"
+  },
+  {
+    "text": "42",
+    "start": 11,
+    "end": 13,
+    "kind": "number"
+  },
+  {
+    "text": "zněla",
+    "start": 14,
+    "end": 19,
+    "kind": "word"
+  },
+  {
+    "text": "na",
+    "start": 20,
+    "end": 22,
+    "kind": "word"
+  },
+  {
+    "text": "tis.",
+    "start": 23,
+    "end": 27,
+    "kind": "abbrev"
+  },
+  {
+    "text": "Kč",
+    "start": 28,
+    "end": 30,
+    "kind": "word"
+  },
+  {
+    "text": ",",
+    "start": 30,
+    "end": 31,
+    "kind": "punct"
+  },
+  {
+    "text": "např.",
+    "start": 32,
+    "end": 37,
+    "kind": "abbrev"
+  },
+  {
+    "text": "za",
+    "start": 38,
+    "end": 40,
+    "kind": "word"
+  },
+  {
+    "text": "služby",
+    "start": 41,
+    "end": 47,
+    "kind": "word"
+  },
+  {
+    "text": ".",
+    "start": 47,
+    "end": 48,
+    "kind": "punct"
+  }
+]

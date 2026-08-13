@@ -118,6 +118,21 @@ class PackState:
             ]
         return state, []
 
+    #: The two-phase halves of `reload`, exposed so the two snapshots the front
+    #: owns — packs and the morph artifact — can be reloaded together without
+    #: either half applying while the other refuses (`reload.py`). `reload()`
+    #: below is still the single-owner path, unchanged.
+    def prepare(self) -> tuple[LoadedState | None, list[Diagnostic]]:
+        return self._attempt()
+
+    def commit(self, state: LoadedState, diagnostics: list[Diagnostic]) -> None:
+        self._state = state
+        self._boot_diagnostics = []
+
+    @property
+    def lock(self) -> asyncio.Lock:
+        return self._lock
+
     def load(self) -> bool:
         """Boot load. Returns whether a snapshot is now serving."""
         state, diagnostics = self._attempt()

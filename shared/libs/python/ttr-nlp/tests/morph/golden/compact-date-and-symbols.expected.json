@@ -1,0 +1,62 @@
+[
+  {
+    "text": "31.",
+    "start": 0,
+    "end": 3,
+    "kind": "ordinal"
+  },
+  {
+    "text": "12.",
+    "start": 3,
+    "end": 6,
+    "kind": "ordinal"
+  },
+  {
+    "text": "2025",
+    "start": 6,
+    "end": 10,
+    "kind": "number"
+  },
+  {
+    "text": "činil",
+    "start": 11,
+    "end": 16,
+    "kind": "word"
+  },
+  {
+    "text": "růst",
+    "start": 17,
+    "end": 21,
+    "kind": "word"
+  },
+  {
+    "text": "5,5",
+    "start": 22,
+    "end": 25,
+    "kind": "number"
+  },
+  {
+    "text": "%",
+    "start": 26,
+    "end": 27,
+    "kind": "sym"
+  },
+  {
+    "text": "a",
+    "start": 28,
+    "end": 29,
+    "kind": "word"
+  },
+  {
+    "text": "1 200",
+    "start": 30,
+    "end": 35,
+    "kind": "number"
+  },
+  {
+    "text": "ks",
+    "start": 36,
+    "end": 38,
+    "kind": "word"
+  }
+]

@@ -162,6 +162,44 @@ packs:
 lists:
   sources: ["/etc/nlp/lists"]
 
+# ── Czech morphology (LM, NLS-P9.1 — cz-lemma contracts §5–§6) ────────────────
+#
+# `sources` is the `morph/v*` snapshot, then any separable share-alike member
+# files, then world overlays — the pack loader's fail-all posture (NL-15): one
+# unreadable source loads nothing at all. A failed load is NOT fatal. The front
+# comes up, reports `LM-MORPH-001` on `GetStatus.morph_state`, keeps serving
+# `Analyze`/`BatchLemmatize` and every non-morph pipeline, and answers
+# FAILED_PRECONDITION only for the pipelines that need the lexicon — because the
+# usual cause is a volume that has not mounted yet, and it comes good on a
+# `ReloadPacks` rather than on a crash loop.
+#
+# EMPTY HERE ON PURPOSE, exactly as `pipelines: {}` is. The artifact is a mounted
+# volume whose path differs per cluster and whose world overlays belong to that
+# world; a shipped default pointing at a file no deployment has would make every
+# `morph: true` pipeline refuse to boot (`validate_morph`). The offline hero
+# recipe (`eval/offline-config.yaml`) turns it on; a cluster sets
+# NLP_MORPH_SOURCES / NLP_MORPH_WORLD / NLP_MORPH_QUEUE_SINK.
+#
+#   morph:
+#     sources: ["/etc/nlp/morph/cs.morph.snap", "/etc/nlp/morph/dfp.morph.overlay"]
+#     world: "dfp"
+#     queue:
+#       sink: "url:http://morph-studio:8000"   # or dir:/var/lib/nlp/morph-queue
+#       spool_dir: "/var/lib/nlp/morph-queue"  # the never-lose-a-miss fallback
+#     worlds:
+#       dfp: { spans: false, retention_days: 90 }
+#
+# `spans: false` is the default for every world and it is the whole S-4 posture:
+# a lemmatizer queue collecting the surrounding text by default would be
+# collecting user data by default. The front DROPS the span at the sink when a
+# world says no — not at the reader.
+morph:
+  sources: []
+  world: ""
+  queue:
+    sink: "none"
+  worlds: {}
+
 # A pipeline runs engine ops, then gazetteer lists, then rule phases — in that
 # order, because the gazetteer matches on `lemma` an engine produced and the rules
 # match on `Lookup` the gazetteer produced. Every reference here is validated
@@ -171,9 +209,22 @@ lists:
 # pipeline referring to packs that are not mounted would fail the boot load. The
 # hero recipe in `docker-compose.offline.yml` (NLS-P4.T4) mounts the pack tree and
 # turns this on.
+#
+# `morph: true` (LM, NLS-P9.1) swaps the front two ops for the in-process Czech
+# morphology: `MORPH_TOKENIZE` + `MORPH_ANNOTATE` replace TOKENIZE + LEMMATIZE,
+# and every op morph does not cover (SENTENCE_SPLIT, NER, DEP_PARSE) still runs
+# on the engine and is merged onto the same document. The lane matrix is
+# untouched by it — `NER.cs` is still unrouted in the default lane, still says
+# so with `NLS-NLP-011`, and the gazetteer still reaches the same QueryPattern.
+#
+# The flag is per pipeline and not global because only the Czech ones have a
+# snapshot to run against; a pipeline serving a language the snapshot is not in
+# takes the engine path unchanged, decided from the artifact's own header rather
+# than from config.
 pipelines: {}
 #  query-patterns:
-#    ops: [TOKENIZE, SENTENCE_SPLIT, LEMMATIZE, NER]
+#    morph: true
+#    ops: [NER]              # TOKENIZE + LEMMATIZE are the morph front's now
 #    gazetteer: [dfp-entity-aliases]
 #    rules:
 #      - { pack: dfp-query-patterns, phase: lookup-cleanup }

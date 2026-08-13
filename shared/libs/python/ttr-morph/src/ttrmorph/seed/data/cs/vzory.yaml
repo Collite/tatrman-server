@@ -1,0 +1,948 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Czech paradigm tables — the DATA half of LM-2. The engine driver
+# (`ttrmorph.engine`) contains no Czech: every letter of the language is in
+# this file, and a second language is a second file, not a second driver. A
+# guard test asserts that literally (`rg "[áéíóúůýžščřďťň]" src/ttrmorph/engine/`
+# must find nothing).
+#
+# ── How a form is built ──────────────────────────────────────────────────────
+#
+#   lemma --strip--> base stem --flags--> stem --+ ending--> spelling --> form
+#
+# `strip` removes the vzor's citation ending (zena: "a"), flags rewrite the
+# stem, the slot supplies the ending, and the spelling rules fix the
+# orthography of the junction. That last step is why the flags can be so few:
+# most of what looks like irregularity in a school table is Czech spelling
+# rules about which vowel may follow which consonant, and those are regular.
+#
+# ── Slot keys ────────────────────────────────────────────────────────────────
+#
+# A slot key is the part of the UD feats that VARIES across the paradigm;
+# `feats_always` carries what is constant for the vzor (gender, animacy,
+# degree). The engine merges the two and sorts the atoms, so the emitted feats
+# string is canonical UD regardless of how this file is written.
+#
+# Animacy appears ONLY in slots where the form actually depends on it (Acc sg
+# masc, Nom/Voc pl masc for adjectives; always, via `feats_always`, for nouns
+# whose lexeme has a fixed animacy). Emitting two identical forms that differ
+# only in an unobservable feature would make `classify` ambiguous for no gain.
+#
+# A slot may hold SEVERAL endings (`Case=Loc|Number=Sing: [u, ě]`): Czech has
+# genuine doublets and `generate` returns a set of (form, feats) pairs, not a
+# function of feats. Where a doublet is lexically restricted rather than free,
+# it belongs in a sub-vzor (see `hrad-proper`), not here.
+
+language: cs
+version: 1
+
+# ── Orthography ──────────────────────────────────────────────────────────────
+#
+# Applied in order to the concatenated stem+ending. These are the rules a
+# Czech school textbook states as "we do not write ..." and they are what let
+# the paradigm tables below stay purely additive.
+#
+#   1-3. A soft consonant before a front vowel is written hard: the softness is
+#        already carried by the vowel (písň+ě = "písně", not "písňě").
+#   4-6. ...and before a plain `e`, the vowel takes the hook instead
+#        (koť+ete = "kotěte").
+#   7.   `ě` is only written after b p v f m d t n. After anything else the
+#        consonant is already soft or hard-only and the vowel is plain `e`
+#        (matc+ě = "matce", Praz+ě = "Praze", les+ě = "lese").
+spelling:
+  - { pattern: "ť(?=[ěií])", replace: "t" }
+  - { pattern: "ď(?=[ěií])", replace: "d" }
+  - { pattern: "ň(?=[ěií])", replace: "n" }
+  - { pattern: "ťe", replace: "tě" }
+  - { pattern: "ďe", replace: "dě" }
+  - { pattern: "ňe", replace: "ně" }
+  - { pattern: "([cčghjklrřsšzž])ě", replace: "\\1e" }
+
+# ── Flags ────────────────────────────────────────────────────────────────────
+#
+# Ordered stem rewrites (contracts §4). `flag_order` is the ORDER OF
+# APPLICATION and it is canonical: an entry that declares [palatal, fleeting-e]
+# generates exactly what [fleeting-e, palatal] generates, because a paradigm
+# that depended on the order an analyst happened to type would not be a
+# function of (lemma, vzor, flags).
+#
+# Each flag names a `kind` the driver implements; everything else is
+# parameters. The six kinds are the whole vocabulary — a seventh needs a driver
+# change and a design note, which is the point.
+flag_order: [foreign-stem, fleeting-e, shorten, shorten-zero, palatal, indeclinable, acronym]
+
+flags:
+  # pes/psa, píseň/písně, matka/matek. ONE flag, both directions: the stem has
+  # a vowel that appears exactly in the zero-ending slots. If the base stem
+  # already carries it (pes -> ps) the flag removes it elsewhere; if it does
+  # not (matk -> matek) the flag inserts it in the zero-ending slot. Writing
+  # these as two flags would ask the analyst to know which side of the
+  # alternation the citation form happens to sit on.
+  fleeting-e:
+    kind: stem-allomorph
+    # The vowel is detectable only in the last syllable: "sestr" has an `e`,
+    # but it is not the fleeting one (sester, not sstr), so the run of
+    # consonants after it is capped.
+    detect: "^(.*)e([bcčdďfghjklmnňpqrřsštťvwxzž]{1,2})$"
+    short: "\\1\\2"
+    insert: "^(.*?)([bcčdďfghjklmnňpqrřsštťvwxzž])$"
+    long: "\\1e\\2"
+
+  # dům/domu, sníh/sněhu, chléb/chleba. The stem vowel shortens wherever an
+  # ending follows. The LAST mapped vowel is the one that shortens.
+  shorten:
+    kind: stem-vowel-map
+    when: ending-nonempty
+    map: { "ů": "o", "á": "a", "é": "e", "í": "ě", "ou": "u" }
+
+  # The other direction, and it is a different flag rather than a `when:` on
+  # the same one: `dům` is long in the citation form and short everywhere else,
+  # while `smlouva` is long everywhere EXCEPT the cell with no ending at all
+  # (smluv, krav, sil). One lexeme never has both, and a flag that tried to
+  # serve both would have to be told which — which is the thing the analyst is
+  # using the flag to avoid saying.
+  shorten-zero:
+    kind: stem-vowel-map
+    when: ending-empty
+    map: { "ů": "o", "á": "a", "é": "e", "í": "i", "ou": "u" }
+
+  # matka/matce, Praha/Praze, vlk/vlci, bratr/bratři. Triggered by the ending,
+  # not by the slot: the same rewrite serves the dative-e of a feminine and the
+  # nominative-i of a masculine animate, which is why it is one flag.
+  #
+  # The two-consonant entries are the adjective series (český -> čeští,
+  # anglický -> angličtí) and they must come first — the longest key wins, or
+  # the cluster is rewritten as if it were the single consonant it ends with.
+  # An adjective whose stem ends in a velar needs this flag: without it the
+  # animate nominative plural comes out unpalatalized, which is the one form
+  # the vzor alone cannot get right.
+  palatal:
+    kind: stem-final-map
+    triggers: ["ě", "i", "í"]
+    map:
+      { "sk": "št", "ck": "čt", "ch": "š", "k": "c", "h": "z", "r": "ř" }
+
+  # cyklus/cyklu, génius/génia. The Latin nominative marker is not part of the
+  # stem; it survives only where nothing follows it.
+  foreign-stem:
+    kind: stem-strip
+    when: ending-nonempty
+    suffixes: ["us", "os", "es"]
+
+  # atašé, taxi. Every slot is the citation form.
+  indeclinable:
+    kind: invariant
+
+  # ČEZ/ČEZu — and "od ČEZ", which is why this is not `indeclinable`. A
+  # declinable acronym is written both ways by real users, so the paradigm
+  # carries both: the inflected form AND the bare lemma in every slot. That is
+  # the difference between the two flags, and it is the reason `acronym` earns
+  # its place: an exported gazetteer list built from it matches both.
+  acronym:
+    kind: add-lemma
+
+# ── Vzory ────────────────────────────────────────────────────────────────────
+
+vzory:
+  # ── Feminine ───────────────────────────────────────────────────────────────
+  žena:
+    upos: NOUN
+    feats_always: "Gender=Fem"
+    stem: { strip: ["a"] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": ["a"]
+      "Case=Gen|Number=Sing": ["y"]
+      "Case=Dat|Number=Sing": ["ě"]
+      "Case=Acc|Number=Sing": ["u"]
+      "Case=Voc|Number=Sing": ["o"]
+      "Case=Loc|Number=Sing": ["ě"]
+      "Case=Ins|Number=Sing": ["ou"]
+      "Case=Nom|Number=Plur": ["y"]
+      "Case=Gen|Number=Plur": [""]
+      "Case=Dat|Number=Plur": ["ám"]
+      "Case=Acc|Number=Plur": ["y"]
+      "Case=Voc|Number=Plur": ["y"]
+      "Case=Loc|Number=Plur": ["ách"]
+      "Case=Ins|Number=Plur": ["ami"]
+
+  růže:
+    upos: NOUN
+    feats_always: "Gender=Fem"
+    stem: { strip: ["e"] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": ["e"]
+      "Case=Gen|Number=Sing": ["e"]
+      "Case=Dat|Number=Sing": ["i"]
+      "Case=Acc|Number=Sing": ["i"]
+      "Case=Voc|Number=Sing": ["e"]
+      "Case=Loc|Number=Sing": ["i"]
+      "Case=Ins|Number=Sing": ["í"]
+      "Case=Nom|Number=Plur": ["e"]
+      "Case=Gen|Number=Plur": ["í"]
+      "Case=Dat|Number=Plur": ["ím"]
+      "Case=Acc|Number=Plur": ["e"]
+      "Case=Voc|Number=Plur": ["e"]
+      "Case=Loc|Number=Plur": ["ích"]
+      "Case=Ins|Number=Plur": ["emi"]
+
+  # The citation form carries the fleeting vowel, so entries on this vzor
+  # normally declare `fleeting-e` (píseň -> písn-). The vzor itself does not
+  # imply it: `dlaň` and `tvář` inflect here without one.
+  píseň:
+    upos: NOUN
+    feats_always: "Gender=Fem"
+    stem: { strip: [""] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": [""]
+      "Case=Gen|Number=Sing": ["ě"]
+      "Case=Dat|Number=Sing": ["i"]
+      "Case=Acc|Number=Sing": [""]
+      "Case=Voc|Number=Sing": ["i"]
+      "Case=Loc|Number=Sing": ["i"]
+      "Case=Ins|Number=Sing": ["í"]
+      "Case=Nom|Number=Plur": ["ě"]
+      "Case=Gen|Number=Plur": ["í"]
+      "Case=Dat|Number=Plur": ["ím"]
+      "Case=Acc|Number=Plur": ["ě"]
+      "Case=Voc|Number=Plur": ["ě"]
+      "Case=Loc|Number=Plur": ["ích"]
+      "Case=Ins|Number=Plur": ["ěmi"]
+
+  kost:
+    upos: NOUN
+    feats_always: "Gender=Fem"
+    stem: { strip: [""] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": [""]
+      "Case=Gen|Number=Sing": ["i"]
+      "Case=Dat|Number=Sing": ["i"]
+      "Case=Acc|Number=Sing": [""]
+      "Case=Voc|Number=Sing": ["i"]
+      "Case=Loc|Number=Sing": ["i"]
+      "Case=Ins|Number=Sing": ["í"]
+      "Case=Nom|Number=Plur": ["i"]
+      "Case=Gen|Number=Plur": ["í"]
+      "Case=Dat|Number=Plur": ["em"]
+      "Case=Acc|Number=Plur": ["i"]
+      "Case=Voc|Number=Plur": ["i"]
+      "Case=Loc|Number=Plur": ["ech"]
+      "Case=Ins|Number=Plur": ["mi"]
+
+  # ── Masculine inanimate ────────────────────────────────────────────────────
+  hrad:
+    upos: NOUN
+    feats_always: "Animacy=Inan|Gender=Masc"
+    stem: { strip: [""] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": [""]
+      "Case=Gen|Number=Sing": ["u"]
+      "Case=Dat|Number=Sing": ["u"]
+      "Case=Acc|Number=Sing": [""]
+      "Case=Voc|Number=Sing": ["e"]
+      # A free doublet: "na hradu" and "na hradě" are both standard. Where it
+      # is NOT free — proper nouns take only -u — the sub-vzor narrows it.
+      "Case=Loc|Number=Sing": ["u", "ě"]
+      "Case=Ins|Number=Sing": ["em"]
+      "Case=Nom|Number=Plur": ["y"]
+      "Case=Gen|Number=Plur": ["ů"]
+      "Case=Dat|Number=Plur": ["ům"]
+      "Case=Acc|Number=Plur": ["y"]
+      "Case=Voc|Number=Plur": ["y"]
+      "Case=Loc|Number=Plur": ["ech"]
+      "Case=Ins|Number=Plur": ["y"]
+
+  stroj:
+    upos: NOUN
+    feats_always: "Animacy=Inan|Gender=Masc"
+    stem: { strip: [""] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": [""]
+      "Case=Gen|Number=Sing": ["e"]
+      "Case=Dat|Number=Sing": ["i"]
+      "Case=Acc|Number=Sing": [""]
+      "Case=Voc|Number=Sing": ["i"]
+      "Case=Loc|Number=Sing": ["i"]
+      "Case=Ins|Number=Sing": ["em"]
+      "Case=Nom|Number=Plur": ["e"]
+      "Case=Gen|Number=Plur": ["ů"]
+      "Case=Dat|Number=Plur": ["ům"]
+      "Case=Acc|Number=Plur": ["e"]
+      "Case=Voc|Number=Plur": ["e"]
+      "Case=Loc|Number=Plur": ["ích"]
+      "Case=Ins|Number=Plur": ["i"]
+
+  # ── Masculine animate ──────────────────────────────────────────────────────
+  #
+  # The vzor is named after `pán`, whose vocative is lexically SHORT (pane, not
+  # páne). That is an irregular of one lexeme, not a property of the pattern —
+  # contracts §3 handles it as a full-form entry — so the golden table for this
+  # vzor is authored on a regular representative instead.
+  pán:
+    upos: NOUN
+    feats_always: "Animacy=Anim|Gender=Masc"
+    stem: { strip: [""] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": [""]
+      "Case=Gen|Number=Sing": ["a"]
+      "Case=Dat|Number=Sing": ["ovi", "u"]
+      "Case=Acc|Number=Sing": ["a"]
+      "Case=Voc|Number=Sing": ["e"]
+      "Case=Loc|Number=Sing": ["ovi", "u"]
+      "Case=Ins|Number=Sing": ["em"]
+      "Case=Nom|Number=Plur": ["i"]
+      "Case=Gen|Number=Plur": ["ů"]
+      "Case=Dat|Number=Plur": ["ům"]
+      "Case=Acc|Number=Plur": ["y"]
+      "Case=Voc|Number=Plur": ["i"]
+      "Case=Loc|Number=Plur": ["ech"]
+      "Case=Ins|Number=Plur": ["y"]
+
+  muž:
+    upos: NOUN
+    feats_always: "Animacy=Anim|Gender=Masc"
+    stem: { strip: [""] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": [""]
+      "Case=Gen|Number=Sing": ["e"]
+      "Case=Dat|Number=Sing": ["ovi", "i"]
+      "Case=Acc|Number=Sing": ["e"]
+      "Case=Voc|Number=Sing": ["i"]
+      "Case=Loc|Number=Sing": ["ovi", "i"]
+      "Case=Ins|Number=Sing": ["em"]
+      "Case=Nom|Number=Plur": ["i"]
+      "Case=Gen|Number=Plur": ["ů"]
+      "Case=Dat|Number=Plur": ["ům"]
+      "Case=Acc|Number=Plur": ["e"]
+      "Case=Voc|Number=Plur": ["i"]
+      "Case=Loc|Number=Plur": ["ích"]
+      "Case=Ins|Number=Plur": ["i"]
+
+  předseda:
+    upos: NOUN
+    feats_always: "Animacy=Anim|Gender=Masc"
+    stem: { strip: ["a"] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": ["a"]
+      "Case=Gen|Number=Sing": ["y"]
+      "Case=Dat|Number=Sing": ["ovi"]
+      "Case=Acc|Number=Sing": ["u"]
+      "Case=Voc|Number=Sing": ["o"]
+      "Case=Loc|Number=Sing": ["ovi"]
+      "Case=Ins|Number=Sing": ["ou"]
+      "Case=Nom|Number=Plur": ["ové"]
+      "Case=Gen|Number=Plur": ["ů"]
+      "Case=Dat|Number=Plur": ["ům"]
+      "Case=Acc|Number=Plur": ["y"]
+      "Case=Voc|Number=Plur": ["ové"]
+      "Case=Loc|Number=Plur": ["ech"]
+      "Case=Ins|Number=Plur": ["y"]
+
+  soudce:
+    upos: NOUN
+    feats_always: "Animacy=Anim|Gender=Masc"
+    stem: { strip: ["e"] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": ["e"]
+      "Case=Gen|Number=Sing": ["e"]
+      "Case=Dat|Number=Sing": ["ovi", "i"]
+      "Case=Acc|Number=Sing": ["e"]
+      "Case=Voc|Number=Sing": ["e"]
+      "Case=Loc|Number=Sing": ["ovi", "i"]
+      "Case=Ins|Number=Sing": ["em"]
+      "Case=Nom|Number=Plur": ["i", "ové"]
+      "Case=Gen|Number=Plur": ["ů"]
+      "Case=Dat|Number=Plur": ["ům"]
+      "Case=Acc|Number=Plur": ["e"]
+      "Case=Voc|Number=Plur": ["i", "ové"]
+      "Case=Loc|Number=Plur": ["ích"]
+      "Case=Ins|Number=Plur": ["i"]
+
+  # ── Neuter ─────────────────────────────────────────────────────────────────
+  město:
+    upos: NOUN
+    feats_always: "Gender=Neut"
+    stem: { strip: ["o"] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": ["o"]
+      "Case=Gen|Number=Sing": ["a"]
+      "Case=Dat|Number=Sing": ["u"]
+      "Case=Acc|Number=Sing": ["o"]
+      "Case=Voc|Number=Sing": ["o"]
+      "Case=Loc|Number=Sing": ["ě"]
+      "Case=Ins|Number=Sing": ["em"]
+      "Case=Nom|Number=Plur": ["a"]
+      "Case=Gen|Number=Plur": [""]
+      "Case=Dat|Number=Plur": ["ům"]
+      "Case=Acc|Number=Plur": ["a"]
+      "Case=Voc|Number=Plur": ["a"]
+      "Case=Loc|Number=Plur": ["ech"]
+      "Case=Ins|Number=Plur": ["y"]
+
+  moře:
+    upos: NOUN
+    feats_always: "Gender=Neut"
+    stem: { strip: ["e"] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": ["e"]
+      "Case=Gen|Number=Sing": ["e"]
+      "Case=Dat|Number=Sing": ["i"]
+      "Case=Acc|Number=Sing": ["e"]
+      "Case=Voc|Number=Sing": ["e"]
+      "Case=Loc|Number=Sing": ["i"]
+      "Case=Ins|Number=Sing": ["em"]
+      "Case=Nom|Number=Plur": ["e"]
+      "Case=Gen|Number=Plur": ["í"]
+      "Case=Dat|Number=Plur": ["ím"]
+      "Case=Acc|Number=Plur": ["e"]
+      "Case=Voc|Number=Plur": ["e"]
+      "Case=Loc|Number=Plur": ["ích"]
+      "Case=Ins|Number=Plur": ["i"]
+
+  # The -et-/-at- extension is in the endings, not in a flag: it is what the
+  # vzor IS. Known gap: lexemes whose stem softness is carried by the citation
+  # `ě` (kotě -> koť-) need the soft consonant spelled in the layer file; the
+  # strip cannot recover it. Not query-domain vocabulary.
+  kuře:
+    upos: NOUN
+    feats_always: "Gender=Neut"
+    stem: { strip: ["e"] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": ["e"]
+      "Case=Gen|Number=Sing": ["ete"]
+      "Case=Dat|Number=Sing": ["eti"]
+      "Case=Acc|Number=Sing": ["e"]
+      "Case=Voc|Number=Sing": ["e"]
+      "Case=Loc|Number=Sing": ["eti"]
+      "Case=Ins|Number=Sing": ["etem"]
+      "Case=Nom|Number=Plur": ["ata"]
+      "Case=Gen|Number=Plur": ["at"]
+      "Case=Dat|Number=Plur": ["atům"]
+      "Case=Acc|Number=Plur": ["ata"]
+      "Case=Voc|Number=Plur": ["ata"]
+      "Case=Loc|Number=Plur": ["atech"]
+      "Case=Ins|Number=Plur": ["aty"]
+
+  stavení:
+    upos: NOUN
+    feats_always: "Gender=Neut"
+    stem: { strip: ["í"] }
+    lemma_slot: "Case=Nom|Number=Sing"
+    slots:
+      "Case=Nom|Number=Sing": ["í"]
+      "Case=Gen|Number=Sing": ["í"]
+      "Case=Dat|Number=Sing": ["í"]
+      "Case=Acc|Number=Sing": ["í"]
+      "Case=Voc|Number=Sing": ["í"]
+      "Case=Loc|Number=Sing": ["í"]
+      "Case=Ins|Number=Sing": ["ím"]
+      "Case=Nom|Number=Plur": ["í"]
+      "Case=Gen|Number=Plur": ["í"]
+      "Case=Dat|Number=Plur": ["ím"]
+      "Case=Acc|Number=Plur": ["í"]
+      "Case=Voc|Number=Plur": ["í"]
+      "Case=Loc|Number=Plur": ["ích"]
+      "Case=Ins|Number=Plur": ["ími"]
+
+  # ── Adjectives ─────────────────────────────────────────────────────────────
+  #
+  # Degree=Pos on every slot. The comparative and the superlative are not
+  # generated: `nej-` is a prefix the snapshot LOADER strips (it maps to
+  # Degree=Sup at lookup time), and the comparative stem is lexical.
+  mladý:
+    upos: ADJ
+    feats_always: "Degree=Pos"
+    stem: { strip: ["ý"] }
+    lemma_slot: "Case=Nom|Gender=Masc|Number=Sing"
+    slots:
+      "Case=Nom|Gender=Masc|Number=Sing": ["ý"]
+      "Case=Gen|Gender=Masc|Number=Sing": ["ého"]
+      "Case=Dat|Gender=Masc|Number=Sing": ["ému"]
+      "Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing": ["ého"]
+      "Animacy=Inan|Case=Acc|Gender=Masc|Number=Sing": ["ý"]
+      "Case=Voc|Gender=Masc|Number=Sing": ["ý"]
+      "Case=Loc|Gender=Masc|Number=Sing": ["ém"]
+      "Case=Ins|Gender=Masc|Number=Sing": ["ým"]
+      "Case=Nom|Gender=Neut|Number=Sing": ["é"]
+      "Case=Gen|Gender=Neut|Number=Sing": ["ého"]
+      "Case=Dat|Gender=Neut|Number=Sing": ["ému"]
+      "Case=Acc|Gender=Neut|Number=Sing": ["é"]
+      "Case=Voc|Gender=Neut|Number=Sing": ["é"]
+      "Case=Loc|Gender=Neut|Number=Sing": ["ém"]
+      "Case=Ins|Gender=Neut|Number=Sing": ["ým"]
+      "Case=Nom|Gender=Fem|Number=Sing": ["á"]
+      "Case=Gen|Gender=Fem|Number=Sing": ["é"]
+      "Case=Dat|Gender=Fem|Number=Sing": ["é"]
+      "Case=Acc|Gender=Fem|Number=Sing": ["ou"]
+      "Case=Voc|Gender=Fem|Number=Sing": ["á"]
+      "Case=Loc|Gender=Fem|Number=Sing": ["é"]
+      "Case=Ins|Gender=Fem|Number=Sing": ["ou"]
+      "Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur": ["í"]
+      "Animacy=Inan|Case=Nom|Gender=Masc|Number=Plur": ["é"]
+      "Case=Gen|Gender=Masc|Number=Plur": ["ých"]
+      "Case=Dat|Gender=Masc|Number=Plur": ["ým"]
+      "Case=Acc|Gender=Masc|Number=Plur": ["é"]
+      "Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur": ["í"]
+      "Animacy=Inan|Case=Voc|Gender=Masc|Number=Plur": ["é"]
+      "Case=Loc|Gender=Masc|Number=Plur": ["ých"]
+      "Case=Ins|Gender=Masc|Number=Plur": ["ými"]
+      "Case=Nom|Gender=Neut|Number=Plur": ["á"]
+      "Case=Gen|Gender=Neut|Number=Plur": ["ých"]
+      "Case=Dat|Gender=Neut|Number=Plur": ["ým"]
+      "Case=Acc|Gender=Neut|Number=Plur": ["á"]
+      "Case=Voc|Gender=Neut|Number=Plur": ["á"]
+      "Case=Loc|Gender=Neut|Number=Plur": ["ých"]
+      "Case=Ins|Gender=Neut|Number=Plur": ["ými"]
+      "Case=Nom|Gender=Fem|Number=Plur": ["é"]
+      "Case=Gen|Gender=Fem|Number=Plur": ["ých"]
+      "Case=Dat|Gender=Fem|Number=Plur": ["ým"]
+      "Case=Acc|Gender=Fem|Number=Plur": ["é"]
+      "Case=Voc|Gender=Fem|Number=Plur": ["é"]
+      "Case=Loc|Gender=Fem|Number=Plur": ["ých"]
+      "Case=Ins|Gender=Fem|Number=Plur": ["ými"]
+
+  jarní:
+    upos: ADJ
+    feats_always: "Degree=Pos"
+    stem: { strip: ["í"] }
+    lemma_slot: "Case=Nom|Gender=Masc|Number=Sing"
+    slots:
+      "Case=Nom|Gender=Masc|Number=Sing": ["í"]
+      "Case=Gen|Gender=Masc|Number=Sing": ["ího"]
+      "Case=Dat|Gender=Masc|Number=Sing": ["ímu"]
+      "Animacy=Anim|Case=Acc|Gender=Masc|Number=Sing": ["ího"]
+      "Animacy=Inan|Case=Acc|Gender=Masc|Number=Sing": ["í"]
+      "Case=Voc|Gender=Masc|Number=Sing": ["í"]
+      "Case=Loc|Gender=Masc|Number=Sing": ["ím"]
+      "Case=Ins|Gender=Masc|Number=Sing": ["ím"]
+      "Case=Nom|Gender=Neut|Number=Sing": ["í"]
+      "Case=Gen|Gender=Neut|Number=Sing": ["ího"]
+      "Case=Dat|Gender=Neut|Number=Sing": ["ímu"]
+      "Case=Acc|Gender=Neut|Number=Sing": ["í"]
+      "Case=Voc|Gender=Neut|Number=Sing": ["í"]
+      "Case=Loc|Gender=Neut|Number=Sing": ["ím"]
+      "Case=Ins|Gender=Neut|Number=Sing": ["ím"]
+      "Case=Nom|Gender=Fem|Number=Sing": ["í"]
+      "Case=Gen|Gender=Fem|Number=Sing": ["í"]
+      "Case=Dat|Gender=Fem|Number=Sing": ["í"]
+      "Case=Acc|Gender=Fem|Number=Sing": ["í"]
+      "Case=Voc|Gender=Fem|Number=Sing": ["í"]
+      "Case=Loc|Gender=Fem|Number=Sing": ["í"]
+      "Case=Ins|Gender=Fem|Number=Sing": ["í"]
+      "Animacy=Anim|Case=Nom|Gender=Masc|Number=Plur": ["í"]
+      "Animacy=Inan|Case=Nom|Gender=Masc|Number=Plur": ["í"]
+      "Case=Gen|Gender=Masc|Number=Plur": ["ích"]
+      "Case=Dat|Gender=Masc|Number=Plur": ["ím"]
+      "Case=Acc|Gender=Masc|Number=Plur": ["í"]
+      "Animacy=Anim|Case=Voc|Gender=Masc|Number=Plur": ["í"]
+      "Animacy=Inan|Case=Voc|Gender=Masc|Number=Plur": ["í"]
+      "Case=Loc|Gender=Masc|Number=Plur": ["ích"]
+      "Case=Ins|Gender=Masc|Number=Plur": ["ími"]
+      "Case=Nom|Gender=Neut|Number=Plur": ["í"]
+      "Case=Gen|Gender=Neut|Number=Plur": ["ích"]
+      "Case=Dat|Gender=Neut|Number=Plur": ["ím"]
+      "Case=Acc|Gender=Neut|Number=Plur": ["í"]
+      "Case=Voc|Gender=Neut|Number=Plur": ["í"]
+      "Case=Loc|Gender=Neut|Number=Plur": ["ích"]
+      "Case=Ins|Gender=Neut|Number=Plur": ["ími"]
+      "Case=Nom|Gender=Fem|Number=Plur": ["í"]
+      "Case=Gen|Gender=Fem|Number=Plur": ["ích"]
+      "Case=Dat|Gender=Fem|Number=Plur": ["ím"]
+      "Case=Acc|Gender=Fem|Number=Plur": ["í"]
+      "Case=Voc|Gender=Fem|Number=Plur": ["í"]
+      "Case=Loc|Gender=Fem|Number=Plur": ["ích"]
+      "Case=Ins|Gender=Fem|Number=Plur": ["ími"]
+
+  # ── Verbs ──────────────────────────────────────────────────────────────────
+  #
+  # The query-relevant subset (GI-1): infinitive, present indicative,
+  # imperative, l-participle. No transgressive, no passive participle, no
+  # verbal noun — a query says "porovnej" or "porovnat", never "porovnávaje".
+  #
+  # Standard forms only. The colloquial 1sg/3pl of the -ovat class (kupuju,
+  # kupujou) are a real gap in user text and a KNOWN one: adding them here
+  # would make every textbook table fail `classify`, so they belong in the
+  # enrichment loop as full-form entries.
+  dělat:
+    upos: VERB
+    feats_always: ""
+    stem: { strip: ["at"] }
+    lemma_slot: "VerbForm=Inf"
+    slots:
+      "VerbForm=Inf": ["at"]
+      "Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin": ["ám"]
+      "Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin": ["áš"]
+      "Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin": ["á"]
+      "Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin": ["áme"]
+      "Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin": ["áte"]
+      "Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin": ["ají"]
+      "Mood=Imp|Number=Sing|Person=2|VerbForm=Fin": ["ej"]
+      "Mood=Imp|Number=Plur|Person=1|VerbForm=Fin": ["ejme"]
+      "Mood=Imp|Number=Plur|Person=2|VerbForm=Fin": ["ejte"]
+      "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part": ["al"]
+      "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part": ["ala"]
+      "Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part": ["alo"]
+      "Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["ali"]
+      "Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["aly"]
+      "Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part": ["aly"]
+      "Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part": ["ala"]
+
+  prosit:
+    upos: VERB
+    feats_always: ""
+    stem: { strip: ["it"] }
+    lemma_slot: "VerbForm=Inf"
+    slots:
+      "VerbForm=Inf": ["it"]
+      "Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin": ["ím"]
+      "Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin": ["íš"]
+      "Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin": ["í"]
+      "Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin": ["íme"]
+      "Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin": ["íte"]
+      "Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin": ["í"]
+      "Mood=Imp|Number=Sing|Person=2|VerbForm=Fin": [""]
+      "Mood=Imp|Number=Plur|Person=1|VerbForm=Fin": ["me"]
+      "Mood=Imp|Number=Plur|Person=2|VerbForm=Fin": ["te"]
+      "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part": ["il"]
+      "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part": ["ila"]
+      "Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part": ["ilo"]
+      "Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["ili"]
+      "Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["ily"]
+      "Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part": ["ily"]
+      "Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part": ["ila"]
+
+  kupovat:
+    upos: VERB
+    feats_always: ""
+    stem: { strip: ["ovat"] }
+    lemma_slot: "VerbForm=Inf"
+    slots:
+      "VerbForm=Inf": ["ovat"]
+      "Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin": ["uji"]
+      "Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin": ["uješ"]
+      "Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin": ["uje"]
+      "Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin": ["ujeme"]
+      "Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin": ["ujete"]
+      "Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin": ["ují"]
+      "Mood=Imp|Number=Sing|Person=2|VerbForm=Fin": ["uj"]
+      "Mood=Imp|Number=Plur|Person=1|VerbForm=Fin": ["ujme"]
+      "Mood=Imp|Number=Plur|Person=2|VerbForm=Fin": ["ujte"]
+      "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part": ["oval"]
+      "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part": ["ovala"]
+      "Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part": ["ovalo"]
+      "Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["ovali"]
+      "Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["ovaly"]
+      "Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part": ["ovaly"]
+      "Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part": ["ovala"]
+
+  tisknout:
+    upos: VERB
+    feats_always: ""
+    stem: { strip: ["nout"] }
+    lemma_slot: "VerbForm=Inf"
+    slots:
+      "VerbForm=Inf": ["nout"]
+      "Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin": ["nu"]
+      "Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin": ["neš"]
+      "Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin": ["ne"]
+      "Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin": ["neme"]
+      "Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin": ["nete"]
+      "Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin": ["nou"]
+      "Mood=Imp|Number=Sing|Person=2|VerbForm=Fin": ["ni"]
+      "Mood=Imp|Number=Plur|Person=1|VerbForm=Fin": ["něme"]
+      "Mood=Imp|Number=Plur|Person=2|VerbForm=Fin": ["něte"]
+      "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part": ["l"]
+      "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part": ["la"]
+      "Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part": ["lo"]
+      "Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["li"]
+      "Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["ly"]
+      "Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part": ["ly"]
+      "Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part": ["la"]
+
+  # Same present tense as tisknout, different imperative and participle: the
+  # vowel stem keeps the -nu- that the consonant stem drops. Two vzory rather
+  # than one vzor plus a flag, exactly as the school tables have it.
+  minout:
+    upos: VERB
+    feats_always: ""
+    stem: { strip: ["nout"] }
+    lemma_slot: "VerbForm=Inf"
+    slots:
+      "VerbForm=Inf": ["nout"]
+      "Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin": ["nu"]
+      "Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin": ["neš"]
+      "Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin": ["ne"]
+      "Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin": ["neme"]
+      "Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin": ["nete"]
+      "Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin": ["nou"]
+      "Mood=Imp|Number=Sing|Person=2|VerbForm=Fin": ["ň"]
+      "Mood=Imp|Number=Plur|Person=1|VerbForm=Fin": ["ňme"]
+      "Mood=Imp|Number=Plur|Person=2|VerbForm=Fin": ["ňte"]
+      "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part": ["nul"]
+      "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part": ["nula"]
+      "Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part": ["nulo"]
+      "Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["nuli"]
+      "Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["nuly"]
+      "Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part": ["nuly"]
+      "Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part": ["nula"]
+
+  začít:
+    upos: VERB
+    feats_always: ""
+    stem: { strip: ["ít"] }
+    lemma_slot: "VerbForm=Inf"
+    slots:
+      "VerbForm=Inf": ["ít"]
+      "Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin": ["nu"]
+      "Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin": ["neš"]
+      "Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin": ["ne"]
+      "Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin": ["neme"]
+      "Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin": ["nete"]
+      "Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin": ["nou"]
+      "Mood=Imp|Number=Sing|Person=2|VerbForm=Fin": ["ni"]
+      "Mood=Imp|Number=Plur|Person=1|VerbForm=Fin": ["něme"]
+      "Mood=Imp|Number=Plur|Person=2|VerbForm=Fin": ["něte"]
+      "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part": ["al"]
+      "Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part": ["ala"]
+      "Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part": ["alo"]
+      "Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["ali"]
+      "Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part": ["aly"]
+      "Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part": ["aly"]
+      "Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part": ["ala"]
+
+# ── Sub-vzory (B-O5) ─────────────────────────────────────────────────────────
+#
+# A sub-vzor is a parent plus a narrowing: overridden slots, implied flags, a
+# different strip, or a restriction to part of the parent's table. It carries a
+# `hints` block that the NLS-P9 pattern-guesser reads to PROPOSE it from a bare
+# surface form — that is the whole reason the inventory is data and not a list
+# in a design document.
+#
+# `lemma_pattern` is a regex matched against the citation form;
+# `capitalized: true` means the guesser should only propose this for a form
+# that starts uppercase. Neither is a validity rule — the analyst may always
+# assign any sub-vzor — they are the guesser's prior.
+subvzory:
+  # Kaufland, Zlín, Excel. Proper inanimates take -u in the locative and never
+  # the -ě doublet, which is the whole difference from `hrad`.
+  hrad-proper:
+    parent: hrad
+    upos: PROPN
+    hints:
+      capitalized: true
+      lemma_pattern: "[^aeiouyáéíóúůýě]$"
+    slots:
+      "Case=Loc|Number=Sing": ["u"]
+
+  # The plain, and by far the commonest, narrowing of `hrad`: a locative
+  # singular of -u alone. The parent allows the free doublet ("na hradu" and
+  # "na hradě" are both standard), and most masculine inanimates do not — so
+  # without this the parent matches almost nothing and every one of those
+  # nouns falls through to whichever narrowing happens to fit.
+  #
+  # ⚑ It is declared BEFORE `hrad-foreign`, and that ordering is the fix for a
+  # real defect: `foreign-stem` is a no-op on a stem with no Latin marker, so
+  # `hrad-foreign` generated exactly this paradigm for `text`, `plán` and `zub`
+  # and claimed 188 ordinary Czech nouns as foreign borrowings. The vzor column
+  # is what the studio shows a human, and a wrong one there is a wrong fact in
+  # front of a reviewer.
+  hrad-u:
+    parent: hrad
+    upos: NOUN
+    hints:
+      capitalized: false
+      lemma_pattern: "[^aeiouyáéíóúůýě]$"
+    slots:
+      "Case=Loc|Number=Sing": ["u"]
+
+  # cyklus, mýtus, kosmos. The Latin nominative marker is stripped by the
+  # flag; the narrowing is the locative, which is -u only — "v cyklu", never
+  # the free doublet `hrad` allows. The same reason `hrad-proper` exists: the
+  # doublet is a property of native lexemes, not of the pattern.
+  hrad-foreign:
+    parent: hrad
+    upos: NOUN
+    implied_flags: [foreign-stem]
+    hints:
+      capitalized: false
+      lemma_pattern: "(us|os|es)$"
+    slots:
+      "Case=Loc|Number=Sing": ["u"]
+
+  # rok, zámek, jazyk, dialog, vrch. A velar stem cannot take the vocative -e
+  # (*roce as a vocative is not Czech), and its locative plural is -ích, not
+  # -ech. Both are consequences of the same fact about k/g/h, so they travel
+  # together in one narrowing, with `palatal` implied — the pattern IS "a
+  # masculine inanimate whose stem ends in a velar", and every cell that
+  # alternates does so for that reason. Found by the D-O1 spike: the velar
+  # vocative was the single largest class of noun mismatches.
+  hrad-velar:
+    parent: hrad
+    upos: NOUN
+    implied_flags: [palatal]
+    hints:
+      capitalized: false
+      lemma_pattern: "(k|g|h|ch)$"
+    slots:
+      "Case=Voc|Number=Sing": ["u"]
+      "Case=Loc|Number=Plur": ["ích"]
+
+  # pracovník, zákazník, člověk, úředník. The animate twin of `hrad-velar`,
+  # and the reason the plain `pán` pattern produced *pracovníke* and
+  # *pracovníkech* — 60+ of the sampled misses in one shape.
+  pan-velar:
+    parent: pán
+    upos: NOUN
+    implied_flags: [palatal]
+    hints:
+      capitalized: false
+      lemma_pattern: "(k|g|h|ch)$"
+    slots:
+      "Case=Voc|Number=Sing": ["u"]
+      "Case=Loc|Number=Plur": ["ích"]
+
+  # Athéňan, občan, křesťan, host. The -é animate nominative plural: a closed
+  # class the pattern cannot predict from the stem, which is exactly what a
+  # sub-vzor is for.
+  pan-e:
+    parent: pán
+    upos: NOUN
+    hints:
+      capitalized: false
+      lemma_pattern: "an$"
+    slots:
+      "Case=Nom|Number=Plur": ["é"]
+      "Case=Voc|Number=Plur": ["é"]
+
+  # ulice, tabulka-free -ice feminines: the genitive plural is bare (ulic,
+  # nemocnic), not -í. The soft feminines split here and the citation form
+  # cannot tell you which side a lexeme is on.
+  ruze-ice:
+    parent: růže
+    upos: NOUN
+    hints:
+      capitalized: false
+      lemma_pattern: "ice$"
+    slots:
+      "Case=Gen|Number=Plur": [""]
+
+  # Kundera, Svoboda, Nosek-type -a surnames and given names.
+  predseda-name:
+    parent: předseda
+    upos: PROPN
+    hints:
+      capitalized: true
+      lemma_pattern: "a$"
+
+  # Hugo, Otto, Bruno. Parent's animate endings, but the citation form and the
+  # vocative end in -o and the nominative plural takes -ove.
+  pan-o:
+    parent: pán
+    upos: PROPN
+    stem: { strip: ["o"] }
+    hints:
+      capitalized: true
+      lemma_pattern: "o$"
+    slots:
+      "Case=Nom|Number=Sing": ["o"]
+      "Case=Voc|Number=Sing": ["o"]
+      "Case=Nom|Number=Plur": ["ové"]
+      "Case=Voc|Number=Plur": ["ové"]
+
+  # atašé, Ferrari-as-a-person. Masculine animate feats, no inflection.
+  indeclinable-m:
+    parent: pán
+    upos: NOUN
+    implied_flags: [indeclinable]
+    hints:
+      capitalized: false
+      lemma_pattern: "[éiyu]$"
+
+  # taxi, menu, Bordeaux. Neuter feats, no inflection.
+  indeclinable-n:
+    parent: město
+    upos: NOUN
+    implied_flags: [indeclinable]
+    hints:
+      capitalized: false
+      lemma_pattern: "[iyu]$"
+
+  # Praha, Ostrava, Vltava.
+  zena-proper:
+    parent: žena
+    upos: PROPN
+    hints:
+      capitalized: true
+      lemma_pattern: "a$"
+
+  # Sydney-type soft feminines and -e place names.
+  ruze-proper:
+    parent: růže
+    upos: PROPN
+    hints:
+      capitalized: true
+      lemma_pattern: "e$"
+
+  # Nováková. The adjectival surname IS the hard adjective's feminine
+  # sub-paradigm, so it is that table restricted rather than a copy of it —
+  # `only_feats` keeps the two from drifting apart. Known non-goal: the
+  # traditional short plural ("sestry Novákovy") is not generated.
+  adj-ova:
+    parent: mladý
+    upos: PROPN
+    stem: { strip: ["á"] }
+    only_feats: ["Gender=Fem"]
+    # The parent's citation slot is masculine and `only_feats` removes it, so
+    # the narrowing has to say which cell is now the citation form.
+    lemma_slot: "Case=Nom|Gender=Fem|Number=Sing"
+    hints:
+      capitalized: true
+      lemma_pattern: "ová$"
+
+  # muzeum, gymnázium, stipendium.
+  muzeum-um:
+    parent: město
+    upos: NOUN
+    stem: { strip: ["um"] }
+    hints:
+      capitalized: false
+      lemma_pattern: "um$"
+    slots:
+      "Case=Nom|Number=Sing": ["um"]
+      "Case=Gen|Number=Sing": ["a"]
+      "Case=Dat|Number=Sing": ["u"]
+      "Case=Acc|Number=Sing": ["um"]
+      "Case=Voc|Number=Sing": ["um"]
+      "Case=Loc|Number=Sing": ["u"]
+      "Case=Ins|Number=Sing": ["em"]
+      "Case=Nom|Number=Plur": ["a"]
+      "Case=Gen|Number=Plur": ["í"]
+      "Case=Dat|Number=Plur": ["ím"]
+      "Case=Acc|Number=Plur": ["a"]
+      "Case=Voc|Number=Plur": ["a"]
+      "Case=Loc|Number=Plur": ["ích"]
+      "Case=Ins|Number=Plur": ["i"]
+
+  # ČEZ, ČSOB, DPH. Declines like hrad AND stays invariant, because both are
+  # written — see the `acronym` flag.
+  acronym-m:
+    parent: hrad
+    upos: PROPN
+    implied_flags: [acronym]
+    hints:
+      capitalized: true
+      lemma_pattern: "^[A-ZÁ-Ž0-9]{2,}$"
+    slots:
+      "Case=Loc|Number=Sing": ["u"]

@@ -117,6 +117,19 @@ services:
       - ../../shared/libs/python/ttr-nlp/tests/fixtures/packs/valid:/etc/nlp/packs:ro
       - ../../shared/libs/python/ttr-nlp/tests/fixtures/lists/valid:/etc/nlp/lists:ro
       - ./eval/offline-config.yaml:/etc/nlp/offline-config.yaml:ro
+      # LM (NLS-P9.1) — the compiled Czech snapshot. A BUILD OUTPUT, so run
+      # `just morph-compile` first; the recipe's `morph-patterns` pipeline is
+      # the only thing that needs it, and the front comes up reporting
+      # `LM-MORPH-001` on GetStatus.morph_state if the directory is empty rather
+      # than refusing to start (`morph_state.py`).
+      - ../../dist/morph:/etc/nlp/morph:ro
+      #
+      # ⚑ NO world overlay here, deliberately. A world's entity layer is that
+      # world's own compiled artifact (LM-10), and the published core does not
+      # carry proper nouns — so in the OPTION lane `morph-patterns` reaches the
+      # customer's name through NameTag, and in the DEFAULT lane it does not
+      # reach it at all. Both are correct, both are worth seeing in the drill,
+      # and a fixture overlay smuggled in here would hide the second one.
     ports:
       - "7270:7270"  # REST mirror (dev/health)
       - "7271:7271"  # gRPC contract

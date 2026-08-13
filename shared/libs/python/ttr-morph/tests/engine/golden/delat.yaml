@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: class 5
+lemma: dělat
+vzor: dělat
+flags: []
+table:
+  Animacy=Anim|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - dělali
+  Animacy=Inan|Gender=Masc|Number=Plur|Tense=Past|VerbForm=Part:
+  - dělaly
+  Gender=Fem|Number=Plur|Tense=Past|VerbForm=Part:
+  - dělaly
+  Gender=Fem|Number=Sing|Tense=Past|VerbForm=Part:
+  - dělala
+  Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part:
+  - dělal
+  Gender=Neut|Number=Plur|Tense=Past|VerbForm=Part:
+  - dělala
+  Gender=Neut|Number=Sing|Tense=Past|VerbForm=Part:
+  - dělalo
+  Mood=Imp|Number=Plur|Person=1|VerbForm=Fin:
+  - dělejme
+  Mood=Imp|Number=Plur|Person=2|VerbForm=Fin:
+  - dělejte
+  Mood=Imp|Number=Sing|Person=2|VerbForm=Fin:
+  - dělej
+  Mood=Ind|Number=Plur|Person=1|Tense=Pres|VerbForm=Fin:
+  - děláme
+  Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin:
+  - děláte
+  Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin:
+  - dělají
+  Mood=Ind|Number=Sing|Person=1|Tense=Pres|VerbForm=Fin:
+  - dělám
+  Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin:
+  - děláš
+  Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin:
+  - dělá
+  VerbForm=Inf:
+  - dělat

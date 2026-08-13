@@ -1,0 +1,63 @@
+# The hand seed, in miniature: the vocabulary the NLS heroes need, plus one of
+# each shape the compiler has to handle — a compact vzor entry, a full-form
+# irregular, a decomposition, an ne-exception, and a fold collision (`byt` here
+# against `být` below).
+layer: core-hand
+version: 1
+language: cs
+license: suite
+attribution: null
+entries:
+  - lemma: tržba
+    upos: NOUN
+    vzor: žena
+    rank: 3
+    provenance: manual
+
+  - lemma: faktura
+    upos: NOUN
+    vzor: žena
+    flags: [palatal]
+    provenance: manual
+
+  - lemma: rok
+    upos: NOUN
+    vzor: hrad
+    provenance: manual
+
+  - lemma: byt
+    upos: NOUN
+    vzor: hrad
+    provenance: manual
+
+  # An irregular: no pattern makes these, and contracts §3 says so outright —
+  # full-form entries are what the compact form falls back to, not a defeat.
+  - lemma: být
+    upos: AUX
+    provenance: manual
+    forms:
+      - { form: být, feats: "VerbForm=Inf" }
+      - { form: jsem, feats: "Mood=Ind|Number=Sing|Person=1|Tense=Pres" }
+      - { form: je, feats: "Mood=Ind|Number=Sing|Person=3|Tense=Pres" }
+      - { form: byl, feats: "Gender=Masc|Number=Sing|Tense=Past|VerbForm=Part" }
+
+  # B-O4: the decomposition rides the flags cell as `parts:aby+bych`.
+  - lemma: abych
+    upos: SCONJ
+    provenance: manual
+    parts: [aby, bych]
+    forms:
+      - { form: abych, feats: "Mood=Cnd|Number=Sing|Person=1" }
+
+  # `nemoc` is not `ne` + `moc`. Every form of it, not just this one, has to
+  # survive the runtime's ne-/nej- strip.
+  - lemma: nemoc
+    upos: NOUN
+    vzor: kost
+    ne_exception: true
+    provenance: manual
+
+  - lemma: porovnat
+    upos: VERB
+    vzor: dělat
+    provenance: manual

@@ -317,3 +317,67 @@ def test_a_missing_grpc_extra_says_which_extra(monkeypatch):
 
     with pytest.raises(ImportError, match=r"ttr-nlp\[grpc\]"):
         doc_to_proto(Document("x"))
+
+
+# ── NLS-P9.1: the morph annotator's list of records ──────────────────────────
+
+
+def test_a_list_of_dicts_travels_as_json_strings():
+    """`Token.analyses` (LM contracts §1/§5) is the one feature in the suite
+    that is a list of records, and §2.1's value domain has no room for it. The
+    alternative to this encoding was `RunPipeline` raising on every Czech morph
+    request — see the module docstring for why the other three options are
+    worse."""
+    import json
+
+    doc = Document("tržby")
+    doc.annset("").add(
+        0,
+        5,
+        "Token",
+        {
+            "lemma": "tržba",
+            "analyses": [
+                {"lemma": "tržba", "upos": "NOUN", "rank": 0},
+                {"lemma": "tržbě", "upos": "NOUN", "rank": 1},
+            ],
+        },
+    )
+
+    payload = doc_to_proto(doc)
+    values = payload.annotation_sets[0].annotations[0].features["analyses"]
+    encoded = [item.string_value for item in values.list_value.items]
+    assert [json.loads(item)["lemma"] for item in encoded] == ["tržba", "tržbě"]
+
+
+def test_the_encoding_is_deterministic():
+    """Sorted keys: two runs must serialise identically or every golden
+    comparison downstream flaps for no reason."""
+    doc = Document("x")
+    doc.annset("").add(0, 1, "Token", {"analyses": [{"b": 2, "a": 1}]})
+    again = Document("x")
+    again.annset("").add(0, 1, "Token", {"analyses": [{"a": 1, "b": 2}]})
+    assert doc_to_proto(doc) == doc_to_proto(again)
+
+
+def test_they_come_back_as_strings_and_that_is_deliberate():
+    """The object-ness is exactly what the wire's value domain does not carry.
+    A heuristic re-parsing any string that starts with `{` would corrupt a
+    genuine string feature that happened to look like JSON — and in-process
+    consumers never cross this boundary at all."""
+    doc = Document("x")
+    doc.annset("").add(0, 1, "Token", {"analyses": [{"lemma": "x"}]})
+    back = doc_from_proto(doc_to_proto(doc))
+    (token,) = back.annset("")
+    assert token.features["analyses"] == ['{"lemma": "x"}']
+
+
+def test_a_top_level_dict_is_still_flattened_not_json():
+    """`Token.feats` keeps the dotted-key convention it has always had — the
+    JSON encoding is for records inside a LIST, which the flattener cannot
+    reach."""
+    doc = Document("x")
+    doc.annset("").add(0, 1, "Token", {"feats": {"Case": "Gen"}})
+    features = doc_to_proto(doc).annotation_sets[0].annotations[0].features
+    assert "feats.Case" in features
+    assert features["feats.Case"].string_value == "Gen"

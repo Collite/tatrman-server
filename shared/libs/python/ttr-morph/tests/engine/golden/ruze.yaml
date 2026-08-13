@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: soft feminine
+lemma: růže
+vzor: růže
+flags: []
+table:
+  Case=Acc|Gender=Fem|Number=Plur:
+  - růže
+  Case=Acc|Gender=Fem|Number=Sing:
+  - růži
+  Case=Dat|Gender=Fem|Number=Plur:
+  - růžím
+  Case=Dat|Gender=Fem|Number=Sing:
+  - růži
+  Case=Gen|Gender=Fem|Number=Plur:
+  - růží
+  Case=Gen|Gender=Fem|Number=Sing:
+  - růže
+  Case=Ins|Gender=Fem|Number=Plur:
+  - růžemi
+  Case=Ins|Gender=Fem|Number=Sing:
+  - růží
+  Case=Loc|Gender=Fem|Number=Plur:
+  - růžích
+  Case=Loc|Gender=Fem|Number=Sing:
+  - růži
+  Case=Nom|Gender=Fem|Number=Plur:
+  - růže
+  Case=Nom|Gender=Fem|Number=Sing:
+  - růže
+  Case=Voc|Gender=Fem|Number=Plur:
+  - růže
+  Case=Voc|Gender=Fem|Number=Sing:
+  - růže

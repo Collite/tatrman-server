@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# S-7 named acceptance case 3 of 3 (contracts §11 -> NLS arc gate 7).
+case: nl-hero-lemma-path
+title: the NL hero's lemma path — NC-free
+text: "Zobraz všechny faktury od zákazníka Microsoft"
+note: >-
+  The primary NLS hero (`services/nlp/eval/corpus/rules.jsonl`, `hero-cs-invoices`).
+  The rule pack that answers it matches on `lemma`, so the whole query turns on
+  two lemmatizations: *faktury* -> `faktura` and *zákazníka* -> `zákazník`.
+
+  **This case is the NC-free proof.** Both come from the core lexicon, whose
+  every layer is suite-licensed or CC BY-SA (contracts §10) — no MorfFlex, no
+  PDT, no hunspell, nothing whose licence forbids commercial use (D-ε/Q-6). The
+  option lane may reach the same lemmas through MorphoDiTa; this case asserts
+  the DEFAULT lane can, with `provenance: lexicon` on every content word.
+
+  *Microsoft* is absent for the same reason *Kaufland* is: a customer name is
+  world vocabulary.
+tokens:
+  - form: Zobraz
+    lemma: zobrazit
+    matched_via: folded
+    provenance: lexicon
+  - form: všechny
+    lemmas: [všechno, všechen]
+    matched_via: exact
+    provenance: lexicon
+    note: >-
+      Two lemmas for one lexeme, and the case asserts BOTH in that order rather
+      than picking a winner. CAC — the oracle — lemmatizes the whole totality
+      paradigm to `všechno` and tags it PRON; a dictionary, and our hand seed,
+      call it `všechen` and tag it DET. Neither is wrong.
+
+      It costs nothing at the gazetteer, which is where it matters: LM-8
+      match-if-any tests every lemma on the token, so a list written either way
+      fires. It costs one point of head-of-list accuracy per token if the head
+      disagrees with CAC, which is why the CAC-attested reading is first.
+
+      Merging the two entries is an editorial decision and belongs to the
+      studio's queue (NLS-P9), not to a hurried edit in an acceptance case.
+  - form: faktury
+    lemma: faktura
+    matched_via: exact
+    provenance: lexicon
+  - form: od
+    lemma: od
+    matched_via: exact
+    provenance: lexicon
+  - form: zákazníka
+    lemma: zákazník
+    matched_via: exact
+    provenance: lexicon
+  - form: Microsoft
+    absent: true

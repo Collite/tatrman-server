@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.1 T3 — a golden paradigm table. Regenerate with
+# `uv run python tests/engine/golden/regen.py`; read the diff before
+# committing it.
+note: i-declension feminine
+lemma: kost
+vzor: kost
+flags: []
+table:
+  Case=Acc|Gender=Fem|Number=Plur:
+  - kosti
+  Case=Acc|Gender=Fem|Number=Sing:
+  - kost
+  Case=Dat|Gender=Fem|Number=Plur:
+  - kostem
+  Case=Dat|Gender=Fem|Number=Sing:
+  - kosti
+  Case=Gen|Gender=Fem|Number=Plur:
+  - kostí
+  Case=Gen|Gender=Fem|Number=Sing:
+  - kosti
+  Case=Ins|Gender=Fem|Number=Plur:
+  - kostmi
+  Case=Ins|Gender=Fem|Number=Sing:
+  - kostí
+  Case=Loc|Gender=Fem|Number=Plur:
+  - kostech
+  Case=Loc|Gender=Fem|Number=Sing:
+  - kosti
+  Case=Nom|Gender=Fem|Number=Plur:
+  - kosti
+  Case=Nom|Gender=Fem|Number=Sing:
+  - kost
+  Case=Voc|Gender=Fem|Number=Plur:
+  - kosti
+  Case=Voc|Gender=Fem|Number=Sing:
+  - kosti

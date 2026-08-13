@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# NLS-P8.4.T1 — the generation-expansion slice. `Kaufland` is a customer name:
+# OPEN vocabulary, so its paradigm lives in a WORLD morph layer (FI-1) and not
+# in the published core, and the expanded list is how a pipeline that does not
+# load the morph snapshot still matches *Kauflandu* in "tržby Kauflandu".
+#
+# Kept beside the other value aliases rather than in a fixture of its own: the
+# exporter's job is to read what a model repo actually writes, and a model repo
+# writes a customer alias exactly here.
+schema: ttr-lexicon/v1
+defaults: { lang: cs, method: TOKENS }
+entries:
+  - terms:
+      - { text: "Kaufland" }
+    target: md.dimension.Customer.class.kaufland

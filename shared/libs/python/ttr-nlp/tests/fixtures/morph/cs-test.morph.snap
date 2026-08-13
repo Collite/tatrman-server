@@ -1,0 +1,66 @@
+#morph-snapshot v1
+#language: cs
+#version: 0.0.0-test
+#layers: core-hand=suite core-test=suite
+#content-hash: sha256:d53e7391f24b877e5a3f73eb71f57ecdee041d551a98dc6b50a9503f4db4b01a
+#rows: 28
+form	lemma	upos	feats	vzor	flags	rank	layer	provenance
+porovnej	porovnat	VERB	Aspect=Perf|Mood=Imp|Number=Sing|Person=2	dělat		0	core-hand	lexicon
+porovnat	porovnat	VERB	Aspect=Perf|VerbForm=Inf	dělat		0	core-hand	lexicon
+tržba	tržba	NOUN	Case=Nom|Number=Sing	žena		0	core-hand	lexicon
+tržby	tržba	NOUN	Case=Acc|Number=Plur;Case=Gen|Number=Sing;Case=Nom|Number=Plur	žena		3	core-hand	lexicon
+tržbě	tržba	NOUN	Case=Dat|Number=Sing;Case=Loc|Number=Sing	žena		0	core-hand	lexicon
+tržbu	tržba	NOUN	Case=Acc|Number=Sing	žena		0	core-hand	lexicon
+tržbou	tržba	NOUN	Case=Ins|Number=Sing	žena		0	core-hand	lexicon
+tržeb	tržba	NOUN	Case=Gen|Number=Plur	žena	fleeting-e	0	core-hand	lexicon
+tržbám	tržba	NOUN	Case=Dat|Number=Plur	žena		0	core-hand	lexicon
+tržbách	tržba	NOUN	Case=Loc|Number=Plur	žena		0	core-hand	lexicon
+tržbami	tržba	NOUN	Case=Ins|Number=Plur	žena		0	core-hand	lexicon
+loňský	loňský	ADJ	Case=Acc|Degree=Pos|Gender=Masc|Number=Sing;Case=Nom|Degree=Pos|Gender=Masc|Number=Sing	mladý		0	core-hand	lexicon
+letošní	letošní	ADJ	Case=Nom|Degree=Pos|Gender=Masc|Number=Sing	jarní		0	core-hand	lexicon
+letošním	letošní	ADJ	Case=Ins|Degree=Pos|Gender=Masc|Number=Sing;Case=Loc|Degree=Pos|Gender=Masc|Number=Sing	jarní		0	core-hand	lexicon
+rok	rok	NOUN	Case=Acc|Number=Sing;Case=Nom|Number=Sing	hrad		0	core-hand	lexicon
+roce	rok	NOUN	Case=Loc|Number=Sing	hrad		0	core-hand	lexicon
+roku	rok	NOUN	Case=Dat|Number=Sing;Case=Gen|Number=Sing;Case=Loc|Number=Sing	hrad		0	core-hand	lexicon
+za	za	ADP	Case=Acc;Case=Gen;Case=Ins			0	core-hand	lexicon
+s	s	ADP	Case=Gen;Case=Ins			0	core-hand	lexicon
+být	být	AUX	Aspect=Imp|VerbForm=Inf			0	core-hand	lexicon
+byt	byt	NOUN	Case=Acc|Number=Sing;Case=Nom|Number=Sing	hrad		1	core-hand	lexicon
+má	mít	VERB	Mood=Ind|Number=Sing|Person=3|Tense=Pres			0	core-hand	lexicon
+má	můj	DET	Case=Nom|Gender=Fem|Number=Sing			1	core-hand	lexicon
+abych	abych	SCONJ	Mood=Cnd|Number=Sing|Person=1		parts:aby+bych	0	core-hand	lexicon
+nemoc	nemoc	NOUN	Case=Acc|Number=Sing;Case=Nom|Number=Sing	kost		0	core-hand	lexicon
+moc	moc	NOUN	Case=Acc|Number=Sing;Case=Nom|Number=Sing	žena		0	core-hand	lexicon
+dostatek	dostatek	NOUN	Case=Acc|Number=Sing;Case=Nom|Number=Sing	hrad	fleeting-e	0	core-hand	lexicon
+lepší	dobrý	ADJ	Degree=Cmp|Gender=Masc|Number=Sing	jarní		0	core-hand	lexicon
+
+#fold-index
+abych	abych
+byt	být,byt
+dostatek	dostatek
+lepsi	lepší
+letosni	letošní
+letosnim	letošním
+lonsky	loňský
+ma	má
+moc	moc
+nemoc	nemoc
+porovnat	porovnat
+porovnej	porovnej
+roce	roce
+rok	rok
+roku	roku
+s	s
+trzba	tržba
+trzbach	tržbách
+trzbam	tržbám
+trzbami	tržbami
+trzbe	tržbě
+trzbou	tržbou
+trzbu	tržbu
+trzby	tržby
+trzeb	tržeb
+za	za
+
+#ne-exceptions
+nemoc

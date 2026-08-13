@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The front's config for the arc-gate-7 stack (NLS-P9.3 T7).
+#
+# This is the ONE configuration in the repo where the whole enrichment loop is
+# wired: the front loads the core snapshot AND the world overlay the studio
+# writes, and its miss queue posts to that studio instead of spooling to a
+# directory. `docker-compose.gate7.yml` brings it up; `docs/morph-studio.md`
+# explains it as a per-world deployment.
+#
+# ⚑ No engine backends. `morph-patterns` is `morph: true, ops: [NER]`, and in
+# the DEFAULT lane cs NER is unrouted by design (NLS-NLP-011, NL-14) — so the
+# pipeline runs the lexicon and the rule packs with nothing else in the stack.
+# That is not a shortcut: it is the claim the LM arc is about. The Czech path
+# from a sentence to a QueryPattern has no non-commercially-licensed model in
+# it, and a gate that needed MorphoDiTa running to prove that would be proving
+# something else.
+
+service:
+  grpc_port: 7271
+  port: 7270
+
+lane: "default"
+
+engines: {}
+op_routing:
+  DETECT_LANGUAGE: "langid"
+
+packs:
+  sources: ["/etc/nlp/packs"]
+lists:
+  sources: ["/etc/nlp/lists"]
+
+# ── The two mounts (LM contracts §5) ─────────────────────────────────────────
+#
+# ⚑⚑ The overlay is a SEPARATE directory from the core, and it has to be. The
+# core snapshot is a release artifact — read-only, versioned, identical on every
+# deployment of a given `morph/v*`. The overlay is one world's live file, written
+# by that world's studio, changing whenever a reviewer acts. Mounting them
+# together would mean either the studio can write into the released artifact's
+# directory or the front cannot see the overlay at all.
+#
+# ⚑ Sources load FAIL-ALL: one unreadable path and nothing loads, not even the
+# core. That is why morph-studio seeds an empty overlay at boot (`_seed_overlay`
+# in its `main.py`) — a declared file that does not exist yet would take the
+# whole Czech lexicon down until the first proper noun happened to auto-validate,
+# and the miss that produces one needs the lexicon that the missing file is
+# holding down.
+morph:
+  sources:
+    - "/etc/nlp/morph/cs.morph.snap"
+    - "/etc/nlp/morph/core-cac.morph.part"
+    - "/etc/nlp/morph/core-kaikki.morph.part"
+    - "/etc/nlp/overlay/dfp.morph.overlay"
+  world: "dfp"
+  queue:
+    # THE WIRE. Every token the lexicon could not analyse is POSTed to the
+    # studio's ingest endpoint, where the cascade meets it. `spool_dir` is what
+    # makes that safe: a studio that is down or restarting costs latency in the
+    # enrichment loop and never a lost miss.
+    sink: "url:http://morph-studio:7290/v1/ingest"
+    spool_dir: "/var/lib/nlp/morph-queue"
+  worlds:
+    # S-4: spans stay off. A lemmatizer queue that collected the surrounding
+    # text by default would be collecting user data by default.
+    dfp: { spans: false, retention_days: 90 }
+
+pipelines:
+  # The lexicon path, and only it. Same pack and phases as the offline recipe's
+  # `morph-patterns`, so the gate measures the pipeline a deployment runs.
+  morph-patterns:
+    morph: true
+    ops: [NER]
+    gazetteer: [dfp-entity-aliases]
+    rules:
+      - { pack: hero-cs-invoices, phase: name-candidates }
+      - { pack: hero-cs-invoices, phase: query-match }
+
+default_language: "cs"
+log_level: "INFO"

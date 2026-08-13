@@ -199,6 +199,12 @@ message StatusResponse {
   string lane = 3;                       // "default" | "option"
   repeated PipelineInfo pipelines = 4;
   PackState pack_state = 5;
+  // LM (NLS-P9). Which morph snapshot is serving, and with which world overlays
+  // — the question an operator asks first when a demo answers wrongly, and one
+  // no capability row can carry (a row says an op is served, not by what
+  // artifact). Field 6 only: fields 1–5 are untouched, which is the whole of
+  // ⚑LMP-D3's additive rule.
+  MorphState morph_state = 6;
 }
 
 // ---------------------------------------------------------------------------
@@ -329,6 +335,22 @@ message ReportTokenRequest {
 
 message ReportTokenResponse {
   bool accepted = 1;                // false = queue sink disabled
+}
+
+// The loaded morph snapshot, as `GetStatus` reports it (LM contracts §5's
+// `MorphStats`, on the wire). `diagnostics` reuses `PackDiagnostic` rather than
+// declaring an `LM-MORPH-*` twin: the wheel's `LM-MORPH-*` codes extend the
+// `NLS-PACK-*` family in the SAME five-field `Diagnostic` shape, deliberately
+// (`ttrnlp.morph.diag`), so an operator reads one dialect for both halves.
+message MorphState {
+  string version = 1;               // the morph/v<x.y.z> the artifact declares
+  string language = 2;
+  int32 rows = 3;                   // core + separable members + overlays
+  int32 forms = 4;                  // distinct surface forms answerable exactly
+  repeated string worlds = 5;       // world overlays loaded, in load order
+  string content_hash = 6;          // the core artifact's own hash
+  int32 fold_collisions = 7;        // folded keys carrying more than one lemma
+  repeated PackDiagnostic diagnostics = 8;  // non-empty only when the load FAILED
 }
 
 // ---------------------------------------------------------------------------
