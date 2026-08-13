@@ -35,7 +35,7 @@ class GetModelLocalizedDescriptionSpec :
 
         val fixtureRoot: Path =
             Path
-                .of(checkNotNull(this::class.java.classLoader.getResource("model-ttr-localized/localized")).toURI())
+                .of(checkNotNull(this::class.java.classLoader.getResource("model-locale/localized")).toURI())
                 .parent
 
         fun service(): MetadataServiceImpl {
