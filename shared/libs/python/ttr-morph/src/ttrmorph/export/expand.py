@@ -55,6 +55,7 @@ from pathlib import Path
 
 import yaml
 from ttrnlp.morph import MorphState, load_morph
+from ttrnlp.morph.snapshot import pack_feats
 
 #: The mode an expanded list carries. Pre-expanded terms are surface forms, and
 #: a surface form matched case-insensitively would make *Kaufland* match a
@@ -174,10 +175,20 @@ class FormIndex:
 
 
 def build_index(state: MorphState) -> FormIndex:
+    """Invert the artifact's exact index, one ``(form, feats)`` per row.
+
+    ⚑ `analysis.feats` is a set of *readings*, each already ``|``-joined by the
+    tagset — so the pack is the artifact's own `pack_feats` and not another
+    ``|``. Joined with a second ``|``, a syncretic form (11,662 of them in the
+    shipped `cs` artifact: every *tržby*, every *ženy*) came out as
+    ``Number=Plur|Person=3|Number=Sing|Person=3``, a cell no consumer can read
+    back into the two readings it is, and one that no longer round-trips
+    through the loader that wrote it.
+    """
     grouped: dict[str, dict[tuple[str, str], None]] = {}
     for form, analyses in state.exact.items():
         for analysis in analyses:
-            feats = "|".join(sorted(analysis.feats))
+            feats = pack_feats(analysis.feats)
             grouped.setdefault(analysis.lemma, {}).setdefault((form, feats), None)
     return FormIndex(
         by_lemma={

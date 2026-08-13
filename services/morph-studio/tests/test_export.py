@@ -10,7 +10,7 @@ this is where the studio's half of it is checked.
 from __future__ import annotations
 
 import yaml
-from ttrmorph.compile.layers import read_layer
+from ttrmorph.compile.layers import LICENSE_SUITE, read_layer
 from ttrmorph.enrich.cascade import LAYER_CORE, LAYER_WORLD
 
 from morph_studio import status as st
@@ -173,19 +173,49 @@ def test_the_proposals_export_carries_exactly_what_the_gate_withholds(client, se
     assert response.status_code == 200
     body = response.json()
 
+    # These three are core-routed (`entry_at` defaults to LAYER_CORE), so they
+    # are in the core fragment — see the licence test below.
     layer, diagnostics = read_layer_text(
-        body["files"][f"{WORLD}-proposed.morph.yaml"]
+        body["files"][f"{CORE_LAYER_ID}-proposed.morph.yaml"]
     )
     assert diagnostics == []
     assert {e.lemma for e in layer.entries} == {"sazba", "smlouva"}
     assert body["exported"] == 2
 
 
+def test_a_core_proposal_never_lands_in_the_world_s_fragment(client, session):
+    """⚑ The licence boundary, on the lane that leaves the building.
+
+    One fragment for everything below the gate put core-routed proposals into a
+    file rendered under `world:<id>` — relabelled as that world's material, in
+    that world's repository, under that world's licence. LM-10 routes to `core`
+    precisely the entries that are *not* the world's.
+    """
+    entry_at(session, st.PROPOSED, lemma="sazba")  # core
+    store.create_entry(
+        session,
+        lemma="Kaufland",
+        upos="PROPN",
+        layer=LAYER_WORLD,
+        vzor="hrad-proper",
+        status_=st.AUTO_VALIDATED,
+    )
+
+    files = client.post("/v1/export/proposals", json={}).json()["files"]
+    core, _ = read_layer_text(files[f"{CORE_LAYER_ID}-proposed.morph.yaml"])
+    world, _ = read_layer_text(files[f"{WORLD}-proposed.morph.yaml"])
+
+    assert {e.lemma for e in core.entries} == {"sazba"}
+    assert {e.lemma for e in world.entries} == {"Kaufland"}
+    assert core.license == LICENSE_SUITE
+    assert world.license == f"world:{WORLD}"
+
+
 def test_the_proposals_file_says_what_it_is(client, session):
     entry_at(session, st.PROPOSED, lemma="sazba")
 
     text = client.post("/v1/export/proposals", json={}).json()["files"][
-        f"{WORLD}-proposed.morph.yaml"
+        f"{CORE_LAYER_ID}-proposed.morph.yaml"
     ]
     assert "NOT a publishable layer" in text
     assert "model-validator CLI" in text

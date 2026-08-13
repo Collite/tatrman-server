@@ -348,3 +348,46 @@ def test_an_empty_directory_is_an_error(tmp_path):
 def test_expansion_without_a_snapshot_says_what_is_missing(lists_dir):
     with pytest.raises(ExpandError, match="compiled snapshot"):
         expand_lists(lists_dir, MorphConfig(lists={"lexicon-cs-ci": "expand"}))
+
+
+# ── what the review of 2026-08-13 found ──────────────────────────────────────
+
+
+def test_a_syncretic_forms_feats_stay_parseable(state, index):
+    """⚑ `analysis.feats` is a set of *readings*, each already `|`-joined.
+
+    Joined with a second `|`, a form realising two readings came out as
+    `Case=Gen|Number=Sing|Case=Nom|Number=Plur` — a cell no consumer can read
+    back into the two readings it is, and one the artifact's own loader would
+    not produce. Czech is full of these: 11,662 rows of the shipped `cs`
+    artifact are multi-reading.
+    """
+    from ttrnlp.morph.snapshot import READING_SEP, _feats
+
+    syncretic = [
+        (form, feats)
+        for form, feats in index.forms_for("tržba")
+        if READING_SEP in feats
+    ]
+    assert syncretic, "the fixture has a form with more than one reading"
+
+    for _form, feats in syncretic:
+        readings = _feats(feats)
+        assert len(readings) > 1
+        # Every reading is a whole one: atoms joined by `|`, nothing truncated
+        # and nothing run together with its neighbour.
+        for reading in readings:
+            assert all("=" in atom for atom in reading.split("|"))
+        # And it round-trips through the artifact's own parser.
+        assert READING_SEP.join(sorted(readings)) == feats
+
+
+def test_the_index_agrees_with_the_artifact_it_was_built_from(state, index):
+    """The pack is the loader's `pack_feats`, so what the index holds for a form
+    is exactly the cell the snapshot holds for it."""
+    from ttrnlp.morph.snapshot import pack_feats
+
+    for form, analyses in state.exact.items():
+        for analysis in analyses:
+            expected = pack_feats(analysis.feats)
+            assert (form, expected) in index.forms_for(analysis.lemma)

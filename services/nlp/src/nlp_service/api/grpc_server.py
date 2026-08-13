@@ -239,6 +239,13 @@ class NlpServicer(nlp_pb2_grpc.NlpServiceServicer):
         except UnknownPipelineError as exc:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
 
+        # `Runner.run` scheduled the spool write rather than performing it (see
+        # `SpoolSink.flush`) — awaited here, so this request still does not
+        # answer until its misses are on disk, while the loop stays free to
+        # serve every other request for the duration of the write instead of
+        # stopping dead in `os.replace`.
+        await self._queue.drain()
+
         resp = nlp_pb2.RunPipelineResponse(
             document=doc_to_proto(
                 result.document,
@@ -329,6 +336,10 @@ class NlpServicer(nlp_pb2_grpc.NlpServiceServicer):
             return nlp_pb2.ReportTokenResponse(accepted=False)
 
         self._queue.flush()
+        # `accepted=true` is a promise that the report survives this process.
+        # Making it before the write has landed would be exactly the promise the
+        # sink's whole design is built to keep.
+        await self._queue.drain()
         return nlp_pb2.ReportTokenResponse(accepted=True)
 
     # ---- GetStatus --------------------------------------------------------

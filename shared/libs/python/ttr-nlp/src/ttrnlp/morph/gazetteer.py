@@ -117,7 +117,15 @@ class MorphGazetteer(TokenGazetteer):
         #: length (in consumed tokens) -> {listidx: data}, so one span cannot
         #: produce two Lookups from one list however many lemmas reached it.
         found: dict[int, dict[int | None, object]] = {}
+        #: length -> how many tokens had been skipped *when that length was
+        #: reached*. ⚑ The end offset was computed from the final `ignored`
+        #: instead, so a walk that skipped tokens after the last match and then
+        #: broke handed back a span running past its own final token — over
+        #: whatever those skipped tokens were. Only the ones inside a match
+        #: belong to it.
+        ignored_at: dict[int, int] = {}
         _collect(found, active, len(consumed))
+        ignored_at[len(consumed)] = 0
 
         j = idx + 1
         while j < endidx and active:
@@ -135,6 +143,7 @@ class MorphGazetteer(TokenGazetteer):
             active = nxt
             consumed.append(token)
             _collect(found, active, len(consumed))
+            ignored_at[len(consumed)] = ignored
             j += 1
 
         if not found:
@@ -147,7 +156,7 @@ class MorphGazetteer(TokenGazetteer):
             entries = found[length]
             data = list(entries.values())
             listidx = list(entries.keys())
-            end = idx + length + ignored
+            end = idx + length + ignored_at.get(length, ignored)
             if matchfunc:
                 matches.append(
                     matchfunc(idx, end, consumed[:length], data, listidx)

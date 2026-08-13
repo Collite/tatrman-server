@@ -485,7 +485,13 @@ class PipelineRunner:
         built = self._morph_gazetteers.get(state.state_id)
         if built is None:
             built = build_morph_gazetteer(state.gazetteer.lists)
-            self._morph_gazetteers[state.state_id] = built
+            # ⚑ Only the current snapshot's. Keyed on `state_id` and never
+            # evicted, every `ReloadPacks` pinned another whole trie for the
+            # life of the process — a front reloaded on each pack edit grew
+            # without bound while every entry but one was unreachable. Pack
+            # snapshots are immutable and superseded whole, so the previous
+            # build is dead the moment a new `state_id` arrives.
+            self._morph_gazetteers = {state.state_id: built}
         return built
 
     def _run_gazetteer(

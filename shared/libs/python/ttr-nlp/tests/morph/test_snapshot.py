@@ -480,3 +480,100 @@ def test_the_fold_index_is_read_from_the_artifact_not_computed(state):
         planted = load_morph([path])
     assert planted.lookup("vymysleno") is not None
     assert planted.lookup("vymysleno").lemma == "tržba"
+
+
+# ── T5b: an overlay shadowing an overlay (the 2026-08-13 review) ─────────────
+
+
+def _overlay(tmp_path: Path, name: str, world: str, rows: list[str]) -> Path:
+    return _write(
+        tmp_path,
+        name,
+        _stamped(
+            rows,
+            header=[
+                "#morph-overlay v1",
+                "#language: cs",
+                "#version: 1.2.3",
+                f"#world: {world}",
+            ],
+        ),
+    )
+
+
+def _two_worlds(tmp_path: Path) -> tuple[Path, Path]:
+    """Two worlds, each with its own *Kaufland* — different lemma, same
+    identity `(Kaufland, PROPN)`, which is what makes them collide."""
+    first = _overlay(
+        tmp_path,
+        "a.morph.overlay",
+        "world-a",
+        ["Kauflandu\tKaufland\tPROPN\tCase=Gen|Number=Sing\thrad\t\t0\ta\tlexicon"],
+    )
+    second = _overlay(
+        tmp_path,
+        "b.morph.overlay",
+        "world-b",
+        ["Kauflandem\tKaufland\tPROPN\tCase=Ins|Number=Sing\thrad\t\t0\tb\tlexicon"],
+    )
+    return first, second
+
+
+def test_a_later_overlay_shadows_an_earlier_one(tmp_path: Path):
+    """⚑ The docstring's promise, which was only ever kept against the core.
+
+    `owners` recorded the later overlay and then every overlay row was appended
+    anyway, so two worlds defining `(Kaufland, PROPN)` *merged* into one answer
+    set instead of the later winning — and `lookup()` takes no world argument,
+    so world A's private vocabulary answered for world B.
+    """
+    first, second = _two_worlds(tmp_path)
+    state = load_morph([SNAPSHOT, first, second])
+
+    assert state.lookup("Kauflandem") is not None, "the later world owns it"
+    assert state.lookup("Kauflandu") is None, (
+        "and the earlier world's form is gone, exactly as a shadowed core "
+        "lexeme's forms are"
+    )
+
+
+def test_shadowing_one_overlay_with_another_is_reported(tmp_path: Path):
+    first, second = _two_worlds(tmp_path)
+    state = load_morph([SNAPSHOT, first, second])
+
+    shadows = [d for d in state.diagnostics if d.code == LM_MORPH_002]
+    assert len(shadows) == 1
+    assert "world-b" in shadows[0].message and "world-a" in shadows[0].message
+    assert shadows[0].severity == "INFO"
+
+
+def test_a_shadowed_overlay_form_is_unreachable_through_the_fold(tmp_path: Path):
+    """Overlays are folded at load, so the dropped form must leave that index
+    too — otherwise a query with no diacritics reaches what nothing owns."""
+    first, second = _two_worlds(tmp_path)
+    state = load_morph([SNAPSHOT, first, second])
+    assert state.lookup("kauflandu") is None
+    assert state.lookup("kauflandem") is not None
+
+
+def test_one_world_in_two_files_does_not_shadow_itself(tmp_path: Path):
+    """The ordinary deployment: a world's own layer plus the studio's Q-7
+    overlay for the same world. Different identities, so nothing is shadowed
+    and both are served."""
+    own = _overlay(
+        tmp_path,
+        "own.morph.overlay",
+        "dfp",
+        ["Kauflandu\tKaufland\tPROPN\tCase=Gen|Number=Sing\thrad\t\t0\tdfp\tlexicon"],
+    )
+    q7 = _overlay(
+        tmp_path,
+        "q7.morph.overlay",
+        "dfp",
+        ["Tesco\tTesco\tPROPN\tCase=Nom|Number=Sing\thrad\t\t0\tdfp\tprovisional"],
+    )
+    state = load_morph([SNAPSHOT, own, q7])
+
+    assert state.lookup("Kauflandu") is not None
+    assert state.lookup("Tesco") is not None
+    assert [d for d in state.diagnostics if d.code == LM_MORPH_002] == []

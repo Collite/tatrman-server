@@ -29,6 +29,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from ttrnlp.morph import VERDICT_RESOLVED_WRONG
 
 from nlp_service.config import MorphConfig, MorphQueueConfig, MorphWorldConfig
 from nlp_service.morph_queue import (
@@ -347,6 +348,7 @@ async def test_an_undelivered_report_stays_spooled(tmp_path, clock):
     )
     sink.report(WORLD, "Kauflandu")
     sink.flush()
+    await sink.drain()
 
     assert await sink.deliver() == 0
     assert [r.token for r in sink.spool.pending()] == ["Kauflandu"]
@@ -382,13 +384,66 @@ async def test_delivery_never_blocks_the_caller(tmp_path, clock):
         "http://x", SpoolSink(tmp_path / "queue", worlds(), clock=clock), sender=slow
     )
     sink.report(WORLD, "Kauflandu")
-    sink.flush()  # returns immediately, having spooled
+    sink.flush()  # returns immediately, having scheduled the write
+    await sink.drain()  # ...which `drain` is how a caller waits for
 
     assert [r["token"] for r in lines(tmp_path)] == ["Kauflandu"]
     await asyncio.wait_for(started.wait(), timeout=1)
     for task in asyncio.all_tasks():
         if task is not asyncio.current_task():
             task.cancel()
+
+
+@pytest.mark.asyncio
+async def test_flush_does_not_write_the_spool_on_the_event_loop(tmp_path, clock):
+    """⚑ `Runner.run` flushes at the end of every pipeline run, from inside
+    `async def RunPipeline`, and `chain.resolve` reports a miss for every
+    non-lexicon answer — so this is one whole-file rewrite per Czech request.
+    It must not happen on the loop that is serving the other requests."""
+    import asyncio
+
+    spool = SpoolSink(tmp_path / "queue", worlds(), clock=clock)
+    spool.report(WORLD, "Kauflandu")
+    spool.flush()
+
+    # Nothing on disk yet: the write is on a worker thread, not this one.
+    assert lines(tmp_path) == []
+    await spool.drain()
+    assert [r["token"] for r in lines(tmp_path)] == ["Kauflandu"]
+
+    # And with no loop at all — a CLI, a sync test, shutdown — it is inline.
+    spool.report(WORLD, "Kaufland")
+    await asyncio.to_thread(spool.flush)
+    assert len(lines(tmp_path)) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_report_arriving_mid_delivery_is_not_dropped(tmp_path, clock):
+    """⚑ `deliver` snapshots the payload, awaits the POST, then forgets what it
+    sent. A miss recorded during that await was deleted unsent — and a
+    `ReportToken` verdict destroyed after `accepted=true` was returned is the
+    one outcome this sink's whole design is against."""
+    import asyncio
+
+    spool = SpoolSink(tmp_path / "queue", worlds(), clock=clock)
+    released = asyncio.Event()
+
+    async def slow(endpoint, payload):
+        # The window: the POST is in flight and the front keeps serving.
+        spool.report(WORLD, "Kauflandu", VERDICT_RESOLVED_WRONG)
+        released.set()
+
+    sink = HttpSink("http://x", spool, sender=slow)
+    sink.report(WORLD, "Kauflandu")
+    sink.flush()
+    await sink.drain()
+
+    assert await sink.deliver() == 1
+    await released.wait()
+
+    kept = sink.spool.pending()
+    assert [r.token for r in kept] == ["Kauflandu"]
+    assert kept[0].verdict == VERDICT_RESOLVED_WRONG
 
 
 def test_a_url_sink_with_no_spool_dir_holds_them_in_memory(clock):

@@ -28,6 +28,9 @@ and nothing else.
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -36,10 +39,11 @@ from sqlalchemy.orm import Session
 from ttrmorph.compile.layers import WORLD_LICENSE_PREFIX
 from ttrmorph.compile.snapshot import compile_layers
 from ttrmorph.enrich.cascade import LAYER_WORLD
-from ttrmorph.importers.emit import LayerHeader, render_layer, vzor_entry
+from ttrmorph.importers.emit import LayerHeader, render_layer
 
 from morph_studio import status as st
 from morph_studio.config import Settings
+from morph_studio.export import entry_document
 from morph_studio.models import Entry
 
 logger = logging.getLogger(__name__)
@@ -69,6 +73,20 @@ class OverlayResult:
     #: Compiler diagnostics and the reload's failure, if any. Never raised.
     notes: list[str] = field(default_factory=list)
     enabled: bool = True
+    #: The overlay compiled and is now the file the front will load. ⚑ Distinct
+    #: from `written` being non-empty, which is the weaker claim that *something*
+    #: reached disk — a caller reporting `overlay_emitted` from that told the
+    #: truth on every path but the one that mattered.
+    compiled: bool = False
+
+
+#: Emissions are serialised process-wide. Two verdicts landing together each
+#: re-read the whole world and write the whole file, so without this the slower
+#: one can finish last and publish the older lexicon — restoring an entry a
+#: reviewer retracted, permanently, until something else happens to emit. Held
+#: across the compile as well as the write, because the read and the file it
+#: produces have to be one atomic step for last-writer-wins to mean anything.
+_EMIT_LOCK = threading.Lock()
 
 
 def emit_overlay(
@@ -80,7 +98,22 @@ def emit_overlay(
     fail-all, so a partial one is not a smaller overlay but a broken world. It
     is also how a retraction happens — the rejected entry is simply not in the
     file that replaces the old one.
+
+    **Nothing reaches the served directory until the compile has succeeded.**
+    The front is fail-all and reads this directory while the studio writes it,
+    so an emission is staged in a temporary directory, compiled there, and moved
+    into place with `os.replace` — atomic per file, and skipped entirely on a
+    compile failure. Written in place, the layer source was overwritten *before*
+    the compile that rejected it, which is exactly when the docstring below
+    claims the previous file is left alone.
     """
+    with _EMIT_LOCK:
+        return _emit(session, settings, retractions=retractions)
+
+
+def _emit(
+    session: Session, settings: Settings, *, retractions: list[str] | None = None
+) -> OverlayResult:
     result = OverlayResult(retracted=list(retractions or []))
     if not settings.overlay_dir:
         result.enabled = False
@@ -94,13 +127,17 @@ def emit_overlay(
     entries = _world_entries(session, provisional=settings.provisional)
     documents = []
     for entry in entries:
-        document = vzor_entry(
-            entry.lemma,
-            entry.upos,
-            entry.vzor or "",
-            tuple(entry.flags or ()),
-            entry.provenance,
-        )
+        # ⚑ `entry_document`, the same renderer `POST /export` uses, not a
+        # `vzor_entry` of its own. Two reasons, and the first one breaks worlds:
+        # an entry with no vzor — every LLM-proposed irregular, every entry a
+        # reviewer authored as bare forms — emitted `vzor: ""`, which the
+        # compiler refuses as "neither 'vzor' nor 'forms'". That is a *permanent*
+        # break, not a bad emission: the overlay stops compiling, so it stops
+        # being replaced, and the world is frozen at whatever it last served.
+        # The second: a reviewer's corrected forms were discarded and the
+        # overruled pattern re-emitted, so the front went on serving the exact
+        # paradigm they had rejected.
+        document = entry_document(entry)
         if entry.provisional:
             document["provisional"] = True
             result.provisional += 1
@@ -121,35 +158,62 @@ def emit_overlay(
 
     directory = Path(settings.overlay_dir)
     directory.mkdir(parents=True, exist_ok=True)
-    layer_path = directory / source_name(settings.world)
-    layer_path.write_text(source, encoding="utf-8")
-    result.written.append(str(layer_path))
 
-    compiled = compile_layers(
-        [str(layer_path)],
-        snapshot_version="0.0.0-provisional",
-        output=overlay_name(settings.world),
-        world=settings.world,
-    )
-    result.notes.extend(
-        f"{d.code}: {d.message}" for d in compiled.diagnostics if d.severity != "INFO"
-    )
-    if not compiled.ok:
-        # The overlay on disk is the front's live lexicon for this world. A
-        # compile that failed must not overwrite the last good one with a file
-        # assembled from whatever was usable.
-        result.notes.append(
-            "the overlay did NOT compile — the previously served file is left in "
-            "place, which is the only safe thing to do with a world's live lexicon"
+    # Staged beside the served directory, not in it: `compile_layers` takes a
+    # path, so the source has to exist somewhere before it can be judged, and
+    # "somewhere" must not be the file the front is loading. `dir=directory`
+    # keeps the staging area on the same filesystem, which is what makes the
+    # `os.replace` below atomic rather than a copy with a window in it.
+    with tempfile.TemporaryDirectory(dir=directory, prefix=".emit-") as staging:
+        layer_path = Path(staging) / source_name(settings.world)
+        layer_path.write_text(source, encoding="utf-8")
+
+        compiled = compile_layers(
+            [str(layer_path)],
+            snapshot_version="0.0.0-provisional",
+            output=overlay_name(settings.world),
+            world=settings.world,
         )
-        return result
+        result.notes.extend(
+            f"{d.code}: {d.message}"
+            for d in compiled.diagnostics
+            if d.severity != "INFO"
+        )
+        if not compiled.ok:
+            # The overlay on disk is the front's live lexicon for this world. A
+            # compile that failed must not overwrite the last good one with a
+            # file assembled from whatever was usable — nor with the source that
+            # produced it, which is what writing in place used to do.
+            result.notes.append(
+                "the overlay did NOT compile — the previously served files are "
+                "left untouched, source included, which is the only safe thing "
+                "to do with a world's live lexicon"
+            )
+            return result
 
-    for name, text in compiled.outputs.items():
-        path = directory / name
-        path.write_text(text, encoding="utf-8")
-        result.written.append(str(path))
-        result.files[name] = text
+        for name, text in compiled.outputs.items():
+            result.files[name] = text
+        result.written.append(str(_publish(layer_path, directory)))
+        for name, text in sorted(compiled.outputs.items()):
+            staged = Path(staging) / name
+            staged.write_text(text, encoding="utf-8")
+            result.written.append(str(_publish(staged, directory)))
+
+    result.compiled = True
     return result
+
+
+def _publish(staged: Path, directory: Path) -> Path:
+    """Move one staged file into the served directory, atomically.
+
+    `os.replace` is the whole point: the front loads this directory fail-all, so
+    a truncate-then-write leaves a window in which a reload reads half a lexicon
+    and drops the world's vocabulary entirely. A rename within one filesystem
+    has no such window — a reader sees the old file or the new one.
+    """
+    target = directory / staged.name
+    os.replace(staged, target)
+    return target
 
 
 async def reload_front(settings: Settings) -> tuple[bool, str]:

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from ttrmorph.enrich.cascade import (
     LAYER_CORE,
     LAYER_WORLD,
     STATUS_AUTO_VALIDATED,
+    STATUS_PROPOSED,
     CascadeResult,
     run_cascade,
 )
@@ -41,6 +43,14 @@ ROUTED_HUMAN = "human"
 #: engine and its output is `manual` material in the licence sense — it derives
 #: from the vzor tables, which are ours — while an LLM answer is `llm`.
 PROVENANCE_BY_SOURCE = {"guesser": "manual", "inflector": "manual", "llm": "llm"}
+
+#: The cascade's own ladder, low to high — the only statuses a *re*-proposal may
+#: move an existing entry along (`_raise_standing`). Everything above these is a
+#: human act or an export, and a second sighting of a word is neither: an ingest
+#: that could push a lexeme to `verified` would be the export gate's one hole,
+#: and one that could push it to `rejected` would let the enrichment loop
+#: overrule the reviewer who rejected it.
+_LADDER = (STATUS_PROPOSED, STATUS_AUTO_VALIDATED)
 
 
 # ── audit ────────────────────────────────────────────────────────────────────
@@ -93,15 +103,29 @@ def create_entry(
     provenance: str = "manual",
     actor: str = "system",
 ) -> Entry:
-    """A new entry with its paradigm materialised, or the existing one.
+    """A new entry with its paradigm materialised, or the existing one, raised.
 
     Identity is `(lemma, upos, layer)` (contracts §3). A second proposal for a
     word already in the store does not create a twin — it is the same lexeme,
     and two rows for it would each be exportable and disagree.
+
+    ⚑ But it does not return the existing row *untouched* either. A cascade that
+    auto-validates the second token of a lexeme already sitting at `proposed`
+    has raised that lexeme's standing, and Q-7 reads `entry.provisional` to
+    decide what goes live: leave both fields at what the first token wrote and
+    the entry the cascade just auto-validated never reaches the front, with
+    nothing anywhere saying why. See `_raise_standing` for how far that goes,
+    which is: forwards only, and never past a human.
     """
     existing = find_entry(session, lemma, upos, layer)
     if existing is not None:
-        return existing
+        return _raise_standing(
+            session,
+            existing,
+            status_=status_,
+            provisional=provisional,
+            actor=actor,
+        )
 
     entry = Entry(
         lemma=lemma,
@@ -129,6 +153,46 @@ def create_entry(
         vzor=vzor,
         source=source,
     )
+    return entry
+
+
+def _raise_standing(
+    session: Session,
+    entry: Entry,
+    *,
+    status_: str,
+    provisional: bool,
+    actor: str,
+) -> Entry:
+    """Apply a re-proposal's standing to the lexeme already in the store.
+
+    Forwards along `_LADDER` and no further. Two rules, both of them about not
+    letting the loop overwrite a person:
+
+    * the status moves only `proposed → auto-validated`. An entry a reviewer
+      already took to `verified` is not pulled back to whatever a fresh cascade
+      would say about it, and a `rejected` one is not reopened by the word being
+      typed again — that is what makes `rejected` terminal worth anything;
+    * `provisional` is set only while the entry is still below the export gate.
+      A `verified` entry is permanent by definition (`set_status` clears the
+      mark when it gets there), and re-marking it would put a row back into
+      Q-7's unverified half after a human had signed it off.
+    """
+    if entry.status not in _LADDER or status_ not in _LADDER:
+        return entry
+
+    changes: dict[str, object] = {}
+    if _LADDER.index(status_) > _LADDER.index(entry.status):
+        was, entry.status = entry.status, status_
+        changes |= {"was": was, "now": status_}
+    if provisional and not entry.provisional and status_ not in st.EXPORTABLE:
+        entry.provisional = 1
+        changes["provisional"] = True
+
+    if not changes:
+        return entry
+    session.flush()
+    audit(session, "entry", entry.id, "re-proposed", actor=actor, **changes)
     return entry
 
 
@@ -187,7 +251,18 @@ def set_status(
     actor: str = "system",
     reason: str = "",
 ) -> Entry:
-    """Move an entry through the machine, or raise `IllegalTransition`."""
+    """Move an entry through the machine, or raise `IllegalTransition`.
+
+    Asking for the status it already has is a no-op, not a refusal. The machine
+    has no self-edges and should not grow any — `verified → verified` is not a
+    claim about the lexicon and does not belong in a table whose whole value is
+    that every edge in it is one. But it *is* something a reviewer does: verify
+    a queue item whose lexeme a second, earlier item already took to `verified`,
+    and the honest answer is that the entry is where they wanted it, not a 409
+    they can do nothing about.
+    """
+    if entry.status == wanted:
+        return entry
     st.check(entry.status, wanted)
     was = entry.status
     entry.status = wanted
@@ -332,14 +407,18 @@ def apply_cascade(
     Nothing about the *rules* changes: the status a precomputed result carries
     is one the cascade produces (`proposed` or `auto-validated`), and the
     entry it creates goes through `entry_from_proposal` exactly as a live one
-    does. What is skipped is the computation, not the gate.
+    does. What is skipped is the computation, not the gate — and `_validated`
+    is what makes that sentence true rather than merely intended.
     """
-    result = result or run_cascade(
-        item.token,
-        llm=llm,
-        vocabulary=vocabulary,
-        context=item.context_span,
-    )
+    if result is None:
+        result = run_cascade(
+            item.token,
+            llm=llm,
+            vocabulary=vocabulary,
+            context=item.context_span,
+        )
+    else:
+        result = _validated(result, item.token)
     item.proposal = {
         "proposals": [p.as_dict() for p in result.proposals],
         "tier": result.tier,
@@ -375,6 +454,59 @@ def apply_cascade(
     return result
 
 
+def _validated(result: CascadeResult, token: str) -> CascadeResult:
+    """LM-14's rule, re-run over a cascade result somebody else computed.
+
+    ⚑ This is the gate, and it is here rather than in `api._precomputed`
+    because the API is not the only caller: the NLS-P9.3 bootstrap batch hands
+    `apply_cascade` its own results directly, and a check that lived in an
+    endpoint would be a check the batch does not get.
+
+    `api._precomputed` already rejects a status no cascade reaches, so the
+    remaining lie a body can tell is the one that matters most: *this token is
+    in the paradigm this pattern generates*. Believed, it puts a paradigm no
+    engine ever produced straight into the world's live overlay past
+    `provisional=True` — which is exactly the claim the docstring above says is
+    never taken on anybody's word, `validates()` being the only thing in this
+    loop that can make it true.
+
+    A result that fails is not refused. It is held at `proposed`, with the
+    reason in the notes where a reviewer reads it: the token was really seen and
+    the proposal may well be right, so the queue item belongs in front of a
+    person, not in a 400 that loses it.
+    """
+    if result.status != STATUS_AUTO_VALIDATED:
+        return result
+    best = result.best
+    if best is not None and validates(best, token):
+        return result
+    why = (
+        "it carried no proposal"
+        if best is None
+        else (
+            f"vzor {best.vzor!r} does not generate {token!r} from lemma "
+            f"{best.lemma!r}"
+        )
+    )
+    logger.warning(
+        "precomputed cascade for %r claimed %s but %s — held at %s",
+        token,
+        STATUS_AUTO_VALIDATED,
+        why,
+        STATUS_PROPOSED,
+    )
+    return replace(
+        result,
+        status=STATUS_PROPOSED,
+        notes=(
+            *result.notes,
+            f"auto-validation was NOT re-derivable here: {why}. Held at "
+            f"{STATUS_PROPOSED!r} for a person (LM-14) — the engine check is "
+            "re-run on every precomputed result, never trusted from the body.",
+        ),
+    )
+
+
 def entry_from_proposal(
     session: Session,
     proposal: Proposal,
@@ -408,6 +540,8 @@ def set_status_queue(
     actor: str = "system",
     reason: str = "",
 ) -> QueueItem:
+    if item.status == wanted:  # idempotent, for `set_status`'s reason
+        return item
     st.check(item.status, wanted)
     was = item.status
     item.status = wanted

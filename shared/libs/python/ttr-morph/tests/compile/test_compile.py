@@ -294,7 +294,32 @@ def test_an_overlay_keeps_share_alike_layers_in_one_file(
         output="dfp.morph.overlay",
         world="dfp",
     )
-    assert set(result.outputs) == {"dfp.morph.overlay", NOTICE_FILENAME}
+    assert set(result.outputs) == {"dfp.morph.overlay", "NOTICE-morph-dfp.md"}
+
+
+def test_an_overlays_notice_is_world_scoped(kaikki_layer_path, world_layer_path):
+    """⚑ Never `NOTICE-morph.md` — that name belongs to the core artifact, and
+    both compiles emit into a directory the caller picks."""
+    result = compile_layers(
+        [kaikki_layer_path, world_layer_path],
+        snapshot_version="0.1.0",
+        output="dfp.morph.overlay",
+        world="dfp",
+    )
+    assert NOTICE_FILENAME not in result.outputs
+    assert "Wiktionary" in result.outputs["NOTICE-morph-dfp.md"]
+
+
+def test_an_overlay_with_no_share_alike_material_emits_no_notice(world_layer_path):
+    """A world's own vocabulary under its own licence has nothing to attribute,
+    and the "suite-licensed only" boilerplate is not empty but wrong."""
+    result = compile_layers(
+        [world_layer_path],
+        snapshot_version="0.1.0",
+        output="dfp.morph.overlay",
+        world="dfp",
+    )
+    assert set(result.outputs) == {"dfp.morph.overlay"}
 
 
 # ── the derived sections ─────────────────────────────────────────────────────
@@ -368,3 +393,59 @@ def test_layer_order_does_not_change_bytes_when_nothing_collides(
     backward = compile_core([kaikki_layer_path, hand_layer_path]).outputs
     assert forward[SNAP] == backward[SNAP]
     assert forward[PART] == backward[PART]
+
+
+# ── what the review of 2026-08-13 found ──────────────────────────────────────
+
+
+def test_a_featless_spot_check_form_keeps_the_whole_paradigm(tmp_path):
+    """⚑ `FormSpec.feats` defaults to empty and the importers write spot-checks
+    that way: a couple of surface forms, untagged, listed to show the pattern
+    was chosen correctly.
+
+    Compared as a bare `(form, feats)` pair against a paradigm whose every
+    reading carries UD atoms, such a form could never match — so the entry read
+    as a pattern regenerating none of its own spot-checks, the vzor was dropped,
+    and the lexeme compiled to the one listed form instead of the ten the
+    pattern makes. On an INFO, with the compile green.
+    """
+    layer = tmp_path / "spot.morph.yaml"
+    layer.write_text(
+        "layer: core-hand\nversion: 1\nlanguage: cs\nlicense: suite\n"
+        "attribution: null\nentries:\n"
+        "  - { lemma: tržba, upos: NOUN, vzor: žena, provenance: manual,\n"
+        "      forms: [{form: tržby}] }\n",
+        encoding="utf-8",
+    )
+    result = compile_layers(
+        [str(layer)], snapshot_version="0.1.0", output="cs.morph.snap"
+    )
+    assert result.ok
+    rows = rows_of(result.outputs["cs.morph.snap"])
+    mine = [row for row in rows if row[1] == "tržba"]
+
+    assert len(mine) > 1, "the pattern expanded rather than being dropped"
+    assert {row[4] for row in mine} == {"žena"}, "and the row still names it"
+    assert "tržby" in {row[0] for row in mine}
+
+
+def test_a_spot_check_form_the_pattern_really_cannot_make_still_wins(tmp_path):
+    """The other half: contracts §3's "forms win" is unchanged. A declared form
+    outside the paradigm is a genuine disagreement, and there the forms are the
+    truth and the pattern is dropped."""
+    layer = tmp_path / "wrong.morph.yaml"
+    layer.write_text(
+        "layer: core-hand\nversion: 1\nlanguage: cs\nlicense: suite\n"
+        "attribution: null\nentries:\n"
+        "  - { lemma: tržba, upos: NOUN, vzor: žena, provenance: manual,\n"
+        "      forms: [{form: xyzzy}] }\n",
+        encoding="utf-8",
+    )
+    result = compile_layers(
+        [str(layer)], snapshot_version="0.1.0", output="cs.morph.snap"
+    )
+    rows = [
+        row for row in rows_of(result.outputs["cs.morph.snap"]) if row[1] == "tržba"
+    ]
+    assert {row[0] for row in rows} == {"xyzzy"}
+    assert {row[4] for row in rows} == {""}, "the pattern is not this lexeme's"

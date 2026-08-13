@@ -87,7 +87,7 @@ def export_layers(
                 license=license_,
                 note=_note(layer, settings, len(entries), retractions or []),
             ),
-            [_entry_document(entry) for entry in entries],
+            [entry_document(entry) for entry in entries],
         )
         result.files[f"{layer_id}.morph.yaml"] = text
         result.exported += len(entries)
@@ -103,39 +103,37 @@ def export_proposals(session: Session, settings: Settings) -> ExportResult:
     review, in the file format their own validator already runs over. Which is
     why this endpoint exports the entries the other one deliberately withholds,
     and marks every one of them.
-    """
-    from sqlalchemy import select
 
-    entries = list(
-        session.scalars(
-            select(Entry)
-            .where(Entry.status.in_([st.PROPOSED, st.AUTO_VALIDATED]))
-            .order_by(Entry.lemma, Entry.upos)
-        ).unique()
-    )
-    text = render_layer(
-        LayerHeader(
-            layer=f"{settings.world}-proposed",
-            language="cs",
-            license=WORLD_LICENSE_PREFIX + settings.world,
-            note=(
-                f"PROPOSED ENTRIES — {settings.world} (LM-12, morph-studio "
-                f"{settings.mode} lane).\n\n"
-                "These are the enrichment queue's proposals, NOT a publishable "
-                "layer: every entry here is below `verified` and has been "
-                "produced by the guesser or the LLM classifier, checked only in "
-                "that the engine regenerates the observed form.\n\n"
-                "Review them in this file, correct what is wrong, and merge what "
-                "survives into the world's own layer — the model-validator CLI "
-                "runs the same schema and regeneration checks the studio does.\n\n"
-                f"{len(entries)} entries."
-            ),
+    ⚑ **Split by layer, exactly as `export_layers` is.** One fragment carrying
+    everything below the gate put every core-routed proposal into a file
+    rendered under `world:<id>` — LM-10 routes to `core` precisely the entries
+    that are *not* the world's, so the fragment relabelled them as that world's
+    material, in that world's repository, under that world's licence. Dropping
+    them instead would have been the other wrong answer: the core queue is
+    reviewed too, and it is reviewed here. So both are emitted, each under the
+    licence it belongs to, which is the same rule the published export follows.
+    """
+    result = ExportResult()
+    for layer, layer_id, license_ in (
+        (LAYER_CORE, f"{CORE_LAYER_ID}-proposed", LICENSE_SUITE),
+        (
+            LAYER_WORLD,
+            f"{settings.world}-proposed",
+            WORLD_LICENSE_PREFIX + settings.world,
         ),
-        [_entry_document(entry, proposed=True) for entry in entries],
-    )
-    return ExportResult(
-        files={f"{settings.world}-proposed.morph.yaml": text}, exported=len(entries)
-    )
+    ):
+        entries = _proposed(session, layer)
+        result.files[f"{layer_id}.morph.yaml"] = render_layer(
+            LayerHeader(
+                layer=layer_id,
+                language="cs",
+                license=license_,
+                note=_proposed_note(layer, settings, len(entries)),
+            ),
+            [entry_document(entry, proposed=True) for entry in entries],
+        )
+        result.exported += len(entries)
+    return result
 
 
 def write(result: ExportResult, directory: str) -> list[str]:
@@ -155,7 +153,7 @@ def write(result: ExportResult, directory: str) -> list[str]:
 # ── internals ────────────────────────────────────────────────────────────────
 
 
-def _entry_document(entry: Entry, *, proposed: bool = False) -> dict[str, object]:
+def entry_document(entry: Entry, *, proposed: bool = False) -> dict[str, object]:
     """One entry, as contracts §3 writes it."""
     corrected = [row for row in entry.forms if row.corrected]
     if corrected or not entry.vzor:
@@ -181,6 +179,47 @@ def _entry_document(entry: Entry, *, proposed: bool = False) -> dict[str, object
         # the reviewer unable to tell what rejecting one retracts.
         document["provisional"] = True
     return document
+
+
+def _proposed(session: Session, layer: str) -> list[Entry]:
+    """Everything below the gate on one layer — what `exportable_entries` drops."""
+    from sqlalchemy import select
+
+    return list(
+        session.scalars(
+            select(Entry)
+            .where(
+                Entry.layer == layer,
+                Entry.status.in_([st.PROPOSED, st.AUTO_VALIDATED]),
+            )
+            .order_by(Entry.lemma, Entry.upos)
+        ).unique()
+    )
+
+
+def _proposed_note(layer: str, settings: Settings, count: int) -> str:
+    whose = (
+        "the core analytical lexicon"
+        if layer == LAYER_CORE
+        else f"the {settings.world} world's entity layer"
+    )
+    merge_into = (
+        "the core layers in `ttr-morph/lexicon/cs`"
+        if layer == LAYER_CORE
+        else "the world's own layer"
+    )
+    return (
+        f"PROPOSED ENTRIES for {whose} (LM-12, morph-studio "
+        f"{settings.mode} lane).\n\n"
+        "These are the enrichment queue's proposals, NOT a publishable "
+        "layer: every entry here is below `verified` and has been "
+        "produced by the guesser or the LLM classifier, checked only in "
+        "that the engine regenerates the observed form.\n\n"
+        f"Review them in this file, correct what is wrong, and merge what "
+        f"survives into {merge_into} — the model-validator CLI runs the "
+        "same schema and regeneration checks the studio does.\n\n"
+        f"{count} entries."
+    )
 
 
 def _withheld(session: Session) -> dict[str, int]:
@@ -226,6 +265,7 @@ def _note(layer: str, settings: Settings, count: int, retractions: list[str]) ->
 __all__ = [
     "CORE_LAYER_ID",
     "ExportResult",
+    "entry_document",
     "export_layers",
     "export_proposals",
     "world_layer_id",

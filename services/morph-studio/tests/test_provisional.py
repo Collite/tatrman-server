@@ -272,3 +272,154 @@ def test_a_reload_target_that_is_not_there_is_reported_not_raised(
     assert body["overlay_emitted"] is True
     assert "reload" in body["reload"] or "front" in body["reload"]
     assert served(core_snapshot, tmp_path / "overlay").lookup("Kauflandu") is not None
+
+
+# ── what the review of 2026-08-13 found ──────────────────────────────────────
+
+
+def test_an_entry_with_no_vzor_still_compiles_into_the_overlay(
+    q7, overlay_dir, core_snapshot
+):
+    """⚑ The one that freezes a world.
+
+    `emit_overlay` rendered every entry as a `vzor:` document. An entry with no
+    vzor — an LLM-proposed irregular, anything a reviewer authored as bare forms
+    — therefore emitted `vzor: ""`, which the compiler refuses as "neither
+    'vzor' nor 'forms'". That is not a bad emission but a permanent one: the
+    overlay stops compiling, so it stops being replaced, and the world is stuck
+    on whatever it last served for as long as that entry exists.
+    """
+    client, settings, app = q7
+    created = client.post(
+        "/v1/entries",
+        json={
+            "lemma": "dveře",
+            "upos": "NOUN",
+            "layer": LAYER_WORLD,
+            "forms": [
+                {"form": "dveře", "feats": "Case=Nom|Number=Plur"},
+                {"form": "dveří", "feats": "Case=Gen|Number=Plur"},
+            ],
+            "actor": "bora",
+        },
+    )
+    assert created.status_code == 201, created.text
+    entry_id = created.json()["id"]
+    assert client.post(
+        f"/v1/entries/{entry_id}/status",
+        json={"status": st.VERIFIED, "actor": "bora"},
+    ).status_code == 200
+
+    session = app.state.sessionmaker()
+    result = emit_overlay(session, settings)
+    session.close()
+
+    assert result.compiled, result.notes
+    state = served(core_snapshot, overlay_dir)
+    assert state is not None
+    hit = state.lookup("dveří")
+    assert hit is not None and any(a.lemma == "dveře" for a in hit.analyses)
+
+
+def test_corrected_forms_are_what_the_overlay_serves(q7, overlay_dir, core_snapshot):
+    """A reviewer's correction is the entry's truth. Re-emitting the pattern
+    they overruled would serve the exact paradigm they rejected."""
+    client, settings, app = q7
+    ingest(client, report(KAUFLANDU))
+    (entry,) = [
+        e for e in client.get("/v1/entries").json() if e["lemma"] == "Kaufland"
+    ]
+
+    corrected = client.post(
+        f"/v1/entries/{entry['id']}/forms",
+        json={
+            "forms": [
+                {"form": "Kaufland", "feats": "Case=Nom|Number=Sing"},
+                {"form": "Kauflandu", "feats": "Case=Gen|Number=Sing"},
+                {"form": "KAUFLANDEM", "feats": "Case=Ins|Number=Sing"},
+            ],
+            "actor": "bora",
+        },
+    )
+    assert corrected.status_code == 200, corrected.text
+
+    state = served(core_snapshot, overlay_dir)
+    forms = {
+        form
+        for form, analyses in state.exact.items()
+        if any(a.lemma == "Kaufland" for a in analyses)
+    }
+    assert forms == {"Kaufland", "Kauflandu", "KAUFLANDEM"}, (
+        "exactly the corrected table — not the eleven-form paradigm the vzor "
+        "makes, which is what the reviewer overruled by correcting it"
+    )
+
+
+def test_an_editor_rejection_retracts_from_the_overlay(q7, overlay_dir, core_snapshot):
+    """The queue's verdict endpoint always re-emitted; the entry editor's status
+    endpoint did not, so a rejection made there left the front serving the
+    retracted word until some unrelated ingest happened to fire."""
+    client, _, _ = q7
+    ingest(client, report(KAUFLANDU))
+    assert served(core_snapshot, overlay_dir).lookup("Kauflandu") is not None
+    (entry,) = [
+        e for e in client.get("/v1/entries").json() if e["lemma"] == "Kaufland"
+    ]
+
+    response = client.post(
+        f"/v1/entries/{entry['id']}/status",
+        json={"status": st.REJECTED, "actor": "bora", "reason": "not ours"},
+    )
+    assert response.status_code == 200, response.text
+    assert served(core_snapshot, overlay_dir).lookup("Kauflandu") is None
+
+
+def test_a_compile_failure_leaves_every_served_file_untouched(q7, overlay_dir):
+    """⚑ Both halves: nothing on disk changes, and the caller is not told the
+    front has a new lexicon. The source used to be written *before* the compile
+    that rejected it, so the file the docstring promised to leave alone was the
+    first casualty."""
+    client, settings, app = q7
+    ingest(client, report(KAUFLANDU))
+    before = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in overlay_dir.iterdir()
+        if path.is_file()
+    }
+    assert before
+
+    # A world entry the compiler must refuse: `LM-MORPH-001`, unknown pattern.
+    session = app.state.sessionmaker()
+    entry = store.create_entry(
+        session,
+        lemma="rozvaha",
+        upos="NOUN",
+        layer=LAYER_WORLD,
+        vzor="žena",
+        status_=st.VERIFIED,
+    )
+    entry.vzor = "no-such-vzor"
+    session.commit()
+    result = emit_overlay(session, settings)
+    session.close()
+
+    assert not result.compiled
+    assert any("did NOT compile" in note for note in result.notes)
+    after = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in overlay_dir.iterdir()
+        if path.is_file()
+    }
+    assert after == before, "not the compiled overlay, and not the layer source"
+
+
+def test_the_overlay_directory_never_holds_a_partial_file(q7, overlay_dir):
+    """The front is fail-all: a torn read costs the world its whole lexicon.
+    Files arrive by `os.replace`, so a reader sees the old one or the new one —
+    and nothing is left behind by the staging that produced them."""
+    client, _, _ = q7
+    ingest(client, report(KAUFLANDU))
+
+    names = sorted(path.name for path in overlay_dir.iterdir())
+    assert names == sorted([overlay_name(WORLD), source_name(WORLD)])
+    assert not any(path.name.startswith(".") for path in overlay_dir.iterdir())

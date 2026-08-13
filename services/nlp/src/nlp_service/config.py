@@ -446,6 +446,28 @@ def validate_morph(config: AppConfig) -> None:
         )
 
     sink = morph.queue.sink.strip()
+
+    if wants_morph and not morph.world and sink and sink != SINK_NONE:
+        # ⚑ The unset world, which the check above cannot see: it asks whether
+        # a *named* world was declared, and `""` names nothing. Left to boot,
+        # every leg of the enrichment loop is wired and the loop is dead —
+        # `SpoolSink.report("")` finds no policy, returns False, and `miss_sink`
+        # discards it, so a cluster that set `NLP_MORPH_SOURCES` and the sink
+        # but forgot `NLP_MORPH_WORLD` comes up green, answers queries, and
+        # silently learns nothing. That is the failure this whole block exists
+        # to make impossible, and it was the one shape that got through.
+        known = ", ".join(sorted(morph.worlds)) or "none declared"
+        raise MorphConfigError(
+            f"pipeline(s) {', '.join(wants_morph)} declare `morph: true` and "
+            f"`morph.queue.sink` is {sink!r}, but `morph.world` is empty "
+            f"(declared worlds: {known}). Queues are world-scoped (LM-5/S-4), "
+            "so a report with no world belongs to nobody and is dropped — the "
+            "enrichment loop would be fully wired and collect nothing. Set "
+            "`morph.world` (NLP_MORPH_WORLD) to one of the declared worlds, or "
+            f"set the sink to {SINK_NONE!r} if this front is not meant to feed "
+            "a studio."
+        )
+
     if sink and sink != SINK_NONE:
         if sink.startswith(SINK_DIR_PREFIX):
             if not sink[len(SINK_DIR_PREFIX) :].strip():

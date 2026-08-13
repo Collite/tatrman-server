@@ -12,6 +12,7 @@ from sqlalchemy import select
 from ttrmorph.enrich.cascade import LAYER_CORE, LAYER_WORLD
 
 from morph_studio import status as st
+from morph_studio import store
 from morph_studio.api import create_app
 from morph_studio.models import Audit, Entry, QueueItem
 
@@ -368,3 +369,122 @@ def test_an_ordinary_report_still_runs_the_cascade(client, session):
     client.post("/v1/ingest", json={"reports": [report(KAUFLANDU)]})
     item = session.scalar(select(QueueItem).where(QueueItem.token == KAUFLANDU))
     assert item.proposal["proposals"], "the studio worked it out"
+
+
+# ── what the review of 2026-08-13 found ──────────────────────────────────────
+
+
+def test_a_bootstrap_row_cannot_auto_validate_a_paradigm_the_engine_refuses(
+    client, session
+):
+    """⚑ THE GATE, and the one lie a precomputed body could still tell.
+
+    `_precomputed` checks the status and the layer. It cannot check the claim
+    that matters — *the observed token is in the paradigm this pattern makes* —
+    and `/v1/ingest` has no auth. Believed, one POST puts an unverified
+    paradigm no engine ever produced straight into the world's live overlay,
+    marked `provisional` and serving, which is exactly what the ⚑ comment on
+    `apply_cascade` says is prevented.
+
+    Held, not refused: the token was really seen, so it belongs in front of a
+    person rather than in a 400 that loses it.
+    """
+    row = _bootstrap_row("Kauflandu")
+    row["cascade"]["proposals"][0]["vzor"] = "žena"  # cannot make *Kauflandu*
+    response = client.post("/v1/ingest", json={"reports": [row]})
+    assert response.status_code == 200, response.text
+
+    item = session.scalar(select(QueueItem).where(QueueItem.token == "Kauflandu"))
+    assert item.status == st.PROPOSED, "held for a human, not auto-validated"
+    assert any("NOT re-derivable" in note for note in item.proposal["notes"])
+    assert item.entry_id is None, "and nothing went live"
+
+
+def test_a_bootstrap_row_whose_engine_check_passes_still_auto_validates(
+    client, session
+):
+    """The re-check is a gate, not a wall: a correct precomputed result lands
+    exactly as it did, without the cascade being run again."""
+    response = client.post(
+        "/v1/ingest", json={"reports": [_bootstrap_row("Kauflandu")]}
+    )
+    assert response.status_code == 200
+    item = session.scalar(select(QueueItem).where(QueueItem.token == "Kauflandu"))
+    assert item.status == st.AUTO_VALIDATED
+    assert item.entry_id is not None
+
+
+def test_a_second_token_raises_the_standing_of_the_lexeme_it_shares(
+    client, session
+):
+    """⚑ Q-7 reads `entry.provisional`, and `create_entry` returned the existing
+    row untouched.
+
+    Two tokens of one lexeme are the ordinary case. The first arrives as a
+    `proposed` guess; the second auto-validates. The entry stayed at `proposed`
+    and non-provisional, so `_world_entries` filtered it out — the queue item
+    said auto-validated, the front never saw the word, and nothing anywhere
+    said why.
+    """
+    session_entry = store.create_entry(
+        session,
+        lemma="Kaufland",
+        upos="PROPN",
+        layer=LAYER_WORLD,
+        vzor="hrad-proper",
+        status_=st.PROPOSED,
+    )
+    session.commit()
+    assert not session_entry.provisional
+
+    ingest(client, report(KAUFLANDU))
+    session.expire_all()
+    entry = session.get(Entry, session_entry.id)
+    assert entry.status == st.AUTO_VALIDATED
+    assert entry.provisional, "and it is now live in the overlay"
+
+
+def test_a_re_proposal_never_pulls_a_verified_entry_backwards(client, session):
+    """Forwards only. A cascade seeing the word again must not undo a person."""
+    entry = store.create_entry(
+        session,
+        lemma="Kaufland",
+        upos="PROPN",
+        layer=LAYER_WORLD,
+        vzor="hrad-proper",
+        status_=st.PROPOSED,
+    )
+    store.set_status(session, entry, st.VERIFIED, actor="bora")
+    session.commit()
+
+    ingest(client, report(KAUFLANDU))
+    session.expire_all()
+    entry = session.get(Entry, entry.id)
+    assert entry.status == st.VERIFIED
+    assert not entry.provisional, "verified is permanent — never re-marked Q-7"
+
+
+def test_verifying_a_queue_item_whose_lexeme_is_already_verified_clears_it(
+    client, session
+):
+    """The machine has no self-edge, and should not grow one — but a reviewer
+    verifying the second queue item for a lexeme the first already settled was
+    getting a 409 with nothing they could do about it."""
+    entry = store.create_entry(
+        session,
+        lemma="Kaufland",
+        upos="PROPN",
+        layer=LAYER_WORLD,
+        vzor="hrad-proper",
+        status_=st.PROPOSED,
+    )
+    store.set_status(session, entry, st.VERIFIED, actor="bora")
+    session.commit()
+
+    ingest(client, report(KAUFLANDU))
+    (item,) = client.get("/v1/queue").json()["items"]
+    response = client.post(
+        f"/v1/queue/{item['id']}/verdict", json={"action": "verify", "actor": "bora"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["item"]["status"] == st.VERIFIED

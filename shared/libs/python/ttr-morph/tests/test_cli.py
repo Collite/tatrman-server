@@ -166,17 +166,43 @@ def test_compile_overlay_needs_a_world(tmp_path, capsys):
     assert "--overlay needs --world" in capsys.readouterr().err
 
 
-def test_compile_overlay_writes_one_file_plus_the_notice(tmp_path):
+def test_compile_overlay_writes_one_file(tmp_path):
     out = tmp_path / "dfp.morph.overlay"
     code = main(
         ["compile", WORLD, "-o", str(out), "--overlay", "--world", "dfp"]
     )
     assert code == EXIT_OK
     assert out.read_text(encoding="utf-8").startswith("#morph-overlay v1\n")
-    assert {path.name for path in tmp_path.iterdir()} == {
-        "dfp.morph.overlay",
-        "NOTICE-morph.md",
-    }
+    assert {path.name for path in tmp_path.iterdir()} == {"dfp.morph.overlay"}
+
+
+def test_compile_overlay_leaves_the_core_notice_alone(tmp_path):
+    """⚑ The licence boundary, as a filesystem fact (S-2, C-F3).
+
+    A release directory holds the snapshot, its `.part` members and the world
+    overlays together. Compiling an overlay into it used to overwrite the core
+    artifact's real CC BY-SA attribution with "None. This artifact contains
+    suite-licensed material only" — the `.part` files still beside it, now
+    attributed by nothing.
+    """
+    assert main(["compile", KAIKKI, "-o", str(tmp_path / "cs.morph.snap")]) == EXIT_OK
+    notice = tmp_path / "NOTICE-morph.md"
+    before = notice.read_text(encoding="utf-8")
+    assert "Share-alike sources" in before and "None." not in before
+
+    code = main(
+        [
+            "compile",
+            WORLD,
+            "-o",
+            str(tmp_path / "dfp.morph.overlay"),
+            "--overlay",
+            "--world",
+            "dfp",
+        ]
+    )
+    assert code == EXIT_OK
+    assert notice.read_text(encoding="utf-8") == before
 
 
 def test_compile_takes_a_frequency_table(tmp_path):

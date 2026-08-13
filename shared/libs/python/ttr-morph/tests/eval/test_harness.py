@@ -181,6 +181,28 @@ def test_a_new_thin_target_fails_and_names_it():
     assert "THIN" in failures[0]
 
 
+def test_a_swapped_thin_target_fails_even_though_the_count_did_not_move():
+    """⚑ The gate compared lengths: `1 > 1` is False, so a change that fixed
+    one thin target while introducing another passed in silence. The failure
+    message on the next line already computed the set difference — which is the
+    condition it was meant to be testing all along."""
+    failures = harness.check(
+        report(targets_thin=["kvartál"]), base(targets={
+            "covered": 2, "missing": [], "thin": ["zobrazit"]
+        })
+    )
+    # The list it names is the new one alone — the prose after it still cites
+    # `zobrazit` as the case this check was built for.
+    assert failures and "['kvartál']" in failures[0]
+
+
+def test_a_thin_target_that_was_already_thin_is_not_a_new_failure():
+    """The gate is a ratchet on what is new, not an assertion that the baseline
+    was clean."""
+    baseline = base(targets={"covered": 2, "missing": [], "thin": ["zobrazit"]})
+    assert harness.check(report(targets_thin=["zobrazit"]), baseline) == []
+
+
 def test_a_failing_case_is_a_gate_failure():
     class Named:
         case = "hero-compare"
@@ -235,3 +257,21 @@ def test_load_state_takes_the_member_files_too(write_and_load, tmp_path):
     state = build(write_and_load, tmp_path)
     again = load_morph([str(tmp_path / "cs.morph.snap")])
     assert again.stats().forms == state.stats().forms
+
+
+def test_thinness_counts_surface_forms_not_analyses(write_and_load, tmp_path):
+    """⚑ A lemma held as ONE form under two parts of speech scored 2 and read
+    as comfortably covered. Czech deverbal pairs are exactly that shape —
+    *vedoucí* and *účetní* are each ADJ and NOUN on one string — and two such
+    lemmas are in the shipped artifact already."""
+    state = build(
+        write_and_load,
+        tmp_path,
+        "  - { lemma: vedoucí, upos: NOUN, provenance: manual,"
+        ' forms: [{form: vedoucí, feats: "Case=Nom|Number=Sing"}] }\n'
+        "  - { lemma: vedoucí, upos: ADJ, provenance: manual,"
+        ' forms: [{form: vedoucí, feats: "Case=Nom|Gender=Masc"}] }\n',
+    )
+    covered, missing, thin = harness.target_coverage(state, ["vedoucí"])
+    assert (covered, missing) == (1, [])
+    assert thin == ["vedoucí"], "one surface form is one surface form"

@@ -100,6 +100,21 @@ COLUMNS = (
     "provenance",
 )
 
+#: What separates two *readings* inside the ``feats`` cell. The atoms of one
+#: reading are ``|``-joined by the tagset (``Case=Nom|Number=Sing``), so kind-(a)
+#: ambiguity — one form, several readings, one row — needs a separator of its
+#: own or the cell cannot be parsed back. Named and exported because three
+#: places pack or unpack this cell, in two wheels, and a `|` in any one of them
+#: produces a value that still *looks* like feats: `Number=Plur|Person=3` and
+#: `Number=Sing|Person=3` run together as one unreadable reading, which no
+#: consumer can tell from a genuine six-atom one.
+READING_SEP = ";"
+
+#: The core's owner token in `load_morph`'s shadowing table. A sentinel object
+#: rather than the string ``"core"``: overlay owners are positions, and a
+#: sentinel cannot collide with one the way a string quietly could.
+_CORE_OWNER = object()
+
 #: Header keys every artifact must carry, plus the one each kind needs.
 _REQUIRED_HEADERS = ("version", "language", "content-hash", "rows")
 _REQUIRED_SNAPSHOT = ("layers",)
@@ -205,7 +220,17 @@ class _Parsed:
 
 def _feats(cell: str) -> frozenset[str]:
     """``;``-packed reading set — kind-(a) ambiguity travels in ONE row."""
-    return frozenset(reading for reading in cell.split(";") if reading)
+    return frozenset(reading for reading in cell.split(READING_SEP) if reading)
+
+
+def pack_feats(readings: Iterable[str]) -> str:
+    """The inverse of `_feats`: a reading set as one cell.
+
+    Sorted, because whoever writes this cell owns row canonicalisation and the
+    content hash is taken over the bytes — a set iterated in whatever order
+    Python chose today would hash differently tomorrow for identical input.
+    """
+    return READING_SEP.join(sorted(reading for reading in readings if reading))
 
 
 def _flags(cell: str) -> tuple[str, ...]:
@@ -748,23 +773,31 @@ def load_morph(sources: Sequence[str | Path]) -> MorphState:
     #: world shadowing *tržba* takes over every form of it, not the one form it
     #: happened to list — a half-shadowed paradigm would answer from two layers
     #: depending on which case the writer used.
-    owners: dict[tuple[str, str], str] = {
-        (row.analysis.lemma, row.analysis.upos): "core" for row in core.rows
+    #: The owner is `_CORE_OWNER` or an overlay's *position* in the source list.
+    #: Position rather than world id, because two sources may name the same
+    #: world (a world's own overlay plus the studio's provisional one is the
+    #: ordinary case) and shadowing has to be decided per file.
+    owners: dict[tuple[str, str], object] = {
+        (row.analysis.lemma, row.analysis.upos): _CORE_OWNER for row in core.rows
     }
     shadowed: set[tuple[str, str]] = set()
     overlay_manifests: list[MorphManifest] = []
-    overlay_rows: list[_Row] = []
+    #: `(owner, row)`, so the shadowed rows can be dropped after every overlay
+    #: has had its say — which overlay finally owns an identity is not known
+    #: until the last one has been read.
+    overlay_rows: list[tuple[object, _Row]] = []
     ne_exceptions = set(core.ne_exceptions)
 
-    for overlay in [
+    for position, overlay in enumerate(
         p for p in parsed if p.manifest is not None and p.manifest.kind == "overlay"
-    ]:
+    ):
         assert overlay.manifest is not None
         overlay_manifests.append(overlay.manifest)
         ne_exceptions |= overlay.ne_exceptions
         for row in overlay.rows:
             identity = (row.analysis.lemma, row.analysis.upos)
-            if owners.get(identity) == "core" and identity not in shadowed:
+            previous = owners.get(identity)
+            if previous == _CORE_OWNER and identity not in shadowed:
                 shadowed.add(identity)
                 diagnostics.append(
                     info(
@@ -776,25 +809,54 @@ def load_morph(sources: Sequence[str | Path]) -> MorphState:
                         source=overlay.manifest.source,
                     )
                 )
-            owners[identity] = overlay.manifest.world or overlay.manifest.source
-        overlay_rows.extend(overlay.rows)
+            elif previous is not None and previous not in (_CORE_OWNER, position):
+                # ⚑ An overlay shadowing an *overlay*. Reported as loudly as the
+                # core case and for a stronger reason: two worlds' vocabularies
+                # colliding is not curation being overridden, it is one world's
+                # private material about to answer for another, and `lookup()`
+                # takes no world argument that could tell them apart.
+                earlier = overlay_manifests[previous]  # type: ignore[index]
+                diagnostics.append(
+                    info(
+                        LM_MORPH_002,
+                        f"{overlay.manifest.source}:{row.line}: world "
+                        f"{overlay.manifest.world!r} shadows "
+                        f"({row.analysis.lemma}, {row.analysis.upos}) from "
+                        f"{earlier.source} (world {earlier.world!r}) — later "
+                        "overlays win whole lexemes, and one front answering "
+                        "for two worlds is worth checking was intended",
+                        source=overlay.manifest.source,
+                    )
+                )
+            owners[identity] = position
+        overlay_rows.extend((position, row) for row in overlay.rows)
 
     exact: dict[str, list[Analysis]] = {}
     for row in core.rows:
         if (row.analysis.lemma, row.analysis.upos) in shadowed:
             continue
         exact.setdefault(row.form, []).append(row.analysis)
-    for row in overlay_rows:
+    for owner, row in overlay_rows:
+        # ⚑ Not unconditionally. The docstring's promise — "a later overlay
+        # shadows an earlier one exactly as it shadows the core" — was only ever
+        # kept against the core: `owners` recorded the later overlay, and then
+        # every overlay row was appended anyway, so two worlds defining
+        # `Kaufland/PROPN` merged into one answer set instead of the later
+        # winning. Shadowing means the earlier rows are *gone*, the same way a
+        # shadowed core lexeme is.
+        if owners.get((row.analysis.lemma, row.analysis.upos)) != owner:
+            continue
         exact.setdefault(row.form, []).append(row.analysis)
 
     folded: dict[str, list[str]] = {
         key: list(forms) for key, forms in core.fold_index.items()
     }
-    for row in overlay_rows:
+    for _, row in overlay_rows:
         # Overlays are folded at load. They are world-owned files a world may
         # hand-edit, so they carry no compiled index of their own — and asking
         # a world to keep one current would be asking for the one drift the
-        # compiled index exists to prevent.
+        # compiled index exists to prevent. Shadowed forms that get in here are
+        # taken back out by the `live` filter below, which is what it is for.
         bucket = folded.setdefault(fold(row.form), [])
         if row.form not in bucket:
             bucket.append(row.form)
@@ -827,6 +889,7 @@ __all__ = [
     "NE_EXCEPTIONS_SECTION",
     "OVERLAY_MAGIC",
     "PARTS_FLAG",
+    "READING_SEP",
     "SNAPSHOT_MAGIC",
     "LoadError",
     "MorphManifest",
@@ -834,4 +897,5 @@ __all__ = [
     "MorphStats",
     "content_hash",
     "load_morph",
+    "pack_feats",
 ]

@@ -71,17 +71,42 @@ from ttrnlp.morph.snapshot import (
     PARTS_FLAG,
     SNAPSHOT_MAGIC,
     content_hash,
+    pack_feats,
 )
 
-from ttrmorph.compile.layers import Entry, Layer, read_layer, resolve_vzor
+from ttrmorph.compile.layers import (
+    Entry,
+    Layer,
+    read_layer,
+    resolve_vzor,
+    unproduced,
+)
 from ttrmorph.compile.notice import render_notice
 from ttrmorph.engine import EngineError, fold, generate, load
 
 #: Extension of a share-alike member file (contracts §10 release assets).
 PART_SUFFIX = ".morph.part"
 
-#: Where the NOTICE lands, beside the artifact it describes.
+#: Where the core artifact's NOTICE lands, beside the artifact it describes.
 NOTICE_FILENAME = "NOTICE-morph.md"
+
+
+def notice_filename(world: str = "") -> str:
+    """The NOTICE's name for this compile — world-scoped for an overlay.
+
+    ⚑ **An overlay must never write `NOTICE-morph.md`.** Both compiles emit
+    into a directory the caller picks (`cli._compile` uses `args.output.parent`,
+    and morph-studio's Q-7 emission uses the shared overlay directory), and the
+    obvious way to build a release is to put the snapshot, its `.part` members
+    and the overlays side by side. Under one filename the last compile wins:
+    running `--overlay --world dfp -o dist/dfp.morph.overlay` overwrote the
+    core artifact's real CC BY-SA attribution with a document reading "None.
+    This artifact contains suite-licensed material only" — the `.part` files
+    still sitting beside it, now with nothing attributing them. That is the
+    licence boundary the whole aggregate design exists to hold, lost to a name
+    collision.
+    """
+    return f"NOTICE-morph-{world}.md" if world else NOTICE_FILENAME
 
 _SEVERITY_ERROR = "ERROR"
 
@@ -151,11 +176,11 @@ def _ranker(frequencies: Mapping[str, int] | None):
 def _feats_cell(readings: Iterable[str]) -> str:
     """The ``;``-packed reading set — kind-(a) ambiguity in ONE row.
 
-    Sorted, because the compiler owns row canonicalisation (P7.2 ruling 1): the
-    hash is taken over the bytes, so a set iterated in whatever order Python
-    chose today would hash differently tomorrow for identical input.
+    The loader's own packer, for the reason `fold` and `content_hash` are also
+    imported rather than reimplemented: a separator the compiler and the loader
+    each spell for themselves is a separator they can come to spell differently.
     """
-    return ";".join(sorted(reading for reading in readings if reading))
+    return pack_feats(readings)
 
 
 def _flags_cell(flags: Sequence[str], parts: Sequence[str]) -> str:
@@ -193,16 +218,12 @@ def _expand(entry: Entry) -> _Emitted | None:
     except EngineError:
         return _Emitted(forms=declared) if declared else None
 
-    if declared:
-        pairs = {
-            (form, feats)
-            for form, readings in declared.items()
-            for feats in readings
-        }
-        if pairs - produced:
-            # Disagreement: the declared forms are the truth and the pattern is
-            # not this lexeme's. `layers.py` already reported LM-MORPH-005.
-            return _Emitted(forms=declared)
+    if declared and unproduced(entry, produced):
+        # Disagreement: the declared forms are the truth and the pattern is
+        # not this lexeme's. `layers.py` already reported LM-MORPH-005 — from
+        # `unproduced`, the same call, so the row this emits and the diagnostic
+        # that describes it cannot disagree about which forms the pattern makes.
+        return _Emitted(forms=declared)
 
     expanded: dict[str, set[str]] = {}
     for form, feats in produced:
@@ -362,9 +383,14 @@ def compile_layers(
         world=world,
     )
     share_alike = [layer for layer in layers if layer.share_alike]
-    outputs[NOTICE_FILENAME] = render_notice(
-        share_alike, snapshot_version=snapshot_version, language=language
-    )
+    if share_alike or not world:
+        # An overlay with no share-alike layer emits no NOTICE at all. There is
+        # nothing for one to say — a world's overlay is the world's own material
+        # under its own licence — and the "None, suite-licensed only" boilerplate
+        # is not merely empty but wrong about a file that is neither.
+        outputs[notice_filename(world)] = render_notice(
+            share_alike, snapshot_version=snapshot_version, language=language
+        )
     return CompileResult(outputs=outputs, diagnostics=tuple(diagnostics))
 
 
@@ -473,5 +499,6 @@ __all__ = [
     "PART_SUFFIX",
     "CompileResult",
     "compile_layers",
+    "notice_filename",
     "read_frequencies",
 ]

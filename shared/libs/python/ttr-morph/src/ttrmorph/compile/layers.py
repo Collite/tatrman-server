@@ -352,9 +352,11 @@ def _check_entry(entry: Entry, where: str, source: str) -> list[Diagnostic]:
     if not entry.forms:
         return diagnostics
 
-    declared = {(form.form, form.feats) for form in entry.forms}
-    if declared - produced:
-        missing = sorted(f"{form} ({feats})" for form, feats in declared - produced)
+    unmade = unproduced(entry, produced)
+    if unmade:
+        missing = sorted(
+            f"{form} ({feats or 'any reading'})" for form, feats in unmade
+        )
         diagnostics.append(
             info(
                 LM_MORPH_005,
@@ -368,6 +370,38 @@ def _check_entry(entry: Entry, where: str, source: str) -> list[Diagnostic]:
             )
         )
     return diagnostics
+
+
+def unproduced(
+    entry: Entry, produced: set[tuple[str, str]]
+) -> list[tuple[str, str]]:
+    """The declared forms this entry's pattern does not make (contracts §3).
+
+    ⚑ **An empty ``feats`` means "this form, whatever it realises"** — not
+    "this form, tagged with the empty string". `FormSpec.feats` defaults to
+    empty and the importers' spot-checks are written exactly that way: two or
+    three surface forms, untagged, listed to show the pattern was chosen
+    correctly. Compared as a bare ``(form, feats)`` pair against a paradigm
+    whose every reading carries UD atoms, such a form can never match — so an
+    entry read as a pattern that regenerates *none* of its own spot-checks, and
+    both callers took the disagreement branch: `read_layer` reported
+    `LM-MORPH-005` against a pattern that is in fact correct, and `_expand`
+    dropped the vzor and emitted the one or two listed forms in place of the
+    dozen the pattern makes. As an INFO on an otherwise green compile, that is
+    a lexeme quietly losing its paradigm.
+
+    Shared by the diagnostic and the routing decision because they are the same
+    question. Answered separately, the artifact and the diagnostics that
+    describe it drift.
+    """
+    forms = {form for form, _ in produced}
+    missing = {
+        (spec.form, spec.feats)
+        for spec in entry.forms
+        if (spec.form, spec.feats) not in produced
+        if spec.feats or spec.form not in forms
+    }
+    return sorted(missing)
 
 
 def resolve_vzor(entry: Entry) -> tuple[str, tuple[str, ...]]:
@@ -430,5 +464,6 @@ __all__ = [
     "Layer",
     "read_layer",
     "resolve_vzor",
+    "unproduced",
     "validate_layers",
 ]

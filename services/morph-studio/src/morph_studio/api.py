@@ -94,6 +94,13 @@ def get_session(request: Request):
 
 Db = Annotated[Session, Depends(get_session)]
 
+#: Ceiling on `?limit=` for the two list endpoints. Bounded because the value
+#: went into `.limit()` unchecked: `limit=-1` is *unlimited* on SQLite and a 500
+#: on Postgres, so the same request read as a full table scan on a laptop and as
+#: an error in a cluster. A page is what a reviewer's screen can hold; anything
+#: larger is a query somebody should be writing against the store directly.
+MAX_LIMIT = 1000
+
 ACTION_VERIFY = "verify"
 ACTION_REJECT = "reject"
 ACTION_ROUTE = "route"
@@ -223,7 +230,7 @@ def create_app(
         session: Db,
         status_filter: Annotated[str | None, Query(alias="status")] = None,
         layer: str | None = None,
-        limit: int = 100,
+        limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = 100,
     ) -> list[EntryModel]:
         query = select(Entry).order_by(Entry.lemma, Entry.upos).limit(limit)
         if status_filter:
@@ -257,7 +264,9 @@ def create_app(
         return _entry(_require(session, Entry, entry_id))
 
     @app.post("/v1/entries/{entry_id}/try-pattern", response_model=ParadigmResponse)
-    def try_pattern(entry_id: int, body: TryPattern, session: Db) -> ParadigmModel:
+    async def try_pattern(
+        entry_id: int, body: TryPattern, session: Db
+    ) -> ParadigmModel:
         """Generate a table for correction — contracts §7's `try-pattern`."""
         entry = _require(session, Entry, entry_id)
         _check_vzor(body.vzor, body.flags)
@@ -289,6 +298,7 @@ def create_app(
                 vzor=body.vzor,
                 flags=list(body.flags),
             )
+            await _refresh_for(session, entry)
         return ParadigmModel(
             vzor=body.vzor,
             flags=list(body.flags),
@@ -328,7 +338,9 @@ def create_app(
         )
 
     @app.post("/v1/entries/{entry_id}/forms", response_model=EntryModel)
-    def correct_forms(entry_id: int, body: CorrectForms, session: Db) -> EntryModel:
+    async def correct_forms(
+        entry_id: int, body: CorrectForms, session: Db
+    ) -> EntryModel:
         entry = _require(session, Entry, entry_id)
         store.set_forms(
             session,
@@ -344,15 +356,28 @@ def create_app(
             actor=body.actor,
             forms=len(body.forms),
         )
+        await _refresh_for(session, entry)
         return _entry(entry)
 
     @app.post("/v1/entries/{entry_id}/status", response_model=EntryModel)
-    def set_entry_status(entry_id: int, body: SetStatus, session: Db) -> EntryModel:
+    async def set_entry_status(
+        entry_id: int, body: SetStatus, session: Db
+    ) -> EntryModel:
         entry = _require(session, Entry, entry_id)
         with _machine():
             store.set_status(
                 session, entry, body.status, actor=body.actor, reason=body.reason
             )
+        # A status change is the other way an entry leaves the overlay — a
+        # reviewer rejecting a provisional row from the editor rather than from
+        # the queue retracts it just as much, and the front has to be told.
+        await _refresh_for(
+            session,
+            entry,
+            retractions=(
+                [f"{entry.lemma} ({entry.upos})"] if body.status == st.REJECTED else []
+            ),
+        )
         return _entry(entry)
 
     # ── FI-7 surfaces 3+4: the queue ────────────────────────────────────────
@@ -402,7 +427,7 @@ def create_app(
         session: Db,
         world: str | None = None,
         status_filter: Annotated[str | None, Query(alias="status")] = None,
-        limit: int = 100,
+        limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = 100,
     ) -> QueueResponse:
         if world and world != settings.world:
             raise HTTPException(
@@ -455,9 +480,20 @@ def create_app(
                     "or the forms first",
                 )
             with _machine():
-                store.set_status(
-                    session, entry, st.VERIFIED, actor=body.actor, reason=body.reason
-                )
+                if entry.status not in st.EXPORTABLE:
+                    # Already past the gate means a second queue item for the
+                    # same lexeme got there first. The reviewer's verdict is
+                    # still about the queue item, and dragging a `published`
+                    # entry back to `verified` to honour it would be a worse
+                    # answer than the 409 — so the item clears and the entry
+                    # stays where the earlier decision put it.
+                    store.set_status(
+                        session,
+                        entry,
+                        st.VERIFIED,
+                        actor=body.actor,
+                        reason=body.reason,
+                    )
                 store.set_status_queue(
                     session, item, st.VERIFIED, actor=body.actor, reason=body.reason
                 )
@@ -520,16 +556,54 @@ def create_app(
     async def _refresh_overlay(
         session: Session, *, retractions: list[str] | None = None
     ) -> tuple[bool, str]:
-        """Re-emit the world overlay and ask the front to reload (Q-7)."""
+        """Re-emit the world overlay and ask the front to reload (Q-7).
+
+        ⚑ The flag is `result.compiled`, not `result.written`. The emission
+        writes the layer source before it compiles it, so `written` is non-empty
+        on the failure branch too — reported as `overlay_emitted: true`, it told
+        a caller the front had been given a new lexicon at the one moment that
+        was least true, and asking the front to reload on top of that turns a
+        compile error into a reload of the old file for no reason.
+        """
         if not settings.overlay_dir:
             return False, ""
         result = provisional_module.emit_overlay(
             session, settings, retractions=retractions
         )
-        if not result.written:
+        if not result.compiled:
             return False, "; ".join(result.notes)
         ok, detail = await provisional_module.reload_front(settings)
         return True, detail if ok else "; ".join([*result.notes, detail])
+
+    async def _refresh_for(
+        session: Session, entry: Entry, *, retractions: list[str] | None = None
+    ) -> None:
+        """Re-emit after an *editor* edit, if this entry can be in the overlay.
+
+        The queue's two endpoints have always done this; the editor's three —
+        status, corrected forms, applied pattern — mutate exactly the same rows
+        and did not. A reviewer who rejected a provisional entry from the entry
+        page watched the front go on resolving the word they had just retracted
+        until some unrelated ingest happened to fire an emission.
+
+        Gated on the layer because the overlay carries the world's entries and
+        only those (`_world_entries`): re-compiling a whole world's lexicon
+        because somebody corrected a cell of a *core* entry would be pure cost.
+        Failures are logged, never raised — the edit itself has committed, and
+        an unreachable front is a latency problem in the enrichment loop, not a
+        reason to hand the reviewer a 500 for work that landed.
+        """
+        if entry.layer != LAYER_WORLD or not settings.overlay_dir:
+            return
+        session.commit()
+        emitted, detail = await _refresh_overlay(session, retractions=retractions)
+        if not emitted:
+            logger.warning(
+                "entry %s changed but the %s overlay was not re-emitted: %s",
+                entry.id,
+                settings.world,
+                detail or "no detail",
+            )
 
     def _entry_for(session: Session, item: QueueItem, actor: str) -> Entry | None:
         """The entry a verdict acts on, created from the top proposal if needed.

@@ -55,7 +55,7 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Callable, Iterable, Mapping
+from typing import Callable, Iterable, Mapping, Sequence
 
 from ttrnlp.morph import VERDICT_MISS, VERDICT_RESOLVED_WRONG
 
@@ -187,6 +187,15 @@ class QueueSink:
         """Drop entries past their world's retention. Returns how many."""
         return 0
 
+    async def drain(self) -> None:
+        """Wait for whatever `flush` started to reach the disk.
+
+        `flush` is deliberately non-blocking on an event loop (see
+        `SpoolSink.flush`), which leaves callers who need the *file* — a test
+        asserting the spool's bytes, a shutdown path, a handler that has just
+        promised a caller `accepted=true` — with nothing to wait on. This is it.
+        """
+
     def close(self) -> None:
         self.flush()
 
@@ -231,6 +240,8 @@ class SpoolSink(QueueSink):
         self._clock = clock
         self._reports: dict[tuple[str, str], Report] = {}
         self._dirty: set[str] = set()
+        #: The in-flight offloaded write, if any (`flush`/`_drain`).
+        self._writer: asyncio.Task | None = None
         self._read()
 
     # ---- reading ----------------------------------------------------------
@@ -243,9 +254,26 @@ class SpoolSink(QueueSink):
         return self._dir / f"{world}{_SPOOL_SUFFIX}"
 
     def _read(self) -> None:
+        """Load the spool — this deployment's worlds, and no others.
+
+        ⚑ By declared world, not by glob. A spool directory is a volume, and
+        volumes are shared and outlive the config that made them: remove a world
+        from `morph.worlds`, or point two fronts at one PVC, and a glob picks up
+        the other world's file. Every consequence of that is a boundary
+        violation. The tokens get POSTed to *this* front's studio — one world's
+        user-typed vocabulary delivered into another world's editorial queue,
+        which is the leak S-4 forbids outright — and `drop()` then unlinks the
+        file, so the world that owned it loses its queue as well.
+
+        `report()` has always refused an undeclared world (`LM-MORPH-007`). This
+        is the same rule applied on the way in, where it was missing.
+        """
         if not self._dir.is_dir():
             return
-        for path in sorted(self._dir.glob(f"*{_SPOOL_SUFFIX}")):
+        for world in sorted(self._worlds):
+            path = self._path(world)
+            if not path.is_file():
+                continue
             for line in path.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if not line:
@@ -258,6 +286,17 @@ class SpoolSink(QueueSink):
                 report = Report.from_dict(payload) if isinstance(payload, dict) else None
                 if report is None:
                     logger.warning("morph spool %s: skipping malformed entry", path)
+                    continue
+                if report.world != world:
+                    # The filename is the world. A row claiming another one is a
+                    # hand-edited or misrouted file, and honouring the field over
+                    # the name is how a single line moves a token between worlds.
+                    logger.warning(
+                        "morph spool %s: entry claims world %r — skipped (the "
+                        "file name is the world, and a queue never crosses one)",
+                        path,
+                        report.world,
+                    )
                     continue
                 self._reports[report.key] = report
 
@@ -318,20 +357,95 @@ class SpoolSink(QueueSink):
         return True
 
     def flush(self) -> None:
+        """Persist the dirty worlds — off the event loop when there is one.
+
+        ⚑ `Runner.run` calls this at the end of *every* pipeline run, from
+        inside `async def RunPipeline`, and `chain.resolve` reports a miss for
+        every answer the lexicon did not give — which on a Czech deployment is
+        most of them. A full re-serialise of the spool plus a blocking
+        `write_text` and `os.replace`, on the loop, once per request, is a stall
+        every other request in flight pays for.
+
+        So: when a loop is running the rows are snapshotted here (they must be —
+        `report()` mutates them from this same thread) and the encode-and-write
+        goes to a worker thread. With no loop — a test, a CLI, `close()` on the
+        way down — it happens inline exactly as before. The file write itself is
+        unchanged, and `_dirty` is cleared only once the bytes have landed, so a
+        dropped task costs a retry and never a report.
+        """
+        if not self._dirty:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._flush_now()
+            return
+        if self._writer is None or self._writer.done():
+            self._writer = loop.create_task(self._drain())
+
+    def _flush_now(self) -> None:
         for world in sorted(self._dirty):
             self._write(world)
         self._dirty.clear()
 
+    async def drain(self) -> None:
+        writer = self._writer
+        if writer is not None and not writer.done():
+            await writer
+        # `_drain` loops until nothing is dirty, so anything still marked here
+        # is a write that failed and logged. Retrying inline gives the caller a
+        # definite answer either way rather than a silently empty file.
+        if self._dirty:
+            self._flush_now()
+
+    async def _drain(self) -> None:
+        """Write dirty worlds until there are none, one batch at a time.
+
+        Coalescing rather than one task per flush: a second flush arriving while
+        this one is in the thread leaves its worlds marked and is picked up by
+        the loop below, so writes for one world can never overlap or land out of
+        order — which for a whole-file rewrite would mean an older spool
+        overwriting a newer one.
+        """
+        while self._dirty:
+            worlds = sorted(self._dirty)
+            self._dirty.clear()
+            # Snapshotted on this thread, encoded on the other: `as_dict` copies,
+            # so the worker never touches a `Report` that `report()` may be
+            # mutating underneath it, nor iterates `_reports` while it grows.
+            batch = [(world, self._snapshot(world)) for world in worlds]
+            try:
+                await asyncio.to_thread(self._put_all, batch)
+            except Exception:  # noqa: BLE001 — a failed write must not lose rows
+                self._dirty.update(worlds)
+                logger.exception(
+                    "morph spool: could not write %s — the reports stay in "
+                    "memory and the next flush retries",
+                    ", ".join(worlds),
+                )
+                return
+
+    def _snapshot(self, world: str) -> list[dict] | None:
+        """This world's spool as plain dicts, or None if it has no rows left."""
+        rows = [r.as_dict() for r in self.pending() if r.world == world]
+        return rows or None
+
     def _write(self, world: str) -> None:
-        rows = [r for r in self.pending() if r.world == world]
+        self._put(world, self._snapshot(world))
+
+    def _put_all(self, batch: Sequence[tuple[str, list[dict] | None]]) -> None:
+        for world, rows in batch:
+            self._put(world, rows)
+
+    def _put(self, world: str, rows: list[dict] | None) -> None:
+        """Encode and write one world's file. Runs in a worker thread."""
         path = self._path(world)
-        if not rows:
+        if rows is None:
             path.unlink(missing_ok=True)
             return
         self._dir.mkdir(parents=True, exist_ok=True)
         body = "".join(
-            json.dumps(row.as_dict(), ensure_ascii=False, sort_keys=False) + "\n"
-            for row in rows
+            json.dumps(row, ensure_ascii=False, sort_keys=False) + "\n" for row in rows
         )
         # Atomic rewrite: a reader (morph-studio ingesting the spool) must never
         # see a half-written file, and a killed process must leave the previous
@@ -376,6 +490,43 @@ class SpoolSink(QueueSink):
                 self._dirty.add(report.world)
         self.flush()
 
+    def drop_delivered(self, delivered: Iterable[tuple[tuple[str, str], int, str]]) -> int:
+        """`drop`, but only for reports that have not moved since they were sent.
+
+        ⚑ Delivery awaits an HTTP POST, and `report()` mutates the stored
+        `Report` **in place** — bumping `count`, moving `last_seen`, upgrading a
+        `miss` to `resolved_wrong`. Dropping by key afterwards therefore deleted
+        whatever arrived during that await, unsent: a `ReportToken` verdict a
+        person typed could be acknowledged with `accepted=true` and then
+        destroyed a few milliseconds later, which is the one outcome this
+        module's "never lose a report" contract is written against.
+
+        Compared on `(count, verdict)` rather than a timestamp because those are
+        exactly the fields a concurrent `report()` changes, and `last_seen` has
+        one-second resolution — too coarse to notice the window it would be
+        checking for.
+
+        Returns how many were kept back for the next delivery.
+        """
+        kept = 0
+        for key, count, verdict in delivered:
+            report = self._reports.get(key)
+            if report is None:
+                continue
+            if report.count != count or report.verdict != verdict:
+                kept += 1
+                continue
+            del self._reports[key]
+            self._dirty.add(report.world)
+        self.flush()
+        return kept
+
+    def close(self) -> None:
+        # Inline, whatever the loop is doing: a write scheduled onto a loop that
+        # is about to stop is a spool file that never gets written, and shutdown
+        # is precisely when the spool has to be on disk.
+        self._flush_now()
+
 
 class MemorySpool(SpoolSink):
     """A `url:` sink with no `spool_dir`: dedup and retry, but no disk.
@@ -395,7 +546,7 @@ class MemorySpool(SpoolSink):
     def _read(self) -> None:
         return
 
-    def _write(self, world: str) -> None:
+    def _put(self, world: str, rows: list[dict] | None) -> None:
         return
 
 
@@ -457,6 +608,9 @@ class HttpSink(QueueSink):
     def sweep(self) -> int:
         return self._spool.sweep()
 
+    async def drain(self) -> None:
+        await self._spool.drain()
+
     def _schedule(self) -> None:
         """Kick delivery onto the loop, if there is one and it is idle.
 
@@ -479,6 +633,10 @@ class HttpSink(QueueSink):
         if not pending:
             return 0
         payload = [report.as_dict() for report in pending]
+        # What was sent, as values rather than as the mutable rows themselves —
+        # see `drop_delivered`. Taken here, before the await, because after it
+        # the objects may no longer describe what went over the wire.
+        sent = [(report.key, report.count, report.verdict) for report in pending]
         try:
             await self._sender(self.endpoint, payload)
         except Exception as exc:  # noqa: BLE001 — every failure means "keep them"
@@ -490,14 +648,20 @@ class HttpSink(QueueSink):
                 exc,
             )
             return 0
-        self._spool.drop(report.key for report in pending)
+        kept = self._spool.drop_delivered(sent)
         logger.info(
             "morph queue: delivered %d report(s) to %s", len(payload), self.endpoint
         )
+        if kept:
+            logger.debug(
+                "morph queue: %d report(s) changed while in flight and stay "
+                "spooled for the next delivery",
+                kept,
+            )
         return len(payload)
 
     def close(self) -> None:
-        self._spool.flush()
+        self._spool.close()
 
 
 def _http_sender(timeout_seconds: float) -> Sender:

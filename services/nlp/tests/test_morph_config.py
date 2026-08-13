@@ -146,10 +146,41 @@ def test_a_url_sink_with_no_spool_dir_warns_and_boots(tmp_path, caplog):
     validate_morph(
         a_config(
             sources=[str(tmp_path / "s")],
+            world="dfp",
+            worlds={"dfp": MorphWorldConfig()},
             queue=MorphQueueConfig(sink="url:http://morph-studio:8000"),
         )
     )
     assert any("spool_dir" in record.message for record in caplog.records)
+
+
+def test_a_live_sink_with_no_world_at_all_refuses_to_boot(tmp_path):
+    """⚑ The shape that boots green and learns nothing.
+
+    `morph.world` unset is not "no world declared" — the check above only asks
+    whether a *named* world has a block, and `""` names none. Everything else is
+    wired: sources mounted, a `morph: true` pipeline, a live sink. And
+    `SpoolSink.report("")` finds no policy, returns False, and `miss_sink`
+    discards it — so the whole enrichment loop runs and collects nothing, which
+    is the one failure nobody would go looking for.
+    """
+    with pytest.raises(MorphConfigError, match="morph.world"):
+        validate_morph(
+            a_config(
+                sources=[str(tmp_path / "s")],
+                worlds={"dfp": MorphWorldConfig()},
+                queue=MorphQueueConfig(sink="dir:/var/lib/nlp/morph-queue"),
+            )
+        )
+
+
+def test_no_world_is_fine_when_the_sink_is_off(tmp_path):
+    """A front that reads the lexicon and feeds no studio is a real deployment
+    — the rule above is about a queue with nowhere to put things, not about
+    every morph pipeline needing a world."""
+    validate_morph(
+        a_config(sources=[str(tmp_path / "s")], queue=MorphQueueConfig(sink="none"))
+    )
 
 
 def test_a_deployment_with_no_morph_at_all_validates():

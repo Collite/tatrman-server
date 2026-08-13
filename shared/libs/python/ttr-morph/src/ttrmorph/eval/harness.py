@@ -201,13 +201,20 @@ def target_coverage(
     infinitive, counted as covered, and the hero sentence starting *Zobraz* had
     no analysis at all. A verb the runtime can only recognise in the dictionary
     is a verb no user will ever type.
+
+    ⚑ Distinct *surface forms*, not analyses. Counting analyses meant a lemma
+    the artifact holds as one single form under two parts of speech scored 2 and
+    read as comfortably covered — and Czech deverbal pairs like *vedoucí* and
+    *účetní* (ADJ and NOUN on the same string) are exactly that shape. Two of
+    them are in the `cs` artifact already; neither has reached the target list
+    yet, which is the only reason this has never fired wrongly.
     """
     missing: list[str] = []
     thin: list[str] = []
-    forms: dict[str, int] = {}
-    for analyses in state.exact.values():
+    forms: dict[str, set[str]] = {}
+    for form, analyses in state.exact.items():
         for analysis in analyses:
-            forms[analysis.lemma] = forms.get(analysis.lemma, 0) + 1
+            forms.setdefault(analysis.lemma, set()).add(form)
 
     for lemma in lemmas:
         hit = state.lookup(lemma)
@@ -215,7 +222,7 @@ def target_coverage(
         if not mine:
             missing.append(lemma)
             continue
-        if forms.get(lemma, 0) <= 1 and any(a.upos in INFLECTING for a in mine):
+        if len(forms.get(lemma, ())) <= 1 and any(a.upos in INFLECTING for a in mine):
             thin.append(lemma)
     return len(lemmas) - len(missing), missing, thin
 
@@ -297,12 +304,16 @@ def check(report: Report, baseline: dict, *, tolerance: float = TOLERANCE) -> li
 
     targets = baseline.get("targets") or {}
     was_thin = targets.get("thin")
-    if was_thin is not None and len(report.targets_thin) > len(was_thin):
+    # ⚑ Which lemmas, not how many. Comparing lengths let a change that fixed
+    # one thin target and introduced another pass silently — `1 > 1` is False —
+    # and the failure message below always computed the set difference anyway,
+    # so the gate reported precisely the condition it was not testing.
+    grew_thin = sorted(set(report.targets_thin) - set(was_thin or ()))
+    if was_thin is not None and grew_thin:
         failures.append(
             "the target vocabulary grew a THIN entry (covered, inflecting, one "
-            f"form): {sorted(set(report.targets_thin) - set(was_thin))}. See "
-            "`target_coverage` — this is the check that would have caught "
-            "`zobrazit` before an acceptance case did"
+            f"form): {grew_thin}. See `target_coverage` — this is the check "
+            "that would have caught `zobrazit` before an acceptance case did"
         )
     was_covered = targets.get("covered")
     if was_covered is not None and report.targets_covered < was_covered:
