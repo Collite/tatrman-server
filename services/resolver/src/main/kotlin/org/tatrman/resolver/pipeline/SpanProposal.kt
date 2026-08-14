@@ -77,6 +77,30 @@ object SpanProposal {
 
     private val NOMINAL_UPOS = setOf("NOUN", "PROPN", "X")
 
+    /**
+     * The syntactic head of a token run: the one whose `dep_head` points **outside** it.
+     *
+     * ⛑ Not the first word, and this cost a live drill. `headToken` is what `FrameRoles` reads for
+     * every deprel rule and what the mention takes its lemma from — and a declared phrase's first
+     * word is usually a modifier or a preposition. With the run's first token as head,
+     * `marketplace revenues` (the MEASURE) came back FILTER, because `marketplace` is a
+     * `compound` and R5 fires on that; `by month` (the GROUPING) came back SUBJECT, because its
+     * head was `by`. The spans and the bindings were right and the whole role layer was wrong.
+     *
+     * Falls back to the first token when every `dep_head` stays inside the run — a coordination
+     * shape this can meet, and the first token is no worse an answer there than any other.
+     */
+    private fun syntacticHead(
+        run: List<Int>,
+        tokens: List<Token>,
+    ): Int {
+        val inRun = run.toHashSet()
+        return run.firstOrNull { i ->
+            val head = tokens[i].depHead - 1 // dep_head is 1-based; 0 means root
+            head < 0 || head !in inRun
+        } ?: run.first()
+    }
+
     /** A declared anchor as the word sequence it is, folded once at index time. */
     private data class AnchorPhrase(
         val words: List<String>,
@@ -214,7 +238,7 @@ object SpanProposal {
                         multiWord.flatMap { it.et.categories }.distinct(),
                         anchored = true,
                         origin = DomainSpanCandidate.Origin.ANCHOR_PHRASE,
-                        headToken = idx,
+                        headToken = syntacticHead(span, tokens),
                     )
                 coveredTokens += span
                 return@forEachIndexed

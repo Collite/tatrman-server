@@ -189,6 +189,31 @@ class DeclaredTermReachabilityTest :
                 }
         }
 
+        "⛑ a multi-word anchor's HEAD is the syntactic head, not the first word" {
+            // Found live, on the first drill after the registry was fed. The span was right and
+            // the binding was right, and every FRAME ROLE was wrong — because `headToken` drives
+            // the deprel rules and the mention's lemma, and a phrase's first word is usually a
+            // modifier (`marketplace revenues`) or a preposition (`by month`).
+            //
+            // The live lattice: `marketplace revenues` — the MEASURE — came back FILTER, because
+            // its head was `marketplace`, whose deprel is `compound`, so R5 fired. And `by month`
+            // — the GROUPING — came back SUBJECT, because its head was `by`. Composition on that
+            // reads "select date_dim.month filtered by ext_sales_price": nonsense, confidently.
+            val cands = SpanProposal.proposeDomainSpans(byMonth, listOf(dateDim, sales))
+
+            val grain = cands.single { it.text == "by month" }
+            withClue("the head of `by month` is `month`, not the preposition") {
+                byMonth.tokensList[grain.headToken].text shouldBe "month"
+                grain.lemma shouldBe "month"
+            }
+
+            val measure = cands.single { it.text == "marketplace revenue" }
+            withClue("the head of `marketplace revenue` is the noun it is about") {
+                byMonth.tokensList[measure.headToken].text shouldBe "revenue"
+                measure.lemma shouldBe "revenue"
+            }
+        }
+
         "the longest anchor wins when two overlap" {
             val overlapping =
                 ResolverEntityType(
