@@ -15,6 +15,7 @@ import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.nlp.v1.NlpServiceGrpcKt
 import org.tatrman.nlp.v1.StatusRequest
 import org.tatrman.nlp.v1.StatusResponse
+import shared.logging.OutgoingCallLoggingInterceptor
 import java.util.concurrent.TimeUnit
 
 /**
@@ -103,6 +104,15 @@ private fun openChannel(
     ManagedChannelBuilder
         .forAddress(host, port)
         .usePlaintext()
+        // TG-P0-F3 (2026-08-14) — log what the core asks nlp and lex-matcher, and what they
+        // answer. DEBUG-only (`LOG_LEVEL=DEBUG`), payloads redacted and capped by the interceptor.
+        //
+        // ⚑ Why it matters more here than anywhere else it is already used (validate, chrono,
+        // translate, dispatch, geo): the resolver's own gRPC surface logs the LATTICE it produced,
+        // but a lattice with no operator bound is ambiguous — it does not distinguish "lex-matcher
+        // returned nothing" from "it returned a match the core discarded". D2 sat on exactly that
+        // ambiguity for a day. This one line separates the two.
+        .intercept(OutgoingCallLoggingInterceptor())
         .keepAliveTime(30, TimeUnit.SECONDS)
         .keepAliveTimeout(10, TimeUnit.SECONDS)
         .keepAliveWithoutCalls(true)

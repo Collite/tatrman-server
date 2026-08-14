@@ -17,7 +17,6 @@ import io.ktor.server.request.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import io.opentelemetry.api.OpenTelemetry
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -43,6 +42,7 @@ import shared.ktor.KtorServerBootstrap
 import shared.ktor.installKtorServerBase
 import shared.ktor.mcp.McpKtorConfig
 import shared.ktor.mcp.installMcpKtorBase
+import org.tatrman.resolver.telemetry.resolverTelemetry
 import shared.logging.IncomingCallLoggingInterceptor
 import java.util.concurrent.TimeUnit
 
@@ -56,6 +56,13 @@ fun main() {
 
 fun Application.module(config: Config) {
     installKtorServerBase(KtorConfigFactory.fromConfig(config, "resolver", 7275))
+
+    // OTel SDK init: OTLP trace/metric/log exporters AND the bridge into the Logback
+    // OpenTelemetryAppender, so SLF4J records ship over OTLP → Alloy → Loki. TG-P0-F1 — until
+    // 2026-08-14 this call did not exist here, alone among the services, and everything below
+    // silently ran on `OpenTelemetry.noop()`. See `telemetry/ResolverTelemetry.kt` for what that
+    // cost and for what it still does NOT buy (trace correlation needs kantheon#34).
+    val otel = resolverTelemetry(config)
 
     val grpcPort = config.getInt("grpc.port")
     val maxMessageSize = config.getInt("grpc.max-message-size-bytes")
@@ -107,7 +114,7 @@ fun Application.module(config: Config) {
             preps = FrameRolePreps.load(config),
             lookupRounds = LookupRounds(fuzzyClient, lookupRoundConfig),
         )
-    val resolverService = ResolverGrpcService(pipeline)
+    val resolverService = ResolverGrpcService(pipeline, otel)
 
     val grpcServer =
         NettyServerBuilder
@@ -166,7 +173,10 @@ fun Application.module(config: Config) {
                                 serverPort = doorPort,
                                 connectionIdleTimeoutSeconds = 120,
                             ),
-                            OpenTelemetry.noop(),
+                            // TG-P0-F1: the same SDK the gRPC surface uses. It was
+                            // `OpenTelemetry.noop()` here, which was consistent with the rest of
+                            // the service only because the rest of the service was noop too.
+                            otel,
                         )
                         installResolveDoor(door, doorHandler, requestContext)
                     }

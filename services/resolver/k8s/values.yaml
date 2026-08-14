@@ -40,9 +40,15 @@ resources:
     memory: 1Gi
     cpu: "1"
 
+# ⚑ Set `otlpHost` (NOT `endpoint`) — the shared otel-config lib builds the URL from a host and a
+# port and never reads OTEL_EXPORTER_OTLP_ENDPOINT. `endpoint` is kept for back-compat only and
+# reaches nothing; see the note in templates/_env.tpl. Typically:
+#   telemetry: { enabled: true, otlpHost: mon-alloy.monitoring.svc.cluster.local, otlpGrpcPort: 4317 }
 telemetry:
   enabled: false
-  endpoint: ""
+  otlpHost: ""
+  otlpGrpcPort: 4317
+  endpoint: ""  # DEPRECATED — unread by the exporters
   serviceName: resolver
 
 # nlp — the parse (Analyze) + capability matrix (GetStatus). ZERO LLM here.
