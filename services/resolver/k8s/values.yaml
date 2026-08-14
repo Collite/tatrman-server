@@ -76,6 +76,25 @@ resumeToken:
 #   - { name: RESOLVER_RESUME_KEY_K1, secretName: resolver-resume-keys, secretKey: k1 }
 secretEnv: []
 
+# ✅ Q-7 — the compiled lexicon archive, the DECLARED-VOCABULARY channel (RS-24: one channel,
+# two consumers). Identical shape to `services/lex-matcher/k8s/values.yaml`, deliberately: it is
+# the SAME ConfigMap, rendered once by the deploying context out of the estate's
+# `generated/lexicon.tar.zst`, and mounted into both readers. The library chart already renders
+# the volume and the mount from these three keys — only the env var below is per-service.
+#
+# OFF by default, and that is the same posture the service code takes: an empty `configMapName`
+# renders no volume, no mount and no `RESOLVER_LEXICON_ARCHIVE_PATH`, and the resolver then runs
+# with an EMPTY declared vocabulary — which is what every deployment did before Q-7.
+#
+# ⚠ Turning it on is a BEHAVIOUR CHANGE, not just a config one: a fed registry makes the gate ask
+# lex-matcher category-scoped questions instead of open ones, and wakes `SpanProposal`'s anchored
+# path. That is the precision path Q-20 built and it is the point of feeding it — but an estate
+# should adopt it deliberately, watching its own corpus, rather than inherit it from a chart bump.
+lexicon:
+  configMapName: ""
+  key: lexicon.tar.zst
+  mountPath: /etc/tatrman/lexicon
+
 # Any other env (a deploying env REPLACES this list).
 extraEnv: []
 
