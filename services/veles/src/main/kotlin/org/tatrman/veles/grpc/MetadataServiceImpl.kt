@@ -268,11 +268,11 @@ class MetadataServiceImpl(
             // Per PF-1: the free-SQL planner needs the full physical schema.
             val packageTables =
                 dbSchema?.tables?.values?.filter { it.sourceFile.contains(packageRoot) } ?: emptyList()
-            bundleBuilder.addAllTables(packageTables.map { it.toModelBundleTable() })
+            bundleBuilder.addAllTables(packageTables.map { it.toModelBundleTable(options) })
 
             val packageViews =
                 dbSchema?.views?.values?.filter { it.sourceFile.contains(packageRoot) } ?: emptyList()
-            bundleBuilder.addAllViews(packageViews.map { it.toModelBundleView() })
+            bundleBuilder.addAllViews(packageViews.map { it.toModelBundleView(options) })
 
             // A3: pattern iff search.patterns is non-empty. Discrimination happens on the
             // domain object, so it is unaffected by include_search_hints stripping later.
@@ -291,7 +291,11 @@ class MetadataServiceImpl(
             if (request.includeRoles) {
                 val packageRoles =
                     cncSchema?.roles?.values?.filter { it.sourceFile.contains(packageRoot) } ?: emptyList()
-                bundleBuilder.addAllRoles(packageRoles.map { it.toRoleDetail().applyBundleOptions(options) })
+                bundleBuilder.addAllRoles(
+                    // NLS-P10: a role's description rides RoleDetail, not an ObjectDescriptor,
+                    // so it needs the chain applied explicitly here.
+                    packageRoles.map { it.toRoleDetail(options.locale).applyBundleOptions(options) },
+                )
             }
 
             // v2.2 — drill maps (Stage 03). Filter to maps contributed by this package's
@@ -947,10 +951,20 @@ class MetadataServiceImpl(
 
 // ----- ListQueries / GetQuery helpers -----
 
-private fun Query.toQueryDescriptor(parseStatus: DomainParseStatus): QueryDescriptor =
+/**
+ * [locale] defaults to `""` because the locale-less RPCs (`ListQueries`, `GetQuery`)
+ * build this too — see [selectDescription]. On the GetModel bundle path the caller
+ * MUST pass `opts.locale`: a `ModelBundleQuery` carries this descriptor nested inside
+ * its own, and two descriptors for one query answering differently is a bug waiting
+ * to be read as data (NLS-P10 review).
+ */
+private fun Query.toQueryDescriptor(
+    parseStatus: DomainParseStatus,
+    locale: String = "",
+): QueryDescriptor =
     QueryDescriptor
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(locale))
         .setSourceLanguage(sourceLanguage.toProtoLanguage())
         .setParseStatus(parseStatus.toProtoParseStatus())
         .setParameterCount(parameters.size)
@@ -982,7 +996,57 @@ private fun ParseStatusFilter.matches(status: DomainParseStatus): Boolean =
         ParseStatusFilter.UNRECOGNIZED -> true
     }
 
-private fun ModelObject.toObjectDescriptor(): ObjectDescriptor =
+/**
+ * NLS-P10 (⚑GXP-D7, grammar 0.13) — pick the description text to serve for [locale].
+ *
+ * TTR 0.13 lets an author write `description:` either as a plain string or as a
+ * localised map. The WIRE did not follow: `meta.v1.ObjectDescriptor.description` is
+ * still one `string`, so the choice is made here, at the edge, and exactly once per
+ * response. The chain (D7, contracts):
+ *
+ *  1. the requested locale, when the map carries it;
+ *  2. the plain-string form (an author who wrote one string meant it for everyone);
+ *  3. `en`;
+ *  4. the first entry **by language code** — sorted, so the served text does not
+ *     depend on the order the author happened to write the block in;
+ *  5. `""`.
+ *
+ * An EMPTY [locale] means the caller expressed no preference and gets today's
+ * behaviour: the plain form, or `""` when only a map was authored. The "empty locale
+ * = all locales" rule that governs `LocalizedString` fields (`display_label`, search
+ * hints — see [BundleOptions]) does NOT apply to a single-string field: there is no
+ * way to return "all" of it, and guessing one would make the bytes a caller receives
+ * depend on authoring order.
+ *
+ * **Which RPCs run the chain, and which cannot.** `GetModel` is the only request in
+ * `meta.v1` that carries a `locale`, so it is the only one that can select: the whole
+ * bundle — entities, their attributes, tables, views, both query lists (outer AND the
+ * nested `QueryDescriptor`) and `RoleDetail` — goes through this function with
+ * `BundleOptions.locale`. Every other surface (`ListObjects`, `GetObject`,
+ * `GetSnapshot`, `Search`, `ListRoles`, `ListQueries`, `GetQuery`, the search-index
+ * `CompileError.object`, `TraverseGraph` edges) has no locale to pass and therefore
+ * serves the plain form — which is `""` for an object whose author wrote only a map.
+ *
+ * That is a consequence of NLS-P10's central constraint, not an oversight: the wire
+ * did not widen, so a locale-less request has nothing to select with. Nothing in the
+ * estate reads descriptions off those RPCs today (golem consumes the bundle). ⚑ If a
+ * consumer ever needs a described object from a locale-less RPC, the fix is a `locale`
+ * field on that request — a proto change with its own window — NOT a house default
+ * here, which would make the served bytes depend on authoring order.
+ */
+private fun ModelObject.selectDescription(locale: String): String {
+    if (locale.isEmpty()) return description
+    descriptionLocalized.byLanguage[locale]?.let { return it }
+    if (description.isNotEmpty()) return description
+    descriptionLocalized.byLanguage["en"]?.let { return it }
+    return descriptionLocalized.byLanguage
+        .toSortedMap()
+        .values
+        .firstOrNull()
+        ?: ""
+}
+
+private fun ModelObject.toObjectDescriptor(locale: String = ""): ObjectDescriptor =
     ObjectDescriptor
         .newBuilder()
         .setInternalId(internalId)
@@ -992,7 +1056,7 @@ private fun ModelObject.toObjectDescriptor(): ObjectDescriptor =
         // fuzzy-matcher need just the trailing segment as a SQL identifier;
         // mirrors the DbColumn.localName() helper at the bottom of this file.
         .setLocalName(qname.name.substringAfterLast('.'))
-        .setDescription(description)
+        .setDescription(selectDescription(locale))
         .addAllTags(tags)
         .setSchemaCode(qname.schemaCode.toProto())
         .setKind(kind)
@@ -1098,15 +1162,15 @@ private fun Entity.toEntityDetail(): EntityDetail =
 private fun Entity.toModelBundleEntity(opts: BundleOptions): ModelBundleEntity =
     ModelBundleEntity
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(opts.locale))
         .setDetail(toEntityDetail().applyBundleOptions(opts))
-        .addAllAttributes(attributes.map { it.toModelBundleAttribute() })
+        .addAllAttributes(attributes.map { it.toModelBundleAttribute(opts) })
         .build()
 
-private fun Attribute.toModelBundleAttribute(): ModelBundleAttribute =
+private fun Attribute.toModelBundleAttribute(opts: BundleOptions): ModelBundleAttribute =
     ModelBundleAttribute
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(opts.locale))
         .setDetail(toAttributeDetail())
         .build()
 
@@ -1123,8 +1187,8 @@ private fun Query.toModelBundleQuery(
     val builder =
         ModelBundleQuery
             .newBuilder()
-            .setObjectDescriptor(toObjectDescriptor())
-            .setQueryDescriptor(toQueryDescriptor(parseStatus).applyBundleOptions(opts))
+            .setObjectDescriptor(toObjectDescriptor(opts.locale))
+            .setQueryDescriptor(toQueryDescriptor(parseStatus, opts.locale).applyBundleOptions(opts))
             .setSourceLanguage(sourceLanguage.toProtoLanguage())
             .setSourceText(sourceText)
     for (param in parameters) {
@@ -1154,10 +1218,10 @@ private fun Attribute.toAttributeDetail(): AttributeDetail =
         .also { s -> semantics?.let { s.semantics = it.toProto(entity) } }
         .build()
 
-private fun Role.toRoleDetail(): RoleDetail =
+private fun Role.toRoleDetail(locale: String = ""): RoleDetail =
     RoleDetail
         .newBuilder()
-        .setDescription(description)
+        .setDescription(selectDescription(locale))
         .also { if (!label.isEmpty) it.label = label.toProto() }
         .also { if (!search.isEmpty) it.search = search.toProto() }
         .build()
@@ -1325,17 +1389,17 @@ private fun DbView.toDbViewDetail(): DbViewDetail =
         .setDefinitionSql(definitionSql)
         .build()
 
-private fun DbTable.toModelBundleTable(): ModelBundleTable =
+private fun DbTable.toModelBundleTable(opts: BundleOptions): ModelBundleTable =
     ModelBundleTable
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(opts.locale))
         .setDetail(toDbTableDetail())
         .build()
 
-private fun DbView.toModelBundleView(): ModelBundleView =
+private fun DbView.toModelBundleView(opts: BundleOptions): ModelBundleView =
     ModelBundleView
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(opts.locale))
         .setDetail(toDbViewDetail())
         .build()
 

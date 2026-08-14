@@ -1,0 +1,15 @@
+package localized
+
+// NLS-P10 review — a QUERY with a localised description. It lives here rather than in
+// `er.ttr` only because queries are authored in the db file by convention (see the
+// bundled `model-ttr/*/db.ttr`).
+//
+// Why it is worth a fixture: `ModelBundleQuery` carries TWO ObjectDescriptors for the
+// same query — its own, and the one nested inside `QueryDescriptor`. The first shipped
+// locale-selected and the second did not, so a bilingual query described itself in
+// Czech at one field and not at all at the other. The spec pins both.
+def query bilingual_query {
+    description: { cs: "Dvojjazyčný dotaz", en: "A bilingual query" },
+    language: SQL,
+    sourceText: """SELECT 1"""
+}
