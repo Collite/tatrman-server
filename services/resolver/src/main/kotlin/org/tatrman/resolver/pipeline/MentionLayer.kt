@@ -55,6 +55,30 @@ object MentionLayer {
                 .filter { i -> gated.any { it.start <= tokens[i].charStart && it.end >= tokens[i].charEnd } }
                 .toHashSet()
 
+        // ⛑ …with ONE exception, and it is the difference between `Marketplace revenue` resolving
+        // and not. A **proper noun** is claimed by span proposal's PROPN branch on sight, with no
+        // model evidence behind it — it is a guess that this word names something, made because
+        // proper nouns usually do. When such a word is also a `compound`/`amod` modifier of a
+        // nominal head, the guess is wrong in the way that costs most: the head noun is left
+        // standing alone, and a bare head ("revenue") is exactly the word an estate declines to
+        // declare, because bare measure words are ambiguous across its objects.
+        //
+        // The tell is that the SAME question with the same word tagged NOUN resolves — the PROPN
+        // branch simply never fires there, the phrase forms, and the declared term matches. So the
+        // exclusion was doing nothing but making the lattice depend on capitalisation.
+        //
+        // The proper noun keeps its own candidate: overlapping spans are already normal here (a
+        // narrow mention and the wider phrase containing it both reach the gate), and the narrow
+        // one is what carries the value/filter reading. This only stops it from BLOCKING the wider
+        // one. ⚠ Deliberately narrow — a token claimed by any other candidate origin still blocks.
+        val propnOnlyClaims =
+            tokens.indices
+                .filter { i ->
+                    val covering = gated.filter { it.start <= tokens[i].charStart && it.end >= tokens[i].charEnd }
+                    covering.isNotEmpty() && covering.all { it.origin == DomainSpanCandidate.Origin.PROPER_NOUN }
+                }.toHashSet()
+        val blocking = claimed - propnOnlyClaims
+
         val out = mutableListOf<DomainSpanCandidate>()
         tokens.forEachIndexed { idx, token ->
             if (token.upos.uppercase() !in NOMINAL_UPOS) return@forEachIndexed
@@ -62,7 +86,7 @@ object MentionLayer {
             if (isUniversal(token, universal)) return@forEachIndexed
             if (idx in claimed) return@forEachIndexed
 
-            val phrase = phraseIndices(idx, children, tokens, universal, claimed)
+            val phrase = phraseIndices(idx, children, tokens, universal, blocking)
             val start = phrase.minOf { tokens[it].charStart }
             val end = phrase.maxOf { tokens[it].charEnd }
             // Anything the gate already asked about is already a lattice span — including the

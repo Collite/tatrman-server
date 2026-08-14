@@ -77,6 +77,12 @@ object SpanProposal {
 
     private val NOMINAL_UPOS = setOf("NOUN", "PROPN", "X")
 
+    /** A declared anchor as the word sequence it is, folded once at index time. */
+    private data class AnchorPhrase(
+        val words: List<String>,
+        val et: ResolverEntityType,
+    )
+
     // A minimal Czech stopword set for the parse-less n-gram floor only. When a
     // dep parse is present these never matter (anchoring drives proposal); the
     // floor is a degraded-language safety net, not the precision path.
@@ -140,30 +146,80 @@ object SpanProposal {
             if (t.depHead > 0) children.getOrPut(t.depHead) { mutableListOf() }.add(idx)
         }
 
-        // Fold declared anchors once: folded anchor word → the entity types owning it.
-        val anchorIndex = HashMap<String, MutableList<ResolverEntityType>>()
+        // Fold declared anchors once, as WORD SEQUENCES keyed on their first word.
+        //
+        // ⛑ This used to be a single-token map, and that quietly made every multi-word declared
+        // term unmatchable: `fold("by month")` is a key with a space in it, and no token folds to
+        // that. An estate could author `by month` → a calendar column exactly as the schema
+        // intends and nothing in the pipeline would ever see it — the term was not stale or
+        // misspelled, it was **unreachable**.
+        //
+        // ⚠ Not fixed by widening `MentionLayer.PHRASE_RELATIONS` to cross a preposition. `by`
+        // attaches with `case`, and admitting `case` would drag prepositions into every leftover
+        // phrase on every question. The anchor index is the right place precisely because the
+        // estate has NAMED this word sequence: matching it is honouring a declaration, not
+        // guessing at syntax.
+        val anchorPhrases = HashMap<String, MutableList<AnchorPhrase>>()
         for (et in entityTypes) {
             for (anchor in et.anchors) {
-                anchorIndex.getOrPut(fold(anchor)) { mutableListOf() }.add(et)
+                val words = fold(anchor).split(' ').filter { it.isNotBlank() }
+                if (words.isEmpty()) continue
+                anchorPhrases.getOrPut(words.first()) { mutableListOf() }.add(AnchorPhrase(words, et))
             }
         }
 
         val out = mutableListOf<DomainSpanCandidate>()
         val coveredTokens = HashSet<Int>()
 
-        // Every token that IS a declared anchor word. An anchor is a mention of its own
+        val folded = tokens.map { fold(it.lemma.ifBlank { it.text }) }
+
+        /** The longest declared phrase starting at [from], per owning entity type. */
+        fun matchesAt(from: Int): List<AnchorPhrase> {
+            val byFirst = anchorPhrases[folded.getOrNull(from) ?: return emptyList()] ?: return emptyList()
+            val hits =
+                byFirst.filter { phrase ->
+                    phrase.words.withIndex().all { (i, w) -> folded.getOrNull(from + i) == w }
+                }
+            if (hits.isEmpty()) return emptyList()
+            // Longest wins: an estate that declared both `by month` and `by month end` meant the
+            // longer one where the question says it. Ties (same length, several owners) all stand
+            // — that is a real ambiguity and the gate's to settle, not this layer's.
+            val longest = hits.maxOf { it.words.size }
+            return hits.filter { it.words.size == longest }
+        }
+
+        // Every token that IS part of a declared anchor. An anchor is a mention of its own
         // model object, so it may not be folded into a sibling anchor's phrase nor taken
         // as that anchor's governed value (RV-P2.1 — see the class doc).
         val anchorTokens =
             tokens.indices
-                .filter { fold(tokens[it].lemma.ifBlank { tokens[it].text }) in anchorIndex }
+                .flatMap { i -> matchesAt(i).flatMap { p -> (i until i + p.words.size).toList() } }
                 .toHashSet()
 
         // (a) anchored subtrees
         tokens.forEachIndexed { idx, t ->
-            val key = fold(if (t.lemma.isNotBlank()) t.lemma else t.text)
-            val owners = anchorIndex[key] ?: return@forEachIndexed
-            for (et in owners) {
+            val hits = matchesAt(idx)
+            if (hits.isEmpty()) return@forEachIndexed
+            // A MULTI-word anchor names its own extent: the estate said which words, so the span
+            // is exactly those and no subtree expansion applies. Single-word anchors keep the
+            // Q-20 behaviour below unchanged — phrase expansion plus governed values.
+            val multiWord = hits.filter { it.words.size > 1 }
+            if (multiWord.isNotEmpty()) {
+                val span = (idx until idx + multiWord.first().words.size).toList()
+                out +=
+                    candidate(
+                        span,
+                        tokens,
+                        multiWord.map { it.et.ref }.distinct(),
+                        multiWord.flatMap { it.et.categories }.distinct(),
+                        anchored = true,
+                        origin = DomainSpanCandidate.Origin.ANCHOR_PHRASE,
+                        headToken = idx,
+                    )
+                coveredTokens += span
+                return@forEachIndexed
+            }
+            for (et in hits.map { it.et }) {
                 // anchor phrase: the anchor noun + its pre-modifiers, contiguous hull.
                 val phraseIdx = anchorPhraseIndices(idx, children, tokens, universal, anchorTokens)
                 if (phraseIdx.isNotEmpty()) {
