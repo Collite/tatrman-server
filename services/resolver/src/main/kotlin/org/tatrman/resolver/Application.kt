@@ -20,6 +20,7 @@ import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.tatrman.mcp.identity.IdentityPolicy
 import org.tatrman.mcp.identity.RequestContext
@@ -35,6 +36,7 @@ import org.tatrman.resolver.pipeline.LookupRounds
 import org.tatrman.resolver.pipeline.FrameRolePreps
 import org.tatrman.resolver.pipeline.ResolverPipeline
 import org.tatrman.resolver.registry.LiveMetadataRegistryAdapter
+import org.tatrman.resolver.registry.LexiconArchiveRegistrySource
 import org.tatrman.resolver.registry.SnapshotRegistry
 import org.tatrman.resolver.token.ResumeTokenCodec
 import shared.ktor.KtorConfigFactory
@@ -96,9 +98,42 @@ fun Application.module(config: Config) {
             broadMaxCandidates = config.getInt("resolver.lookup-broad-max-candidates"),
             maxQueriesPerRound = config.getInt("resolver.lookup-max-queries-per-round"),
         )
-    // Snapshot-fed registry over the one-channel seam (RS-24). Startup uses the
-    // E3-β step-one live-metadata adapter; a per-request `Registry` override wins.
-    val registry = SnapshotRegistry(LiveMetadataRegistryAdapter(), defaultThresholds)
+    // Snapshot-fed registry over the one-channel seam (RS-24). ✅ Q-7 (Bora, 2026-08-14): the
+    // channel is the COMPILED LEXICON ARCHIVE — the same file lex-matcher mounts — when the
+    // estate points at one. A per-request `Registry` override still wins for that request.
+    //
+    // ⚠ No path configured ⇒ the E3-β step-one adapter, which yields an EMPTY vocabulary. That
+    // was the silent default for every deployment until now, and its whole problem was that it
+    // looked exactly like an estate that had declared nothing. It is still the default — the
+    // narrowing that a fed registry causes is an estate's decision — but it is no longer silent.
+    val archivePath = config.getString("resolver.lexicon-archive-path").trim()
+    val registrySource =
+        if (archivePath.isEmpty()) {
+            log.warn(
+                "resolver.lexicon-archive-path is unset — the declared vocabulary is EMPTY, so the " +
+                    "anchored span-proposal path cannot fire and every binding will carry the stub's " +
+                    "snapshot hash. Set RESOLVER_LEXICON_ARCHIVE_PATH to the mounted lexicon archive " +
+                    "(the same one lex-matcher reads) to feed it.",
+            )
+            LiveMetadataRegistryAdapter()
+        } else {
+            LexiconArchiveRegistrySource(
+                java.nio.file.Path
+                    .of(archivePath),
+            )
+        }
+    val registry = SnapshotRegistry(registrySource, defaultThresholds)
+    // ⛑ Projected once at boot so the size is in the log before the first question. An empty
+    // vocabulary looks exactly like a small one, which is why this is stated and not inferred.
+    runBlocking {
+        val loaded = registry.current()
+        log.info(
+            "declared vocabulary: {} entity type(s), {} anchor(s), snapshot={}",
+            loaded.entityTypes.size,
+            loaded.entityTypes.sumOf { it.anchors.size },
+            loaded.snapshotHash.ifBlank { "<none>" },
+        )
+    }
 
     // HMAC resume-token codec (RS-26). Keys come from config so they rotate by
     // key_id without a redeploy; the active key signs, all listed keys verify

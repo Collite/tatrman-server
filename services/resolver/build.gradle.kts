@@ -111,6 +111,12 @@ dependencies {
     // first. Reading it costs the artifact model only — ttr-lexicon is a leaf (kotlinx-json +
     // snakeyaml), and NOT the compiler, which is what the P1.2 (a3) ruling buys.
     implementation(libs.tatrman.ttr.lexicon)
+    // ✅ Q-7 (Bora, 2026-08-14) — the declared-vocabulary channel is the compiled lexicon
+    // archive, the same file lex-matcher mounts (RS-24: one channel, two consumers, one
+    // snapshot identity). ttr-snapshot untars it; ttr-lexicon above decodes it. The COMPILER
+    // stays out of the serving artifact, which is what the P1.2 (a3) ruling buys — and neither
+    // is an LLM client, so the zero-LLM classpath guard below is unaffected.
+    implementation(libs.tatrman.ttr.snapshot)
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
@@ -119,6 +125,10 @@ dependencies {
     // in-process against the ported rules (FrameRolesFixtureTest). Test-only.
     testImplementation(libs.jackson.dataformat.yaml)
     testImplementation(libs.jackson.databind)
+    // Q-7 — the archive fixture is packed by the REAL producer, test scope only, exactly as
+    // lex-matcher's `LexiconArchiveSourceTest` does. Two readers conformant by contract are
+    // held together by both being held to the same packer.
+    testImplementation(libs.tatrman.ttr.lexicon.compile)
 }
 
 // RG-P5 — structural ZERO-LLM guard (RS-23). Fail the build if the resolver's
