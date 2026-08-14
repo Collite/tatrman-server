@@ -48,9 +48,30 @@ only behind an auth-terminating ingress.
   value: {{ .Values.telemetry.serviceName | quote }}
 - name: OTEL_ENABLED_RESOLVER
   value: {{ .Values.telemetry.enabled | quote }}
-{{- if and .Values.telemetry.enabled .Values.telemetry.endpoint }}
+{{- /*
+  TG-P0-F1 — the collector address, as `shared.otel.OtelConfig` ACTUALLY reads it: a HOST and a
+  PORT, from which it builds the URL itself (`OtelEndpointConfig.hostEnvVar` defaults to
+  OTEL_EXPORTER_OTLP_HOST; the port comes from OTEL_EXPORTER_OTLP_{GRPC,HTTP,HTTPS}_PORT).
+  It never reads OTEL_EXPORTER_OTLP_ENDPOINT.
+
+  ⚠ So `telemetry.endpoint` below has never reached the exporters. It went unnoticed because no
+  tatrman-server service on any cluster had telemetry enabled — the resolver is the first, and it
+  would have silently exported to localhost:4317. Kantheon's charts got this right and say so:
+  "The otel-config lib reads host + grpc port separately (not a single endpoint URL)."
+  The same latent bug is in every other service's k8s _env.tpl; fixing those is not this change.
+*/}}
+{{- if .Values.telemetry.enabled }}
+{{- if .Values.telemetry.otlpHost }}
+- name: OTEL_EXPORTER_OTLP_HOST
+  value: {{ .Values.telemetry.otlpHost | quote }}
+- name: OTEL_EXPORTER_OTLP_GRPC_PORT
+  value: {{ .Values.telemetry.otlpGrpcPort | default 4317 | quote }}
+{{- end }}
+{{- if .Values.telemetry.endpoint }}
+{{- /* kept only so an existing values file does not silently lose a setting; unread by the lib */}}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: {{ .Values.telemetry.endpoint | quote }}
+{{- end }}
 {{- end }}
 {{- range .Values.secretEnv }}
 - name: {{ .name }}

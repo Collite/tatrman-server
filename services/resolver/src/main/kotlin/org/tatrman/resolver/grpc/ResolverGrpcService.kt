@@ -26,7 +26,19 @@ import org.tatrman.resolver.v1.ResolverServiceGrpcKt
 class ResolverGrpcService(
     private val pipeline: ResolverPipeline,
     // RV-P2.4.T5 — defaulted to the noop SDK so every existing construction site (and every test)
-    // keeps working and pays nothing; the service passes the real one.
+    // keeps working and pays nothing.
+    //
+    // ⚠ This comment used to end "; the service passes the real one." It did not. `Application.kt`
+    // constructed `ResolverGrpcService(pipeline)` and the default won, so the `resolve.gate` span
+    // documented below was never emitted from any cluster — for three months, while the comment
+    // said otherwise. Fixed 2026-08-14 (TG-P0-F1); the wiring now lives in
+    // `telemetry/ResolverTelemetry.kt`.
+    //
+    // ⚑ Note what is and is not guarded. `ResolverTelemetryTest` covers the factory — that the
+    // flag is honoured and that an enabled SDK really is non-noop. **No test asserts that
+    // `Application.kt` passes it**, because the argument is a default and dropping it compiles.
+    // That is precisely how this survived. If you touch that construction site, check it by hand
+    // — and prefer a comment that admits a gap to one that closes it in prose.
     openTelemetry: OpenTelemetry = OpenTelemetry.noop(),
 ) : ResolverServiceGrpcKt.ResolverServiceCoroutineImplBase() {
     private val log = LoggerFactory.getLogger(javaClass)
