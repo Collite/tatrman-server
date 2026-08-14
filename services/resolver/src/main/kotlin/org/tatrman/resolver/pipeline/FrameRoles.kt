@@ -21,7 +21,7 @@ import org.tatrman.resolver.v1.TargetClass
  * ```
  * R0  target_class == OPERATOR                      -> {}         # RV-35, always
  * R1  target_class == MEMBER                        -> +FILTER    # a member IS a restriction
- * R2  object_kind  == measure                       -> +MEASURE   # a measure IS the measure
+ * R2  object_kind  == measure                       -> +MEASURE   # a measure IS the measure  ⛔ DEAD
  * R3  prep in GROUPING_PREPS and not measure(m)     -> +GROUPING
  * R4  prep in FILTER_PREPS   and not measure(m)     -> +FILTER
  * R5  no prep, deprel == compound, not measure      -> +FILTER     # "WEB revenue"
@@ -158,6 +158,39 @@ object FrameRoles {
         return roles.mapValues { (_, set) -> set.toList() }
     }
 
+    /**
+     * ⛔ **ALWAYS FALSE IN PRODUCTION, and not because anything here is unwired.**
+     *
+     * `objectKind` has **no source in this system** — checked against the artifacts 2026-08-14,
+     * after two rounds of assuming otherwise:
+     *
+     *  - `meta.v1` contains **zero** occurrences of `measure`. `ObjectDescriptor.kind` comes
+     *    straight from `ttr-metadata`'s `ModelObject.kind`, whose whole vocabulary is
+     *    `table | view | column | procedure | foreign_key | entity | attribute | relation |
+     *    role | query | drill_map | world | …` — no measure, no dimension, no cubelet. Its
+     *    `SchemaCode` has no `MD` member either.
+     *  - the compiled lexicon archive states a target **class**
+     *    (`MODEL_OBJECT | MEMBER | OPERATOR | GROUNDING_TRIGGER`), a different axis; its reader
+     *    says so in as many words.
+     *  - the per-request `Registry` override has the field, and nothing populates it.
+     *
+     * The `md.` layer these rules were written against is authored in TTR but is **not
+     * represented in the metadata model** — which is also why `TransDslRenderer.address()`
+     * rejects `md.` refs outright (*"no md layer exists to say what object carries it"*).
+     *
+     * ⚠ **The cost is wider than R2.** This predicate also gates R3–R6, each of which reads
+     * *"and NOT measure(m)"* — so with the kind blank, nothing is ever exempted from FILTER or
+     * GROUPING **for being the measure**. Observed live: a measure mention comes back
+     * `FRAME_ROLE_SUBJECT`, and its compound modifier takes FILTER through R5.
+     *
+     * ⛔ **Do not "fix" this by deriving a kind from the ref prefix.**
+     * `LexiconArchiveRegistrySource` refuses to do that because it would be a second rule, free
+     * to drift from the model's own — and that argument gets *stronger*, not weaker, when the
+     * first rule turns out to be missing: there would be no authority to drift from at all. The
+     * real fix is an md layer in the metadata model, upstream. Recorded here rather than only in
+     * a tracker, because a rule that reads as merely unwired invites exactly the local fix this
+     * comment refuses.
+     */
     private fun isMeasure(mention: Input): Boolean = mention.objectKind.equals("measure", ignoreCase = true)
 
     /** The lemma of the adposition attached to [headToken] by a `case` relation, folded low. */
