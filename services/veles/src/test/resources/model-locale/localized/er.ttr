@@ -29,6 +29,17 @@ def entity neither {
     ]
 }
 
+// An authored-but-EMPTY entry. The chain tests PRESENCE on the map steps, so `cs` wins
+// and serves "" rather than promoting the `en` text. Pinned because it is the one input
+// where "presence" and "truthiness" diverge, and the LSP reader implements the same chain
+// (`model-graph.ts` `resolveDescription`) — the two must not disagree about it.
+def entity empty_entry {
+    description: { cs: "", en: "Fallback" },
+    attributes: [
+        def attribute id { type: int, isKey: true }
+    ]
+}
+
 // The regression pin: a plain-string model must serve exactly what it served at 0.12.
 def entity plain {
     description: "a plain description",

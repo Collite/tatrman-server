@@ -53,18 +53,18 @@ class GetModelLocalizedDescriptionSpec :
             return MetadataServiceImpl(registry)
         }
 
-        suspend fun entities(locale: String): Map<String, ModelBundleEntity> {
-            val req =
-                GetModelRequest
-                    .newBuilder()
-                    .addPackages("localized")
-                    .also { if (locale.isNotEmpty()) it.locale = locale }
-                    .build()
-            return service()
-                .getModel(req)
-                .model.entitiesList
-                .associateBy { it.objectDescriptor.localName }
-        }
+        suspend fun bundle(locale: String) =
+            service()
+                .getModel(
+                    GetModelRequest
+                        .newBuilder()
+                        .addPackages("localized")
+                        .also { if (locale.isNotEmpty()) it.locale = locale }
+                        .build(),
+                ).model
+
+        suspend fun entities(locale: String): Map<String, ModelBundleEntity> =
+            bundle(locale).entitiesList.associateBy { it.objectDescriptor.localName }
 
         "step 1 — the requested locale wins when the map carries it" {
             val cs = entities("cs")
@@ -89,6 +89,15 @@ class GetModelLocalizedDescriptionSpec :
             // alternative (map iteration order) makes the served text depend on how the
             // author happened to order the block.
             entities("cs").getValue("neither").objectDescriptor.description shouldBe "Nur Deutsch"
+        }
+
+        "an authored-but-empty entry WINS its locale — presence, not emptiness" {
+            // Steps 1 and 3 test presence; only step 2 (the plain form) tests non-emptiness.
+            // The LSP implements this same chain for the Designer (`model-graph.ts`
+            // `resolveDescription`), and this is the single input where the two readings
+            // diverge — so it is pinned on both sides rather than left to the comment.
+            entities("cs").getValue("empty_entry").objectDescriptor.description shouldBe ""
+            entities("en").getValue("empty_entry").objectDescriptor.description shouldBe "Fallback"
         }
 
         "step 5 — nothing authored at all stays empty" {
@@ -129,10 +138,40 @@ class GetModelLocalizedDescriptionSpec :
         }
 
         "the localised map itself never reaches the wire" {
-            // The proof that the D7 work did not widen `meta.v1`: ObjectDescriptor has
-            // exactly one description field and it is a string. If someone later adds a
-            // map field to the proto, this line stops compiling — which is the point.
+            // The proof that the D7 work did not widen `meta.v1`: the ONLY description
+            // this object can carry is the single selected string. Asserted over the
+            // descriptor's whole field set rather than by naming `description` — a map
+            // field added to the proto later would show up here as a new field name, and
+            // a type assertion on `description` alone would not have noticed it.
             val d = entities("cs").getValue("bilingual").objectDescriptor
-            (d.description is String) shouldBe true
+            val descriptionFields =
+                d.descriptorForType.fields
+                    .filter { it.name.contains("description") }
+                    .map { "${it.name}:${it.javaType}" }
+            descriptionFields shouldBe listOf("description:STRING")
+            d.description shouldBe "Dvojjazyčný popis"
+        }
+
+        // ---- NLS-P10 review: the bundle must not contradict itself -----------------------
+        //
+        // `ModelBundleQuery` carries the same query's ObjectDescriptor TWICE — its own, and
+        // the one nested in `QueryDescriptor`. The outer one shipped locale-selected and the
+        // nested one did not, so a bilingual query's description was Czech at one field and
+        // empty at the other, inside a single message. Nothing read the nested one yet, which
+        // is exactly why it needs a pin rather than a bug report.
+        "a query's description is locale-selected at BOTH descriptors in the bundle" {
+            val cs = bundle("cs").namedQueriesList.single { it.objectDescriptor.localName == "bilingual_query" }
+            cs.objectDescriptor.description shouldBe "Dvojjazyčný dotaz"
+            cs.queryDescriptor.objectDescriptor.description shouldBe "Dvojjazyčný dotaz"
+
+            val en = bundle("en").namedQueriesList.single { it.objectDescriptor.localName == "bilingual_query" }
+            en.objectDescriptor.description shouldBe "A bilingual query"
+            en.queryDescriptor.objectDescriptor.description shouldBe "A bilingual query"
+        }
+
+        "REGRESSION PIN — an empty locale leaves both query descriptors as 0.12 served them" {
+            val none = bundle("").namedQueriesList.single { it.objectDescriptor.localName == "bilingual_query" }
+            none.objectDescriptor.description shouldBe ""
+            none.queryDescriptor.objectDescriptor.description shouldBe ""
         }
     })

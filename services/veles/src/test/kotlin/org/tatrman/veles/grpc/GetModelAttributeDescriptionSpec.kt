@@ -74,14 +74,30 @@ class GetModelAttributeDescriptionSpec :
             described.all { it.objectDescriptor.localName.isNotEmpty() } shouldBe true
         }
 
-        "an attribute the author did not describe arrives EMPTY, not absent and not defaulted" {
-            // The roster's "bare `name (type)` line" branch depends on this being an empty string
-            // rather than a fabricated placeholder.
-            val e = bundle().entitiesList.first { it.attributesList.isNotEmpty() }
-            e.attributesList.all { it.objectDescriptor.hasQualifiedName() } shouldBe true
-            e.attributesList
-                .none { it.objectDescriptor.description == "null" } shouldBe true
+        "the description that arrives is the AUTHORED text, verbatim" {
+            // Named, not counted. A floor of "≥20 non-empty" survives a mapping that fills
+            // every description with the local name, or the entity's, or a placeholder — all
+            // of which would render a plausible-looking roster made of the wrong words. One
+            // exact pair, straight out of `model-ttr/ucetnictvi/er.ttr`, cannot.
+            val attrs =
+                bundle()
+                    .entitiesList
+                    .single { it.objectDescriptor.localName == "hodnoty_manažerského_účetnictví" }
+                    .attributesList
+                    .associateBy { it.objectDescriptor.localName }
+
+            attrs.getValue("id_hodnoty").objectDescriptor.description shouldBe
+                "Unikátní identifikátor záznamu hodnoty"
+            attrs.getValue("plán").objectDescriptor.description shouldBe "Plánovaná hodnota za období"
+            // …and it is not any of the things a broken mapping would substitute.
+            attrs.getValue("plán").objectDescriptor.localName shouldBe "plán"
         }
+
+        // ⚑ "an attribute the author did not describe arrives EMPTY" is NOT asserted here:
+        // `ucetnictvi` describes all 52 of its attributes, so any such case against this
+        // fixture is vacuous by construction. It is pinned where an undescribed attribute
+        // actually exists — `GetModelLocalizedDescriptionSpec`, "step 5", over the
+        // `model-locale/localized` matrix.
 
         "AttributeDetail carries the three facts the roster prints (type / key / nullable)" {
             val attrs = bundle().entitiesList.flatMap { it.attributesList }

@@ -951,10 +951,20 @@ class MetadataServiceImpl(
 
 // ----- ListQueries / GetQuery helpers -----
 
-private fun Query.toQueryDescriptor(parseStatus: DomainParseStatus): QueryDescriptor =
+/**
+ * [locale] defaults to `""` because the locale-less RPCs (`ListQueries`, `GetQuery`)
+ * build this too — see [selectDescription]. On the GetModel bundle path the caller
+ * MUST pass `opts.locale`: a `ModelBundleQuery` carries this descriptor nested inside
+ * its own, and two descriptors for one query answering differently is a bug waiting
+ * to be read as data (NLS-P10 review).
+ */
+private fun Query.toQueryDescriptor(
+    parseStatus: DomainParseStatus,
+    locale: String = "",
+): QueryDescriptor =
     QueryDescriptor
         .newBuilder()
-        .setObjectDescriptor(toObjectDescriptor())
+        .setObjectDescriptor(toObjectDescriptor(locale))
         .setSourceLanguage(sourceLanguage.toProtoLanguage())
         .setParseStatus(parseStatus.toProtoParseStatus())
         .setParameterCount(parameters.size)
@@ -1007,6 +1017,22 @@ private fun ParseStatusFilter.matches(status: DomainParseStatus): Boolean =
  * hints — see [BundleOptions]) does NOT apply to a single-string field: there is no
  * way to return "all" of it, and guessing one would make the bytes a caller receives
  * depend on authoring order.
+ *
+ * **Which RPCs run the chain, and which cannot.** `GetModel` is the only request in
+ * `meta.v1` that carries a `locale`, so it is the only one that can select: the whole
+ * bundle — entities, their attributes, tables, views, both query lists (outer AND the
+ * nested `QueryDescriptor`) and `RoleDetail` — goes through this function with
+ * `BundleOptions.locale`. Every other surface (`ListObjects`, `GetObject`,
+ * `GetSnapshot`, `Search`, `ListRoles`, `ListQueries`, `GetQuery`, the search-index
+ * `CompileError.object`, `TraverseGraph` edges) has no locale to pass and therefore
+ * serves the plain form — which is `""` for an object whose author wrote only a map.
+ *
+ * That is a consequence of NLS-P10's central constraint, not an oversight: the wire
+ * did not widen, so a locale-less request has nothing to select with. Nothing in the
+ * estate reads descriptions off those RPCs today (golem consumes the bundle). ⚑ If a
+ * consumer ever needs a described object from a locale-less RPC, the fix is a `locale`
+ * field on that request — a proto change with its own window — NOT a house default
+ * here, which would make the served bytes depend on authoring order.
  */
 private fun ModelObject.selectDescription(locale: String): String {
     if (locale.isEmpty()) return description
@@ -1162,7 +1188,7 @@ private fun Query.toModelBundleQuery(
         ModelBundleQuery
             .newBuilder()
             .setObjectDescriptor(toObjectDescriptor(opts.locale))
-            .setQueryDescriptor(toQueryDescriptor(parseStatus).applyBundleOptions(opts))
+            .setQueryDescriptor(toQueryDescriptor(parseStatus, opts.locale).applyBundleOptions(opts))
             .setSourceLanguage(sourceLanguage.toProtoLanguage())
             .setSourceText(sourceText)
     for (param in parameters) {
