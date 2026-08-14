@@ -141,8 +141,35 @@ class OutgoingCallLoggingInterceptor : ClientInterceptor {
     }
 }
 
-/** Cap on a single logged payload — bounds large/streaming messages (e.g. ResultBatch arrow_ipc). */
-private const val MAX_PAYLOAD_CHARS = 4000
+/** Default cap on a single logged payload — bounds large/streaming messages (e.g. ResultBatch arrow_ipc). */
+internal const val DEFAULT_MAX_PAYLOAD_CHARS = 4000
+
+/**
+ * Resolve the payload cap, overridable per deployment with `GRPC_LOG_PAYLOAD_MAX_CHARS`.
+ *
+ * **Why an override exists (2026-08-14).** 4000 is right for the case it was written for — a
+ * `ResultBatch` carrying `arrow_ipc` would otherwise flood the log with megabytes of base64. It is
+ * wrong for the case that motivated turning DEBUG on in the first place: a resolver
+ * `ResolveResponse` runs to ~8 000 chars, and the cap lands **exactly** in the middle, keeping the
+ * parse (tokens, lemmas, feats) and cutting the `resolution { bindings … mentions … gaps }` block —
+ * the only part anyone reads a lattice dump for. Two live captures lost 4202 and 4705 chars each,
+ * and a truncated dump reads exactly like a short one unless you notice the ellipsis.
+ *
+ * Rejected alternatives, so nobody re-opens them: raising the constant (it protects a real case),
+ * and per-service constants (the cap is a property of the *deployment's* log budget, not of the
+ * code). An unparseable or non-positive value falls back to the default rather than failing a
+ * service at boot over a logging knob.
+ */
+internal fun payloadCapFrom(raw: String?): Int {
+    val parsed =
+        raw
+            ?.trim()
+            ?.toIntOrNull()
+            ?.takeIf { it > 0 }
+    return parsed ?: DEFAULT_MAX_PAYLOAD_CHARS
+}
+
+private val MAX_PAYLOAD_CHARS: Int = payloadCapFrom(System.getenv("GRPC_LOG_PAYLOAD_MAX_CHARS"))
 
 /**
  * Proto field names whose string value is a secret and must never reach a log sink
