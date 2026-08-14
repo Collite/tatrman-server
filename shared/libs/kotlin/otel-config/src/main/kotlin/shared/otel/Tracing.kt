@@ -19,8 +19,14 @@ import kotlinx.coroutines.withContext
  * the kotlin OTel extension's [asContextElement] — so any span created inside
  * [block] (including ones created by a different component that shares the same
  * [Tracer]/SDK and runs in this coroutine) nests underneath it. This is what
- * gives the in-process `run_query` chain a single, properly-nested trace; across
- * pods the same nesting is delivered by gRPC auto-instrumentation.
+ * gives the in-process `run_query` chain a single, properly-nested trace.
+ *
+ * ⚠ Corrected 2026-08-14: this used to add "across pods the same nesting is delivered by gRPC
+ * auto-instrumentation." **There was no such instrumentation anywhere in the fleet**, and the SDK
+ * carried no propagators either, so every hop opened a fresh trace. Cross-pod nesting now comes
+ * from `OtelPropagatingClientInterceptor` / `OtelContextServerInterceptor` in
+ * `shared.logging` — explicitly installed, per hop, on both sides. Only the golem → resolver hop
+ * has both halves so far.
  *
  * Records the exception and sets `ERROR` status on a thrown [Throwable], then
  * re-throws. Always ends the span. When the tracer comes from a `noop`

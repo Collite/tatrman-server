@@ -4,6 +4,7 @@ package org.tatrman.resolver.grpc
 import io.grpc.Status
 import io.grpc.StatusException
 import io.opentelemetry.api.OpenTelemetry
+import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.Tracer
 import org.slf4j.LoggerFactory
 import shared.otel.withSpan
@@ -44,18 +45,28 @@ class ResolverGrpcService(
     private val log = LoggerFactory.getLogger(javaClass)
     private val tracer: Tracer = openTelemetry.getTracer("org.tatrman.resolver")
 
-    override suspend fun resolve(request: ResolveRequest): ResolveResponse {
-        log.info("resolve conversation_id={}", request.conversationId)
-        // A rejected/expired/mismatched resume token is a caller error, not a server
-        // fault — map it to UNAUTHENTICATED carrying the RG-RES-002 reason instead of
-        // letting the throw surface as an opaque UNKNOWN (RG-P6 review J).
-        return try {
-            pipeline.resolve(request)
-        } catch (e: ResumeTokenException) {
-            log.info("resume token rejected conversation_id={}: {}", request.conversationId, e.reason)
-            throw StatusException(Status.UNAUTHENTICATED.withDescription(e.message).withCause(e))
+    /**
+     * TG-P0-F1 — a SERVER span, so the resolve hop is *visible* and not merely correlated.
+     *
+     * `Gate` has had one since RV-P2.4.T5 and `Resolve` never did, which mattered little while
+     * neither was emitted at all. Now that the caller's context arrives (the
+     * `OtelContextServerInterceptor` on the server), this span is what makes the turn's trace show
+     * where its time went — without it a reader sees golem's CLIENT span, a gap, and then whatever
+     * the resolver logged.
+     */
+    override suspend fun resolve(request: ResolveRequest): ResolveResponse =
+        tracer.withSpan("resolve.resolve", kind = SpanKind.SERVER) {
+            log.info("resolve conversation_id={}", request.conversationId)
+            // A rejected/expired/mismatched resume token is a caller error, not a server
+            // fault — map it to UNAUTHENTICATED carrying the RG-RES-002 reason instead of
+            // letting the throw surface as an opaque UNKNOWN (RG-P6 review J).
+            try {
+                pipeline.resolve(request)
+            } catch (e: ResumeTokenException) {
+                log.info("resume token rejected conversation_id={}: {}", request.conversationId, e.reason)
+                throw StatusException(Status.UNAUTHENTICATED.withDescription(e.message).withCause(e))
+            }
         }
-    }
 
     /**
      * RV-P2.4 — the re-gate sibling (Q-13 = B). Stateless: the caller carries the lattice.

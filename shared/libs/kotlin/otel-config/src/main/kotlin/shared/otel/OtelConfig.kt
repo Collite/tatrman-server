@@ -4,6 +4,8 @@ package shared.otel
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
+import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter
@@ -122,6 +124,19 @@ fun createOpenTelemetrySdk(
             .setTracerProvider(tracerProvider)
             .setMeterProvider(meterProvider)
             .setLoggerProvider(loggerProvider)
+            // ⚑ LOAD-BEARING, and absent until 2026-08-14. Without it `getPropagators()` returns a
+            // NoopTextMapPropagator, so anything asking this SDK to inject trace context injects
+            // NOTHING: spans are created, no `traceparent` reaches the wire, and every hop starts a
+            // fresh trace. It is invisible in review and shows up only as fragmented traces in
+            // Grafana — which is how it survived across the whole fleet.
+            //
+            // Kantheon worked around it by wrapping the returned SDK (`withW3CPropagators()`,
+            // duplicated in golem AND iris-bff), and that duplication's own KDoc named this file as
+            // the proper home: "which would also fix the tatrman-server half of the turn path, since
+            // those services use the same lib". This is that fix. The wrappers become redundant —
+            // harmlessly so, since wrapping a W3C SDK in W3C is idempotent — and can be deleted
+            // whenever kantheon next moves its pin.
+            .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
             .build()
 
     // Install the SDK into the Logback OpenTelemetryAppender so that SLF4J/Logback

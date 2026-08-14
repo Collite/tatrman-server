@@ -44,6 +44,7 @@ import shared.ktor.mcp.McpKtorConfig
 import shared.ktor.mcp.installMcpKtorBase
 import org.tatrman.resolver.telemetry.resolverTelemetry
 import shared.logging.IncomingCallLoggingInterceptor
+import shared.logging.OtelContextServerInterceptor
 import java.util.concurrent.TimeUnit
 
 private val log = LoggerFactory.getLogger("org.tatrman.resolver.Application")
@@ -123,6 +124,15 @@ fun Application.module(config: Config) {
             .permitKeepAliveWithoutCalls(true)
             .maxInboundMessageSize(maxMessageSize)
             .intercept(IncomingCallLoggingInterceptor())
+            // TG-P0-F1 — join the caller's trace instead of starting a fresh one. Extracts the
+            // W3C `traceparent` golem now injects and makes it current *inside the handler
+            // coroutine*, which is why it is a CoroutineContextServerInterceptor and not a plain
+            // one: a thread-local would be lost at the first suspension point. Two things follow
+            // from it — the resolver's spans hang under the turn, and the Logback appender stamps
+            // trace_id on every line the handler logs, so a turn's resolver logs are findable AS
+            // that turn. Ordering vs the logging interceptor does not matter; neither reads the
+            // other's state.
+            .intercept(OtelContextServerInterceptor(otel))
             .addService(resolverService)
             .apply { if (reflectionEnabled) addService(ProtoReflectionServiceV1.newInstance()) }
             .build()

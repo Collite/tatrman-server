@@ -36,10 +36,16 @@ dependencies {
     // service already declares these themselves.
     compileOnly(libs.grpc.kotlin.stub)
     compileOnly(libs.protobuf.java)
+    // W3C trace-context propagation over gRPC metadata (GrpcTracing.kt). `extension-kotlin`
+    // supplies Context.asContextElement() — the server half contributes the extracted context to
+    // the HANDLER's coroutine context, because a thread-local would not survive a suspension.
+    compileOnly(libs.opentelemetry.extension.kotlin)
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.wiremock)
     testImplementation(libs.mockk)
     testImplementation(libs.grpc.kotlin.stub)
     testImplementation(libs.protobuf.java)
+    testImplementation(libs.opentelemetry.extension.kotlin)
+    testImplementation(libs.opentelemetry.sdk)
 }
