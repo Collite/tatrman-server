@@ -32,6 +32,9 @@ import org.tatrman.ttr.lexicon.LexiconValidator
  * nothing is still a mention, and that is what makes G1 expressible at all.
  */
 object LatticeAssembler {
+    /** The only kernel the rung is wired to today; see [GroundingRung]. */
+    private const val CHRONO_KERNEL = "chrono"
+
     fun assemble(
         parse: AnalyzeResponse,
         gate: GateOutcome,
@@ -47,6 +50,10 @@ object LatticeAssembler {
         // for an estate that ships no grounding vocabulary, which is every estate until the P3
         // delivery chain lands, and the lattice is then exactly what P2.1 emitted.
         triggers: Map<Pair<Int, Int>, List<Binding>> = emptyMap(),
+        // ✅ R1 — what a grounding KERNEL made of each span, keyed the same way `triggers` is.
+        // Computed upstream (ResolverPipeline) because it costs an RPC and this object is pure;
+        // empty whenever the rung is off, which leaves the lattice exactly as P2.1 emitted it.
+        grounded: Map<Pair<Int, Int>, GroundingRung.Grounded> = emptyMap(),
     ): ResolutionState {
         val gatedByLayer =
             gate.gated.groupBy { layerOf(it, hasTrigger = (it.candidate.start to it.candidate.end) in triggers) }
@@ -124,17 +131,34 @@ object LatticeAssembler {
         val groundedValues =
             universals.map { universal ->
                 val anchor = triggerAnchorOf(universal, parse, triggerByHead)
+                val kernelResult = grounded[universal.start to universal.end]
                 val grounding =
                     Grounding
                         .newBuilder()
-                        .setKernel(universal.sourceEngine)
+                        // A kernel that answered SPEAKS for the span: `Grounding.kernel` is
+                        // documented as "chrono | money | geo | the NER engine that typed it",
+                        // and the NER engine is the fallback, not the winner.
+                        .setKernel(if (kernelResult != null) CHRONO_KERNEL else universal.sourceEngine)
                         .setKind(universal.entityType.name)
-                        .setNormalizedValue(universal.normalizedValue)
+                        // The kernel's interval REPLACES the NER engine's normalization when it
+                        // has one. stanza says `2025`; chrono says `2025-01-01/2026-01-01`, which
+                        // is the only one of the two a half-open filter can be built from.
+                        .setNormalizedValue(
+                            kernelResult?.normalizedValue?.ifBlank { null } ?: universal.normalizedValue,
+                        )
                 val builder =
                     ValueFinding
                         .newBuilder()
                         .setSpan(span(universal.start, universal.end, universal.text))
                         .setKind(ValueKind.VALUE_KIND_GROUNDED)
+                // The anchor column, as an attribution. This is the fact the composer reads to
+                // turn a grounded value into a filter — and the reason it is an ATTRIBUTION and
+                // not a new field is that "this literal could be a value of THAT attribute" is
+                // exactly what an attribution already means. No binding rides with it: the value
+                // is not a member of the attribute, it is a range over it.
+                kernelResult?.anchorAttributeRef?.takeIf { it.isNotBlank() }?.let { ref ->
+                    builder.addAttributions(Attribution.newBuilder().setAttributeRef(ref))
+                }
                 // Only when the two independent statements AGREE: the universal layer says what
                 // kind of thing this is, the trigger says which kernel claimed the words beside it.
                 if (anchor != null && GroundingTriggers.kernelOf(universal.entityType) == anchor.kind) {
