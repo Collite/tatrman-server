@@ -8,6 +8,7 @@ import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.nlp.v1.NlpOp
 import org.tatrman.nlp.v1.StatusResponse
 import org.tatrman.resolver.client.FuzzyClient
+import org.tatrman.resolver.client.GroundingClient
 import org.tatrman.resolver.client.NlpClient
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverRegistry
@@ -36,9 +37,16 @@ import org.tatrman.resolver.v1.Universal
 /**
  * The deterministic resolver pipeline (RG-P5): parse → extractUniversal →
  * proposeDomainSpans (anchored, Q-20) → gateSpans (one BatchMatch) → assemble a
- * `Resolution | AwaitingClarification`. ZERO LLM — the only upstreams are nlp
- * (parse + capability matrix) and lex-matcher (vocabulary match), neither an LLM;
- * NoLlmDependencyTest guards the module.
+ * `Resolution | AwaitingClarification`. ZERO LLM in this module — `NoLlmDependencyTest` guards
+ * the classpath.
+ *
+ * ⚑ **Upstreams are THREE since R1 (ruled 2026-08-28), not two.** This sentence used to read
+ * "the only upstreams are nlp and lex-matcher"; the grounding kernel ([GroundingRung]) is the
+ * third, and it is OFF by default. The distinction the old wording was really making still
+ * holds — none of the three is an LLM client of this module — but a kernel may itself be
+ * configured with an LLM fallback, so "no LLM anywhere behind this call" is a deployment
+ * property (hartland: `CHRONO_LLM_FALLBACK_ENABLED=false`), not something a classpath test can
+ * promise. Stated rather than quietly outgrown.
  *
  * S2 additions: the registry is snapshot-fed ([registry], RS-24) with the caller's
  * per-request `Registry` override winning; a clarification is offered under a
@@ -62,6 +70,10 @@ class ResolverPipeline(
     // wall-clock, and a test that races a real one is a test that flakes) or switch the rung off
     // entirely, which is what an estate with no lexicon to narrow against effectively has.
     private val lookupRounds: LookupRounds = LookupRounds(fuzzy),
+    // ✅ R1 — the grounding kernel, and the estate to ask it about. Null client = rung off, which
+    // is the default everywhere: it adds an upstream to a hot path, so it is opted into.
+    private val grounding: GroundingClient? = null,
+    private val defaultPackage: String = "",
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -165,6 +177,24 @@ class ResolverPipeline(
                 thresholds = resolverRegistry.thresholds,
                 snapshotHash = resolverRegistry.snapshotHash,
             )
+        // ✅ R1 — ground the time-typed universals ONCE, before the lattice is assembled, and
+        // reuse the result across every re-assembly the lookup loop performs below. Doing it here
+        // rather than inside LatticeAssembler keeps that object pure and keeps the RPC count at
+        // "once per resolve" instead of "once per narrowing round".
+        val groundedSpans =
+            grounding
+                ?.let {
+                    GroundingRung.ground(
+                        client = it,
+                        universals = universals,
+                        questionText = fresh.text,
+                        // The caller's package wins; config is the single-estate fallback (D1).
+                        pkg = request.context.`package`.ifBlank { defaultPackage },
+                        referenceDatetime = request.context.referenceDatetime,
+                        locale = locale,
+                    )
+                }.orEmpty()
+
         // The lattice (RV-P2.1) is annotation, not outcome: it is emitted the same way whether
         // the gate bound everything or is asking a question, because what the core UNDERSTOOD
         // does not change with what it decided.
@@ -188,6 +218,7 @@ class ResolverPipeline(
                 preps = preps,
                 degraded = assessment.degradedFloor,
                 triggers = triggers,
+                grounded = groundedSpans,
             )
         }
 

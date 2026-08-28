@@ -24,6 +24,7 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.tatrman.mcp.identity.IdentityPolicy
 import org.tatrman.mcp.identity.RequestContext
+import org.tatrman.resolver.client.GrpcGroundingClient
 import org.tatrman.resolver.client.GrpcFuzzyClient
 import org.tatrman.resolver.client.GrpcNlpClient
 import org.tatrman.resolver.grpc.ResolverGrpcService
@@ -72,8 +73,9 @@ fun Application.module(config: Config) {
     val reflectionEnabled =
         config.hasPath("grpc.reflection-enabled") && config.getBoolean("grpc.reflection-enabled")
 
-    // Upstream clients — nlp (parse + capability matrix) and lex-matcher
-    // (vocabulary match). NEITHER is an LLM (RS-23).
+    // Upstream clients — nlp (parse + capability matrix), lex-matcher (vocabulary match) and,
+    // when the estate opts in, a grounding kernel (R1). NONE is an LLM client of this service
+    // (RS-23); see ResolverPipeline's KDoc for why the kernel needs that sentence qualified.
     val nlpClient =
         GrpcNlpClient(config.getString("nlp.host"), config.getInt("nlp.port"), config.getLong("nlp.deadline-seconds"))
     val fuzzyClient =
@@ -82,6 +84,47 @@ fun Application.module(config: Config) {
             config.getInt("fuzzy.port"),
             config.getLong("fuzzy.deadline-seconds"),
         )
+
+    // ✅ R1 (Bora, 2026-08-28) — the grounding rung, off unless the estate says otherwise.
+    // Built here rather than lazily so an unreachable kernel is a BOOT-time log line and not a
+    // surprise on the first dated question; the channel itself connects lazily, so this does not
+    // make the kernel a startup dependency.
+    val groundingEnabled = config.getBoolean("resolver.grounding.enabled")
+    val resolverPackage = config.getString("resolver.package").trim()
+    val groundingClient =
+        if (!groundingEnabled) {
+            null
+        } else {
+            if (resolverPackage.isEmpty()) {
+                // Not fatal: `ResolveContext.package` may still supply it per request, and a
+                // multi-estate deployment would legitimately leave this blank. Said out loud
+                // because the single-estate case is the common one and its failure is silent —
+                // the rung simply never runs and dated questions keep getting refused.
+                log.warn(
+                    "resolver.grounding.enabled=true but resolver.package is unset — grounding will " +
+                        "only run for callers that set ResolveContext.package. Set RESOLVER_PACKAGE " +
+                        "to the estate's metadata package for a single-estate deployment.",
+                )
+            }
+            GrpcGroundingClient(
+                config.getString("resolver.grounding.chrono-host"),
+                config.getInt("resolver.grounding.chrono-port"),
+                config.getLong("resolver.grounding.deadline-seconds"),
+            ).also {
+                log.info(
+                    "grounding rung ENABLED — chrono at {}:{}, package={}",
+                    config.getString("resolver.grounding.chrono-host"),
+                    config.getInt("resolver.grounding.chrono-port"),
+                    resolverPackage.ifBlank { "<per-request>" },
+                )
+            }
+        }
+    if (!groundingEnabled) {
+        log.info(
+            "grounding rung disabled (resolver.grounding.enabled=false) — grounded values carry no " +
+                "anchor column, so a question whose only restriction is a date will be refused by the door",
+        )
+    }
 
     val defaultThresholds =
         ResolverThresholds(
@@ -149,6 +192,8 @@ fun Application.module(config: Config) {
             tokenCodec = tokenCodec,
             preps = FrameRolePreps.load(config),
             lookupRounds = LookupRounds(fuzzyClient, lookupRoundConfig),
+            grounding = groundingClient,
+            defaultPackage = resolverPackage,
         )
     val resolverService = ResolverGrpcService(pipeline, otel)
 

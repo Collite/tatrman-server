@@ -97,7 +97,8 @@ dependencies {
     implementation(libs.micrometer.registry.prometheus)
 
     // gRPC — :shared:proto generates the ResolverService coroutine base + the
-    // FuzzyService / NlpService client stubs the deterministic core calls.
+    // FuzzyService / NlpService / GroundingService client stubs the deterministic core calls.
+    // The grounding stub needs no new coordinate: one proto module, all three contracts.
     implementation(project(":shared:proto"))
     implementation(libs.grpc.kotlin.stub)
     implementation(libs.grpc.netty.shaded)

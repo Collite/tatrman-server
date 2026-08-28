@@ -109,6 +109,13 @@ message ResumeAnswer {
 message ResolveContext {
   string reference_datetime = 1;  // ISO-8601; grounding anchor
   string tenant = 2;
+  // The metadata package the question is asked against — the scope a grounding kernel
+  // discovers its period table and anchor column in (grounding.v1 GroundRequest.package).
+  // It sits beside `reference_datetime` because they are the two halves of the same thing:
+  // the CALLER knows which estate it is asking about and when "now" is; the resolver can
+  // derive neither. Empty is legal and means "use the resolver's configured default"
+  // (`resolver.package`), which is what a single-estate deployment will do.
+  string package = 3;
 }
 
 // Caller-supplied registry override (RS-24). When absent the snapshot-fed

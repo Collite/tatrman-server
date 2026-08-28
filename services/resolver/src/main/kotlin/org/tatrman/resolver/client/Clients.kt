@@ -10,6 +10,11 @@ import org.tatrman.fuzzy.v1.FuzzyStatusRequest
 import org.tatrman.fuzzy.v1.FuzzyStatusResponse
 import org.tatrman.fuzzy.v1.LookupRequest
 import org.tatrman.fuzzy.v1.LookupResponse
+import org.tatrman.grounding.v1.GetStatusRequest as GroundingStatusRequest
+import org.tatrman.grounding.v1.GetStatusResponse as GroundingStatusResponse
+import org.tatrman.grounding.v1.GroundRequest
+import org.tatrman.grounding.v1.GroundResponse
+import org.tatrman.grounding.v1.GroundingServiceGrpcKt
 import org.tatrman.nlp.v1.AnalyzeRequest
 import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.nlp.v1.NlpServiceGrpcKt
@@ -19,10 +24,20 @@ import shared.logging.OutgoingCallLoggingInterceptor
 import java.util.concurrent.TimeUnit
 
 /**
- * The two upstream contracts the deterministic core consumes. Interfaces (not
- * concrete stubs) so the pipeline is testable with fakes — the Q-20 corpora feed
- * the pipeline through these seams without a live nlp/fuzzy. NEITHER is an LLM;
- * NoLlmDependencyTest guards the module boundary.
+ * The upstream contracts the deterministic core consumes. Interfaces (not concrete stubs) so
+ * the pipeline is testable with fakes — the Q-20 corpora feed the pipeline through these seams
+ * without a live nlp/fuzzy. NONE is an LLM; NoLlmDependencyTest guards the module boundary.
+ *
+ * ⚑ **There are three now, and that is a deliberate change** (R1, ruled 2026-08-28). This KDoc
+ * used to say "the only upstreams are nlp and lex-matcher" — an invariant worth updating
+ * explicitly rather than quietly outgrowing. [GroundingClient] is the third, and it is the one
+ * that carries the interesting caveat: a grounding kernel MAY be configured with an LLM
+ * fallback of its own. The non-LLM guarantee this module makes is therefore about the resolver's
+ * own dependencies, which `NoLlmDependencyTest` still checks; it is not a claim about what a
+ * kernel does behind its wire. Estates that need the stronger guarantee run their kernels with
+ * the fallback off (hartland does: `CHRONO_LLM_FALLBACK_ENABLED=false`), and that is a
+ * DEPLOYMENT fact, not a code one — so it is stated here rather than asserted in a test that
+ * could not see it anyway.
  */
 interface NlpClient {
     suspend fun analyze(request: AnalyzeRequest): AnalyzeResponse
@@ -52,6 +67,43 @@ interface FuzzyClient {
 
     /** Category discovery + staleness (S2: registry snapshot echo). */
     suspend fun getStatus(): FuzzyStatusResponse
+}
+
+/**
+ * A deterministic grounding kernel (chrono | money | geo — they share one contract).
+ *
+ * The resolver asks exactly one question of it: *"what interval/point/amount is this span, and
+ * which column would restrict by it?"* — [org.tatrman.grounding.v1.FilterRecipe.getAnchorColumn]
+ * is the half the lattice cannot obtain any other way, because it is discovered from `meta.v1`
+ * semantic roles and the resolver has no metadata client.
+ *
+ * Optional by construction: absent grounding, the lattice is exactly what it was before, which
+ * is why the whole rung is off by default (`resolver.grounding.enabled`).
+ */
+interface GroundingClient {
+    suspend fun ground(request: GroundRequest): GroundResponse
+
+    suspend fun getStatus(): GroundingStatusResponse
+}
+
+class GrpcGroundingClient(
+    host: String,
+    port: Int,
+    private val deadlineSeconds: Long = 10,
+) : GroundingClient,
+    AutoCloseable {
+    private val channel: ManagedChannel = openChannel(host, port)
+    private val stub = GroundingServiceGrpcKt.GroundingServiceCoroutineStub(channel)
+
+    override suspend fun ground(request: GroundRequest): GroundResponse =
+        stub.withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS).ground(request)
+
+    override suspend fun getStatus(): GroundingStatusResponse =
+        stub.withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS).getStatus(GroundingStatusRequest.getDefaultInstance())
+
+    override fun close() {
+        channel.shutdown().awaitTermination(5, TimeUnit.SECONDS)
+    }
 }
 
 class GrpcNlpClient(
