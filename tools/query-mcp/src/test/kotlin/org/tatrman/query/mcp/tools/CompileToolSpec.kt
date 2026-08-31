@@ -1,20 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.query.mcp.tools
 
-import org.tatrman.common.v1.ResponseMessage
-import org.tatrman.common.v1.Severity
-import org.tatrman.plan.v1.PipelineContext
-import org.tatrman.plan.v1.PlanNode
-import org.tatrman.translate.v1.ParseRequest
-import org.tatrman.translate.v1.ParseResponse
-import org.tatrman.translate.v1.TranslateRequest
-import org.tatrman.translate.v1.TranslateResponse
-import org.tatrman.translate.v1.UnparseRequest
-import org.tatrman.translate.v1.UnparseResponse
-import org.tatrman.validate.v1.ValidateRequest
-import org.tatrman.validate.v1.ValidateResponse
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequestParams
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
@@ -23,11 +13,25 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import org.tatrman.query.mcp.QueryMcpConfig
+import org.tatrman.common.v1.ResponseMessage
+import org.tatrman.common.v1.Severity
 import org.tatrman.mcp.identity.IdentitySource
 import org.tatrman.mcp.identity.UserIdentity
+import org.tatrman.plan.v1.PipelineContext
+import org.tatrman.plan.v1.PlanNode
+import org.tatrman.plan.v1.QualifiedName
+import org.tatrman.plan.v1.TableScanNode
+import org.tatrman.query.mcp.QueryMcpConfig
 import org.tatrman.query.mcp.upstream.TranslatorClient
 import org.tatrman.query.mcp.upstream.ValidatorClient
+import org.tatrman.translate.v1.ParseRequest
+import org.tatrman.translate.v1.ParseResponse
+import org.tatrman.translate.v1.TranslateRequest
+import org.tatrman.translate.v1.TranslateResponse
+import org.tatrman.translate.v1.UnparseRequest
+import org.tatrman.translate.v1.UnparseResponse
+import org.tatrman.validate.v1.ValidateRequest
+import org.tatrman.validate.v1.ValidateResponse
 
 class CompileToolSpec :
     StringSpec({
@@ -75,6 +79,27 @@ class CompileToolSpec :
             }
 
         val plan = PlanNode.getDefaultInstance()
+
+        fun validated(req: ValidateRequest): ValidateResponse =
+            ValidateResponse
+                .newBuilder()
+                .setPlan(req.plan)
+                .setContext(req.context)
+                .build()
+
+        fun compileRequest(): CallToolRequest =
+            CallToolRequest(
+                params =
+                    CallToolRequestParams(
+                        name = "compile",
+                        arguments =
+                            buildJsonObject {
+                                put("source", JsonPrimitive("SELECT * FROM Customers"))
+                                put("source_language", JsonPrimitive("sql"))
+                                put("target_dialect", JsonPrimitive("mssql"))
+                            },
+                    ),
+            )
 
         "happy path with apply_security=true: parse → validate → unparse" {
             var parsed = false
@@ -130,6 +155,76 @@ class CompileToolSpec :
             ((res.structuredContent!!["compiledSql"] as JsonPrimitive).content) shouldBe
                 "SELECT * FROM Customers WHERE tenantId = 'X'"
             ((res.structuredContent!!["appliedSecurity"] as JsonPrimitive).content) shouldBe "true"
+        }
+
+        // The plan CompileResponse has always carried, now surfaced. A caller that wants to show
+        // what it is about to run had only the SQL — the compiled form, after the plan had been
+        // unparsed away.
+        "compile returns the plan as text" {
+            val scanPlan =
+                PlanNode
+                    .newBuilder()
+                    .setTableScan(TableScanNode.newBuilder().setTable(QualifiedName.newBuilder().setName("Customers")))
+                    .build()
+            val translator =
+                fakeTranslator(
+                    parseImpl = {
+                        ParseResponse
+                            .newBuilder()
+                            .setPlan(scanPlan)
+                            .setContext(PipelineContext.getDefaultInstance())
+                            .build()
+                    },
+                )
+            val tool = CompileTool(cfg, translator, fakeValidator { req -> validated(req) })
+            val res = runBlocking { tool.execute(compileRequest(), identity = null) }
+
+            val text = (res.structuredContent!!["relPlanText"] as JsonPrimitive).content
+            // Proto text format, so PROTO field names — `table_scan`, not `tableScan`. The tree
+            // is rendered indented, which is what makes it readable without a bespoke printer.
+            text shouldContain "table_scan {"
+            text shouldContain "Customers"
+        }
+
+        // ⚑ The assertion that makes the field trustworthy. The validator injects row-level
+        // predicates, so the plan it returns is the one that RUNS. Publishing the pre-validator
+        // plan would show a reader a materially different query and present it as the real one.
+        "the plan returned is the one AFTER the validator, not after the parse" {
+            val parsedPlan =
+                PlanNode
+                    .newBuilder()
+                    .setTableScan(TableScanNode.newBuilder().setTable(QualifiedName.newBuilder().setName("BeforeRls")))
+                    .build()
+            val securedPlan =
+                PlanNode
+                    .newBuilder()
+                    .setTableScan(TableScanNode.newBuilder().setTable(QualifiedName.newBuilder().setName("AfterRls")))
+                    .build()
+            val translator =
+                fakeTranslator(
+                    parseImpl = {
+                        ParseResponse
+                            .newBuilder()
+                            .setPlan(parsedPlan)
+                            .setContext(PipelineContext.getDefaultInstance())
+                            .build()
+                    },
+                )
+            // A validator that REWRITES the plan, the way security injection does.
+            val validator =
+                fakeValidator { req ->
+                    ValidateResponse
+                        .newBuilder()
+                        .setPlan(securedPlan)
+                        .setContext(req.context)
+                        .build()
+                }
+            val tool = CompileTool(cfg, translator, validator)
+            val res = runBlocking { tool.execute(compileRequest(), identity = null) }
+
+            val text = (res.structuredContent!!["relPlanText"] as JsonPrimitive).content
+            text shouldContain "AfterRls"
+            text shouldNotContain "BeforeRls"
         }
 
         "apply_security=false + admin: skips validator" {
