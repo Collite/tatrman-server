@@ -16,6 +16,19 @@ enum class ChronoKind {
 
     /** A whole fiscal year ("fiscal year 2026", "fiskální rok 2026"). */
     FISCAL_YEAR,
+
+    /**
+     * A bare calendar year ("2025", "v roce 2025") — January 1st through December 31st, with no
+     * fiscal adjective and no month.
+     *
+     * Deliberately NOT folded into one of the four above. It is not [ABSOLUTE] (that is a single
+     * day), not [RELATIVE] (it names the year outright rather than leaning on the reference), not
+     * [PERIOD] (which means an *accounting* period and carries a `periodCode`; a calendar year has
+     * none and must not be routed through the period table), and not [FISCAL_YEAR] (whose whole
+     * point is that the estate's fiscal year may not start in January). Reusing any of them would
+     * have made the recipe builder pick the wrong shape — see its `kind == PERIOD` branch.
+     */
+    CALENDAR_YEAR,
 }
 
 /**

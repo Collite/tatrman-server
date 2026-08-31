@@ -26,6 +26,13 @@ class DateRecognizer {
          * still above chrono's 0.6 clarification floor — the estate declared the word.
          */
         const val TRIGGERED_SCOPELESS_CONFIDENCE = 0.8
+
+        /**
+         * The range a four-digit run has to fall in to be read as a year. Mirrors the guard
+         * `periodCode` already applies to its own `yyyy` half, so the two entry points cannot
+         * disagree about what counts as a plausible year.
+         */
+        val PLAUSIBLE_YEARS = 1900..2999
     }
 
     /**
@@ -53,6 +60,7 @@ class DateRecognizer {
                 ?: numericDate(n, reference)
                 ?: namedMonthDate(n, reference)
                 ?: relative(n, reference, triggered)
+                ?: calendarYear(n)
                 ?: return null
         return if (target != null) base.copy(target = target) else base
     }
@@ -145,7 +153,7 @@ class DateRecognizer {
         val code = m.groupValues[1]
         val year = code.substring(0, 4).toInt()
         val month = code.substring(4, 6).toInt()
-        if (month !in 1..12 || year !in 1900..2999) return null
+        if (month !in 1..12 || year !in PLAUSIBLE_YEARS) return null
         val explicit = hasAny(n, "period", "obdobi")
         // A bare 6-digit run is ambiguous with document/order ids ("doklad 200312", "objednávka
         // 202612"). Only read it as an accounting period when the span says so ("period"/"období") or
@@ -232,6 +240,37 @@ class DateRecognizer {
         month: Int,
         confidence: Double,
     ): ChronoRecognition = monthInterval(year, month, ChronoKind.PERIOD, confidence, "%04d%02d".format(year, month))
+
+    // ----- bare calendar year: "2025" -----
+
+    /**
+     * A span that is nothing but a four-digit year.
+     *
+     * **Last in the chain, and that placement is the rule.** Every other recognizer describes a
+     * year more specifically than this one does, and each would be shadowed if this ran earlier:
+     * `fiscalYear` ("fiscal year 2025"), `periodCode` ("202505"), `isoDate` ("2025-03-15"),
+     * `numericDate` ("15.3.2025"), `namedMonthDate` ("May 2025") and `relative` ("last year") all
+     * contain or imply a four-digit run. Running last means this fires only on what nothing else
+     * claimed.
+     *
+     * Before this existed a bare "2025" reached the end of the chain and returned null — chrono
+     * answered UNGROUNDABLE, the resolver produced an interval-less value, and the door refused
+     * the question for want of a column. `yearRe` was present but reachable only from inside
+     * [namedMonthDate], behind its `Months.find` guard, so it never saw a span without a month.
+     *
+     * The year must be the span's ONLY digit run. A second number means the span is some other
+     * construct that the recognizers above declined to claim, and guessing a year out of it would
+     * be inventing a filter the user never asked for.
+     */
+    private fun calendarYear(n: String): ChronoRecognition? {
+        val digitRuns = Regex("""\d+""").findAll(n).map { it.value }.toList()
+        val only = digitRuns.singleOrNull() ?: return null
+        val y = only.takeIf { it.length == 4 }?.toIntOrNull() ?: return null
+        if (y !in PLAUSIBLE_YEARS) return null
+        // Explicit and unambiguous — the user named the year. Held just below `fiscalYear`'s 0.95:
+        // that span also said the WORD "year", where this one is inferred from shape alone.
+        return yearInterval(y, ChronoKind.CALENDAR_YEAR, 0.9)
+    }
 
     // ----- relative: today/yesterday/tomorrow · this/last week/month/year · last N days/months -----
 
