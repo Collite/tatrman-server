@@ -30,6 +30,7 @@ import org.tatrman.query.mcp.mcp.McpTool
 import org.tatrman.query.mcp.mcp.PipelineWarnings
 import org.tatrman.query.mcp.mcp.boolFieldOr
 import org.tatrman.query.mcp.mcp.buildErrorResult
+import com.google.protobuf.TextFormat
 import org.tatrman.query.mcp.mcp.messagesArray
 import org.tatrman.query.mcp.mcp.objectFieldOrEmpty
 import org.tatrman.query.mcp.mcp.stringFieldOrNull
@@ -246,6 +247,23 @@ class CompileTool(
                 put("compiledSql", JsonPrimitive(sql))
                 put("targetDialect", JsonPrimitive(targetDialectStr.lowercase()))
                 put("appliedSecurity", JsonPrimitive(applySecurity))
+                // The plan itself, as text. `CompileResponse` has carried the PlanNode all
+                // along; this tool simply never surfaced it, so a caller wanting to show what
+                // it was about to run had only the SQL — the compiled form, after the plan had
+                // been unparsed away.
+                //
+                // ⚑ This is `planForUnparse`: the plan AFTER the validator, which is the one
+                // that runs. Rendering `planAfterParse` would show a reader a plan without the
+                // row-level predicates the estate injected — a materially different query
+                // presented as the real one.
+                //
+                // Proto TEXT FORMAT rather than a bespoke pretty-printer. PlanNode is a oneof of
+                // thirteen node types with nested inputs; a hand-written renderer would have to
+                // grow a case per node and would silently omit any it had not been taught,
+                // which for a plan display is the one failure that matters. Text format renders
+                // the tree indented, cannot omit a field, and needs no maintenance when a node
+                // is added. It is the wire form, and it is named as such.
+                put("relPlanText", JsonPrimitive(TextFormat.printer().printToString(planForUnparse)))
                 put(
                     "parameterPlan",
                     buildJsonArray {
