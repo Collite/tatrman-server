@@ -6,6 +6,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.coroutines.runBlocking
 import org.tatrman.grounding.v1.DateTimeInterval
 import org.tatrman.grounding.v1.FilterRecipe
@@ -74,7 +75,11 @@ private fun erColumn(
     .newBuilder()
     .setPackage("hartland")
     .setSchemaCode(SchemaCode.ER)
-    .setNamespace(entity)
+    // ⛑ `entity.` prefix INCLUDED, because that is what veles emits. This fake used to set a
+    // bare `date_dim`, which is the assumption the code was written from rather than the shape
+    // the wire carries — so the test confirmed the code against itself and the doubled-segment
+    // ref (`er.entity.entity.date_dim.cal_date`) reached hartland.
+    .setNamespace("entity.$entity")
     .setName(attribute)
     .build()
 
@@ -118,6 +123,55 @@ class GroundingRungTest :
                 g.intervalEndExclusive shouldBe "2026-01-01"
             }
             g.normalizedValue shouldBe "2025-01-01/2026-01-01"
+        }
+
+        // The live regression (hartland, 2026-08-31). veles hands back
+        // `namespace = "entity.date_dim"`, and the ref used to be built as
+        // "er.entity.${namespace}.${name}" — one `entity.` too many. Golem read the extra
+        // segment as a second entity, found no relation to it, and refused a question it had
+        // otherwise resolved perfectly. Asserted on the RAW QualifiedName rather than through
+        // the `erColumn` helper, so a future edit to that helper cannot quietly restate the bug.
+        "the anchor ref is built from the wire's namespace, not by re-prefixing it" {
+            val fromVeles =
+                QualifiedName
+                    .newBuilder()
+                    .setPackage("hartland")
+                    .setSchemaCode(SchemaCode.ER)
+                    .setNamespace("entity.date_dim")
+                    .setName("cal_date")
+                    .build()
+            val kernel = FakeKernel { okWith("2025-01-01", "2026-01-01", fromVeles) }
+            val g =
+                runBlocking {
+                    GroundingRung.ground(kernel, listOf(date("2025", 0, 4)), "q", "hartland", "")
+                }.getValue(0 to 4)
+            g.anchorAttributeRef shouldBe "er.entity.date_dim.cal_date"
+            withClue("the doubled segment is the exact regression") {
+                g.anchorAttributeRef shouldNotContain "entity.entity"
+            }
+        }
+
+        // The other half of the guard: an unknown namespace shape degrades to unanchored rather
+        // than emitting a ref that names an entity nobody declared. A refusal for want of a
+        // column is debuggable; a refusal for want of a relation to a phantom entity is not.
+        "a namespace that is not entity.<entity> yields no ref at all" {
+            val odd =
+                QualifiedName
+                    .newBuilder()
+                    .setPackage("hartland")
+                    .setSchemaCode(SchemaCode.ER)
+                    .setNamespace("date_dim")
+                    .setName("cal_date")
+                    .build()
+            val kernel = FakeKernel { okWith("2025-01-01", "2026-01-01", odd) }
+            val g =
+                runBlocking {
+                    GroundingRung.ground(kernel, listOf(date("2025", 0, 4)), "q", "hartland", "")
+                }.getValue(0 to 4)
+            g.anchorAttributeRef shouldBe ""
+            withClue("the interval still survives — only the column is missing") {
+                g.intervalStart shouldBe "2025-01-01"
+            }
         }
 
         "the request carries what the kernel cannot read for itself" {

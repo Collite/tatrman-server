@@ -47,6 +47,9 @@ import org.tatrman.resolver.v1.UniversalEntityType
 object GroundingRung {
     private val log = LoggerFactory.getLogger(GroundingRung::class.java)
 
+    /** The segment an ER attribute's `QualifiedName.namespace` opens with: `entity.<entity>`. */
+    private const val ENTITY_SEGMENT = "entity."
+
     /**
      * What a kernel added to one span: the interval, and the attribute to apply it to.
      *
@@ -170,10 +173,19 @@ object GroundingRung {
     /**
      * chrono's anchor column → this repo's attribute ref.
      *
-     * An attribute's `QualifiedName` is `{package, schema_code, namespace = <entity>, name =
-     * <attribute>}` — `MetaV1SemanticDiscovery.columnRef` reads `qualifiedName.namespace` as the
-     * entity name, which is what pins the shape. The resolver's ref grammar for the same thing is
-     * `er.entity.<entity>.<attribute>` (`TransDslRenderer.address`).
+     * An attribute's `QualifiedName` is `{package, schema_code, namespace = "entity.<entity>",
+     * name = <attribute>}` — the namespace ALREADY carries the `entity.` segment, exactly as
+     * `JoinRecipe.entity`'s `cnc/ER/entity/AccountingPeriod` does one level up. The resolver's
+     * ref grammar is `er.entity.<entity>.<attribute>` (`TransDslRenderer.address`), so the ref
+     * is `er.` + namespace + `.` + name, with nothing inserted between.
+     *
+     * ⛑ This read `"er.entity.\${q.namespace}.\${q.name}"` and shipped, because the unit test's
+     * fake set `namespace = "date_dim"` — the assumption the code was written from, restated as
+     * the input that would confirm it. Against veles it produced
+     * `er.entity.entity.date_dim.cal_date`; golem parsed the doubled segment as a SECOND entity,
+     * found no relation between `er.entity.date_dim` and `er.entity.entity`, and refused the
+     * question rather than joining on a guess. The refusal was correct and the ref was not. A
+     * fake that states the shape under test proves only that the code is self-consistent.
      *
      * ⚑ **ER only.** A `DB`-coded anchor names a physical column, and an attribution is a
      * statement about the MODEL — mapping one to the other here would be inventing the er2db
@@ -192,6 +204,20 @@ object GroundingRung {
             return ""
         }
         if (q.namespace.isBlank() || q.name.isBlank()) return ""
-        return "er.entity.${q.namespace}.${q.name}"
+        // The namespace must already be `entity.<entity>`. Anything else is a shape this
+        // function does not know how to render, and emitting a ref anyway is what caused the
+        // bug above: golem cannot tell a malformed ref from a real entity it has never heard
+        // of, so it reports a missing RELATION and the actual fault stays invisible. Blank
+        // degrades to "grounded but unanchored", which refuses honestly.
+        if (!q.namespace.startsWith(ENTITY_SEGMENT)) {
+            log.warn(
+                "grounding: anchor column namespace '{}' is not '{}<entity>' — the interval is " +
+                    "not applied, because a ref built from it would name an entity that does not exist",
+                q.namespace,
+                ENTITY_SEGMENT,
+            )
+            return ""
+        }
+        return "er.${q.namespace}.${q.name}"
     }
 }
