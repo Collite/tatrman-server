@@ -75,12 +75,13 @@ private fun erColumn(
     .newBuilder()
     .setPackage("hartland")
     .setSchemaCode(SchemaCode.ER)
-    // ⛑ `entity.` prefix INCLUDED, because that is what veles emits. This fake used to set a
-    // bare `date_dim`, which is the assumption the code was written from rather than the shape
-    // the wire carries — so the test confirmed the code against itself and the doubled-segment
-    // ref (`er.entity.entity.date_dim.cal_date`) reached hartland.
-    .setNamespace("entity.$entity")
-    .setName(attribute)
+    // ⛑ The wire shape, quoted from a live hartland exchange rather than inferred:
+    //     anchor_column { schema_code: ER namespace: "entity" name: "date_dim.cal_date" }
+    // The ENTITY is the first half of `name`; the namespace is the bare object class. Two
+    // earlier versions of this fake guessed otherwise (`date_dim`, then `entity.date_dim`) and
+    // each time the suite passed while hartland refused the question.
+    .setNamespace("entity")
+    .setName("$entity.$attribute")
     .build()
 
 private class FakeKernel(
@@ -137,8 +138,8 @@ class GroundingRungTest :
                     .newBuilder()
                     .setPackage("hartland")
                     .setSchemaCode(SchemaCode.ER)
-                    .setNamespace("entity.date_dim")
-                    .setName("cal_date")
+                    .setNamespace("entity")
+                    .setName("date_dim.cal_date")
                     .build()
             val kernel = FakeKernel { okWith("2025-01-01", "2026-01-01", fromVeles) }
             val g =
@@ -154,13 +155,13 @@ class GroundingRungTest :
         // The other half of the guard: an unknown namespace shape degrades to unanchored rather
         // than emitting a ref that names an entity nobody declared. A refusal for want of a
         // column is debuggable; a refusal for want of a relation to a phantom entity is not.
-        "a namespace that is not entity.<entity> yields no ref at all" {
+        "a name missing its entity half yields no ref at all" {
             val odd =
                 QualifiedName
                     .newBuilder()
                     .setPackage("hartland")
                     .setSchemaCode(SchemaCode.ER)
-                    .setNamespace("date_dim")
+                    .setNamespace("entity")
                     .setName("cal_date")
                     .build()
             val kernel = FakeKernel { okWith("2025-01-01", "2026-01-01", odd) }
