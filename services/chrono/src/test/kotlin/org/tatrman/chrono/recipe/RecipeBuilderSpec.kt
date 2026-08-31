@@ -90,6 +90,27 @@ class RecipeBuilderSpec :
             r.sqlPreview shouldContain "t.\"date\" < {end}"
         }
 
+        // The hartland regression, at the recipe layer: "…revenues for 2025 by month?". A bare year
+        // has no period code, so it must take the interval branch and land on the anchor column —
+        // even against an estate that DOES declare a period table, which `tableBacked` does.
+        "bare '2025' → FilterRecipe on the anchor column, not a period-table join" {
+            val rec = recognizer.recognize("2025", ref).shouldNotBeNull()
+            val r = tableBacked.build("2025", rec, "cnc", tz).shouldNotBeNull()
+
+            r.applicationCase shouldBe GroundingResult.ApplicationCase.FILTER
+            r.filter.anchorColumn.name shouldBe "date"
+            r.filter.parametersList.map { it.name } shouldBe listOf("start", "end")
+            r.filter.parametersList[0]
+                .value.datetimeValue shouldContain "2025-01-01"
+            // Exclusive end — the whole point of the half-open contract (§1.1).
+            r.filter.parametersList[1]
+                .value.datetimeValue shouldContain "2026-01-01"
+            r.sqlPreview shouldContain "t.\"date\" >= {start}"
+            r.sqlPreview shouldContain "t.\"date\" < {end}"
+            r.normalized.interval.start shouldContain "2025-01-01"
+            r.normalized.interval.end shouldContain "2026-01-01"
+        }
+
         "explicit DUE target anchors the recipe on the due_date column" {
             val rec = recognizer.recognize("due in May", ref).shouldNotBeNull()
             val r = tableBacked.build("due in May", rec, "cnc", tz).shouldNotBeNull()

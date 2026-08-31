@@ -115,6 +115,47 @@ class DateRecognizerSpec :
             rec.recognize("fiskální rok 2026", ref).shouldNotBeNull().startInclusive shouldBe day(2026, 1, 1)
         }
 
+        // ---- bare calendar year ----
+        // The live regression: hartland asked "…revenues for 2025 by month?", stanza tagged the
+        // span DATE, and chrono answered UNGROUNDABLE — so the value reached golem with no
+        // interval, no anchor column, and the door refused the question.
+        "bare '2025' → whole-year interval" {
+            val r = rec.recognize("2025", ref).shouldNotBeNull()
+            r.kind shouldBe ChronoKind.CALENDAR_YEAR
+            r.startInclusive shouldBe day(2025, 1, 1)
+            r.endExclusive shouldBe day(2026, 1, 1)
+        }
+        "a bare year carries no period code — it must not route through the period table" {
+            rec
+                .recognize("2025", ref)
+                .shouldNotBeNull()
+                .periodCode
+                .shouldBeNull()
+        }
+        "a bare year is not read as a fiscal one" {
+            rec.recognize("2025", ref).shouldNotBeNull().kind shouldBe ChronoKind.CALENDAR_YEAR
+            rec.recognize("fiscal year 2025", ref).shouldNotBeNull().kind shouldBe ChronoKind.FISCAL_YEAR
+        }
+        // Placement: every more specific rule must still win, or adding this one silently
+        // reinterpreted spans that already worked.
+        "the more specific rules still win over the bare year" {
+            rec.recognize("2026-03-15", ref).shouldNotBeNull().kind shouldBe ChronoKind.ABSOLUTE
+            rec.recognize("March 2026", ref).shouldNotBeNull().endExclusive shouldBe day(2026, 4, 1)
+            rec.recognize("202605", ref).shouldNotBeNull().kind shouldBe ChronoKind.PERIOD
+            rec.recognize("15.3.2026", ref).shouldNotBeNull().endExclusive shouldBe day(2026, 3, 16)
+        }
+        "a year outside the plausible range is not a year" {
+            rec.recognize("1899", ref).shouldBeNull()
+            rec.recognize("3000", ref).shouldBeNull()
+        }
+        "a span with a second number is not claimed as a year" {
+            rec.recognize("2025 4", ref).shouldBeNull()
+        }
+        "a run that is not four digits is not a year" {
+            rec.recognize("205", ref).shouldBeNull()
+            rec.recognize("20255", ref).shouldBeNull()
+        }
+
         // ---- relative ----
         "today / dnes → reference day" {
             rec.recognize("today", ref).shouldNotBeNull().startInclusive shouldBe ref
