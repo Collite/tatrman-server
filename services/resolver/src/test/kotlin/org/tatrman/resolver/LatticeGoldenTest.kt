@@ -74,24 +74,43 @@ class LatticeGoldenTest :
         //
         // ⚑ The task list expected `objectKind` to appear on the mention and nothing else to
         // move. Neither half is what happens. `Mention` has no `object_kind` field — the kind is
-        // consumed by `FrameRoles.Input` and never reaches the wire — so the ONLY observable
-        // effect of feeding kinds through the snapshot channel is a frame role. And that role is
-        // R2: *a measure IS the measure*. **R2 comes alive here, in P2·S2, not in P3.** It was
-        // never dead code; it was live code that had never been given a kind, which is precisely
-        // what tatrman-server#69 says. P3 changes competition and exemptions on top of a lattice
-        // that already has R2 in it.
+        // consumed by `FrameRoles.Input` and never reaches the wire — so a kind cannot show up as
+        // itself. What it shows up as is a frame role, and the role is R2: *a measure IS the
+        // measure*. **R2 comes alive here, in P2·S2, not in P3.** It was never dead code; it was
+        // live code that had never been given a kind, which is precisely what tatrman-server#69
+        // says. P3 changes competition and exemptions on top of a lattice that already has R2.
         //
-        // So the guard asserts the delta is confined to `frameRoles`, and names the one role that
-        // appears. Anything else moving is a behaviour change MS did not sanction.
+        // ⛑ But "a frame role is the only effect" is FALSE as a general claim (review-083 F2),
+        // and the first version of this guard made it from one case. A kind is read in a second
+        // place: `SpanProposal` skips governed-value proposal for an anchor whose kind is in
+        // `VALUELESS_OBJECT_KINDS = {operator, measure}`, and emitting a governed value marks its
+        // tokens COVERED — so a kind can change the mention SET, not just its roles. `h2-cs`
+        // shows exactly that, and it is pinned below rather than left as folklore.
+        //
+        // What saves the no-op claim is the scope: `operator` never reaches the snapshot channel
+        // (the archive's `targets` map holds entity/attribute entries and `fetch()` filters to
+        // `TargetClass.MODEL_OBJECT`, so an `op:` ref is never given a kind). Restricted to the
+        // four kinds MS can actually produce, the corpus is unchanged outside `frameRoles` — and
+        // that is the property asserted over ALL four cases, not one.
+        //
+        // ⚠ It stays a corpus result, not a theorem: `measure` IS in that set, so an estate whose
+        // measure anchor governs a nominal child would see its spans change too. No case here has
+        // that shape. That belongs in the MS-P4·T3 chain drill.
 
-        "MS: a registry carrying kinds wakes R2 — and changes nothing else" {
-            val id = "h1-cs"
+        // Contracts §5 — the four values `MentionKinds` can put on the snapshot channel.
+        val msProducibleKinds = setOf("measure", "attribute", "entity", "entity_with_measures")
+
+        // Rebuild a case's proto registry as a DeclaredVocabulary, the way the archive reader now
+        // produces one: one entry per (targetRef, category), anchors as values, kinds per
+        // `kindOf`. Feeding it through `StubRegistrySource` — with NO per-request override — is
+        // what makes this the SNAPSHOT channel rather than the one the goldens below exercise.
+        fun latticeWith(
+            id: String,
+            kindOf: (String) -> String,
+        ): JsonObject {
             val case = loadJson("/lattice/$id.case.json")
             val declared = registryOf(case)
-
-            // Rebuild the case's proto registry as a DeclaredVocabulary, the way the archive
-            // reader now produces one: one entry per (targetRef, category), anchors as values.
-            fun vocabulary(withKinds: Boolean) =
+            val vocabulary =
                 DeclaredVocabulary(
                     entries =
                         declared.entityTypesList.flatMap { t ->
@@ -108,65 +127,90 @@ class LatticeGoldenTest :
                                         } else {
                                             emptyList()
                                         },
-                                    objectKind = if (withKinds) t.objectKind else "",
+                                    objectKind = kindOf(t.objectKind),
                                 )
                             }
                         },
                     locales = declared.localesList.toList(),
                 )
+            val pipeline =
+                ResolverPipeline(
+                    FakeNlp(parseOf(case)),
+                    FakeFuzzy(case),
+                    SnapshotRegistry(
+                        StubRegistrySource(vocabulary, "snap-ms"),
+                        ResolverThresholds.LIVE,
+                        configLocales = declared.localesList.toList(),
+                    ),
+                    emptyMap(),
+                    ResumeTokenCodec(mapOf("k1" to ByteArray(32) { it.toByte() }), activeKeyId = "k1"),
+                )
+            val request =
+                ResolveRequest
+                    .newBuilder()
+                    .setConversationId("$id-ms")
+                    .setFresh(
+                        FreshQuestion
+                            .newBuilder()
+                            .setText(case["text"]!!.jsonPrimitive.content)
+                            .setLocale(case["locale"]!!.jsonPrimitive.content),
+                    ).build()
+            val response = runBlocking { pipeline.resolve(request) }
+            val printed = json.parseToJsonElement(printer.print(response)).jsonObject
+            val lattice = printed["resolutionState"]!!.jsonObject
+            return JsonObject(withoutDurations(lattice) - "parse")
+        }
 
-            fun latticeWith(withKinds: Boolean): JsonObject {
-                val pipeline =
-                    ResolverPipeline(
-                        FakeNlp(parseOf(case)),
-                        FakeFuzzy(case),
-                        SnapshotRegistry(
-                            StubRegistrySource(vocabulary(withKinds), "snap-ms"),
-                            ResolverThresholds.LIVE,
-                            configLocales = declared.localesList.toList(),
-                        ),
-                        emptyMap(),
-                        ResumeTokenCodec(mapOf("k1" to ByteArray(32) { it.toByte() }), activeKeyId = "k1"),
-                    )
-                val request =
-                    ResolveRequest
-                        .newBuilder()
-                        .setConversationId("$id-ms")
-                        .setFresh(
-                            FreshQuestion
-                                .newBuilder()
-                                .setText(case["text"]!!.jsonPrimitive.content)
-                                .setLocale(case["locale"]!!.jsonPrimitive.content),
-                        ).build()
-                val response = runBlocking { pipeline.resolve(request) }
-                val printed = json.parseToJsonElement(printer.print(response)).jsonObject
-                val lattice = printed["resolutionState"]!!.jsonObject
-                return JsonObject(withoutDurations(lattice) - "parse")
+        val noKinds: (String) -> String = { "" }
+        val msKindsOnly: (String) -> String = { if (it in msProducibleKinds) it else "" }
+        val everyKind: (String) -> String = { it }
+
+        listOf("h1-cs", "h1prime-cs", "h2-cs", "h5-cs").forEach { id ->
+            "$id: MS-producible kinds move frame roles and nothing else" {
+                // The property that generalises to MS's channel, asserted on the whole corpus
+                // rather than on the one case that happens to show R2.
+                stripFrameRoles(latticeWith(id, msKindsOnly)) shouldBe stripFrameRoles(latticeWith(id, noKinds))
             }
+        }
 
-            val withKinds = latticeWith(true)
-            val without = latticeWith(false)
+        "MS: a registry carrying kinds wakes R2 — h1-cs is the case that shows it" {
+            val withKinds = latticeWith("h1-cs", msKindsOnly)
+            val without = latticeWith("h1-cs", noKinds)
 
-            // Everything except the roles is byte-identical…
-            stripFrameRoles(withKinds) shouldBe stripFrameRoles(without)
-            // …and the roles are not, or the comparison above would be vacuous.
+            // The roles DID move, or the corpus assertion above would be vacuous.
             withKinds shouldNotBe without
 
             // The mention bound to `md.measure.cost` is the one that moves, and it moves by
             // GAINING the measure role — the R2 the estate's declaration finally supplies.
-            // `md.dimension.Account` (objectKind `dimension`) does not, which is the negative
-            // half: R2 keys on the kind, not on the mere presence of one.
-            val measureMention = mentionsOf(withKinds)[1]
-            measureMention["frameRoles"]!!.jsonArray.map { it.jsonPrimitive.content } shouldBe
+            // `md.dimension.Account` does not: its kind is not one MS produces, so it arrives
+            // blank, and a blank kind fires no rule. R2 keys on the kind, never on syntax.
+            mentionsOf(withKinds)[1]["frameRoles"]!!.jsonArray.map { it.jsonPrimitive.content } shouldBe
                 listOf("FRAME_ROLE_SUBJECT", "FRAME_ROLE_MEASURE")
             mentionsOf(without)[1]["frameRoles"]!!.jsonArray.map { it.jsonPrimitive.content } shouldBe
                 listOf("FRAME_ROLE_SUBJECT")
 
             // Every OTHER mention keeps the roles it had — the change is one mention wide.
-            val kept = mentionsOf(withKinds).indices.filter { it != 1 }
-            kept.forEach { i ->
+            mentionsOf(withKinds).indices.filter { it != 1 }.forEach { i ->
                 mentionsOf(withKinds)[i]["frameRoles"] shouldBe mentionsOf(without)[i]["frameRoles"]
             }
+        }
+
+        "⛑ a kind is read in TWO places — an operator kind changes the mention SET, not its roles" {
+            // review-083 F2, pinned so the no-op claim above can never quietly widen. `op:show`
+            // is the root of h2's parse and governs the rest of the question; with a blank kind
+            // it proposes every noun under it as one of its values, and those tokens are then
+            // COVERED, so `čerpacích stanic` never becomes a mention of its own. Give it its
+            // kind and `SpanProposal` skips that emission — the question gains a mention.
+            //
+            // MS cannot cause this today: `targets` never describes an `op:` ref, so the
+            // snapshot channel cannot deliver `operator`. The per-request override can, and
+            // does, which is why this is asserted rather than assumed.
+            mentionsOf(latticeWith("h2-cs", everyKind)).size shouldBe 4
+            mentionsOf(latticeWith("h2-cs", noKinds)).size shouldBe 3
+            // ⚠ `measure` is in the same set as `operator` (SpanProposal.VALUELESS_OBJECT_KINDS),
+            // so the exemption becomes reachable from MS's OWN channel the day an estate has a
+            // measure anchor governing a nominal child. No corpus case has that shape, which is
+            // why this test exists on the operator half instead.
         }
 
         listOf("h1-cs", "h1prime-cs", "h2-cs", "h5-cs").forEach { id ->

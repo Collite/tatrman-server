@@ -1460,7 +1460,25 @@ private fun DbTable.toDbTableDetail(): DbTableDetail =
         .addAllColumns(columns.map { it.toColumnSummary(mentionSemantics) })
         .addAllPrimaryKey(primaryKey)
         .also { b -> objectSemanticsProto(semanticsKind, mentionSemantics)?.let { b.semantics = it } }
-        .build()
+        // MS (review-083 F1) — the db twin of EntityDetail.name_attribute/code_attribute.
+        // Read straight off the resolved block: unlike the er side there is no legacy
+        // `nameAttribute:` on a table, so there is nothing to merge and the semantics block is
+        // the only source. Without these two lines the declaration was accepted, validated and
+        // then dropped here, and contracts §9's MS-R3 count could never take its code branch on
+        // a db-table estate.
+        .also { b ->
+            mentionSemantics
+                ?.name
+                ?.path
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { b.nameAttribute = it }
+        }.also { b ->
+            mentionSemantics
+                ?.code
+                ?.path
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { b.codeAttribute = it }
+        }.build()
 
 private fun DbView.toDbViewDetail(): DbViewDetail =
     DbViewDetail

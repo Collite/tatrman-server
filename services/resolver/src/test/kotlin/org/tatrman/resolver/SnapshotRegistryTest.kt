@@ -13,6 +13,9 @@ import org.tatrman.resolver.registry.LiveMetadataRegistryAdapter
 import org.tatrman.resolver.registry.RegistrySource
 import org.tatrman.resolver.registry.SnapshotRegistry
 import org.tatrman.resolver.registry.StubRegistrySource
+import org.tatrman.resolver.pipeline.ResolverPipeline
+import org.tatrman.resolver.v1.EntityType
+import org.tatrman.resolver.v1.Registry
 
 /**
  * RG-P5.S2.T1 — the one-channel snapshot registry (RS-24). The registry is built
@@ -87,5 +90,49 @@ class SnapshotRegistryTest :
             val built = runBlocking { SnapshotRegistry(adapter, ResolverThresholds.LIVE).current() }
             built.entityTypes shouldBe emptyList()
             built.snapshotHash shouldBe "live-metadata:step-one"
+        }
+
+        // ---- MS (review-083 F3): the OTHER channel's projection ------------------------------
+        //
+        // `SnapshotRegistry.project` above is one of two ways a `ResolverEntityType` is built;
+        // `ResolverPipeline.fromProto` is the other, for the caller-supplied per-request override
+        // (RS-24), and it WINS where supplied. MS-P2·S2 added `owner_ref` to that proto in the
+        // same commit as the model field so the override channel would never lag the snapshot
+        // channel — and then nothing asserted it, which is how a channel starts lagging.
+        // MS-P3's declared-containment collapse reads `ownerRef` from whichever channel served
+        // the registry, so both must carry it.
+
+        "the per-request override carries objectKind AND ownerRef through, verbatim" {
+            val override =
+                Registry
+                    .newBuilder()
+                    .addEntityTypes(
+                        EntityType
+                            .newBuilder()
+                            .setRef("er.entity.sales.amount_czk")
+                            .addCategories("measures")
+                            .addAnchors("tržby")
+                            .setObjectKind("measure")
+                            .setOwnerRef("er.entity.sales"),
+                    ).addEntityTypes(
+                        // An owner states no owner of its own, and that must survive as "" rather
+                        // than as the previous row's value.
+                        EntityType
+                            .newBuilder()
+                            .setRef("er.entity.sales")
+                            .addCategories("entities")
+                            .setObjectKind("entity_with_measures"),
+                    ).build()
+
+            val types =
+                ResolverPipeline
+                    .fromProto(override, ResolverThresholds.LIVE)
+                    .entityTypes
+                    .associateBy { it.ref }
+
+            types.getValue("er.entity.sales.amount_czk").objectKind shouldBe "measure"
+            types.getValue("er.entity.sales.amount_czk").ownerRef shouldBe "er.entity.sales"
+            types.getValue("er.entity.sales").objectKind shouldBe "entity_with_measures"
+            types.getValue("er.entity.sales").ownerRef shouldBe ""
         }
     })

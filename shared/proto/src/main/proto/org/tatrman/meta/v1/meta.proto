@@ -442,6 +442,18 @@ message DbTableDetail {
   repeated string primary_key = 2;
   reserved 3 to 7;
   EntitySemantics semantics = 8;                            // RS-33 grounding semantics (kind: period_table | poi | …)
+  // MS (review-083 F1) — the db twin of EntityDetail.name_attribute/code_attribute.
+  // A db `table` semantics block admits `name:` and `code:` exactly as an entity does
+  // (MS contracts §1.1), and without these two fields the declaration was accepted,
+  // validated and then dropped at this boundary: EntitySemantics carries only
+  // kind/params/measures, and §9's MS-R3 count (`COUNT(DISTINCT <code attribute>)`)
+  // could never take its code branch on a db-table estate. Column LOCAL names, fed from
+  // the table's resolved mention block. Empty = not declared.
+  // ⓘ Unlike the er side these have no legacy property behind them — `nameAttribute:`
+  // is an ENTITY property in ttr-metadata and has no table twin — so there is no D2
+  // merge here: the semantics block is the only source.
+  string name_attribute = 9;
+  string code_attribute = 10;
 }
 
 message DbViewDetail {
@@ -544,6 +556,11 @@ message AttributeSemantics {               // serves er attributes AND db column
   // denormalised onto the attribute by veles (the join is veles' job, not the
   // consumer's). A bare `measures: [amount]` item means "sum". Orthogonal to
   // `role:` above: an attribute is routinely both a grounding amount and a measure.
+  // ⛑ The membership predicate is spelled `measure.attribute.path == <local name of
+  // this attribute>` — the SAME spelling tatrman's LexiconCompiler.memberFacts uses to
+  // decide `objectKind = measure`. Two implementations exist because the archive carries
+  // the kind but not the aggregation; they must stay spelled the same way or one object
+  // can be a measure to the resolver and not to the planner (MS contracts §7).
   string aggregation = 6;
 }
 

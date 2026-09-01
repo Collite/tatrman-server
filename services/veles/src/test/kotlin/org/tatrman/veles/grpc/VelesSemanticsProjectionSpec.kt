@@ -245,6 +245,22 @@ class VelesSemanticsProjectionSpec :
             table.columnsList
                 .first { it.name == "label" }
                 .semantics.aggregation shouldBe ""
+            // review-083 F1 — and the other two thirds of the facet. `invoice_line` declares
+            // `name: label, code: line_no`; before F1 the declaration was accepted, validated
+            // and then dropped, because DbTableDetail had nowhere to put it. This assertion is
+            // the one the fixture was written for and could not make.
+            table.nameAttribute shouldBe "label"
+            table.codeAttribute shouldBe "line_no"
+        }
+
+        "a db table declaring no mention keys serves them EMPTY, not guessed" {
+            val svc = serviceFrom("fixture-semantics")
+            // `60-semantics-db.ttrm` is a vendored golden: grounding facet only, no mention
+            // keys anywhere. The new fields must read as "nothing declared" rather than fall
+            // back to a primary key or a first text column — absence is the answer (MS-R4).
+            val table = svc.getByName("table", "accounting_period").table
+            table.nameAttribute shouldBe ""
+            table.codeAttribute shouldBe ""
         }
 
         // ---- (i) MS: the other two projection paths, and D4 ----
