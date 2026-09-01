@@ -170,6 +170,133 @@ class SpanProposalTest :
             SpanProposal.proposeDomainSpans(parse, listOf(branch, product, qstred)) shouldBe emptyList()
         }
 
+        // --- MS-P3·S1 — the same-span multi-owner merge (contracts §8.2, design.md §10.2) ----
+
+        // One anchor word, two declared owners: the entity and its own measure attribute. This is
+        // the COMMON shape for a shared anchor (`tržby`), and the single-word path is the one that
+        // used to emit a candidate per owner.
+        val sales =
+            ResolverEntityType(
+                ref = "er.entity.sales",
+                categories = listOf("er.entity.sales.name"),
+                anchors = listOf("tržby"),
+                objectKind = "entity_with_measures",
+            )
+        val salesAmount =
+            ResolverEntityType(
+                ref = "er.entity.sales.amount_czk",
+                categories = listOf("er.entity.sales.amount_czk"),
+                anchors = listOf("tržby"),
+                objectKind = "measure",
+                ownerRef = "er.entity.sales",
+            )
+
+        // "Zobraz tržby" — 0 Zobraz(VERB, root) 1 tržby(NOUN, obj, lemma tržby)
+        val sharedAnchor =
+            AnalyzeResponse
+                .newBuilder()
+                .addAllTokens(
+                    listOf(
+                        tok("Zobraz", 0, 6, "zobrazit", "VERB", 0, "root"),
+                        tok("tržby", 7, 12, "tržby", "NOUN", 1, "obj"),
+                    ),
+                ).build()
+
+        "MS: a single-word anchor declared for two owners proposes ONE candidate carrying both" {
+            val cands = SpanProposal.proposeDomainSpans(sharedAnchor, listOf(sales, salesAmount))
+
+            val anchorPhrases = cands.filter { it.origin == DomainSpanCandidate.Origin.ANCHOR_PHRASE }
+            anchorPhrases.size shouldBe 1
+            val merged = anchorPhrases.single()
+            merged.text shouldBe "tržby"
+            merged.start shouldBe 7
+            merged.end shouldBe 12
+            merged.anchored shouldBe true
+            // Both owners reach the gate together — the point of the merge. Gated to one of them
+            // alone, the other never becomes evidence and the Binder cannot choose between them.
+            merged.gatedEntityRefs shouldContainExactlyInAnyOrder
+                listOf("er.entity.sales", "er.entity.sales.amount_czk")
+            merged.categories shouldContainExactlyInAnyOrder
+                listOf("er.entity.sales.name", "er.entity.sales.amount_czk")
+        }
+
+        // "Zobraz tržby prodejen" — 0 Zobraz(VERB, root) 1 tržby(NOUN, obj) 2 prodejen(NOUN, nmod→2)
+        // `prodejen` is a nominal argument GOVERNED by the anchor: a value candidate iff the
+        // anchor's owner has member vocabulary at all.
+        val anchorGoverningValue =
+            AnalyzeResponse
+                .newBuilder()
+                .addAllTokens(
+                    listOf(
+                        tok("Zobraz", 0, 6, "zobrazit", "VERB", 0, "root"),
+                        tok("tržby", 7, 12, "tržby", "NOUN", 1, "obj"),
+                        tok("prodejen", 13, 21, "prodejna", "NOUN", 2, "nmod"),
+                    ),
+                ).build()
+
+        "MS: a measure-only anchor proposes NO governed value (VALUELESS_OBJECT_KINDS, real kinds)" {
+            val cands = SpanProposal.proposeDomainSpans(anchorGoverningValue, listOf(salesAmount))
+            cands.none { it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE } shouldBe true
+            // the anchor itself still proposes — only what it governs is withheld
+            cands.single { it.origin == DomainSpanCandidate.Origin.ANCHOR_PHRASE }.text shouldBe "tržby"
+        }
+
+        "MS: an entity_with_measures anchor DOES propose its governed value (it has members)" {
+            val cands = SpanProposal.proposeDomainSpans(anchorGoverningValue, listOf(sales))
+            val value = cands.single { it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE }
+            value.text shouldBe "prodejen"
+            value.gatedEntityRefs shouldBe listOf("er.entity.sales")
+        }
+
+        "MS: sharing the anchor does not suppress the entity owner's governed value" {
+            // The merge is for the anchor phrase only. `prodejen` is a value of the ENTITY and of
+            // nothing else: the measure contributes none, and the entity's is still emitted.
+            val cands = SpanProposal.proposeDomainSpans(anchorGoverningValue, listOf(sales, salesAmount))
+            val values = cands.filter { it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE }
+            values.map { it.gatedEntityRefs } shouldBe listOf(listOf("er.entity.sales"))
+        }
+
+        "MS: which owner survives is no longer registry order" {
+            // The defect this stage removes: `dedupe` keys on (start, end), so the per-owner loop
+            // did not double-emit — it kept whichever owner the registry listed FIRST and dropped
+            // the other. Reversing the registry used to reverse the answer.
+            val forward = SpanProposal.proposeDomainSpans(sharedAnchor, listOf(sales, salesAmount))
+            val reversed = SpanProposal.proposeDomainSpans(sharedAnchor, listOf(salesAmount, sales))
+
+            fun refsOf(c: List<DomainSpanCandidate>) =
+                c.single { it.origin == DomainSpanCandidate.Origin.ANCHOR_PHRASE }.gatedEntityRefs.sorted()
+            refsOf(forward) shouldBe refsOf(reversed)
+            refsOf(forward) shouldBe listOf("er.entity.sales", "er.entity.sales.amount_czk")
+        }
+
+        "MS: three owners on one anchor all reach the gate" {
+            val salesQty =
+                ResolverEntityType(
+                    ref = "er.entity.sales.quantity",
+                    categories = listOf("er.entity.sales.quantity"),
+                    anchors = listOf("tržby"),
+                    objectKind = "measure",
+                    ownerRef = "er.entity.sales",
+                )
+            val cands = SpanProposal.proposeDomainSpans(sharedAnchor, listOf(sales, salesAmount, salesQty))
+            cands
+                .single { it.origin == DomainSpanCandidate.Origin.ANCHOR_PHRASE }
+                .gatedEntityRefs shouldContainExactlyInAnyOrder
+                listOf("er.entity.sales", "er.entity.sales.amount_czk", "er.entity.sales.quantity")
+        }
+
+        "MS invariant: no two ANCHOR_PHRASE candidates ever share a span (contracts §8.2)" {
+            val registry = listOf(branch, product, qstred, sales, salesAmount)
+            listOf(hero, sharedAnchor, anchorGoverningValue).forEach { parse ->
+                val spans =
+                    SpanProposal
+                        .proposeDomainSpans(parse, registry)
+                        .filter { it.origin == DomainSpanCandidate.Origin.ANCHOR_PHRASE }
+                        .map { it.start to it.end }
+                spans shouldBe spans.distinct()
+            }
+        }
+
         "R4-γ floor: a parse-less (no dep) input still yields n-gram candidates gated to all types" {
             // Degraded language: tokens present, every dep_head = 0, no NER.
             val parse =

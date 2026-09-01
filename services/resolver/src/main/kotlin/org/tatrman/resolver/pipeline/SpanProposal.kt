@@ -243,22 +243,34 @@ object SpanProposal {
                 coveredTokens += span
                 return@forEachIndexed
             }
+            // MS-P3.S1 (contracts §8.2) — the anchor phrase is ONE candidate carrying every
+            // owner that declared this word, exactly as the multi-word branch above builds it.
+            //
+            // ⛑ Emitting one candidate per owner did not produce two mentions: the phrase hull
+            // does not depend on the owner, so both candidates had the identical span and
+            // `dedupe` — which keys on (start, end) — kept the FIRST and dropped the rest. The
+            // effect was a competitor silently deleted, and WHICH one survived was the order of
+            // `entityTypes` in the registry. `tržby` declared for both an entity and its own
+            // measure was gated against whichever the archive happened to list first, so the
+            // Binder was never shown the choice it exists to make.
+            val phraseIdx = anchorPhraseIndices(idx, children, tokens, universal, anchorTokens)
+            if (phraseIdx.isNotEmpty()) {
+                out +=
+                    candidate(
+                        phraseIdx,
+                        tokens,
+                        hits.map { it.et.ref }.distinct(),
+                        hits.flatMap { it.et.categories }.distinct(),
+                        anchored = true,
+                        origin = DomainSpanCandidate.Origin.ANCHOR_PHRASE,
+                        headToken = idx,
+                    )
+                coveredTokens += phraseIdx
+            }
+            // Governed values stay PER-OWNER and are never merged: a value candidate is gated
+            // against the vocabulary of the one object whose member it would be, and merging
+            // them would offer `DF ADNAK` to every owner sharing the anchor.
             for (et in hits.map { it.et }) {
-                // anchor phrase: the anchor noun + its pre-modifiers, contiguous hull.
-                val phraseIdx = anchorPhraseIndices(idx, children, tokens, universal, anchorTokens)
-                if (phraseIdx.isNotEmpty()) {
-                    out +=
-                        candidate(
-                            phraseIdx,
-                            tokens,
-                            listOf(et.ref),
-                            et.categories,
-                            anchored = true,
-                            origin = DomainSpanCandidate.Origin.ANCHOR_PHRASE,
-                            headToken = idx,
-                        )
-                    coveredTokens += phraseIdx
-                }
                 // governed value arguments (e.g. `středisko` → `DF ADNAK`). Only for an anchor
                 // that HAS values: an operator or a measure has no member vocabulary, so its
                 // nominal arguments are not its values. Without this the operator word — which
