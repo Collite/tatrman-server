@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.fuzzy.loader
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.LoggerContext
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain as shouldContainText
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
 import org.tatrman.fuzzy.config.AppConfig
@@ -18,11 +24,13 @@ import org.tatrman.fuzzy.core.Candidate
 import org.tatrman.fuzzy.core.FuzzyMatcher
 import org.tatrman.fuzzy.core.SourceTag
 import org.tatrman.fuzzy.core.StringRepository
+import org.tatrman.ttr.lexicon.CompiledLexiconHeader
 import org.tatrman.ttr.lexicon.LexiconArea
 import org.tatrman.ttr.lexicon.LexiconDataFile
 import org.tatrman.ttr.lexicon.LexiconLoad
 import org.tatrman.ttr.lexicon.LexiconValidator
 import org.tatrman.ttr.lexicon.TargetClass
+import org.tatrman.ttr.lexicon.compile.CompileResult
 import org.tatrman.ttr.lexicon.compile.LexiconCompiler
 import org.tatrman.ttr.lexicon.compile.LexiconPacker
 import org.tatrman.ttr.lexicon.compile.LexiconSources
@@ -55,6 +63,7 @@ class LexiconArchiveSourceTest :
             dir: Path,
             yaml: String,
             name: String = "lexicon.tar.zst",
+            transform: (CompileResult) -> CompileResult = { it },
         ): Path {
             val file =
                 LexiconValidator
@@ -73,7 +82,7 @@ class LexiconArchiveSourceTest :
                     modelHash,
                     "2026-08-03T00:00:00Z",
                 )
-            val packed = LexiconPacker.pack(result, modelHash, "test")
+            val packed = LexiconPacker.pack(transform(result), modelHash, "test")
             return dir.resolve(name).also { it.writeBytes(packed.bytes) }
         }
 
@@ -89,6 +98,64 @@ class LexiconArchiveSourceTest :
               - terms: [ { text: "tržba", method: TOKENS } ]
                 target: md.measure.revenue
             """.trimIndent()
+
+        // ---- MS-P2·S2 (contracts §6): the canary, and the version check ----------------------
+        //
+        // This reader is the SECOND of the two duplicated archive readers (RS-24 / plan risk 2).
+        // MS moves the archive to `ttr-lexicon-compiled/v2` with a new `targets` map, and this
+        // side ignores that map entirely — but it must keep reading the file, and it must say
+        // something useful when the versions disagree. Both are asserted here, because nothing
+        // else in this repo would notice the day a bump makes this reader blind.
+
+        fun warnsFrom(body: () -> Unit): List<String> {
+            val logger =
+                (org.slf4j.LoggerFactory.getILoggerFactory() as LoggerContext)
+                    .getLogger(LexiconArchiveSource::class.java.name)
+            val appender = ListAppender<ILoggingEvent>().apply { start() }
+            logger.addAppender(appender)
+            return try {
+                body()
+                appender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
+            } finally {
+                logger.detachAppender(appender)
+                appender.stop()
+            }
+        }
+
+        "a v2 archive reads here unchanged — the targets map is simply ignored" {
+            val dir = Files.createTempDirectory("lex-archive")
+            val source = LexiconArchiveSource(writeArchive(dir, aliases))
+
+            runBlocking {
+                // The producer writes `targets` into EVERY v2 archive (encodeDefaults), including
+                // this one, so "reads fine" here is a statement about the real bytes.
+                source.fetch().entries.shouldNotBeEmpty()
+            }
+            warnsFrom { runBlocking { source.fetch() } }.none { it.contains("schema") } shouldBe true
+        }
+
+        "a foreign schemaVersion is read anyway, but WARNs naming both versions" {
+            val dir = Files.createTempDirectory("lex-archive")
+            val path =
+                writeArchive(dir, aliases) { r ->
+                    r.copy(
+                        lexicon =
+                            r.lexicon.copy(
+                                header = r.lexicon.header.copy(schemaVersion = "ttr-lexicon-compiled/v9"),
+                            ),
+                    )
+                }
+            val source = LexiconArchiveSource(path)
+
+            val warns = warnsFrom { runBlocking { source.fetch() } }
+
+            // Read anyway: refusing would blank the estate's vocabulary, which is the degrade
+            // that made this whole class of problem silent (review-082 F1).
+            runBlocking { source.fetch() }.entries.shouldNotBeEmpty()
+            val warn = warns.single { it.contains("schema") }
+            warn shouldContainText "ttr-lexicon-compiled/v9"
+            warn shouldContainText CompiledLexiconHeader.SCHEMA_VERSION
+        }
 
         "an archive loads into declared vocabulary keyed by target ref" {
             val dir = Files.createTempDirectory("lex-archive")

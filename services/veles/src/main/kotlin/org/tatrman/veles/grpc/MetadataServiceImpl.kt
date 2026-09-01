@@ -115,6 +115,7 @@ import org.tatrman.ttr.metadata.search.SearchQuery
 import io.opentelemetry.api.trace.Tracer
 import org.tatrman.ttr.metadata.registry.MetadataRegistry
 import org.tatrman.ttr.semantics.semanticsblock.ResolvedAttributeSemantics
+import org.tatrman.ttr.semantics.semanticsblock.ResolvedEntitySemantics
 
 /**
  * Metadata service gRPC surface.
@@ -399,8 +400,11 @@ class MetadataServiceImpl(
         val snap =
             registry.read()
                 ?: return GetObjectResponse.newBuilder().addMessages(notReadyMessage()).build()
+        // MS: hoisted — the mention-facet owner lookup below indexes the same map, and
+        // `objectByQname()` rebuilds it on every call.
+        val byQname = snap.model.objectByQname()
         val obj =
-            snap.model.objectByQname()[request.qualifiedName.toDomain()]
+            byQname[request.qualifiedName.toDomain()]
                 ?: return GetObjectResponse
                     .newBuilder()
                     .addMessages(
@@ -419,10 +423,10 @@ class MetadataServiceImpl(
         when (obj) {
             is DbTable -> builder.table = obj.toDbTableDetail()
             is DbView -> builder.view = obj.toDbViewDetail()
-            is DbColumn -> builder.column = obj.toDbColumnDetail()
+            is DbColumn -> builder.column = obj.toDbColumnDetail(byQname.mentionOf(obj.table))
             is DbForeignKey -> builder.foreignKey = obj.toDbForeignKeyDetail()
             is Entity -> builder.entity = obj.toEntityDetail()
-            is Attribute -> builder.attribute = obj.toAttributeDetail()
+            is Attribute -> builder.attribute = obj.toAttributeDetail(byQname.mentionOf(obj.entity))
             is Er2DbEntityMapping -> builder.er2DbEntityMapping = obj.toEr2DbEntityMappingDetail()
             is Er2DbAttributeMapping -> builder.er2DbAttributeMapping = obj.toEr2DbAttributeMappingDetail()
             is Er2DbRelationMapping -> builder.er2DbRelationMapping = obj.toEr2DbRelationMappingDetail()
@@ -453,7 +457,8 @@ class MetadataServiceImpl(
             org.tatrman.meta.v1.ModelSnapshot
                 .newBuilder()
                 .setModel(descriptor)
-        snap.model.objectByQname().values.forEach { obj ->
+        val byQname = snap.model.objectByQname()
+        byQname.values.forEach { obj ->
             val entryBuilder =
                 ObjectEntry
                     .newBuilder()
@@ -462,10 +467,10 @@ class MetadataServiceImpl(
             when (obj) {
                 is DbTable -> entryBuilder.table = obj.toDbTableDetail()
                 is DbView -> entryBuilder.view = obj.toDbViewDetail()
-                is DbColumn -> entryBuilder.column = obj.toDbColumnDetail()
+                is DbColumn -> entryBuilder.column = obj.toDbColumnDetail(byQname.mentionOf(obj.table))
                 is DbForeignKey -> entryBuilder.foreignKey = obj.toDbForeignKeyDetail()
                 is Entity -> entryBuilder.entity = obj.toEntityDetail()
-                is Attribute -> entryBuilder.attribute = obj.toAttributeDetail()
+                is Attribute -> entryBuilder.attribute = obj.toAttributeDetail(byQname.mentionOf(obj.entity))
                 is Er2DbEntityMapping -> entryBuilder.er2DbEntityMapping = obj.toEr2DbEntityMappingDetail()
                 is Er2DbAttributeMapping -> entryBuilder.er2DbAttributeMapping = obj.toEr2DbAttributeMappingDetail()
                 is Er2DbRelationMapping -> entryBuilder.er2DbRelationMapping = obj.toEr2DbRelationMappingDetail()
@@ -1094,23 +1099,95 @@ private fun toProtoBinding(b: DomainBinding): BindingProto =
 // dropped upstream (semantics == null / semanticsKind == null) and surfaces as a
 // TTR-SEM load issue — Veles serves the object WITHOUT semantics, never guesses.
 
-private fun entitySemanticsProto(kind: String): EntitySemantics = EntitySemantics.newBuilder().setKind(kind).build()
+/**
+ * The entity/table-side semantics message, or null when there is nothing to say.
+ *
+ * MS: built when EITHER facet has content — a grounding `kind:` or a mention `measures:`
+ * list. `name:`/`code:` deliberately do NOT trigger it: they reach consumers through
+ * `EntityDetail.name_attribute` / `code_attribute`, which predate MS and are now fed by
+ * the model's D2 merge (MS-P1·S2), so an entity declaring only those keeps serving no
+ * semantics message rather than a newly-appearing empty one.
+ *
+ * `measures` carries attribute LOCAL NAMES in declared order — the same rendering
+ * `name_attribute` gets, because both come from a resolved same-model `SymbolRef.path`.
+ */
+private fun objectSemanticsProto(
+    kind: String?,
+    mention: ResolvedEntitySemantics?,
+): EntitySemantics? {
+    val measures = mention?.measures.orEmpty().map { it.attribute.path }
+    if (kind.isNullOrEmpty() && measures.isEmpty()) return null
+    return EntitySemantics
+        .newBuilder()
+        .also { if (!kind.isNullOrEmpty()) it.kind = kind }
+        .addAllMeasures(measures)
+        .build()
+}
 
 /**
- * A resolved attribute/column semantics → the wire message. `owner` is the
- * declaring object's qname; the resolved `period:`/`currency:` refs carry only a
- * local `path`, so the cross-ref qname is rebuilt in the owner's schema/namespace
+ * The attribute/column-side semantics message, or null when there is nothing to say.
+ *
+ * `owner` is the declaring object's qname; the resolved `period:`/`currency:` refs carry
+ * only a local `path`, so the cross-ref qname is rebuilt in the owner's schema/namespace
  * (same-model refs — the period table lives beside the fact entity).
+ *
+ * MS: `aggregation` is declared on the OWNER (`semantics { measures: [...] }`) and
+ * denormalised onto the member here — veles owns the join so that a consumer holding one
+ * AttributeDetail needs no second lookup. It can be the ONLY reason this message exists:
+ * a measure attribute routinely carries no grounding `role:` at all.
  */
-private fun ResolvedAttributeSemantics.toProto(
+private fun attributeSemanticsProto(
+    grounding: ResolvedAttributeSemantics?,
     owner: org.tatrman.ttr.metadata.model.QualifiedName,
-): AttributeSemantics {
-    val b = AttributeSemantics.newBuilder().setRole(role)
-    codeFormat?.takeIf { it.isNotEmpty() }?.let { b.codeFormat = it }
-    period?.path?.takeIf { it.isNotEmpty() }?.let { b.period = owner.copy(name = it).toProto() }
-    currency?.path?.takeIf { it.isNotEmpty() }?.let { b.currencyAttribute = it }
+    aggregation: String,
+): AttributeSemantics? {
+    if (grounding == null && aggregation.isEmpty()) return null
+    val b = AttributeSemantics.newBuilder()
+    grounding?.let { g ->
+        b.role = g.role
+        g.codeFormat?.takeIf { it.isNotEmpty() }?.let { b.codeFormat = it }
+        g.period
+            ?.path
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { b.period = owner.copy(name = it).toProto() }
+        g.currency
+            ?.path
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { b.currencyAttribute = it }
+    }
+    if (aggregation.isNotEmpty()) b.aggregation = aggregation
     return b.build()
 }
+
+/** The local name a mention ref is spelled with — `er.Sales.amount` → `amount`. */
+private fun org.tatrman.ttr.metadata.model.QualifiedName.localName(): String = name.substringAfterLast('.')
+
+/**
+ * The measure lookup. Returns "" for an attribute its owner does not list — absence is the
+ * answer (MS-R4), never a guessed default.
+ */
+private fun ResolvedEntitySemantics?.aggregationOf(member: org.tatrman.ttr.metadata.model.QualifiedName): String =
+    this
+        ?.measures
+        ?.firstOrNull { it.attribute.path == member.localName() }
+        ?.aggregation
+        ?: ""
+
+/**
+ * The owner lookup that join needs, for the call sites holding only a member.
+ *
+ * ⛑ Deliberately NOT a defaulted parameter anywhere downstream: a forgotten argument would
+ * silently serve an empty aggregation, and an empty aggregation is indistinguishable from
+ * the legitimate "not a measure" answer, so nothing else would ever catch it.
+ */
+private fun Map<org.tatrman.ttr.metadata.model.QualifiedName, ModelObject>.mentionOf(
+    owner: org.tatrman.ttr.metadata.model.QualifiedName,
+): ResolvedEntitySemantics? =
+    when (val o = this[owner]) {
+        is Entity -> o.mentionSemantics
+        is DbTable -> o.mentionSemantics
+        else -> null
+    }
 
 // ----- Phase 2.2 detail builders -----
 
@@ -1149,7 +1226,7 @@ private fun Entity.toEntityDetail(): EntityDetail =
         .addAllAliases(aliases)
         .also { if (!displayLabel.isEmpty) it.displayLabel = displayLabel.toProto() }
         .also { if (!search.isEmpty) it.search = search.toProto() }
-        .also { if (!semanticsKind.isNullOrEmpty()) it.semantics = entitySemanticsProto(semanticsKind!!) }
+        .also { b -> objectSemanticsProto(semanticsKind, mentionSemantics)?.let { b.semantics = it } }
         .build()
 
 /**
@@ -1164,14 +1241,17 @@ private fun Entity.toModelBundleEntity(opts: BundleOptions): ModelBundleEntity =
         .newBuilder()
         .setObjectDescriptor(toObjectDescriptor(opts.locale))
         .setDetail(toEntityDetail().applyBundleOptions(opts))
-        .addAllAttributes(attributes.map { it.toModelBundleAttribute(opts) })
+        .addAllAttributes(attributes.map { it.toModelBundleAttribute(opts, mentionSemantics) })
         .build()
 
-private fun Attribute.toModelBundleAttribute(opts: BundleOptions): ModelBundleAttribute =
+private fun Attribute.toModelBundleAttribute(
+    opts: BundleOptions,
+    owner: ResolvedEntitySemantics?,
+): ModelBundleAttribute =
     ModelBundleAttribute
         .newBuilder()
         .setObjectDescriptor(toObjectDescriptor(opts.locale))
-        .setDetail(toAttributeDetail())
+        .setDetail(toAttributeDetail(owner))
         .build()
 
 /**
@@ -1204,7 +1284,7 @@ private fun Query.toModelBundleQuery(
     return builder.build()
 }
 
-private fun Attribute.toAttributeDetail(): AttributeDetail =
+private fun Attribute.toAttributeDetail(owner: ResolvedEntitySemantics?): AttributeDetail =
     AttributeDetail
         .newBuilder()
         .setEntity(entity.toProto())
@@ -1215,7 +1295,7 @@ private fun Attribute.toAttributeDetail(): AttributeDetail =
         .also { builder ->
             valueLabels.forEach { (code, text) -> builder.putValueLabels(code, text.toProto()) }
         }.also { if (!search.isEmpty) it.search = search.toProto() }
-        .also { s -> semantics?.let { s.semantics = it.toProto(entity) } }
+        .also { b -> attributeSemanticsProto(semantics, entity, owner.aggregationOf(qname))?.let { b.semantics = it } }
         .build()
 
 private fun Role.toRoleDetail(locale: String = ""): RoleDetail =
@@ -1364,28 +1444,48 @@ private fun Er2CncRoleMapping.toEr2CncRoleMappingDetail(): Er2CncRoleMappingDeta
 // segment after the last dot.
 private fun DbColumn.localName(): String = qname.name.substringAfterLast('.')
 
-private fun DbColumn.toColumnSummary(): DbColumnSummary =
+private fun DbColumn.toColumnSummary(owner: ResolvedEntitySemantics?): DbColumnSummary =
     DbColumnSummary
         .newBuilder()
         .setName(localName())
         .setDataType(dataType)
         .setNullable(nullable)
         .setBinding(toProtoBinding(binding))
-        .also { s -> semantics?.let { s.semantics = it.toProto(table) } }
+        .also { b -> attributeSemanticsProto(semantics, table, owner.aggregationOf(qname))?.let { b.semantics = it } }
         .build()
 
 private fun DbTable.toDbTableDetail(): DbTableDetail =
     DbTableDetail
         .newBuilder()
-        .addAllColumns(columns.map { it.toColumnSummary() })
+        .addAllColumns(columns.map { it.toColumnSummary(mentionSemantics) })
         .addAllPrimaryKey(primaryKey)
-        .also { if (!semanticsKind.isNullOrEmpty()) it.semantics = entitySemanticsProto(semanticsKind!!) }
-        .build()
+        .also { b -> objectSemanticsProto(semanticsKind, mentionSemantics)?.let { b.semantics = it } }
+        // MS (review-083 F1) — the db twin of EntityDetail.name_attribute/code_attribute.
+        // Read straight off the resolved block: unlike the er side there is no legacy
+        // `nameAttribute:` on a table, so there is nothing to merge and the semantics block is
+        // the only source. Without these two lines the declaration was accepted, validated and
+        // then dropped here, and contracts §9's MS-R3 count could never take its code branch on
+        // a db-table estate.
+        .also { b ->
+            mentionSemantics
+                ?.name
+                ?.path
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { b.nameAttribute = it }
+        }.also { b ->
+            mentionSemantics
+                ?.code
+                ?.path
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { b.codeAttribute = it }
+        }.build()
 
 private fun DbView.toDbViewDetail(): DbViewDetail =
     DbViewDetail
         .newBuilder()
-        .addAllColumns(columns.map { it.toColumnSummary() })
+        // A view declares no `semantics { }` block of its own, so its columns have no owner
+        // to take an aggregation from.
+        .addAllColumns(columns.map { it.toColumnSummary(null) })
         .setDefinitionSql(definitionSql)
         .build()
 
@@ -1403,7 +1503,7 @@ private fun DbView.toModelBundleView(opts: BundleOptions): ModelBundleView =
         .setDetail(toDbViewDetail())
         .build()
 
-private fun DbColumn.toDbColumnDetail(): DbColumnDetail =
+private fun DbColumn.toDbColumnDetail(owner: ResolvedEntitySemantics?): DbColumnDetail =
     DbColumnDetail
         .newBuilder()
         .setTable(table.toProto())
@@ -1412,7 +1512,7 @@ private fun DbColumn.toDbColumnDetail(): DbColumnDetail =
         .setIsPrimaryKey(isPrimaryKey)
         .setIsForeignKey(isForeignKey)
         .also { if (!search.isEmpty) it.search = search.toProto() }
-        .also { s -> semantics?.let { s.semantics = it.toProto(table) } }
+        .also { b -> attributeSemanticsProto(semantics, table, owner.aggregationOf(qname))?.let { b.semantics = it } }
         .build()
 
 private fun DbForeignKey.toDbForeignKeyDetail(): DbForeignKeyDetail =

@@ -54,6 +54,11 @@ class SnapshotRegistry(
                     ref = ref,
                     categories = entries.map { it.category }.distinct(),
                     anchors = entries.flatMap { it.values.map { v -> v.value } }.distinct(),
+                    // MS: verbatim. The grouping above is by targetRef and the facts are per
+                    // ref, so every entry in a group carries the same pair — `first` is not a
+                    // tie-break, there is nothing to break.
+                    objectKind = entries.first().objectKind,
+                    ownerRef = entries.first().ownerRef,
                 )
             }
         val locales = (vocab.locales + configLocales).distinct()

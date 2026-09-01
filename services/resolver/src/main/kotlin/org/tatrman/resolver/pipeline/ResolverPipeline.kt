@@ -538,6 +538,7 @@ class ResolverPipeline(
                         it.categoriesList.toList(),
                         it.anchorsList.toList(),
                         it.objectKind,
+                        it.ownerRef,
                     )
                 }
             val thresholds =

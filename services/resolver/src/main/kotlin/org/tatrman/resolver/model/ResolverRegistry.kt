@@ -21,19 +21,31 @@ data class ResolverRegistry(
  * ties content subtrees to; [categories] are the fuzzy categories a span gated to
  * this type is matched against (one BatchMatch slot per proposed span).
  *
- * [objectKind] is what the ref IS in the model — `measure` | `dimension` | `attribute` |
- * `entity` | `operator` — and frame-role derivation reads it before it reads any syntax
- * (RV-P2.1, Q-15 rule R2: "a measure IS the measure", which is what keeps *podle tržby* an
- * ORDER-BY instead of a GROUP-BY). ⚠ Only the per-request `Registry` override carries it
- * today: the snapshot channel's [org.tatrman.resolver.registry.DeclaredVocabulary] has no
- * object kind — it mirrors lex-matcher's vocabulary source field-for-field (RS-24), and the
- * model facts live on the other side of the RO-13 snapshot reader. Blank ⇒ R2 does not fire.
+ * [objectKind] is what the ref IS in the model — `measure` | `attribute` | `entity` |
+ * `entity_with_measures` (MS contracts §5) or `operator` — and frame-role derivation reads it
+ * before it reads any syntax (RV-P2.1, Q-15 rule R2: "a measure IS the measure", which is what
+ * keeps *podle tržby* an ORDER-BY instead of a GROUP-BY).
+ *
+ * Both channels now supply it: the per-request `Registry` override as always, and — since
+ * MS-P2·S2 — the snapshot channel, from the compiled lexicon archive's `targets` map, which
+ * `MentionKinds` filled at compile time from the E-R model's declared mention facet. Blank ⇒ R2
+ * does not fire, which is the correct reading for an estate that declared nothing.
+ *
+ * `dimension` has left this list: it was never produced by anything and MS does not produce it.
+ *
+ * ⛔ Neither channel may derive the kind from the ref STRING. One rule decides, upstream.
  */
 data class ResolverEntityType(
     val ref: String,
     val categories: List<String>,
     val anchors: List<String>,
     val objectKind: String = "",
+    /**
+     * MS — the declaring entity/table's ref for a member (`measure` / `attribute`); `""` for an
+     * owner, and for any ref the archive declares nothing about. Spelled exactly as a [ref] is,
+     * because MS-P3's declared-containment collapse looks the owner up in this same set.
+     */
+    val ownerRef: String = "",
 )
 
 /**

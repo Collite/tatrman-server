@@ -20,6 +20,19 @@ data class DeclaredVocabularyEntry(
     val category: String,
     val targetRef: String,
     val values: List<DeclaredValue>,
+    /**
+     * MS (contracts §5/§6) — what [targetRef] IS in the model: `measure` | `attribute` |
+     * `entity` | `entity_with_measures`, derived by `MentionKinds` at COMPILE time and carried
+     * per ref in the archive's `targets` map. Read here by lookup and copy; `""` when the
+     * archive declares nothing for the ref, which is also every pre-v3 archive.
+     *
+     * ⛔ Never derive this from the ref STRING. The whole point of routing it through the
+     * model is that one rule decides, and a second rule reading `md.measure.*` prefixes here
+     * would be free to drift from it.
+     */
+    val objectKind: String = "",
+    /** The declaring entity/table's ref for a member; `""` for an owner or an unknown ref. */
+    val ownerRef: String = "",
 )
 
 data class DeclaredVocabulary(

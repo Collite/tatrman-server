@@ -24,6 +24,7 @@ import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotBeEmpty
 import java.nio.file.Path
 
@@ -211,10 +212,20 @@ class MetadataServiceFixtureSpec :
             r.overallStatus shouldBe OverallStatus.DEGRADED
         }
 
-        "ValidateModel returns warnings_count = 0 on a clean fixture" {
+        // MS (ttr-semantics v3, catalog 0.13.2): the fixture is no longer warning-FREE, and
+        // that is the designed behaviour rather than fixture rot. `er-customer.ttr` declares
+        // the legacy `nameAttribute:`, which v3 deprecates in favour of `semantics { name: }`
+        // (MS contracts §1.2) — a WARNING, deliberately not an error, so an estate still
+        // writing the legacy property keeps loading. The fixture KEEPS the legacy spelling on
+        // purpose: it is this repo's only coverage of that path, and pinning the exact issue
+        // is worth more than pinning a zero. Errors must still be zero.
+        "ValidateModel returns errors_count = 0, and the only warning is the v3 deprecation" {
             val r = service().validateModel(ValidateModelRequest.getDefaultInstance())
             r.errorsCount shouldBe 0
-            r.warningsCount shouldBe 0
+            r.warningsCount shouldBe 1
+            val issue = r.issuesList.single()
+            issue.humanMessage shouldContain "TTR-SEM-218"
+            issue.sourceFile shouldContain "er-customer"
         }
 
         "ListObjects pagination — small page size advances via page tokens" {

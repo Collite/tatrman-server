@@ -11,6 +11,7 @@ import org.tatrman.fuzzy.core.TyposRule
 import org.tatrman.fuzzy.core.TargetClass
 import org.tatrman.ttr.lexicon.CompiledEntry
 import org.tatrman.ttr.lexicon.CompiledLexicon
+import org.tatrman.ttr.lexicon.CompiledLexiconHeader
 import org.tatrman.ttr.lexicon.LexiconArchive
 import org.tatrman.ttr.snapshot.SnapshotId
 import org.tatrman.ttr.snapshot.SnapshotReadResult
@@ -243,7 +244,10 @@ class LexiconArchiveSource(
             }
 
         return try {
-            Loaded(id, CompiledLexicon.fromJson(json)).also { cached = it }
+            Loaded(id, CompiledLexicon.fromJson(json)).also {
+                checkSchemaVersion(it.lexicon)
+                cached = it
+            }
         } catch (e: Exception) {
             logger.warn(
                 "Lexicon archive at {} has an undecodable {}: {}",
@@ -253,5 +257,30 @@ class LexiconArchiveSource(
             )
             cached
         }
+    }
+
+    /**
+     * MS-P2·S2 (contracts §6) — the version check this reader never had.
+     *
+     * review-082 F2: neither this reader nor the resolver's twin read `schemaVersion` at all, so
+     * an archive from a producer this build has never heard of arrived as a generic
+     * *"undecodable"*. The WARN names BOTH versions, because the useful question in a cluster is
+     * *which* side is behind.
+     *
+     * ⛑ It **reads the archive anyway**. Refusing on a version mismatch would blank the estate's
+     * vocabulary — the degrade (review-082 F1) that makes this class of problem silent.
+     */
+    private fun checkSchemaVersion(lexicon: CompiledLexicon) {
+        val found = lexicon.header.schemaVersion
+        if (found == CompiledLexiconHeader.SCHEMA_VERSION) return
+        logger.warn(
+            "Lexicon archive at {} declares schema '{}'; this reader was built against '{}'. " +
+                "Reading it anyway — unknown fields are ignored — but a field this reader needs " +
+                "may be absent, and an OLDER reader than the producer cannot be fixed by config: " +
+                "roll the readers first (MS contracts §6, readers before producers).",
+            archivePath,
+            found,
+            CompiledLexiconHeader.SCHEMA_VERSION,
+        )
     }
 }
