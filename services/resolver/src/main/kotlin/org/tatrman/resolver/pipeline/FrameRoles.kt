@@ -200,6 +200,14 @@ object FrameRoles {
      * unchanged now that an authority exists: a second rule is free to drift from the model's own,
      * and the two would disagree about a question no one thinks to re-check. The model decides,
      * through exactly one table, upstream.
+     *
+     * That rule is now **enforced, not merely stated**: `verifyNoKindDerivation` in this module's
+     * `build.gradle.kts` fails the build if any MAIN source imports `org.tatrman.ttr.semantics`,
+     * so the local fix this comment forbids cannot compile. (Naming the table in prose, as the
+     * chain above does, stays legal — explaining where a kind comes from is the opposite of
+     * deriving one.) Added at review-084 F2, which found that the `testImplementation` scope
+     * everyone assumed was doing this job was doing nothing: `ttr-metadata` puts `ttr-semantics`
+     * on the runtime classpath regardless.
      */
     private fun isMeasure(mention: Input): Boolean = mention.objectKind.equals("measure", ignoreCase = true)
 

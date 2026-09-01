@@ -312,11 +312,24 @@ class LatticeAssemblerTest :
 
         // --- MS-P3·S3 — the kind reaches the roles through the assembler ---------------------
 
-        "MS: a bound measure mention comes out MEASURE, and its compound modifier is not a FILTER" {
-            // "webové tržby" — 0 webové(NOUN, compound→2) 1 tržby(NOUN, root). The whole phrase is
-            // ONE mention whose syntactic head is `tržby`; before MS its kind was blank, R5 saw a
-            // compound and stamped FILTER, and R9 then had to look elsewhere for a subject. This
-            // is design.md §1's *"marketplace revenues"* shape, in Czech, end to end.
+        "MS: a bound measure mention comes out MEASURE, and R5 still FILTERs its modifier" {
+            // "webové tržby" — 0 webové(NOUN, compound→2) 1 tržby(NOUN, root), TWO mentions: the
+            // premodifier binds a plain attribute, the head binds the measure.
+            //
+            // ⛑ review-084 F1 — this case used to be named *"and its compound modifier is not a
+            // FILTER"*, which is not a rule this system has. **R5 reads the MENTION's own kind and
+            // the MENTION's own head deprel; it never consults the head mention's kind.** No frame
+            // rule is transitive through a head. So `webové` keeps FILTER here exactly as it did
+            // before MS, and design.md §1's *"its compound modifier takes FILTER through R5"* is
+            // describing something MS neither fixes nor should.
+            //
+            // What MS does fix is the MIRROR image — a mention that IS a compound modifier and
+            // binds something measure-capable is no longer stamped FILTER — and that is pinned in
+            // `FrameRolesMeasureTest` ("R5 exemption/contrast"), where the mention's own head
+            // token carries the `compound` relation. Here the measure is the phrase head at
+            // deprel `root`, so R5 never looks at it at all; what this case pins end to end is R2
+            // reaching the roles through `objectKindOf`, and the modifier beside it as the
+            // control that says the exemption did not leak sideways.
             val parse =
                 AnalyzeResponse
                     .newBuilder()
@@ -326,10 +339,22 @@ class LatticeAssemblerTest :
                             token("tržby", 7, 12, "tržby", "NOUN", 0, "root"),
                         ),
                     ).build()
-            val span =
+            val modifierSpan =
                 DomainSpanCandidate(
-                    "webové tržby",
+                    "webové",
                     0,
+                    6,
+                    listOf("er.entity.sales.channel"),
+                    listOf("er.entity.sales.channel"),
+                    anchored = true,
+                    origin = DomainSpanCandidate.Origin.ANCHOR_PHRASE,
+                    headToken = 0,
+                    lemma = "web",
+                )
+            val headSpan =
+                DomainSpanCandidate(
+                    "tržby",
+                    7,
                     12,
                     listOf("er.entity.sales", "er.entity.sales.amount_czk"),
                     listOf("er.entity.sales.name", "er.entity.sales.amount_czk"),
@@ -338,13 +363,22 @@ class LatticeAssemblerTest :
                     headToken = 1,
                     lemma = "tržby",
                 )
+            val channel = declared("er.entity.sales.channel", "er.entity.sales.channel")
             val amount = declared("er.entity.sales.amount_czk", "er.entity.sales.amount_czk")
             val state =
                 LatticeAssembler.assemble(
                     parse = parse,
                     // the mention's bindings are read off the GATED span; `Bound.bindings` is the
                     // door's answer and plays no part in role derivation
-                    gate = Bound(emptyList(), 1.0, listOf(gatedSpan(span, listOf(amount), ambiguous = false))),
+                    gate =
+                        Bound(
+                            emptyList(),
+                            1.0,
+                            listOf(
+                                gatedSpan(modifierSpan, listOf(channel), ambiguous = false),
+                                gatedSpan(headSpan, listOf(amount), ambiguous = false),
+                            ),
+                        ),
                     ungatedMentions = emptyList(),
                     universals = emptyList(),
                     entityTypes =
@@ -362,17 +396,27 @@ class LatticeAssemblerTest :
                                 objectKind = "measure",
                                 ownerRef = "er.entity.sales",
                             ),
+                            ResolverEntityType(
+                                "er.entity.sales.channel",
+                                listOf("er.entity.sales.channel"),
+                                listOf("web"),
+                                objectKind = "attribute",
+                                ownerRef = "er.entity.sales",
+                            ),
                         ),
                     snapshotHash = "snap-1",
                     lang = "cs",
                     preps = FrameRolePreps.shipped(),
                     batch = BatchMatchResponse.getDefaultInstance(),
                 )
-            val mention = state.mentionsList.single()
+            val bySpan = state.mentionsList.associateBy { it.span.start }
             // the binding's OWN ref decides the kind — `objectKindOf` reads the registry, and the
             // measure is what the containment collapse bound
-            mention.frameRolesList shouldContainExactly
+            bySpan.getValue(7).frameRolesList shouldContainExactly
                 listOf(FrameRole.FRAME_ROLE_SUBJECT, FrameRole.FRAME_ROLE_MEASURE)
+            // and the modifier is untouched by any of it: its own kind is `attribute`, its own head
+            // relation is `compound`, so R5 fires exactly as it always did
+            bySpan.getValue(0).frameRolesList shouldContainExactly listOf(FrameRole.FRAME_ROLE_FILTER)
         }
 
         "MS: a measure-CAPABLE entity under `podle` is exempt from GROUPING and takes no MEASURE" {

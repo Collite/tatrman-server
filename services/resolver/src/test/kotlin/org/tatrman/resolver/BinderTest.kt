@@ -2,6 +2,7 @@
 package org.tatrman.resolver
 
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
@@ -285,6 +286,44 @@ class BinderTest :
             val bind = verdict.shouldBeInstanceOf<Binder.Bind>()
             bind.winner.match.targetRef shouldBe amount
             bind.rejected.map { it.match.targetRef } shouldContainExactly listOf(sales)
+        }
+
+        // --- review-084 F3 — malformed containment, the two shapes that empty the survivors ----
+
+        "MS: a containment CYCLE declines the collapse instead of throwing" {
+            // `owners` is data this service did not produce. A cycle collapses every identity and
+            // leaves nothing to bind; the rule declines and the ordinary tie check answers, which
+            // for two distinct identities in the band is what it always was — a refusal.
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        declared(sales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    thresholds,
+                    mapOf(sales to amount, amount to sales),
+                )
+            val ambiguous = verdict.shouldBeInstanceOf<Binder.Ambiguous>()
+            ambiguous.admitted.map { it.match.targetRef } shouldContainExactlyInAnyOrder listOf(sales, amount)
+            // and nothing was moved to `rejected` by a collapse that did not happen
+            ambiguous.rejected.shouldBeEmpty()
+        }
+
+        "MS: a ref declared as its OWN owner still binds — never a clarification with one option" {
+            // The degenerate half of the same guard, and the one that used to be wrong: returning
+            // `Ambiguous` from the empty-survivors branch made `Ambiguous` reachable with a single
+            // admitted candidate, and `GateSpans.outcomeOf` renders any ambiguous span by offering
+            // its contenders. One row in, one option out — the exact question the collapse exists
+            // to remove, produced from malformed data instead of from good data.
+            val verdict =
+                Binder.decide(
+                    listOf(declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT)),
+                    thresholds,
+                    mapOf(amount to amount),
+                )
+            verdict
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.targetRef shouldBe amount
         }
 
         "UNSPECIFIED never outranks a real class, though proto3 gives it the zero value" {

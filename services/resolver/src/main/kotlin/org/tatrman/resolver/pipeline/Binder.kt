@@ -148,14 +148,29 @@ object Binder {
                 .filter { isModelObject(it) }
                 .mapNotNull { owners[it.match.targetRef]?.takeIf { ref -> ref.isNotBlank() } }
                 .toSet()
-        val (collapsed, admitted) =
+        val (collapsed, survived) =
             distinct.partition { isModelObject(it) && it.match.targetRef in ownedRefs }
-        // A containment CYCLE would collapse everything and leave nothing to bind. It cannot arise
-        // from a model (an attribute's owner is an entity, which owns nothing), but the filter is
-        // written to be safe on data it did not produce rather than to throw on it.
-        if (admitted.isEmpty()) return Ambiguous(distinct, rejected)
-        // Nothing is silently dropped — the owner rides the rung log like every other refusal.
-        rejected += collapsed
+        // A containment CYCLE would collapse everything and leave nothing to bind — `{a owns b,
+        // b owns a}`, or a ref declared as its own owner. Neither can arise from a model (an
+        // attribute's owner is an entity, and entities own nothing), but `owners` is data this
+        // service did not produce, so the collapse declines rather than throwing on `single()`.
+        //
+        // ⚠ It declines by yielding the UN-collapsed set to the ordinary size check below, not by
+        // returning a verdict of its own (review-084 F3). Returning `Ambiguous` here made
+        // `Ambiguous` reachable with ONE admitted candidate — an invariant this class had held
+        // since RV-14 — and `GateSpans.outcomeOf` renders any ambiguous span by offering its
+        // contenders, so a single self-owning row came back as a clarification with one option.
+        // Asking the user to choose between one thing is the failure the containment collapse
+        // exists to remove; producing it from malformed data is no better than producing it from
+        // good data.
+        val admitted =
+            if (survived.isEmpty()) {
+                distinct
+            } else {
+                // Nothing is silently dropped — the owner rides the rung log like every other refusal.
+                rejected += collapsed
+                survived
+            }
 
         return if (admitted.size > 1) {
             Ambiguous(admitted, rejected)
