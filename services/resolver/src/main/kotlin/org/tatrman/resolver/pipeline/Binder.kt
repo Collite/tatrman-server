@@ -86,7 +86,8 @@ object Binder {
         matches: List<FuzzyMatch>,
         candidate: DomainSpanCandidate,
         thresholds: ResolverThresholds,
-    ): Verdict = decide(classify(matches, candidate, thresholds), thresholds)
+        owners: Map<String, String> = emptyMap(),
+    ): Verdict = decide(classify(matches, candidate, thresholds), thresholds, owners)
 
     fun classify(
         matches: List<FuzzyMatch>,
@@ -98,6 +99,7 @@ object Binder {
     fun decide(
         classed: List<ClassedMatch>,
         thresholds: ResolverThresholds,
+        owners: Map<String, String> = emptyMap(),
     ): Verdict {
         val rejected = mutableListOf<ClassedMatch>()
         val eligible = mutableListOf<ClassedMatch>()
@@ -120,13 +122,55 @@ object Binder {
 
         // The same identity reached twice (two spans, two categories, one target) is one candidate,
         // and the stronger reading of it speaks — never an ambiguity with itself.
-        val admitted = contenders.distinctBy { identityKey(it.match) }
+        val distinct = contenders.distinctBy { identityKey(it.match) }
+
+        // MS-P3.S2 — the declared-containment collapse (contracts §8.3, design.md §10.2 amendment 2).
+        //
+        // An entity tied with its OWN attribute is one answer reached at two granularities, not a
+        // tie: `tržby` declared for both `er.entity.sales` and its measure `amount_czk` used to
+        // reach here as two `V:` identities inside the band and leave as a G2 — asking the user to
+        // choose between an entity and its own measure, a question no user can parse. The attribute
+        // speaks: it is the more specific object, and the entity reading stays recoverable through
+        // the owner ref it declared.
+        //
+        // This is the same kind of rule as the `distinctBy` above it — "one answer reached twice" —
+        // and deliberately no more than that. It fires ONLY on a declared containment relation
+        // between two `V:` identities that are already in the top class and already inside the tie
+        // band: no class is compared across, no score is weighed, WEAK is long gone, and a genuine
+        // ambiguity (two siblings, or two unrelated objects) still refuses. `owners` empty — the
+        // pre-v3 estate, and every estate that declared no mention facet — is byte-identical.
+        //
+        // ⛔ The containment is DECLARED data, threaded in from the registry. It is never parsed
+        // out of a ref string here: `er.entity.sales.amount_czk` looking like a child of
+        // `er.entity.sales` is a spelling coincidence this service is not permitted to read.
+        val ownedRefs =
+            distinct
+                .filter { isModelObject(it) }
+                .mapNotNull { owners[it.match.targetRef]?.takeIf { ref -> ref.isNotBlank() } }
+                .toSet()
+        val (collapsed, admitted) =
+            distinct.partition { isModelObject(it) && it.match.targetRef in ownedRefs }
+        // A containment CYCLE would collapse everything and leave nothing to bind. It cannot arise
+        // from a model (an attribute's owner is an entity, which owns nothing), but the filter is
+        // written to be safe on data it did not produce rather than to throw on it.
+        if (admitted.isEmpty()) return Ambiguous(distinct, rejected)
+        // Nothing is silently dropped — the owner rides the rung log like every other refusal.
+        rejected += collapsed
+
         return if (admitted.size > 1) {
             Ambiguous(admitted, rejected)
         } else {
             Bind(admitted.single(), admitted, rejected)
         }
     }
+
+    /**
+     * A `V:` identity — a declared model object rather than a data row.
+     *
+     * The containment collapse touches these and only these: `M:` rows are data values, and one
+     * value being stored in a table the other names is not the same relation at all.
+     */
+    private fun isModelObject(c: ClassedMatch): Boolean = c.match.source != SourceTag.MEMBER
 
     /**
      * What makes two candidates the same THING: a member is its data PK, anything else is its

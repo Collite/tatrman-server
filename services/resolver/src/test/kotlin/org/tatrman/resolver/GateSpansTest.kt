@@ -213,6 +213,109 @@ class GateSpansTest :
             clarify.options.size shouldBe 2
         }
 
+        // --- MS-P3·S2 — the collapse, end to end through the gate (contracts §8.3) -----------
+
+        "MS: the shared-anchor span binds the ATTRIBUTE instead of asking (G2-that-must-not-ask)" {
+            // The S1 merged candidate: ONE span carrying both owners' refs and categories. Before
+            // MS it reached here gated to one owner alone; now both compete, and the containment
+            // collapse answers instead of clarifying.
+            val sales =
+                ResolverEntityType(
+                    "er.entity.sales",
+                    listOf("er.entity.sales.name"),
+                    listOf("tržby"),
+                    objectKind = "entity_with_measures",
+                )
+            val amount =
+                ResolverEntityType(
+                    "er.entity.sales.amount_czk",
+                    listOf("er.entity.sales.amount_czk"),
+                    listOf("tržby"),
+                    objectKind = "measure",
+                    ownerRef = "er.entity.sales",
+                )
+            val merged =
+                DomainSpanCandidate(
+                    "tržby",
+                    7,
+                    12,
+                    listOf("er.entity.sales", "er.entity.sales.amount_czk"),
+                    listOf("er.entity.sales.name", "er.entity.sales.amount_czk"),
+                    anchored = true,
+                )
+            val resp =
+                batch(
+                    fmr(
+                        fm(
+                            "lex:sales",
+                            "tržby",
+                            1.0,
+                            "er.entity.sales.name",
+                            SourceTag.DECLARED,
+                            targetRef = "er.entity.sales",
+                        ),
+                        fm(
+                            "lex:amount",
+                            "tržby",
+                            1.0,
+                            "er.entity.sales.amount_czk",
+                            SourceTag.DECLARED,
+                            targetRef = "er.entity.sales.amount_czk",
+                        ),
+                    ),
+                )
+            val outcome = GateSpans.gate(listOf(merged), resp, listOf(sales, amount), thresholds, emptyMap(), "snap-1")
+            val bound = outcome.shouldBeInstanceOf<Bound>()
+            bound.bindings shouldHaveSize 1
+            bound.bindings.single().targetRef shouldBe "er.entity.sales.amount_czk"
+        }
+
+        "MS: the same span WITHOUT a declared owner still clarifies — the collapse is the only change" {
+            // Identical inputs, one difference: the attribute declares no `ownerRef`, which is what
+            // a pre-v3 archive serves. The gate goes back to refusing, which is the correct answer
+            // when nothing declares the two objects to be one answer at two granularities.
+            val sales = ResolverEntityType("er.entity.sales", listOf("er.entity.sales.name"), listOf("tržby"))
+            val amount =
+                ResolverEntityType(
+                    "er.entity.sales.amount_czk",
+                    listOf("er.entity.sales.amount_czk"),
+                    listOf("tržby"),
+                )
+            val merged =
+                DomainSpanCandidate(
+                    "tržby",
+                    7,
+                    12,
+                    listOf("er.entity.sales", "er.entity.sales.amount_czk"),
+                    listOf("er.entity.sales.name", "er.entity.sales.amount_czk"),
+                    anchored = true,
+                )
+            val resp =
+                batch(
+                    fmr(
+                        fm(
+                            "lex:sales",
+                            "tržby",
+                            1.0,
+                            "er.entity.sales.name",
+                            SourceTag.DECLARED,
+                            targetRef = "er.entity.sales",
+                        ),
+                        fm(
+                            "lex:amount",
+                            "tržby",
+                            1.0,
+                            "er.entity.sales.amount_czk",
+                            SourceTag.DECLARED,
+                            targetRef = "er.entity.sales.amount_czk",
+                        ),
+                    ),
+                )
+            GateSpans
+                .gate(listOf(merged), resp, listOf(sales, amount), thresholds, emptyMap(), "snap-1")
+                .shouldBeInstanceOf<Clarify>()
+        }
+
         "sibling-column: a MEMBER value on the NAZEV column also points at its KOD sibling" {
             val cands = listOf(cand("MAJETEK", 0, 7, listOf("er.qxxukazmu.kod", "er.qxxukazmu.nazev")))
             val siblings = mapOf("er.qxxukazmu.nazev" to listOf("er.qxxukazmu.kod"))
