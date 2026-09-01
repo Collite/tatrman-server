@@ -4,6 +4,7 @@ package org.tatrman.resolver
 import com.google.protobuf.util.JsonFormat
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -27,6 +28,8 @@ import org.tatrman.resolver.client.NlpClient
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.pipeline.ResolverPipeline
 import org.tatrman.resolver.registry.DeclaredVocabulary
+import org.tatrman.resolver.registry.DeclaredValue
+import org.tatrman.resolver.registry.DeclaredVocabularyEntry
 import org.tatrman.resolver.registry.SnapshotRegistry
 import org.tatrman.resolver.registry.StubRegistrySource
 import org.tatrman.resolver.token.ResumeTokenCodec
@@ -66,6 +69,105 @@ import java.io.File
  */
 class LatticeGoldenTest :
     StringSpec({
+
+        // ---- MS-P2·S2 T5 — the no-op guard, and the lattice P3 starts from -------------------
+        //
+        // ⚑ The task list expected `objectKind` to appear on the mention and nothing else to
+        // move. Neither half is what happens. `Mention` has no `object_kind` field — the kind is
+        // consumed by `FrameRoles.Input` and never reaches the wire — so the ONLY observable
+        // effect of feeding kinds through the snapshot channel is a frame role. And that role is
+        // R2: *a measure IS the measure*. **R2 comes alive here, in P2·S2, not in P3.** It was
+        // never dead code; it was live code that had never been given a kind, which is precisely
+        // what tatrman-server#69 says. P3 changes competition and exemptions on top of a lattice
+        // that already has R2 in it.
+        //
+        // So the guard asserts the delta is confined to `frameRoles`, and names the one role that
+        // appears. Anything else moving is a behaviour change MS did not sanction.
+
+        "MS: a registry carrying kinds wakes R2 — and changes nothing else" {
+            val id = "h1-cs"
+            val case = loadJson("/lattice/$id.case.json")
+            val declared = registryOf(case)
+
+            // Rebuild the case's proto registry as a DeclaredVocabulary, the way the archive
+            // reader now produces one: one entry per (targetRef, category), anchors as values.
+            fun vocabulary(withKinds: Boolean) =
+                DeclaredVocabulary(
+                    entries =
+                        declared.entityTypesList.flatMap { t ->
+                            t.categoriesList.mapIndexed { i, category ->
+                                DeclaredVocabularyEntry(
+                                    category = category,
+                                    targetRef = t.ref,
+                                    // Anchors hang off the first category only; `project`
+                                    // distincts the union, so repeating them would be a no-op
+                                    // that hid a duplication bug.
+                                    values =
+                                        if (i == 0) {
+                                            t.anchorsList.map { DeclaredValue(id = "lex:${t.ref}:$it", value = it) }
+                                        } else {
+                                            emptyList()
+                                        },
+                                    objectKind = if (withKinds) t.objectKind else "",
+                                )
+                            }
+                        },
+                    locales = declared.localesList.toList(),
+                )
+
+            fun latticeWith(withKinds: Boolean): JsonObject {
+                val pipeline =
+                    ResolverPipeline(
+                        FakeNlp(parseOf(case)),
+                        FakeFuzzy(case),
+                        SnapshotRegistry(
+                            StubRegistrySource(vocabulary(withKinds), "snap-ms"),
+                            ResolverThresholds.LIVE,
+                            configLocales = declared.localesList.toList(),
+                        ),
+                        emptyMap(),
+                        ResumeTokenCodec(mapOf("k1" to ByteArray(32) { it.toByte() }), activeKeyId = "k1"),
+                    )
+                val request =
+                    ResolveRequest
+                        .newBuilder()
+                        .setConversationId("$id-ms")
+                        .setFresh(
+                            FreshQuestion
+                                .newBuilder()
+                                .setText(case["text"]!!.jsonPrimitive.content)
+                                .setLocale(case["locale"]!!.jsonPrimitive.content),
+                        ).build()
+                val response = runBlocking { pipeline.resolve(request) }
+                val printed = json.parseToJsonElement(printer.print(response)).jsonObject
+                val lattice = printed["resolutionState"]!!.jsonObject
+                return JsonObject(withoutDurations(lattice) - "parse")
+            }
+
+            val withKinds = latticeWith(true)
+            val without = latticeWith(false)
+
+            // Everything except the roles is byte-identical…
+            stripFrameRoles(withKinds) shouldBe stripFrameRoles(without)
+            // …and the roles are not, or the comparison above would be vacuous.
+            withKinds shouldNotBe without
+
+            // The mention bound to `md.measure.cost` is the one that moves, and it moves by
+            // GAINING the measure role — the R2 the estate's declaration finally supplies.
+            // `md.dimension.Account` (objectKind `dimension`) does not, which is the negative
+            // half: R2 keys on the kind, not on the mere presence of one.
+            val measureMention = mentionsOf(withKinds)[1]
+            measureMention["frameRoles"]!!.jsonArray.map { it.jsonPrimitive.content } shouldBe
+                listOf("FRAME_ROLE_SUBJECT", "FRAME_ROLE_MEASURE")
+            mentionsOf(without)[1]["frameRoles"]!!.jsonArray.map { it.jsonPrimitive.content } shouldBe
+                listOf("FRAME_ROLE_SUBJECT")
+
+            // Every OTHER mention keeps the roles it had — the change is one mention wide.
+            val kept = mentionsOf(withKinds).indices.filter { it != 1 }
+            kept.forEach { i ->
+                mentionsOf(withKinds)[i]["frameRoles"] shouldBe mentionsOf(without)[i]["frameRoles"]
+            }
+        }
 
         listOf("h1-cs", "h1prime-cs", "h2-cs", "h5-cs").forEach { id ->
             "$id: the emitted ResolutionState matches its golden file" {
@@ -228,6 +330,24 @@ class LatticeGoldenTest :
          * is a flake with a delay fuse, so it comes out here rather than being rounded, zeroed, or
          * left to fail one CI run in ten.
          */
+        private fun mentionsOf(lattice: JsonObject): List<JsonObject> =
+            lattice["mentions"]!!.jsonArray.map { it.jsonObject }
+
+        /** The same lattice with every `frameRoles` key removed, at any depth. */
+        private fun stripFrameRoles(
+            element: kotlinx.serialization.json.JsonElement,
+        ): kotlinx.serialization.json.JsonElement =
+            when (element) {
+                is JsonObject ->
+                    JsonObject(
+                        element.entries
+                            .filterNot { it.key == "frameRoles" }
+                            .associate { it.key to stripFrameRoles(it.value) },
+                    )
+                is JsonArray -> JsonArray(element.map { stripFrameRoles(it) })
+                else -> element
+            }
+
         private fun withoutDurations(lattice: JsonObject): JsonObject =
             JsonObject(
                 lattice.toMutableMap().also { map ->

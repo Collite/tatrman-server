@@ -137,10 +137,18 @@ message EntityType {
   // measure" is rule R2 of the Q-15 report, and it is the rule that keeps `podle tržby`
   // an ORDER-BY instead of a GROUP-BY. Nothing in the RV rules reads the ref STRING
   // (no `md.measure.*` matching), so the kind has to arrive as data.
-  // ⚠ Only the per-request override supplies it today: the snapshot channel's
-  // DeclaredVocabulary carries no object kind (it mirrors lex-matcher's source), and
-  // filling it needs the model-snapshot reader (RO-13). Empty ⇒ R2 does not fire.
+  // Both channels supply it: this override as always, and — since MS-P2·S2 — the snapshot
+  // channel, from the compiled lexicon archive's `targets` map (schema
+  // `ttr-lexicon-compiled/v2`), derived by MentionKinds at compile time. Empty ⇒ R2 does
+  // not fire, which is the correct reading for an estate that declared nothing.
+  // MS §5 values: `measure` | `attribute` | `entity` | `entity_with_measures`. `dimension`
+  // has left the list — nothing ever produced it.
   string object_kind = 4;
+  // MS — the declaring entity/table's ref for a member (`measure` / `attribute`); empty for
+  // an owner. Added with the model field rather than after it, so this override channel
+  // never lags the snapshot channel: a caller overriding one object's kind must be able to
+  // state its owner too, or the collapse MS-P3 builds would see a half-described registry.
+  string owner_ref = 5;
 }
 
 // Gating thresholds — ported from the live ENTITIES_ONLY config (ResolverGraph).

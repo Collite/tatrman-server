@@ -4,6 +4,7 @@ package org.tatrman.resolver.registry
 import org.slf4j.LoggerFactory
 import org.tatrman.ttr.lexicon.CompiledEntry
 import org.tatrman.ttr.lexicon.CompiledLexicon
+import org.tatrman.ttr.lexicon.CompiledLexiconHeader
 import org.tatrman.ttr.lexicon.LexiconArchive
 import org.tatrman.ttr.lexicon.TargetClass
 import org.tatrman.ttr.snapshot.SnapshotId
@@ -28,13 +29,18 @@ import kotlin.io.path.readBytes
  * model at boot, to obtain terms this file already carries **with the authored match method
  * attached**. The options paper is `project/kantheon/features/turn-gate/implementation/q7-registry-channel.md`.
  *
- * ⚠ **What this does NOT deliver: `objectKind`.** The artifact states a `TargetClass`
- * (`MODEL_OBJECT | MEMBER | OPERATOR | GROUNDING_TRIGGER`) — the *class*. The resolver's
- * `objectKind` wants `measure | dimension | attribute | entity | operator`, which is a **model**
- * fact living on the other side of the boundary. So `FrameRoles` R2 (*object_kind == measure →
- * MEASURE*) **still does not fire**, and that half of tatrman-server#59 remains open by design,
- * not by omission. Do not "fix" it by deriving a kind from the ref's prefix here: that is a
- * second rule, free to drift from the model's own.
+ * ✅ **It DOES deliver `objectKind` — since MS-P2·S2.** The artifact states a `TargetClass`
+ * (`MODEL_OBJECT | MEMBER | OPERATOR | GROUNDING_TRIGGER`) — the *class* — and, from
+ * `ttr-lexicon-compiled/v2`, a per-ref `targets` map carrying the model fact the resolver's
+ * `objectKind` wants: `measure | attribute | entity | entity_with_measures` (MS contracts §5),
+ * plus the member's `ownerRef`. It is derived by `MentionKinds` at COMPILE time from the E-R
+ * model's declared mention facet (`semantics { name: · code: · measures: [...] }`), so
+ * `FrameRoles` R2 (*object_kind == measure → MEASURE*) now fires for an estate that declares
+ * measures — the half of tatrman-server#69 that was open by design.
+ *
+ * ⛔ **The old warning survives, and is the rule of this file:** do not "fix" anything by
+ * deriving a kind from the ref's prefix here. That would be a second rule, free to drift from
+ * the model's own. What happens below is a lookup and a copy.
  *
  * ## Two readers, one producer
  *
@@ -109,10 +115,16 @@ class LexiconArchiveRegistrySource(
                 .filter { it.targetClass == TargetClass.MODEL_OBJECT }
                 .groupBy { it.targetRef }
                 .map { (targetRef, rows) ->
+                    // MS: a lookup and a copy. A ref the archive declares nothing about — a
+                    // pre-v3 archive, an md-backed estate, a ref the model does not contain —
+                    // yields nulls, and "" is the correct reading of "nothing declared".
+                    val facts = lexicon.targets[targetRef]
                     DeclaredVocabularyEntry(
                         category = targetRef,
                         targetRef = targetRef,
                         values = rows.map { it.toDeclaredValue() },
+                        objectKind = facts?.objectKind ?: "",
+                        ownerRef = facts?.ownerRef ?: "",
                     )
                 }.sortedBy { it.category }
 
@@ -195,7 +207,11 @@ class LexiconArchiveRegistrySource(
         return try {
             Loaded(id, CompiledLexicon.fromJson(json)).also {
                 cached = it
+                // Cleared BEFORE the version check, not after: `warnOnce` dedups by cause, and
+                // clearing afterwards would drop the very key just recorded — so a file that
+                // never changes would re-warn on every reload.
                 reported.clear()
+                checkSchemaVersion(it.lexicon)
             }
         } catch (e: Exception) {
             warnOnce(
@@ -207,6 +223,33 @@ class LexiconArchiveRegistrySource(
             )
             cached
         }
+    }
+
+    /**
+     * MS-P2·S2 (contracts §6) — the version check this reader never had.
+     *
+     * review-082 F2: neither serving reader read `schemaVersion` at all, so an archive from a
+     * producer this build has never heard of arrived as a generic *"undecodable"* — or, worse,
+     * decoded into something subtly wrong. The WARN names BOTH versions, because the useful
+     * question in a cluster is *which* side is behind.
+     *
+     * ⛑ It **reads the archive anyway**. Refusing on a version mismatch would blank the estate's
+     * declared vocabulary — precisely the degrade (review-082 F1) that makes this whole class of
+     * problem silent. A mismatch is a reason to say so out loud, never a reason to serve nothing.
+     */
+    private fun checkSchemaVersion(lexicon: CompiledLexicon) {
+        val found = lexicon.header.schemaVersion
+        if (found == CompiledLexiconHeader.SCHEMA_VERSION) return
+        warnOnce(
+            "schema-version",
+            "lexicon archive at {} declares schema '{}'; this reader was built against '{}'. " +
+                "Reading it anyway — unknown fields are ignored — but a field this reader needs " +
+                "may be absent, and an OLDER reader than the producer cannot be fixed by config: " +
+                "roll the readers first (MS contracts §6, readers before producers).",
+            archivePath,
+            found,
+            CompiledLexiconHeader.SCHEMA_VERSION,
+        )
     }
 
     private fun warnOnce(
