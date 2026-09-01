@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import org.tatrman.fuzzy.v1.BatchMatchResponse
 import org.tatrman.fuzzy.v1.FuzzyMatch
@@ -14,6 +15,7 @@ import org.tatrman.fuzzy.v1.Provenance
 import org.tatrman.fuzzy.v1.SourceTag
 import org.tatrman.fuzzy.v1.TargetClass
 import org.tatrman.nlp.v1.AnalyzeResponse
+import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.pipeline.Binder
 import org.tatrman.resolver.pipeline.Bindings
@@ -25,6 +27,7 @@ import org.tatrman.resolver.pipeline.GatedSpan
 import org.tatrman.resolver.pipeline.LatticeAssembler
 import org.tatrman.resolver.pipeline.UniversalBinding
 import org.tatrman.resolver.v1.EvidenceClass
+import org.tatrman.resolver.v1.FrameRole
 import org.tatrman.resolver.v1.MatchMethod
 import org.tatrman.resolver.v1.UniversalEntityType
 import org.tatrman.resolver.v1.ValueKind
@@ -307,6 +310,173 @@ class LatticeAssemblerTest :
             value.grounding.kernel shouldBe "nametag3"
         }
 
+        // --- MS-P3·S3 — the kind reaches the roles through the assembler ---------------------
+
+        "MS: a bound measure mention comes out MEASURE, and R5 still FILTERs its modifier" {
+            // "webové tržby" — 0 webové(NOUN, compound→2) 1 tržby(NOUN, root), TWO mentions: the
+            // premodifier binds a plain attribute, the head binds the measure.
+            //
+            // ⛑ review-084 F1 — this case used to be named *"and its compound modifier is not a
+            // FILTER"*, which is not a rule this system has. **R5 reads the MENTION's own kind and
+            // the MENTION's own head deprel; it never consults the head mention's kind.** No frame
+            // rule is transitive through a head. So `webové` keeps FILTER here exactly as it did
+            // before MS, and design.md §1's *"its compound modifier takes FILTER through R5"* is
+            // describing something MS neither fixes nor should.
+            //
+            // What MS does fix is the MIRROR image — a mention that IS a compound modifier and
+            // binds something measure-capable is no longer stamped FILTER — and that is pinned in
+            // `FrameRolesMeasureTest` ("R5 exemption/contrast"), where the mention's own head
+            // token carries the `compound` relation. Here the measure is the phrase head at
+            // deprel `root`, so R5 never looks at it at all; what this case pins end to end is R2
+            // reaching the roles through `objectKindOf`, and the modifier beside it as the
+            // control that says the exemption did not leak sideways.
+            val parse =
+                AnalyzeResponse
+                    .newBuilder()
+                    .addAllTokens(
+                        listOf(
+                            token("webové", 0, 6, "web", "NOUN", 2, "compound"),
+                            token("tržby", 7, 12, "tržby", "NOUN", 0, "root"),
+                        ),
+                    ).build()
+            val modifierSpan =
+                DomainSpanCandidate(
+                    "webové",
+                    0,
+                    6,
+                    listOf("er.entity.sales.channel"),
+                    listOf("er.entity.sales.channel"),
+                    anchored = true,
+                    origin = DomainSpanCandidate.Origin.ANCHOR_PHRASE,
+                    headToken = 0,
+                    lemma = "web",
+                )
+            val headSpan =
+                DomainSpanCandidate(
+                    "tržby",
+                    7,
+                    12,
+                    listOf("er.entity.sales", "er.entity.sales.amount_czk"),
+                    listOf("er.entity.sales.name", "er.entity.sales.amount_czk"),
+                    anchored = true,
+                    origin = DomainSpanCandidate.Origin.ANCHOR_PHRASE,
+                    headToken = 1,
+                    lemma = "tržby",
+                )
+            val channel = declared("er.entity.sales.channel", "er.entity.sales.channel")
+            val amount = declared("er.entity.sales.amount_czk", "er.entity.sales.amount_czk")
+            val state =
+                LatticeAssembler.assemble(
+                    parse = parse,
+                    // the mention's bindings are read off the GATED span; `Bound.bindings` is the
+                    // door's answer and plays no part in role derivation
+                    gate =
+                        Bound(
+                            emptyList(),
+                            1.0,
+                            listOf(
+                                gatedSpan(modifierSpan, listOf(channel), ambiguous = false),
+                                gatedSpan(headSpan, listOf(amount), ambiguous = false),
+                            ),
+                        ),
+                    ungatedMentions = emptyList(),
+                    universals = emptyList(),
+                    entityTypes =
+                        listOf(
+                            ResolverEntityType(
+                                "er.entity.sales",
+                                listOf("er.entity.sales.name"),
+                                listOf("tržby"),
+                                objectKind = "entity_with_measures",
+                            ),
+                            ResolverEntityType(
+                                "er.entity.sales.amount_czk",
+                                listOf("er.entity.sales.amount_czk"),
+                                listOf("tržby"),
+                                objectKind = "measure",
+                                ownerRef = "er.entity.sales",
+                            ),
+                            ResolverEntityType(
+                                "er.entity.sales.channel",
+                                listOf("er.entity.sales.channel"),
+                                listOf("web"),
+                                objectKind = "attribute",
+                                ownerRef = "er.entity.sales",
+                            ),
+                        ),
+                    snapshotHash = "snap-1",
+                    lang = "cs",
+                    preps = FrameRolePreps.shipped(),
+                    batch = BatchMatchResponse.getDefaultInstance(),
+                )
+            val bySpan = state.mentionsList.associateBy { it.span.start }
+            // the binding's OWN ref decides the kind — `objectKindOf` reads the registry, and the
+            // measure is what the containment collapse bound
+            bySpan.getValue(7).frameRolesList shouldContainExactly
+                listOf(FrameRole.FRAME_ROLE_SUBJECT, FrameRole.FRAME_ROLE_MEASURE)
+            // and the modifier is untouched by any of it: its own kind is `attribute`, its own head
+            // relation is `compound`, so R5 fires exactly as it always did
+            bySpan.getValue(0).frameRolesList shouldContainExactly listOf(FrameRole.FRAME_ROLE_FILTER)
+        }
+
+        "MS: a measure-CAPABLE entity under `podle` is exempt from GROUPING and takes no MEASURE" {
+            // "prvních 10 prodejen podle prodejů" — the ORDER-BY reading. `prodejů` binds the sales
+            // ENTITY, which declares measures: it must not become the grouping axis (R3 exemption
+            // via measureCapable) and must not be stamped MEASURE either, because whether the
+            // question wants rows, a count or a measure value is the operator layer's reading
+            // (MS-R6, contracts §9). Both halves of the split are asserted by one case.
+            val parse =
+                AnalyzeResponse
+                    .newBuilder()
+                    .addAllTokens(
+                        listOf(
+                            token("prvních", 0, 7, "první", "ADJ", 3, "amod"),
+                            token("10", 8, 10, "10", "NUM", 3, "nummod"),
+                            token("prodejen", 11, 19, "prodejna", "NOUN", 0, "nsubj"),
+                            token("podle", 20, 25, "podle", "ADP", 5, "case"),
+                            token("prodejů", 26, 33, "prodej", "NOUN", 3, "nmod"),
+                        ),
+                    ).build()
+            val span =
+                DomainSpanCandidate(
+                    "prodejů",
+                    26,
+                    33,
+                    listOf("er.entity.sales"),
+                    listOf("er.entity.sales.name"),
+                    anchored = true,
+                    origin = DomainSpanCandidate.Origin.ANCHOR_PHRASE,
+                    headToken = 4,
+                    lemma = "prodej",
+                )
+            val sales = declared("er.entity.sales", "er.entity.sales.name")
+            val state =
+                LatticeAssembler.assemble(
+                    parse = parse,
+                    gate = Bound(emptyList(), 1.0, listOf(gatedSpan(span, listOf(sales), ambiguous = false))),
+                    ungatedMentions = emptyList(),
+                    universals = emptyList(),
+                    entityTypes =
+                        listOf(
+                            ResolverEntityType(
+                                "er.entity.sales",
+                                listOf("er.entity.sales.name"),
+                                listOf("prodej"),
+                                objectKind = "entity_with_measures",
+                            ),
+                        ),
+                    snapshotHash = "snap-1",
+                    lang = "cs",
+                    preps = FrameRolePreps.shipped(),
+                    batch = BatchMatchResponse.getDefaultInstance(),
+                )
+            val mention = state.mentionsList.single()
+            mention.frameRolesList shouldNotContain FrameRole.FRAME_ROLE_GROUPING
+            mention.frameRolesList shouldNotContain FrameRole.FRAME_ROLE_MEASURE
+            // it is the only mention left, so R9's residue pick lands on it
+            mention.frameRolesList shouldContainExactly listOf(FrameRole.FRAME_ROLE_SUBJECT)
+        }
+
         "the RV-39 layer tuple is echoed from the matcher's answer, absence and all" {
             val batch =
                 BatchMatchResponse
@@ -368,6 +538,26 @@ class LatticeAssemblerTest :
             values
                 .filter { it.name != "UNRECOGNIZED" }
                 .associate { it.name to (it as com.google.protobuf.ProtocolMessageEnum).number }
+
+        private fun token(
+            text: String,
+            start: Int,
+            end: Int,
+            lemma: String,
+            upos: String,
+            depHead: Int,
+            depRelation: String,
+        ): org.tatrman.nlp.v1.Token =
+            org.tatrman.nlp.v1.Token
+                .newBuilder()
+                .setText(text)
+                .setCharStart(start)
+                .setCharEnd(end)
+                .setLemma(lemma)
+                .setUpos(upos)
+                .setDepHead(depHead)
+                .setDepRelation(depRelation)
+                .build()
 
         private fun mention(
             text: String,

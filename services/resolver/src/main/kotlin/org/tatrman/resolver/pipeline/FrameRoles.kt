@@ -21,11 +21,11 @@ import org.tatrman.resolver.v1.TargetClass
  * ```
  * R0  target_class == OPERATOR                      -> {}         # RV-35, always
  * R1  target_class == MEMBER                        -> +FILTER    # a member IS a restriction
- * R2  object_kind  == measure                       -> +MEASURE   # a measure IS the measure  ⛔ DEAD
- * R3  prep in GROUPING_PREPS and not measure(m)     -> +GROUPING
- * R4  prep in FILTER_PREPS   and not measure(m)     -> +FILTER
- * R5  no prep, deprel == compound, not measure      -> +FILTER     # "WEB revenue"
- * R6  no prep, deprel starts "obl", not measure     -> +FILTER     # "minulý TÝDEN"
+ * R2  object_kind  == measure                       -> +MEASURE   # a measure IS the measure
+ * R3  prep in GROUPING_PREPS and not capable(m)     -> +GROUPING
+ * R4  prep in FILTER_PREPS   and not capable(m)     -> +FILTER
+ * R5  no prep, deprel == compound, not capable      -> +FILTER     # "WEB revenue"
+ * R6  no prep, deprel starts "obl", not capable     -> +FILTER     # "minulý TÝDEN"
  * R6' no prep, deprel == advmod, binds an attribute -> +FILTER     # "LONI" (spike F-1)
  * R7  deprel == conj  -> inherit the head mention's FILTER / GROUPING
  * R8  m anchors a value and deprel not nsubj        -> +FILTER     # "účtu 501001"
@@ -37,8 +37,13 @@ import org.tatrman.resolver.v1.TargetClass
  * **R3's measure exception is what makes `podle`/`by` safe.** It is GROUP-BY in *"tržby podle
  * prodejen"* and ORDER-BY in *"prvních 10 stanic podle tržby"* — the same preposition, opposite
  * roles. The discriminator is neither the operator nor the word order: it is whether the
- * governed mention **binds a measure**, which is model-driven and therefore does not need a
+ * governed mention is **measure-capable**, which is model-driven and therefore does not need a
  * top-n operator to have been recognised first.
+ *
+ * ⚑ MS widened that predicate from `measure` to `measure ∪ entity_with_measures`, and the reason
+ * is *"prodeje podle prodejen"*: `prodeje` binds the sales ENTITY, which declares measures, and
+ * the question groups by the branch. Grouping by the sales themselves is not a reading anyone
+ * asked for. R2 was NOT widened with it — see [measureCapable].
  *
  * **R9(a) `nsubj` is the highest-value signal in the set.** It separates *"Které POLOŽKY nebyly
  * skladem"* (subject = the dimension) from *"Zobraz TRŽBY podle prodejen"* (subject = the
@@ -91,20 +96,22 @@ object FrameRoles {
         // -- R3..R6' syntax-driven roles --------------------------------------
         for (m in scoreable) {
             if (m.headToken < 0 || m.headToken >= tokens.size) continue
-            val measure = isMeasure(m)
+            val capable = measureCapable(m)
             val prep = prepositionOf(parse, m.headToken)
             val relation = tokens[m.headToken].depRelation
             when {
                 prep != null && prep in grouping -> {
-                    // "podle X" / "by X" is GROUP-BY for a dimension and ORDER-BY for a measure.
-                    // The measure case needs no extra role — R2 already gave it MEASURE — and
-                    // crucially must NOT become a grouping.
-                    if (!measure) roles.getValue(m.id) += FrameRole.FRAME_ROLE_GROUPING
+                    // "podle X" / "by X" is GROUP-BY for a dimension and ORDER-BY for anything
+                    // measure-capable. The measure case needs no extra role — R2 already gave it
+                    // MEASURE — and crucially must NOT become a grouping. A measure-CAPABLE entity
+                    // gets no role here either: it is not the grouping axis, and MS-R6 leaves the
+                    // rows/count/value reading to the operator layer.
+                    if (!capable) roles.getValue(m.id) += FrameRole.FRAME_ROLE_GROUPING
                 }
                 prep != null && prep in filter -> {
-                    if (!measure) roles.getValue(m.id) += FrameRole.FRAME_ROLE_FILTER
+                    if (!capable) roles.getValue(m.id) += FrameRole.FRAME_ROLE_FILTER
                 }
-                prep == null && !measure ->
+                prep == null && !capable ->
                     when {
                         // A noun premodifying another noun restricts it: "WEB revenue".
                         relation == "compound" -> roles.getValue(m.id) += FrameRole.FRAME_ROLE_FILTER
@@ -159,39 +166,67 @@ object FrameRoles {
     }
 
     /**
-     * ⛔ **ALWAYS FALSE IN PRODUCTION, and not because anything here is unwired.**
+     * **R2's predicate — and since MS-P2, one that fires in production.**
      *
-     * `objectKind` has **no source in this system** — checked against the artifacts 2026-08-14,
-     * after two rounds of assuming otherwise:
+     * The kinds ARRIVE. The chain, end to end, and every link is a file you can open:
      *
-     *  - `meta.v1` contains **zero** occurrences of `measure`. `ObjectDescriptor.kind` comes
-     *    straight from `ttr-metadata`'s `ModelObject.kind`, whose whole vocabulary is
-     *    `table | view | column | procedure | foreign_key | entity | attribute | relation |
-     *    role | query | drill_map | world | …` — no measure, no dimension, no cubelet. Its
-     *    `SchemaCode` has no `MD` member either.
-     *  - the compiled lexicon archive states a target **class**
-     *    (`MODEL_OBJECT | MEMBER | OPERATOR | GROUNDING_TRIGGER`), a different axis; its reader
-     *    says so in as many words.
-     *  - the per-request `Registry` override has the field, and nothing populates it.
+     *  1. an estate declares the mention facet in its model — `semantics { name: · code: ·
+     *     measures: [...] }` on an `entity` or a db `table` (MS contracts §1.1);
+     *  2. `MentionKinds` (ttr-semantics) turns those declared facts into ONE of
+     *     `measure | attribute | entity | entity_with_measures` — the whole derivation table, in
+     *     one place, at COMPILE time (contracts §5);
+     *  3. `LexiconCompiler` writes them into the compiled lexicon archive's `targets` map
+     *     (`ttr-lexicon-compiled/v2`);
+     *  4. `LexiconArchiveRegistrySource` copies them onto `ResolverEntityType.objectKind`
+     *     verbatim, and `LatticeAssembler.objectKindOf` hands them to [Input].
      *
-     * The `md.` layer these rules were written against is authored in TTR but is **not
-     * represented in the metadata model** — which is also why `TransDslRenderer.address()`
-     * rejects `md.` refs outright (*"no md layer exists to say what object carries it"*).
+     * So a blank kind now means what it says — *this estate declared no mention facet* — and R2
+     * being inert for it is the correct reading rather than a missing wire.
      *
-     * ⚠ **The cost is wider than R2.** This predicate also gates R3–R6, each of which reads
-     * *"and NOT measure(m)"* — so with the kind blank, nothing is ever exempted from FILTER or
-     * GROUPING **for being the measure**. Observed live: a measure mention comes back
-     * `FRAME_ROLE_SUBJECT`, and its compound modifier takes FILTER through R5.
+     * **History, because it explains the shape of everything around this rule.** Until 2026-09-01
+     * this comment was an obituary: `objectKind` had no source in the system at all. `meta.v1`
+     * contained zero occurrences of `measure`; `ttr-metadata`'s `ModelObject.kind` vocabulary
+     * (`table | view | column | entity | attribute | relation | …`) had no member for it; the
+     * archive stated only a target CLASS (`MODEL_OBJECT | MEMBER | OPERATOR |
+     * GROUNDING_TRIGGER`), a different axis; and the per-request `Registry` override had the
+     * field with nothing populating it. The cost was wider than R2, because this predicate also
+     * gated R3–R6 — so nothing was ever exempted from FILTER or GROUPING *for being the measure*,
+     * and a measure mention came back SUBJECT with its compound modifier taking FILTER through
+     * R5. MS supplied the missing authority; it did not unwire anything here.
      *
-     * ⛔ **Do not "fix" this by deriving a kind from the ref prefix.**
-     * `LexiconArchiveRegistrySource` refuses to do that because it would be a second rule, free
-     * to drift from the model's own — and that argument gets *stronger*, not weaker, when the
-     * first rule turns out to be missing: there would be no authority to drift from at all. The
-     * real fix is an md layer in the metadata model, upstream. Recorded here rather than only in
-     * a tracker, because a rule that reads as merely unwired invites exactly the local fix this
-     * comment refuses.
+     * ⛔ **The rule that outlived the obituary: no kind is DERIVED in this service.** Not from the
+     * ref's prefix, not from its dots, not from the category it matched on.
+     * `LexiconArchiveRegistrySource` refuses to do it for the same reason, and the reason is
+     * unchanged now that an authority exists: a second rule is free to drift from the model's own,
+     * and the two would disagree about a question no one thinks to re-check. The model decides,
+     * through exactly one table, upstream.
+     *
+     * That rule is now **enforced, not merely stated**: `verifyNoKindDerivation` in this module's
+     * `build.gradle.kts` fails the build if any MAIN source imports `org.tatrman.ttr.semantics`,
+     * so the local fix this comment forbids cannot compile. (Naming the table in prose, as the
+     * chain above does, stays legal — explaining where a kind comes from is the opposite of
+     * deriving one.) Added at review-084 F2, which found that the `testImplementation` scope
+     * everyone assumed was doing this job was doing nothing: `ttr-metadata` puts `ttr-semantics`
+     * on the runtime classpath regardless.
      */
     private fun isMeasure(mention: Input): Boolean = mention.objectKind.equals("measure", ignoreCase = true)
+
+    /**
+     * R3–R6's predicate: this mention IS a measure, or it HAS measures.
+     *
+     * The distinction from [isMeasure] is MS-R6 and it is deliberate. *"prodeje podle prodejen"*
+     * groups by the branch, not by the sales — so an entity that declares measures must be
+     * exempted from GROUPING and FILTER exactly as a measure is. But it must NOT be stamped
+     * MEASURE: whether *"kolik prodejů"* wants rows, a count, or the value of a measure is a
+     * reading the operator layer makes from operator evidence (design.md §6.3, contracts §9), and
+     * a role asserted here would pre-empt it with the one fact the model cannot supply.
+     *
+     * Everything else stays keyed to the narrower predicate: R2 above, and R6' below, which reads
+     * `attribute` exactly — spike F-1 found a temporal adverb binding a calendar ATTRIBUTE, and
+     * widening it to measure-capable kinds would make *"loni"* a filter for binding an entity.
+     */
+    private fun measureCapable(mention: Input): Boolean =
+        isMeasure(mention) || mention.objectKind.equals("entity_with_measures", ignoreCase = true)
 
     /** The lemma of the adposition attached to [headToken] by a `case` relation, folded low. */
     private fun prepositionOf(

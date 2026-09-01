@@ -1,0 +1,176 @@
+# MS — the mention-facet corpus (MS-P3·S4, contracts §8.5)
+#
+# WHY A SEPARATE FILE. `fixtures.yaml` and `holdout.yaml` are the Q-15 spike's frozen
+# evidence: 39 + 8 fixtures authored before/after the rule freeze, scored against numbers
+# the ruling was made on. Adding MS shapes to them would change the denominators of a
+# published score and rewrite the provenance of a corpus whose value IS its provenance.
+# So MS gets its own file, asserted a different and stricter way: not "at least the
+# recorded precision" but EXACT role sets, mention by mention.
+#
+# THE PARSES ARE REAL. Every `text` here is character-identical to a question already in
+# `fixtures.yaml`, so each one reuses that question's cached Stanza parse
+# (`parses/<sha256(lang\0text)[:16]>.json`) rather than a dep tree someone typed. What
+# changes is not the sentence, it is the MODEL BEHIND IT: the same words over an estate
+# that declares the mention facet, where `tržby` binds the sales ENTITY that declares
+# measures instead of an `md.` measure object. That is precisely the difference MS makes,
+# and holding the parse fixed is what isolates it.
+#
+# WHAT THESE PIN, and none of it is reachable from the frozen corpora (they contain no
+# `entity_with_measures` ref, because before MS nothing could produce one):
+#
+#   * an entity that HAS measures is exempt from GROUPING and FILTER exactly as a measure
+#     is (R3–R6 via `measureCapable`);
+#   * and is NOT stamped MEASURE (MS-R6 — rows / count / value is the operator layer's
+#     reading, contracts §9);
+#   * an estate that declares NOTHING gets the pre-MS roles, byte for byte
+#     (contracts §10, last row) — `ms-undeclared-cs` is that row, executable.
+#
+# Kinds are DERIVED here as everywhere: the fixture states model facts, `MentionKinds`
+# turns them into the kind. A fixture stating `object_kind` is rejected by the loader.
+
+schema: ms-frame-roles-fixtures/v1
+authored: 2026-09-01
+effort: MS-P3·S4
+
+fixtures:
+
+  # ======================================================== the *prodeje* trio (entity-bound)
+
+  - id: ms-grouping-cs
+    lang: cs
+    world: hartland
+    source: "text reused verbatim from hl-rev-by-store-cs (same cached parse)"
+    text: "Zobraz tržby podle prodejen"
+    note: >
+      The E-R twin of hl-rev-by-store-cs. `tržby` no longer binds an md measure — it binds
+      the SALES ENTITY, which declares `measures: [amount_czk]`. It is still what the
+      question is about (SUBJECT via R9) and it is still not the grouping axis, but it no
+      longer carries MEASURE: which of the entity's measures the question wants, or whether
+      it wants rows at all, is not something the model states.
+    model:
+      "er.entity.sales": {isAttribute: false, ownerHasMeasures: true}
+      "er.entity.store": {isAttribute: false}
+    mentions:
+      - span: "Zobraz"
+        binding: {ref: "op:show", target_class: OPERATOR}
+        roles: []
+      - span: "tržby"
+        binding: {ref: "er.entity.sales", target_class: MODEL_OBJECT}
+        roles: [SUBJECT]
+      - span: "prodejen"
+        binding: {ref: "er.entity.store", target_class: MODEL_OBJECT}
+        roles: [GROUPING]
+
+  - id: ms-orderby-cs
+    lang: cs
+    world: hartland
+    source: "text reused verbatim from hl-topn-cs (same cached parse)"
+    text: "Zobraz prvních 10 produktů podle tržby"
+    note: >
+      THE load-bearing case of this stage. `podle tržby` is ORDER-BY, and what makes it so
+      is a model fact about the governed mention. Before MS that fact could only be
+      "objectKind == measure"; here the mention binds an ENTITY that declares measures, and
+      it must be exempted from GROUPING just the same — otherwise the estate that models its
+      sales as an entity gets a GROUP BY where the estate that models them as an md measure
+      gets an ORDER BY, for the identical question.
+    model:
+      "md.dimension.Product": {isAttribute: false}
+      "er.entity.sales": {isAttribute: false, ownerHasMeasures: true}
+    mentions:
+      - span: "Zobraz"
+        binding: {ref: "op:show", target_class: OPERATOR}
+        roles: []
+      - span: "prvních 10"
+        binding: {ref: "op:top-n", target_class: OPERATOR}
+        roles: []
+      - span: "produktů"
+        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT}
+        roles: [SUBJECT]
+      - span: "tržby"
+        binding: {ref: "er.entity.sales", target_class: MODEL_OBJECT}
+        roles: []
+
+  - id: ms-listing-cs
+    lang: cs
+    world: hartland
+    source: "text reused verbatim from hl-trend-cs (same cached parse)"
+    text: "Jak se vyvíjely tržby z tržiště v roce 2025?"
+    note: >
+      The listing shape, with two restrictions around it. The capable entity keeps SUBJECT
+      and takes no MEASURE; the channel and the year still FILTER — the exemption is a
+      property of the measure-capable mention, not something it spreads to its neighbours.
+    model:
+      "er.entity.sales": {isAttribute: false, ownerHasMeasures: true}
+      "er.entity.catalog_sales": {isAttribute: false}
+      "md.dimension.Calendar.year": {isAttribute: true}
+    mentions:
+      - span: "vyvíjely"
+        binding: {ref: "op:trend", target_class: OPERATOR}
+        roles: []
+      - span: "tržby"
+        binding: {ref: "er.entity.sales", target_class: MODEL_OBJECT}
+        roles: [SUBJECT]
+      - span: "tržiště"
+        binding: {ref: "er.entity.catalog_sales", target_class: MODEL_OBJECT}
+        roles: [FILTER]
+      - span: "roce"
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
+        roles: [FILTER]
+    values:
+      - {span: "2025", anchor: "roce"}
+
+  # ================================================================ the *kolik* count shape
+
+  - id: ms-kolik-cs
+    lang: cs
+    world: hartland
+    source: "text reused verbatim from hl-orders-cs (same cached parse)"
+    text: "Kolik objednávek jsme měli v roce 2025 podle měsíce?"
+    note: >
+      "Kolik X" over an entity that declares measures. MS-R6 in its clearest form: the
+      COUNT reading is the planner's to choose from operator evidence (contracts §9), so
+      the corpus pins only that MS does not mis-role it — no MEASURE, no GROUPING, and the
+      subject where R9 puts it. The calendar attributes are untouched by any of this.
+    model:
+      "er.entity.orders": {isAttribute: false, ownerHasMeasures: true}
+      "md.dimension.Calendar.year": {isAttribute: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
+    mentions:
+      - span: "objednávek"
+        binding: {ref: "er.entity.orders", target_class: MODEL_OBJECT}
+        roles: [SUBJECT]
+      - span: "roce"
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
+        roles: [FILTER]
+      - span: "měsíce"
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
+        roles: [GROUPING]
+    values:
+      - {span: "2025", anchor: "roce"}
+
+  # ============================================ contracts §10 — declare nothing, change nothing
+
+  - id: ms-undeclared-cs
+    lang: cs
+    world: hartland
+    source: "ms-orderby-cs with the `model:` section removed"
+    text: "Zobraz prvních 10 produktů podle tržby"
+    note: >
+      The same sentence and the same refs as ms-orderby-cs, over an estate that declared no
+      mention facet at all: every kind derives to "" and every mention is treated exactly as
+      it was before MS existed. `tržby` therefore takes GROUPING — the reading MS exists to
+      correct — and that is the CORRECT answer here, because nothing in this estate says
+      otherwise. This fixture fails the day MS starts guessing.
+    mentions:
+      - span: "Zobraz"
+        binding: {ref: "op:show", target_class: OPERATOR}
+        roles: []
+      - span: "prvních 10"
+        binding: {ref: "op:top-n", target_class: OPERATOR}
+        roles: []
+      - span: "produktů"
+        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT}
+        roles: [SUBJECT]
+      - span: "tržby"
+        binding: {ref: "er.entity.sales", target_class: MODEL_OBJECT}
+        roles: [GROUPING]

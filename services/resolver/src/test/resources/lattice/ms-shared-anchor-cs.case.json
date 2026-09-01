@@ -1,0 +1,104 @@
+{
+  "id": "ms-shared-anchor-cs",
+  "source": "review-084 F4 — the S1→S2→S3 chain, end to end through ResolverPipeline",
+  "expect": "One anchor word declared by TWO owners — the sales ENTITY (which declares measures) and its own measure attribute — reaches the gate as ONE merged candidate carrying both refs and both categories (MS-P3·S1), the declared-containment collapse binds the ATTRIBUTE instead of asking (MS-P3·S2), and the mention comes out MEASURE with no GROUPING under `podle` (MS-P3·S3, R2 + the R3 exemption). Nothing else in this estate is new. The text and the parse are h2-cs's, character for character, so the only variable is the model behind the words — the `ms.yaml` technique (contracts §8.5).",
+  "text": "Zobraz prvních 10 čerpacích stanic v Praze podle tržby za 12 měsíců.",
+  "locale": "cs",
+  "parseFile": "h2-cs.parse.json",
+  "registry": {
+    "entityTypes": [
+      {
+        "ref": "op:show",
+        "categories": ["op:show"],
+        "anchors": ["zobraz"],
+        "objectKind": "operator"
+      },
+      {
+        "ref": "op:top-n",
+        "categories": ["op:top-n"],
+        "anchors": ["první"],
+        "objectKind": "operator"
+      },
+      {
+        "ref": "er.entity.sales",
+        "categories": ["er.entity.sales.name"],
+        "anchors": ["tržba"],
+        "objectKind": "entity_with_measures"
+      },
+      {
+        "ref": "er.entity.sales.amount_czk",
+        "categories": ["er.entity.sales.amount_czk"],
+        "anchors": ["tržba"],
+        "objectKind": "measure",
+        "ownerRef": "er.entity.sales"
+      },
+      {
+        "ref": "md.dimension.Calendar.month",
+        "categories": ["md.dimension.Calendar.month"],
+        "anchors": ["měsíc"],
+        "objectKind": "attribute"
+      }
+    ],
+    "locales": ["cs"],
+    "snapshotHash": "snap-ms-shared-anchor"
+  },
+  "matcher": {
+    "vocabularyVersion": "lex-ms-vocab",
+    "layerVersions": {
+      "lexiconArtifactHash": "sha256:ms-lexicon",
+      "memberIndexVersions": {}
+    },
+    "byQuery": {
+      "Zobraz": [
+        {
+          "candidateId": "lex:op:show:zobraz",
+          "candidate": "zobraz",
+          "score": 1.0,
+          "category": "op:show",
+          "source": "DECLARED",
+          "targetRef": "op:show",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "matchMethod": "EXACT",
+          "provenance": { "producer": "lex-matcher", "method": "TATRMAN", "rawScore": 1.0 }
+        }
+      ],
+      "prvních": [
+        {
+          "candidateId": "lex:op:top-n:prvnich",
+          "candidate": "prvních",
+          "score": 1.0,
+          "category": "op:top-n",
+          "source": "DECLARED",
+          "targetRef": "op:top-n",
+          "targetClass": "TARGET_CLASS_OPERATOR",
+          "matchMethod": "EXACT",
+          "provenance": { "producer": "lex-matcher", "method": "TATRMAN", "rawScore": 1.0 }
+        }
+      ],
+      "tržby": [
+        {
+          "candidateId": "lex:er.entity.sales:trzby",
+          "candidate": "tržby",
+          "score": 1.0,
+          "category": "er.entity.sales.name",
+          "source": "DECLARED",
+          "targetRef": "er.entity.sales",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "matchMethod": "EXACT",
+          "provenance": { "producer": "lex-matcher", "method": "TATRMAN", "rawScore": 1.0 }
+        },
+        {
+          "candidateId": "lex:er.entity.sales.amount_czk:trzby",
+          "candidate": "tržby",
+          "score": 1.0,
+          "category": "er.entity.sales.amount_czk",
+          "source": "DECLARED",
+          "targetRef": "er.entity.sales.amount_czk",
+          "targetClass": "TARGET_CLASS_MODEL_OBJECT",
+          "matchMethod": "EXACT",
+          "provenance": { "producer": "lex-matcher", "method": "TATRMAN", "rawScore": 1.0 }
+        }
+      ]
+    }
+  }
+}

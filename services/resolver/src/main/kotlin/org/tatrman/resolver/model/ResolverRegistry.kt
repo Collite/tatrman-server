@@ -49,6 +49,20 @@ data class ResolverEntityType(
 )
 
 /**
+ * MS-P3·S2 — the declared containment the Binder collapses on: member ref → its owner's ref.
+ *
+ * Built here and nowhere else so the three producers that gate (`GateSpans`, the lookup rounds,
+ * the re-gate) cannot drift into three spellings of the same question. Refs with no declared owner
+ * are absent rather than mapped to `""`, so a lookup answers "not owned" by missing.
+ *
+ * ⛔ A derivation, not a parse: the pairs come from [ResolverEntityType.ownerRef], which the
+ * archive carries because the model declared it. Splitting a ref on dots to guess a parent would
+ * be a second rule, and the two would eventually disagree.
+ */
+fun List<ResolverEntityType>.ownersByRef(): Map<String, String> =
+    filter { it.ownerRef.isNotBlank() }.associate { it.ref to it.ownerRef }
+
+/**
  * Gating thresholds — ported from the live ENTITIES_ONLY config
  * (`ResolverGraph.kt:38-48`). Provenance for the numbers is that file, except [strong],
  * which RV-P2.2 adds and whose provenance is recorded on the property.

@@ -130,6 +130,17 @@ dependencies {
     // lex-matcher's `LexiconArchiveSourceTest` does. Two readers conformant by contract are
     // held together by both being held to the same packer.
     testImplementation(libs.tatrman.ttr.lexicon.compile)
+    // MS-P3.S4 — the frame-role corpus derives each mention's `objectKind` through the REAL
+    // `MentionKinds` table (contracts §8.5) instead of the fixture stating one. There is exactly
+    // ONE implementation of that mapping in the ecosystem and it lives in ttr-semantics; a copy of
+    // it in this repo's test tree would be a second.
+    //
+    // ⛑ Declared at TEST scope to say where it belongs — but that scope is a signal, NOT a guard,
+    // and the first version of this comment claimed otherwise (review-084 F2). `ttr-semantics` is
+    // already on this module's `runtimeClasspath`, transitively via `ttr-metadata`, so production
+    // code here can import `MentionKinds` and compile. What actually holds the line is
+    // `verifyNoKindDerivation` below.
+    testImplementation(libs.tatrman.ttr.semantics)
 }
 
 // RG-P5 — structural ZERO-LLM guard (RS-23). Fail the build if the resolver's
@@ -162,4 +173,54 @@ val verifyNoLlmDependency by tasks.registering {
     }
 }
 
-tasks.named("check") { dependsOn(verifyNoLlmDependency) }
+// MS (review-084 F2) — structural NO-KIND-DERIVATION guard. Fail the build if anything in this
+// module's MAIN source set reaches for the derivation table.
+//
+// `FrameRoles.isMeasure`'s ⛔ comment forbids deriving an `objectKind` anywhere in this service:
+// the model decides, through exactly one table, upstream, and a second rule here would be free to
+// drift from the model's own. That was enforced by prose, and prose was assumed to be backed by
+// the `testImplementation` scope above — which backs nothing, because `ttr-metadata` puts
+// `ttr-semantics` on the runtime classpath regardless. This is the guard that comment describes:
+// a `MentionKinds` import under `src/main` fails the build, and the failure names the rule.
+//
+// The token is the PACKAGE, not the type name, and that is deliberate: Kotlin can only reach
+// `MentionKinds` through an import or a fully-qualified use, and both spell the package — so one
+// token is necessary and sufficient.
+//
+// Comments are stripped before the search, because the main-source KDocs that *name* the chain
+// (`FrameRoles`, `ResolverRegistry`, `RegistrySource`, `LexiconArchiveRegistrySource`) must stay
+// legal: explaining where a kind comes from is the opposite of deriving one, and a guard that
+// punished the explanation would delete the only documentation of the chain. The strip is
+// deliberately naive — a `//` inside a string literal truncates that line — which can only ever
+// cost a false NEGATIVE on a line that mixes a string with a fully-qualified use. An `import` line
+// contains no strings, so the shape that actually enables the local fix is always caught.
+//
+// Test sources are exempt on purpose — deriving the kind from declared facts is exactly what the
+// frame-role corpus must do (contracts §8.5), and doing it through the real table is the point.
+val forbiddenKindDerivationImport = "org.tatrman.ttr.semantics"
+
+val verifyNoKindDerivation by tasks.registering {
+    val mainSources = fileTree("src/main") { include("**/*.kt") }
+    inputs.files(mainSources).withPathSensitivity(PathSensitivity.RELATIVE)
+    doLast {
+        val blockComment = Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL)
+        val lineComment = Regex("""(?m)//.*$""")
+        val hits =
+            mainSources
+                .filter { file ->
+                    file
+                        .readText()
+                        .replace(blockComment, "")
+                        .replace(lineComment, "")
+                        .contains(forbiddenKindDerivationImport)
+                }.map { it.relativeTo(projectDir).path }
+        require(hits.isEmpty()) {
+            "NO-KIND-DERIVATION violation (MS contracts §5, FrameRoles.isMeasure ⛔): " +
+                "$hits import `$forbiddenKindDerivationImport` from MAIN sources. A kind is DECLARED " +
+                "by the model and copied verbatim through the archive — it is never derived in this " +
+                "service. Naming the table in a comment is fine; reaching for it is not."
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(verifyNoLlmDependency, verifyNoKindDerivation) }

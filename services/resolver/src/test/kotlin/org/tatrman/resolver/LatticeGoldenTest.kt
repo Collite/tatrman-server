@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import org.tatrman.fuzzy.v1.BatchMatchRequest
 import org.tatrman.fuzzy.v1.BatchMatchResponse
@@ -107,6 +108,10 @@ class LatticeGoldenTest :
         fun latticeWith(
             id: String,
             kindOf: (String) -> String,
+            // review-084 F4 — the declared containment, on the SNAPSHOT channel. Defaulted to
+            // pass-through so every case above is unaffected (they declare no owner at all); the
+            // shared-anchor case below uses it, and blanks it to get its own control.
+            ownerOf: (String) -> String = { it },
         ): JsonObject {
             val case = loadJson("/lattice/$id.case.json")
             val declared = registryOf(case)
@@ -128,6 +133,7 @@ class LatticeGoldenTest :
                                             emptyList()
                                         },
                                     objectKind = kindOf(t.objectKind),
+                                    ownerRef = ownerOf(t.ownerRef),
                                 )
                             }
                         },
@@ -211,6 +217,76 @@ class LatticeGoldenTest :
             // so the exemption becomes reachable from MS's OWN channel the day an estate has a
             // measure anchor governing a nominal child. No corpus case has that shape, which is
             // why this test exists on the operator half instead.
+        }
+
+        // ---- review-084 F4 — S1 -> S2 -> S3, end to end through ResolverPipeline --------------
+        //
+        // Until this case the three P3 stages were pinned only at their own level: the merge in
+        // `SpanProposalTest`, the collapse in `BinderTest` + `GateSpansTest`, the predicate split
+        // in `FrameRolesMeasureTest` + `ms.yaml`. Nothing ran the chain, and nothing could: all
+        // four cases above declare no `ownerRef` and give every anchor exactly ONE owner, so "no
+        // golden moved at P3" was true because no golden COULD move.
+        //
+        // The estate here is `h2-cs`'s question and `h2-cs`'s cached parse, character for
+        // character — the `ms.yaml` technique (contracts §8.5). The only variable is the model
+        // behind the words: `tržba` is declared by BOTH the sales entity (which declares measures)
+        // and its own measure attribute, which is the shape every real mention facet produces.
+        // Fed through the SNAPSHOT channel, because that is the channel an estate actually uses.
+        //
+        // Scope, stated so it is not over-read: the S3 half asserted here is R2 and the R3
+        // exemption over a `measure` kind, where `isMeasure` and `measureCapable` agree. The
+        // WIDENING to `entity_with_measures` is `ms.yaml`'s (`ms-orderby-cs`), which is where
+        // collapsing the predicate back reds. What this case adds is the joints.
+
+        "ms-shared-anchor-cs: the shared anchor is ONE mention, bound to the measure, no G2" {
+            val lattice = latticeWith("ms-shared-anchor-cs", msKindsOnly)
+            val anchor =
+                mentionsOf(
+                    lattice,
+                ).single { it["span"]!!.jsonObject["text"]?.jsonPrimitive?.content == "tržby" }
+
+            // S1: one candidate for the span, so one mention — not one per owner, and not one
+            // owner silently deleted by `dedupe`.
+            anchor["span"]!!.jsonObject["start"]!!.jsonPrimitive.int shouldBe 49
+
+            // S2: the declared containment collapsed the tie to the more specific object. One
+            // binding, and it is the attribute — the entity reading stays recoverable through the
+            // `ownerRef` it declared.
+            val bindings = anchor["bindings"]!!.jsonArray.map { it.jsonObject["ref"]!!.jsonPrimitive.content }
+            bindings shouldBe listOf("er.entity.sales.amount_czk")
+
+            // S3: R2 stamps MEASURE from the bound ref's kind, and R3's exemption keeps `podle
+            // tržby` from becoming a grouping — the ORDER-BY reading, decided by a model fact.
+            anchor["frameRoles"]!!.jsonArray.map { it.jsonPrimitive.content } shouldBe
+                listOf("FRAME_ROLE_SUBJECT", "FRAME_ROLE_MEASURE")
+
+            // and the question the collapse exists to suppress was never asked
+            gapKindsOf(lattice) shouldBe listOf("GAP_KIND_G3_UNATTRIBUTED", "GAP_KIND_G3_UNATTRIBUTED")
+        }
+
+        "ms-shared-anchor-cs: with the ownerRef blanked the SAME estate asks a G2 — the control" {
+            // Identical everything, one field removed: the attribute declares no owner, which is
+            // what a pre-v3 archive serves. Without it the two readings are a genuine tie and the
+            // gate refuses, exactly as contracts §10's last row requires.
+            //
+            // ⛑ This half is also the S1 evidence. TWO bindings on one span can only happen if
+            // span proposal put both owners into one candidate: before the merge the per-owner
+            // loop emitted two candidates over the identical span and `dedupe` kept the first, so
+            // the second owner never reached the matcher at all — the competitor was deleted, not
+            // refused. Restore the pre-S1 emission and this case comes back with ONE binding and
+            // no gap, which is a wrong answer that looks like a confident one.
+            val lattice = latticeWith("ms-shared-anchor-cs", msKindsOnly) { "" }
+            val anchor =
+                mentionsOf(
+                    lattice,
+                ).single { it["span"]!!.jsonObject["text"]?.jsonPrimitive?.content == "tržby" }
+
+            anchor["bindings"]!!.jsonArray.map { it.jsonObject["ref"]!!.jsonPrimitive.content } shouldBe
+                listOf("er.entity.sales", "er.entity.sales.amount_czk")
+            // the entity speaks for the mention when nothing collapses the tie, so no MEASURE
+            anchor["frameRoles"]!!.jsonArray.map { it.jsonPrimitive.content } shouldBe listOf("FRAME_ROLE_SUBJECT")
+            gapKindsOf(lattice) shouldBe
+                listOf("GAP_KIND_G3_UNATTRIBUTED", "GAP_KIND_G3_UNATTRIBUTED", "GAP_KIND_G2_AMBIGUOUS")
         }
 
         listOf("h1-cs", "h1prime-cs", "h2-cs", "h5-cs").forEach { id ->
@@ -376,6 +452,10 @@ class LatticeGoldenTest :
          */
         private fun mentionsOf(lattice: JsonObject): List<JsonObject> =
             lattice["mentions"]!!.jsonArray.map { it.jsonObject }
+
+        /** Every gap kind the lattice carries, in emission order — `[]` when it carries none. */
+        private fun gapKindsOf(lattice: JsonObject): List<String> =
+            lattice["gaps"]?.jsonArray.orEmpty().map { it.jsonObject["kind"]!!.jsonPrimitive.content }
 
         /** The same lattice with every `frameRoles` key removed, at any depth. */
         private fun stripFrameRoles(

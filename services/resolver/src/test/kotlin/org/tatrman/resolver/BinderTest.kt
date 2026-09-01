@@ -2,6 +2,7 @@
 package org.tatrman.resolver
 
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
@@ -155,6 +156,176 @@ class BinderTest :
             bind.winner.match.score shouldBe 0.92
         }
 
+        // --- MS-P3·S2 — the declared-containment collapse (contracts §8.3, design.md §10.2) ----
+
+        val sales = "er.entity.sales"
+        val amount = "er.entity.sales.amount_czk"
+        val quantity = "er.entity.sales.quantity"
+        val owners = mapOf(amount to sales, quantity to sales)
+
+        "MS: an entity tied with its OWN attribute binds the attribute — one answer, two granularities" {
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        declared(sales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    thresholds,
+                    owners,
+                )
+            val bind = verdict.shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe amount
+            bind.admitted.map { it.match.targetRef } shouldContainExactly listOf(amount)
+            // nothing is silently dropped: the owner is nameable in the rung log
+            bind.rejected.map { it.match.targetRef } shouldContainExactly listOf(sales)
+        }
+
+        "MS: with no declared owners the same input stays Ambiguous (pre-v3 estates unchanged)" {
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        declared(sales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    thresholds,
+                )
+            verdict.shouldBeInstanceOf<Binder.Ambiguous>().admitted.size shouldBe 2
+        }
+
+        "MS: two attributes of the SAME entity are still a genuine tie — no sibling collapse" {
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(quantity, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    thresholds,
+                    owners,
+                )
+            verdict.shouldBeInstanceOf<Binder.Ambiguous>().admitted.map {
+                it.match.targetRef
+            } shouldContainExactlyInAnyOrder
+                listOf(amount, quantity)
+        }
+
+        "MS: an entity and an UNRELATED entity's attribute are still a genuine tie" {
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        declared("er.entity.branch", 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    thresholds,
+                    owners,
+                )
+            verdict.shouldBeInstanceOf<Binder.Ambiguous>().admitted.size shouldBe 2
+        }
+
+        "MS: a WEAK owner row is rejected BEFORE the collapse ever sees it" {
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        declared(sales, 0.99, EvidenceClass.EVIDENCE_CLASS_WEAK),
+                        declared(amount, 0.72, EvidenceClass.EVIDENCE_CLASS_ANCHORED_FUZZY_STRONG),
+                    ),
+                    thresholds,
+                    owners,
+                )
+            val bind = verdict.shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe amount
+            // the WEAK row is refused by RV-14, with its class intact — not by the collapse
+            bind.rejected.single().evidenceClass shouldBe EvidenceClass.EVIDENCE_CLASS_WEAK
+        }
+
+        "MS: the collapse lives INSIDE the top class — a higher-class entity still wins outright" {
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        declared(sales, 0.80, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(amount, 0.99, EvidenceClass.EVIDENCE_CLASS_ANCHORED_FUZZY_STRONG),
+                    ),
+                    thresholds,
+                    owners,
+                )
+            // RV-14: the top class wins outright, and the attribute is not in it. No cross-class
+            // rule crept in with the collapse.
+            verdict
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.targetRef shouldBe sales
+        }
+
+        "MS: a MEMBER identity is never collapsed, even when it carries an owned target ref" {
+            // `M:` rows are data values, not model objects. This member row's targetRef IS the
+            // entity the attribute declares as its owner — so without the `V:`-only guard the
+            // collapse would delete a data value on the strength of a model relation and bind the
+            // attribute alone. Drop the guard and this case turns into a Bind.
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        member("row-in-sales", sales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    thresholds,
+                    owners,
+                )
+            verdict.shouldBeInstanceOf<Binder.Ambiguous>().admitted.size shouldBe 2
+        }
+
+        "MS: out-of-band owners are not resurrected by the collapse" {
+            // The entity is outside the tie band, so it is already rejected when the collapse runs
+            // — and the attribute binds on its own, exactly as it did before MS.
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(sales, 0.10, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    thresholds,
+                    owners,
+                )
+            val bind = verdict.shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe amount
+            bind.rejected.map { it.match.targetRef } shouldContainExactly listOf(sales)
+        }
+
+        // --- review-084 F3 — malformed containment, the two shapes that empty the survivors ----
+
+        "MS: a containment CYCLE declines the collapse instead of throwing" {
+            // `owners` is data this service did not produce. A cycle collapses every identity and
+            // leaves nothing to bind; the rule declines and the ordinary tie check answers, which
+            // for two distinct identities in the band is what it always was — a refusal.
+            val verdict =
+                Binder.decide(
+                    listOf(
+                        declared(sales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    thresholds,
+                    mapOf(sales to amount, amount to sales),
+                )
+            val ambiguous = verdict.shouldBeInstanceOf<Binder.Ambiguous>()
+            ambiguous.admitted.map { it.match.targetRef } shouldContainExactlyInAnyOrder listOf(sales, amount)
+            // and nothing was moved to `rejected` by a collapse that did not happen
+            ambiguous.rejected.shouldBeEmpty()
+        }
+
+        "MS: a ref declared as its OWN owner still binds — never a clarification with one option" {
+            // The degenerate half of the same guard, and the one that used to be wrong: returning
+            // `Ambiguous` from the empty-survivors branch made `Ambiguous` reachable with a single
+            // admitted candidate, and `GateSpans.outcomeOf` renders any ambiguous span by offering
+            // its contenders. One row in, one option out — the exact question the collapse exists
+            // to remove, produced from malformed data instead of from good data.
+            val verdict =
+                Binder.decide(
+                    listOf(declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT)),
+                    thresholds,
+                    mapOf(amount to amount),
+                )
+            verdict
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.targetRef shouldBe amount
+        }
+
         "UNSPECIFIED never outranks a real class, though proto3 gives it the zero value" {
             val verdict =
                 Binder.decide(
@@ -170,6 +341,45 @@ class BinderTest :
         }
     }) {
     private companion object {
+        /** A MEMBER row that nonetheless carries a target ref — a data value inside an object. */
+        private fun member(
+            id: String,
+            targetRef: String,
+            score: Double,
+            evidenceClass: EvidenceClass,
+        ): Binder.ClassedMatch =
+            Binder.ClassedMatch(
+                FuzzyMatch
+                    .newBuilder()
+                    .setCandidateId(id)
+                    .setCandidate(id)
+                    .setScore(score)
+                    .setTargetRef(targetRef)
+                    .setCategory(targetRef)
+                    .setSource(SourceTag.MEMBER)
+                    .build(),
+                evidenceClass,
+            )
+
+        /** A DECLARED row for a model object — identity `V:targetRef`, the collapse's unit. */
+        private fun declared(
+            targetRef: String,
+            score: Double,
+            evidenceClass: EvidenceClass,
+        ): Binder.ClassedMatch =
+            Binder.ClassedMatch(
+                FuzzyMatch
+                    .newBuilder()
+                    .setCandidateId("lex:$targetRef")
+                    .setCandidate(targetRef)
+                    .setScore(score)
+                    .setTargetRef(targetRef)
+                    .setCategory(targetRef)
+                    .setSource(SourceTag.DECLARED)
+                    .build(),
+                evidenceClass,
+            )
+
         /** A member row at [score], already carrying the class the gate is being asked to order by. */
         private fun classed(
             id: String,

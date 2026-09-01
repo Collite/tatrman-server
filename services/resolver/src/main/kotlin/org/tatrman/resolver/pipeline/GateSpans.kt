@@ -8,6 +8,7 @@ import org.tatrman.fuzzy.v1.SourceTag
 import org.tatrman.fuzzy.v1.SpanQuery
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.model.ownersByRef
 
 /**
  * gateSpans (RG-P5.S1.T4) — the heart. All proposed spans go out in ONE
@@ -60,20 +61,24 @@ object GateSpans {
         snapshotHash: String,
     ): GateOutcome =
         outcomeOf(
-            candidates.mapIndexed { i, cand ->
-                // The ONE decision, made in the one place that makes it (RV-P2.2). Note what is NOT
-                // filtered before the call: the bind floor is the binder's too, because a candidate
-                // the gate refused is still something the rung log should be able to name.
-                val verdict =
-                    Binder.gate(
-                        response.resultsList
-                            .getOrNull(i)
-                            ?.matchesList
-                            .orEmpty(),
-                        cand,
-                        thresholds,
-                    )
-                GatedSpan(cand, verdict.admitted, ambiguous = verdict is Binder.Ambiguous)
+            // MS-P3·S2 — one owners map per gate call, shared by every span (contracts §8.3).
+            entityTypes.ownersByRef().let { owners ->
+                candidates.mapIndexed { i, cand ->
+                    // The ONE decision, made in the one place that makes it (RV-P2.2). Note what is NOT
+                    // filtered before the call: the bind floor is the binder's too, because a candidate
+                    // the gate refused is still something the rung log should be able to name.
+                    val verdict =
+                        Binder.gate(
+                            response.resultsList
+                                .getOrNull(i)
+                                ?.matchesList
+                                .orEmpty(),
+                            cand,
+                            thresholds,
+                            owners,
+                        )
+                    GatedSpan(cand, verdict.admitted, ambiguous = verdict is Binder.Ambiguous)
+                }
             },
             entityTypes,
             thresholds,

@@ -58,3 +58,34 @@ and never offered `db.dbo.QSTRED_DF.KOD_STR` at 0.667.
 from the spike cache and re-applies the authored NER layer. Do not hand-edit tokens. The goldens are authored from
 `contracts.md` §1 and the fixture gold, then confirmed against the emission; on a mismatch the
 test writes what the core actually produced to `build/lattice-actual/<id>.lattice.json`.
+
+---
+
+## MS (review-084 F4, 2026-09-01) — `ms-shared-anchor-cs`, a case with no golden
+
+A fifth case file joins the four above, and it is a different kind of thing: it has **no
+`.lattice.json`**. It exists to run the MS-P3 chain — span-proposal merge → the Binder's
+declared-containment collapse → the frame-role split — through the real `ResolverPipeline` and
+assert three facts about the result, rather than to freeze an emission.
+
+**Why it was needed.** Every case above declares no `ownerRef` and gives each anchor exactly ONE
+owner, and `latticeWith` did not carry an owner onto the vocabulary it built. So MS-P3 could
+report "no golden moved" truthfully while none of them *could* have moved: the merge and the
+collapse had no end-to-end coverage anywhere in the module.
+
+**Why it has no parse of its own.** Its `text` is `h2-cs`'s, character for character, and its
+`parseFile` is `h2-cs.parse.json` — the `ms.yaml` technique from `frame-roles/PROVENANCE.md`
+§MS. Hand-authoring a Czech dependency tree to test rules that read dependency trees proves only
+that the tree matches the expectation. Holding the parse fixed makes the MODEL the only variable.
+
+**What differs from `h2-cs`, and it is one thing.** `tržba` is declared by **two** owners — the
+sales entity, which declares measures, and its own measure attribute, which declares the entity
+as its `ownerRef` — and `matcher.byQuery["tržby"]` answers with one EXACT row per category. That
+is the shape every real mention facet produces, and the shape no case here had.
+
+It is asserted on the **snapshot** channel (`latticeWith`, no per-request override), because that
+is the channel an estate actually uses, and it is asserted twice: once as declared, and once with
+`ownerRef` blanked, which is what a pre-v3 archive serves. The control comes back with two
+bindings and a `G2_AMBIGUOUS`; the declared run comes back with one binding to the measure and
+`SUBJECT, MEASURE`. The pair is the diff artefact the MS-P4·T3 live chain drill should be read
+against.

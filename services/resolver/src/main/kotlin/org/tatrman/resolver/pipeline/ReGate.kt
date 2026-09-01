@@ -12,6 +12,7 @@ import org.tatrman.fuzzy.v1.LookupRequest
 import org.tatrman.resolver.client.FuzzyClient
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.model.ownersByRef
 import org.tatrman.resolver.v1.Attribution
 import org.tatrman.resolver.v1.Binding
 import org.tatrman.resolver.v1.GapKind
@@ -119,6 +120,8 @@ object ReGate {
         val mentions = lattice.mentionsList.associateBy { it.span.start to it.span.end }
         val values = lattice.valuesList.associateBy { it.span.start to it.span.end }
         val categoriesByRef = entityTypes.associate { it.ref to it.categories }
+        // MS-P3·S2 — see GateSpans: every producer gates through the same containment map.
+        val owners = entityTypes.ownersByRef()
         // `Gate` is a public rpc and `hypotheses` is an unbounded repeated field, so the fan-out has
         // to be bounded by this service rather than by the caller's good manners: without this a
         // single request opens one concurrent matcher RPC per hypothesis, each with a 30s deadline.
@@ -187,7 +190,7 @@ object ReGate {
             // already said so. The hypothesis' own confidence is NOT evidence of anchoring — a
             // proposer that could talk itself into a higher evidence class is a proposer that binds.
             val anchored = mention != null || (value?.anchorMentionId?.isNotBlank() == true)
-            val verdict = Binder.gate(candidates, anchorCandidate(hypothesis, anchored), thresholds)
+            val verdict = Binder.gate(candidates, anchorCandidate(hypothesis, anchored), thresholds, owners)
             when {
                 verdict is Binder.Ambiguous -> outcomes += outcome(hypothesis, Reason.AMBIGUOUS)
                 verdict is Binder.Bind -> {
