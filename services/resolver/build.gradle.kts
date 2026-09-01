@@ -130,6 +130,12 @@ dependencies {
     // lex-matcher's `LexiconArchiveSourceTest` does. Two readers conformant by contract are
     // held together by both being held to the same packer.
     testImplementation(libs.tatrman.ttr.lexicon.compile)
+    // MS-P3.S4 — the frame-role corpus derives each mention's `objectKind` through the REAL
+    // `MentionKinds` table (contracts §8.5) instead of the fixture stating one. Test scope only:
+    // this service must never derive a kind, and importing the table at runtime would be an
+    // invitation to. There is exactly ONE implementation of that mapping in the ecosystem and it
+    // lives in ttr-semantics; a copy of it in this repo's test tree would be a second.
+    testImplementation(libs.tatrman.ttr.semantics)
 }
 
 // RG-P5 — structural ZERO-LLM guard (RS-23). Fail the build if the resolver's

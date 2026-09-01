@@ -59,21 +59,26 @@ fixtures:
       The live Resolver bound 501001 to the cost-centre entity because "účtu" was
       discarded as a "noun hint". Frame roles are the structural fix: účtu is the
       FILTER axis that anchors the value.
+    model:
+      "md.measure.cost": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Account": {isAttribute: false}
+      "md.dimension.Calendar.year": {isAttribute: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "náklady"
-        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "účtu"
-        binding: {ref: "md.dimension.Account", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Account", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "roce"
-        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "období"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
     values:
       - {span: "501001", anchor: "účtu"}
@@ -89,21 +94,26 @@ fixtures:
       H1' differs from H1 only in a typo'd VALUE (letter O for zero). Frame roles must
       be identical — role derivation is a syntactic/structural job and must not wobble
       because a downstream lookup missed.
+    model:
+      "md.measure.cost": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Account": {isAttribute: false}
+      "md.dimension.Calendar.year": {isAttribute: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "náklady"
-        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "účtu"
-        binding: {ref: "md.dimension.Account", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Account", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "roce"
-        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "období"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
     values:
       - {span: "5010O1", anchor: "účtu"}
@@ -122,6 +132,9 @@ fixtures:
       forced "Praze" into cost-centre columns and never admitted ignorance.
       (2) "podle tržby" here is ORDER-BY, not GROUP-BY — the naive "podle + genitive
       -> GROUPING" rule is wrong whenever a top-n operator is present.
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
@@ -138,10 +151,10 @@ fixtures:
         gap_kind: G3_UNATTRIBUTED
         roles: [FILTER]
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [MEASURE]
       - span: "měsíců"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [FILTER]
     values:
       - {span: "12", anchor: "měsíců"}
@@ -155,6 +168,11 @@ fixtures:
     note: >
       Three operator words (Ukaž/vývoj/porovnej), none of which may take a frame role.
       "plánem" is a second measure in the instrumental after porovnej.
+    model:
+      "md.measure.cost": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.CostCentre": {isAttribute: false}
+      "md.dimension.Calendar.month": {isAttribute: true}
+      "md.measure.plan": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "Ukaž"
         binding: {ref: "op:show", target_class: OPERATOR}
@@ -163,19 +181,19 @@ fixtures:
         binding: {ref: "op:trend", target_class: OPERATOR}
         roles: []
       - span: "nákladů"
-        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "střediska"
-        binding: {ref: "md.dimension.CostCentre", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.CostCentre", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "měsíců"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "porovnej"
         binding: {ref: "op:compare", target_class: OPERATOR}
         roles: []
       - span: "plánem"
-        binding: {ref: "md.measure.plan", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.plan", target_class: MODEL_OBJECT}
         roles: [MEASURE]
     values:
       - {span: "220", anchor: "střediska"}
@@ -191,9 +209,11 @@ fixtures:
       No verb, no prepositions, no operator word. Nothing syntactic marks the subject —
       only the fact that "náklady" is the sole model-bound noun. A deriver that leans on
       a show-verb scores zero here.
+    model:
+      "md.measure.cost": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "náklady"
-        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
     values:
       - {span: "501001", anchor: null}
@@ -205,15 +225,18 @@ fixtures:
     source: "task list T1 — the measure-as-subject hard class, verbatim"
     text: "Zobraz tržby podle středisek"
     hard_classes: [operator-roleless, measure-as-subject, grouping-podle]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.CostCentre": {isAttribute: false}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "středisek"
-        binding: {ref: "md.dimension.CostCentre", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.CostCentre", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: double-grouping-cs
@@ -225,18 +248,22 @@ fixtures:
     note: >
       The second grouping mention hangs off the first by `conj`, not off the preposition.
       A rule that only looks at direct children of `podle` finds one of the two.
+    model:
+      "md.measure.cost": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
+      "md.dimension.CostCentre": {isAttribute: false}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "náklady"
-        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "období"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
       - span: "středisek"
-        binding: {ref: "md.dimension.CostCentre", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.CostCentre", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   # ================================================== hartland_cz — fresh variants
@@ -250,15 +277,18 @@ fixtures:
     note: >
       "prodejny" is a declared channel synonym for er.entity.store_sales
       (model/lexicon/cs/channels.ttrm) — an ENTITY in grouping position.
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "er.entity.store_sales": {isAttribute: false}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "prodejen"
-        binding: {ref: "er.entity.store_sales", target_class: MODEL_OBJECT, object_kind: entity}
+        binding: {ref: "er.entity.store_sales", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: hl-double-grouping-cs
@@ -267,18 +297,22 @@ fixtures:
     source: fresh
     text: "Ukaž tržby podle kategorie a měsíce"
     hard_classes: [operator-roleless, measure-as-subject, double-grouping, coordination]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Product.categoryCode": {isAttribute: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "Ukaž"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "kategorie"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT}
         roles: [GROUPING]
       - span: "měsíce"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: hl-filter-only-cs
@@ -290,12 +324,14 @@ fixtures:
     note: >
       "Brno DC" is a declared dcCode valueLabel (md/dimensions.ttrm, sk 5, cs label) —
       a MEMBER, and the only non-measure mention in the question.
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "Brno DC"
-        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER}
         roles: [FILTER]
 
   - id: hl-trend-cs
@@ -307,18 +343,22 @@ fixtures:
     note: >
       A real declared example from the estate's own lexicon. "vyvíjely" is the finite
       verb form of the op:trend trigger family; "tržiště" is a declared channel synonym.
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "er.entity.catalog_sales": {isAttribute: false}
+      "md.dimension.Calendar.year": {isAttribute: true}
     mentions:
       - span: "vyvíjely"
         binding: {ref: "op:trend", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "tržiště"
-        binding: {ref: "er.entity.catalog_sales", target_class: MODEL_OBJECT, object_kind: entity}
+        binding: {ref: "er.entity.catalog_sales", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "roce"
-        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
         roles: [FILTER]
     values:
       - {span: "2025", anchor: "roce"}
@@ -334,18 +374,22 @@ fixtures:
       synonym) is what the question is about; the measure (onHandQty, via the
       "není skladem" stockout trigger) is a predicate over it. Any deriver that assumes
       "the subject is the measure" fails this one.
+    model:
+      "md.dimension.Product": {isAttribute: false}
+      "md.measure.onHandQty": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "položky"
-        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT}
         roles: [SUBJECT]
       - span: "skladem"
-        binding: {ref: "md.measure.onHandQty", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.onHandQty", target_class: MODEL_OBJECT}
         roles: [MEASURE]
       - span: "Brno DC"
-        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "říjnu"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [FILTER]
     values:
       - {span: "2025", anchor: "říjnu"}
@@ -357,12 +401,15 @@ fixtures:
     text: "Jaká je naše míra vrácení podle kanálu?"
     hard_classes: [measure-as-subject, grouping-podle, multiword-measure]
     note: '"míra vrácení" is a declared multi-word returnAmount synonym.'
+    model:
+      "md.measure.returnAmount": {isAttribute: true, listedAsMeasure: true}
+      "er.entity.channel": {isAttribute: false}
     mentions:
       - span: "míra vrácení"
-        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "kanálu"
-        binding: {ref: "er.entity.channel", target_class: MODEL_OBJECT, object_kind: entity}
+        binding: {ref: "er.entity.channel", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: hl-topn-cs
@@ -374,6 +421,9 @@ fixtures:
     note: >
       The hartland twin of h2-cs's second trap, with the subject BOUND this time:
       "podle tržby" is order-by, so tržby is MEASURE and produktů is the SUBJECT.
+    model:
+      "md.dimension.Product": {isAttribute: false}
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
@@ -382,10 +432,10 @@ fixtures:
         binding: {ref: "op:top-n", target_class: OPERATOR}
         roles: []
       - span: "produktů"
-        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT}
         roles: [SUBJECT]
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [MEASURE]
 
   - id: hl-compare-cs
@@ -397,21 +447,26 @@ fixtures:
     note: >
       Coordinated FILTERS (not groupings) — both channel entities are restrictions,
       joined by "a". The mirror image of double-grouping-cs.
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "er.entity.web_sales": {isAttribute: false}
+      "er.entity.store_sales": {isAttribute: false}
+      "md.dimension.Calendar.year": {isAttribute: true}
     mentions:
       - span: "Porovnej"
         binding: {ref: "op:compare", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "e-shopu"
-        binding: {ref: "er.entity.web_sales", target_class: MODEL_OBJECT, object_kind: entity}
+        binding: {ref: "er.entity.web_sales", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "prodejen"
-        binding: {ref: "er.entity.store_sales", target_class: MODEL_OBJECT, object_kind: entity}
+        binding: {ref: "er.entity.store_sales", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "rok"
-        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
         roles: [FILTER]
     values:
       - {span: "2025", anchor: "rok"}
@@ -426,18 +481,22 @@ fixtures:
       "Elektronika" is a declared categoryCode valueLabel (cs). Its anchor "kategorii"
       is a FILTER axis, and "značky" is the grouping — a filter and a grouping on the
       same hierarchy in one question.
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Product.categoryCode": {isAttribute: true}
+      "md.dimension.Product.brandCode": {isAttribute: true}
     mentions:
       - span: "Rozepiš"
         binding: {ref: "op:drilldown", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "kategorii"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "značky"
-        binding: {ref: "md.dimension.Product.brandCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Product.brandCode", target_class: MODEL_OBJECT}
         roles: [GROUPING]
     values:
       - {span: "Elektronika", anchor: "kategorii"}
@@ -451,15 +510,18 @@ fixtures:
     note: >
       "podíl" triggers op:share-of. The SUBJECT is the category (whose share is asked),
       the measure is the denominator — the reverse assignment from the by-default case.
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Product.categoryCode": {isAttribute: true}
     mentions:
       - span: "podíl"
         binding: {ref: "op:share-of", target_class: OPERATOR}
         roles: []
       - span: "tržbách"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [MEASURE]
       - span: "kategorie"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT}
         roles: [SUBJECT]
     values:
       - {span: "Knihy", anchor: "kategorie"}
@@ -470,15 +532,18 @@ fixtures:
     source: fresh
     text: "Kolik kusů jsme prodali v Praha DC v prosinci?"
     hard_classes: [measure-as-subject, two-filters, interrogative-quantity]
+    model:
+      "md.measure.quantity": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "kusů"
-        binding: {ref: "md.measure.quantity", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.quantity", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "Praha DC"
-        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "prosinci"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [FILTER]
 
   - id: hl-returns-by-reason-cs
@@ -487,15 +552,18 @@ fixtures:
     source: fresh
     text: "Ukaž vratky podle důvodu vrácení"
     hard_classes: [operator-roleless, measure-as-subject, grouping-podle, multiword-grouping]
+    model:
+      "md.measure.returnAmount": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.ReturnReason.reasonCode": {isAttribute: true}
     mentions:
       - span: "Ukaž"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "vratky"
-        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "důvodu vrácení"
-        binding: {ref: "md.dimension.ReturnReason.reasonCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.ReturnReason.reasonCode", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: hl-customer-state-cs
@@ -507,18 +575,22 @@ fixtures:
     note: >
       "zákazníka" is a genitive POSSESSOR of the grouping attribute, not a second
       grouping — the trap that a bare "genitive after podle" rule walks into.
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Customer.state": {isAttribute: true}
+      "md.dimension.Customer": {isAttribute: false}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "státu"
-        binding: {ref: "md.dimension.Customer.state", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Customer.state", target_class: MODEL_OBJECT}
         roles: [GROUPING]
       - span: "zákazníka"
-        binding: {ref: "md.dimension.Customer", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Customer", target_class: MODEL_OBJECT}
         roles: []
 
   - id: hl-promo-filter-cs
@@ -527,12 +599,15 @@ fixtures:
     source: fresh
     text: "Jaké byly tržby v akci Letní výprodej?"
     hard_classes: [measure-as-subject, filter-only-mention, member-value, anchored-value]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Promotion": {isAttribute: false}
     mentions:
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "akci"
-        binding: {ref: "md.dimension.Promotion", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Promotion", target_class: MODEL_OBJECT}
         roles: [FILTER]
     values:
       - {span: "Letní výprodej", anchor: "akci"}
@@ -544,18 +619,22 @@ fixtures:
     text: "Jaká byla dostupnost zboží v Ostrava DC minulý týden?"
     hard_classes: [measure-as-subject, two-filters, member-value, relative-chrono]
     note: '"dostupnost" is a declared onHandQty synonym; "zboží" a declared Product synonym.'
+    model:
+      "md.measure.onHandQty": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Product": {isAttribute: false}
+      "md.dimension.Calendar.week": {isAttribute: true}
     mentions:
       - span: "dostupnost"
-        binding: {ref: "md.measure.onHandQty", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.onHandQty", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "zboží"
-        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT}
         roles: []
       - span: "Ostrava DC"
-        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "týden"
-        binding: {ref: "md.dimension.Calendar.week", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.week", target_class: MODEL_OBJECT}
         roles: [FILTER]
 
   - id: hl-orders-cs
@@ -564,15 +643,19 @@ fixtures:
     source: fresh
     text: "Kolik objednávek jsme měli v roce 2025 podle měsíce?"
     hard_classes: [measure-as-subject, grouping-podle, interrogative-quantity, anchored-value]
+    model:
+      "md.measure.orderCount": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.year": {isAttribute: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "objednávek"
-        binding: {ref: "md.measure.orderCount", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.orderCount", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "roce"
-        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "měsíce"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
     values:
       - {span: "2025", anchor: "roce"}
@@ -589,12 +672,14 @@ fixtures:
       There is no model-bound subject in this question at all — the correct output is
       an operator with no role and nothing else. Guards against a deriver that always
       names some SUBJECT.
+    model:
+      "md.dimension.Calendar.year": {isAttribute: true}
     mentions:
       - span: "Porovnej"
         binding: {ref: "op:compare", target_class: OPERATOR}
         roles: []
       - span: "loňskem"
-        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
         roles: [FILTER]
 
   - id: hl-brand-filter-grouping-cs
@@ -603,18 +688,22 @@ fixtures:
     source: fresh
     text: "Ukaž tržby značky Nike podle měsíce"
     hard_classes: [operator-roleless, measure-as-subject, grouping-podle, anchored-value, filter-plus-grouping]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Product.brandCode": {isAttribute: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "Ukaž"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "značky"
-        binding: {ref: "md.dimension.Product.brandCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Product.brandCode", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "měsíce"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
     values:
       - {span: "Nike", anchor: "značky"}
@@ -625,12 +714,15 @@ fixtures:
     source: fresh
     text: "Kolik položek objednávek bylo v prosinci 2025?"
     hard_classes: [measure-as-subject, filter-only-mention, multiword-measure]
+    model:
+      "md.measure.lineCount": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "položek objednávek"
-        binding: {ref: "md.measure.lineCount", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.lineCount", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "prosinci"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [FILTER]
     values:
       - {span: "2025", anchor: "prosinci"}
@@ -645,19 +737,22 @@ fixtures:
       The h2-cs subject gap transplanted into hartland_cz, where the grouping IS a
       group-by (no top-n). Tests that an unbound mention can still be given a role from
       syntax alone — the precondition for RV-15's "ask on load-bearing gaps only".
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "čerpacích stanic"
         binding: null
         gap_kind: G1_UNBOUND
         roles: [FILTER]
       - span: "měsíce"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: hl-birthyear-cs
@@ -666,18 +761,22 @@ fixtures:
     source: fresh
     text: "Zobraz tržby podle roku narození zákazníků"
     hard_classes: [operator-roleless, measure-as-subject, grouping-podle, multiword-grouping, possessive-genitive]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Customer.birthYear": {isAttribute: true}
+      "md.dimension.Customer": {isAttribute: false}
     mentions:
       - span: "Zobraz"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "roku narození"
-        binding: {ref: "md.dimension.Customer.birthYear", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Customer.birthYear", target_class: MODEL_OBJECT}
         roles: [GROUPING]
       - span: "zákazníků"
-        binding: {ref: "md.dimension.Customer", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Customer", target_class: MODEL_OBJECT}
         roles: []
 
   - id: hl-quarter-filter-cs
@@ -686,15 +785,18 @@ fixtures:
     source: fresh
     text: "Jaké byly tržby elektroniky ve druhém čtvrtletí?"
     hard_classes: [measure-as-subject, filter-only-mention, member-value, ordinal-chrono]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.quarter": {isAttribute: true}
     mentions:
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "elektroniky"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "čtvrtletí"
-        binding: {ref: "md.dimension.Calendar.quarter", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.quarter", target_class: MODEL_OBJECT}
         roles: [FILTER]
 
   # ================================================================= English (10)
@@ -705,18 +807,22 @@ fixtures:
     source: "design.md H1 (English form)"
     text: "Show me the costs of account 501001 in 2025 by period."
     hard_classes: [operator-roleless, measure-as-subject, grouping-by, anchored-value]
+    model:
+      "md.measure.cost": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Account": {isAttribute: false}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "Show"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "costs"
-        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.cost", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "account"
-        binding: {ref: "md.dimension.Account", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Account", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "period"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
     values:
       - {span: "501001", anchor: "account"}
@@ -731,6 +837,8 @@ fixtures:
     note: >
       The English twin of h2-cs, and imperative-less as well: no verb anywhere. "by
       revenue" is order-by, and the SUBJECT is unbound.
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "Top 10"
         binding: {ref: "op:top-n", target_class: OPERATOR}
@@ -744,7 +852,7 @@ fixtures:
         gap_kind: G3_UNATTRIBUTED
         roles: [FILTER]
       - span: "revenue"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [MEASURE]
 
   - id: hl-rev-by-store-en
@@ -753,15 +861,18 @@ fixtures:
     source: fresh
     text: "Show revenue by store"
     hard_classes: [operator-roleless, measure-as-subject, grouping-by]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Store": {isAttribute: false}
     mentions:
       - span: "Show"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "revenue"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "store"
-        binding: {ref: "md.dimension.Store", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Store", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: hl-double-grouping-en
@@ -770,18 +881,22 @@ fixtures:
     source: fresh
     text: "Show revenue by category and month"
     hard_classes: [operator-roleless, measure-as-subject, double-grouping, coordination]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Product.categoryCode": {isAttribute: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "Show"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "revenue"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "category"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT}
         roles: [GROUPING]
       - span: "month"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: hl-filter-only-en
@@ -790,12 +905,14 @@ fixtures:
     source: fresh
     text: "What was the revenue in the Memphis DC?"
     hard_classes: [filter-only-mention, measure-as-subject, member-value]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "revenue"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "Memphis DC"
-        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER}
         roles: [FILTER]
 
   - id: hl-trend-en
@@ -804,12 +921,15 @@ fixtures:
     source: "model/lexicon/en/examples.ttrm twin of ex_marketplace_yoy_cs"
     text: "How did marketplace revenue develop in 2025?"
     hard_classes: [operator-roleless, measure-as-subject, filter-only-mention]
+    model:
+      "er.entity.catalog_sales": {isAttribute: false}
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "marketplace"
-        binding: {ref: "er.entity.catalog_sales", target_class: MODEL_OBJECT, object_kind: entity}
+        binding: {ref: "er.entity.catalog_sales", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "revenue"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "develop"
         binding: {ref: "op:trend", target_class: OPERATOR}
@@ -823,6 +943,9 @@ fixtures:
     source: fresh
     text: "Show the top 10 products by revenue"
     hard_classes: [operator-roleless, top-n, dimension-as-subject, by-is-order-by]
+    model:
+      "md.dimension.Product": {isAttribute: false}
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "Show"
         binding: {ref: "op:show", target_class: OPERATOR}
@@ -831,10 +954,10 @@ fixtures:
         binding: {ref: "op:top-n", target_class: OPERATOR}
         roles: []
       - span: "products"
-        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT}
         roles: [SUBJECT]
       - span: "revenue"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [MEASURE]
 
   - id: hl-compare-en
@@ -843,18 +966,22 @@ fixtures:
     source: fresh
     text: "Compare web and store revenue for 2025"
     hard_classes: [operator-roleless, measure-as-subject, two-filters, coordination]
+    model:
+      "er.entity.web_sales": {isAttribute: false}
+      "er.entity.store_sales": {isAttribute: false}
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "Compare"
         binding: {ref: "op:compare", target_class: OPERATOR}
         roles: []
       - span: "web"
-        binding: {ref: "er.entity.web_sales", target_class: MODEL_OBJECT, object_kind: entity}
+        binding: {ref: "er.entity.web_sales", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "store"
-        binding: {ref: "er.entity.store_sales", target_class: MODEL_OBJECT, object_kind: entity}
+        binding: {ref: "er.entity.store_sales", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "revenue"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
     values:
       - {span: "2025", anchor: null}
@@ -865,15 +992,18 @@ fixtures:
     source: fresh
     text: "How many units did we sell in Columbus DC in December?"
     hard_classes: [measure-as-subject, two-filters, interrogative-quantity]
+    model:
+      "md.measure.quantity": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "units"
-        binding: {ref: "md.measure.quantity", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.quantity", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "Columbus DC"
-        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "December"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [FILTER]
 
   - id: hl-imperativeless-en
@@ -882,12 +1012,14 @@ fixtures:
     source: fresh
     text: "revenue Electronics 2025?"
     hard_classes: [imperative-less, no-verb, measure-as-subject, member-value]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "revenue"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "Electronics"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER}
         roles: [FILTER]
     values:
       - {span: "2025", anchor: null}

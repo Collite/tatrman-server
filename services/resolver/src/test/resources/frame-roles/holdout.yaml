@@ -35,15 +35,18 @@ fixtures:
     text: "Kolik jsme utržili v Plzeň DC loni?"
     hard_classes: [verb-form-measure, member-value, bare-adverbial-time]
     note: '"utržit" is a declared revenue synonym — here in a finite verb form, not a noun.'
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.year": {isAttribute: true}
     mentions:
       - span: "utržili"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "Plzeň DC"
-        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "loni"
-        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
         roles: [FILTER]
 
   - id: ho-possessive-cs
@@ -52,21 +55,26 @@ fixtures:
     source: held-out
     text: "Vypiš objednávky zákazníků ze státu CA za rok 2025"
     hard_classes: [operator-roleless, measure-as-subject, possessive-genitive, anchored-value]
+    model:
+      "md.measure.orderCount": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Customer": {isAttribute: false}
+      "md.dimension.Customer.state": {isAttribute: true}
+      "md.dimension.Calendar.year": {isAttribute: true}
     mentions:
       - span: "Vypiš"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "objednávky"
-        binding: {ref: "md.measure.orderCount", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.orderCount", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "zákazníků"
-        binding: {ref: "md.dimension.Customer", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Customer", target_class: MODEL_OBJECT}
         roles: []
       - span: "státu"
-        binding: {ref: "md.dimension.Customer.state", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Customer.state", target_class: MODEL_OBJECT}
         roles: [FILTER]
       - span: "rok"
-        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.year", target_class: MODEL_OBJECT}
         roles: [FILTER]
     values:
       - {span: "CA", anchor: "státu"}
@@ -78,15 +86,19 @@ fixtures:
     source: held-out
     text: "Které značky měly nejvyšší vratky v prosinci?"
     hard_classes: [dimension-as-subject, relative-clause, filter-only-mention]
+    model:
+      "md.dimension.Product.brandCode": {isAttribute: true}
+      "md.measure.returnAmount": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "značky"
-        binding: {ref: "md.dimension.Product.brandCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Product.brandCode", target_class: MODEL_OBJECT}
         roles: [SUBJECT]
       - span: "vratky"
-        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT}
         roles: [MEASURE]
       - span: "prosinci"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [FILTER]
 
   - id: ho-member-filter-grouping-cs
@@ -95,18 +107,21 @@ fixtures:
     source: held-out
     text: "Ukaž mi tržby za obuv podle čtvrtletí"
     hard_classes: [operator-roleless, measure-as-subject, member-value, grouping-podle]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.quarter": {isAttribute: true}
     mentions:
       - span: "Ukaž"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "obuv"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "čtvrtletí"
-        binding: {ref: "md.dimension.Calendar.quarter", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.quarter", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: ho-coordinated-members-cs
@@ -116,21 +131,24 @@ fixtures:
     text: "Porovnej tržby Elektroniky a Knih podle měsíce"
     hard_classes: [operator-roleless, measure-as-subject, coordination, member-value, grouping-podle]
     note: "Coordinated MEMBERS under one filter — fixtures.yaml only coordinates entities and groupings."
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.month": {isAttribute: true}
     mentions:
       - span: "Porovnej"
         binding: {ref: "op:compare", target_class: OPERATOR}
         roles: []
       - span: "tržby"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "Elektroniky"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "Knih"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "měsíce"
-        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.month", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: ho-hyphenated-measure-en
@@ -139,15 +157,18 @@ fixtures:
     source: held-out
     text: "What is the on-hand quantity for Reno DC by week?"
     hard_classes: [measure-as-subject, hyphenated-measure, member-value, grouping-by]
+    model:
+      "md.measure.onHandQty": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Calendar.week": {isAttribute: true}
     mentions:
       - span: "on-hand quantity"
-        binding: {ref: "md.measure.onHandQty", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.onHandQty", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "Reno DC"
-        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER, object_kind: member}
+        binding: {ref: "md.dimension.DistributionCentre.dcCode", target_class: MEMBER}
         roles: [FILTER]
       - span: "week"
-        binding: {ref: "md.dimension.Calendar.week", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Calendar.week", target_class: MODEL_OBJECT}
         roles: [GROUPING]
 
   - id: ho-highest-orderby-en
@@ -157,15 +178,18 @@ fixtures:
     text: "List the products with the highest returns in 2025"
     hard_classes: [operator-roleless, dimension-as-subject, with-is-order-by]
     note: '"with the highest X" is an order-by, not a filter — the English cousin of "podle tržby".'
+    model:
+      "md.dimension.Product": {isAttribute: false}
+      "md.measure.returnAmount": {isAttribute: true, listedAsMeasure: true}
     mentions:
       - span: "List"
         binding: {ref: "op:show", target_class: OPERATOR}
         roles: []
       - span: "products"
-        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT, object_kind: dimension}
+        binding: {ref: "md.dimension.Product", target_class: MODEL_OBJECT}
         roles: [SUBJECT]
       - span: "returns"
-        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.returnAmount", target_class: MODEL_OBJECT}
         roles: [MEASURE]
     values:
       - {span: "2025", anchor: null}
@@ -176,15 +200,19 @@ fixtures:
     source: held-out
     text: "revenue by manufacturer for the Books category"
     hard_classes: [imperative-less, no-verb, measure-as-subject, grouping-by, anchored-value]
+    model:
+      "md.measure.revenue": {isAttribute: true, listedAsMeasure: true}
+      "md.dimension.Product.manufacturerCode": {isAttribute: true}
+      "md.dimension.Product.categoryCode": {isAttribute: true}
     mentions:
       - span: "revenue"
-        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT, object_kind: measure}
+        binding: {ref: "md.measure.revenue", target_class: MODEL_OBJECT}
         roles: [SUBJECT, MEASURE]
       - span: "manufacturer"
-        binding: {ref: "md.dimension.Product.manufacturerCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Product.manufacturerCode", target_class: MODEL_OBJECT}
         roles: [GROUPING]
       - span: "category"
-        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT, object_kind: attribute}
+        binding: {ref: "md.dimension.Product.categoryCode", target_class: MODEL_OBJECT}
         roles: [FILTER]
     values:
       - {span: "Books", anchor: "category"}

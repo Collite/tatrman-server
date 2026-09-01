@@ -13,6 +13,7 @@ import org.tatrman.resolver.pipeline.FrameRolePreps
 import org.tatrman.resolver.pipeline.FrameRoles
 import org.tatrman.resolver.v1.FrameRole
 import org.tatrman.resolver.v1.TargetClass
+import org.tatrman.ttr.semantics.semanticsblock.MentionKinds
 
 /**
  * RV-P2.1.T5 — the Q-15 spike's own corpus, re-run in process against the ported rules.
@@ -49,6 +50,7 @@ class FrameRolesFixtureTest :
                     val values = fixture.list("values")
 
                     val anchors = values.mapNotNull { it["anchor"] as String? }.toSet()
+                    val model = modelFacts(fixture)
                     val inputs =
                         mentions.mapIndexed { i, mention ->
                             val span = mention["span"] as String
@@ -59,7 +61,7 @@ class FrameRolesFixtureTest :
                                 charStart = start,
                                 headToken = headToken(parse, start, end),
                                 targetClass = targetClass(binding?.get("target_class") as String?),
-                                objectKind = binding?.get("object_kind") as String? ?: "",
+                                objectKind = objectKind(binding, model, "${fixture["id"]}#$i"),
                                 anchorsValue = span in anchors,
                             )
                         }
@@ -84,6 +86,69 @@ class FrameRolesFixtureTest :
                     score.precision("SUBJECT") shouldBeGreaterThanOrEqual 0.85
                     score.mismatches.size shouldBe corpus.knownMisses
                 }
+            }
+        }
+
+        // --- MS-P3·S4 — the mention-facet corpus (contracts §8.5) ----------------------------
+
+        "ms.yaml: every mention's roles are EXACTLY what the fixture says" {
+            // Stricter than the two frozen corpora on purpose. Those assert "at least the score
+            // the spike recorded", which is the right shape for a regression floor over evidence
+            // someone else gathered; this corpus was authored WITH the rules it tests, so a floor
+            // would let a wrong answer through as long as three others were right.
+            for (fixture in load("ms.yaml")) {
+                val text = fixture["text"] as String
+                val lang = fixture["lang"] as String
+                val parse = parseOf(text, lang)
+                val mentions = fixture.list("mentions")
+                val anchors = fixture.list("values").mapNotNull { it["anchor"] as String? }.toSet()
+                val model = modelFacts(fixture)
+                val inputs =
+                    mentions.mapIndexed { i, mention ->
+                        val span = mention["span"] as String
+                        val (start, end) = locate(text, span, (mention["occurrence"] as Int?) ?: 1)
+                        val binding = mention["binding"] as Map<*, *>?
+                        FrameRoles.Input(
+                            id = "${fixture["id"]}#$i",
+                            charStart = start,
+                            headToken = headToken(parse, start, end),
+                            targetClass = targetClass(binding?.get("target_class") as String?),
+                            objectKind = objectKind(binding, model, "${fixture["id"]}#$i"),
+                            anchorsValue = span in anchors,
+                        )
+                    }
+                val derived = FrameRoles.derive(inputs, parse, lang, preps)
+                mentions.forEachIndexed { i, mention ->
+                    val id = "${fixture["id"]}#$i"
+                    val gold = (mention["roles"] as List<*>? ?: emptyList<String>()).map { it as String }.toSet()
+                    val predicted = derived[id].orEmpty().map { it.shortName() }.toSet()
+                    withClue("$id '${mention["span"]}'") { predicted shouldBe gold }
+                }
+            }
+        }
+
+        "ms.yaml derives its kinds through the REAL MentionKinds table, and they are the four" {
+            // The point of §8.5: the fixture states model FACTS and the shipped table turns them
+            // into a kind. If this corpus could state a kind directly, it would be scoring the
+            // rules against a vocabulary no producer has ever emitted — which is the half of
+            // issue #69 the frozen corpora were guilty of for a year.
+            val kinds =
+                load("ms.yaml")
+                    .flatMap { fixture ->
+                        val model = modelFacts(fixture)
+                        fixture.list("mentions").map { objectKind(it["binding"] as Map<*, *>?, model, "ms") }
+                    }.toSet()
+            kinds shouldBe setOf("", "entity_with_measures", "attribute", "entity")
+        }
+
+        "no fixture in ANY corpus states object_kind — the loader rejects it, this says why" {
+            // Belt and braces with the `require` in `objectKind`: that one fires when a fixture is
+            // loaded, this one names the file and the rule for whoever added the line. Both exist
+            // because "the fixture supplies the kind by hand" is the habit MS is here to end, and
+            // habits come back.
+            // the KEY, not the word: ms.yaml's own header prose names it while forbidding it
+            for (file in listOf("fixtures.yaml", "holdout.yaml", "ms.yaml")) {
+                withClue(file) { resource(file).contains("object_kind:") shouldBe false }
             }
         }
 
@@ -235,6 +300,48 @@ class FrameRolesFixtureTest :
         }
 
         private fun round4(value: Double): Double = Math.round(value * 10_000.0) / 10_000.0
+
+        /**
+         * MS-P3·S4 (contracts §8.5) — a mention's `objectKind`, DERIVED rather than declared.
+         *
+         * Issue #69's second problem was this corpus: every fixture hand-supplied `object_kind`,
+         * so the rules were scored against kinds no producer had ever computed, and R2 could be
+         * "passing" on 39 fixtures while being dead in every deployment. The fixture now states
+         * the MODEL FACTS — which node the ref is, who owns it, whether the owner lists it as a
+         * measure — and the kind comes out of the real [MentionKinds] table, the same one the
+         * lexicon compiler calls.
+         *
+         * A ref with no `model:` entry derives `""`: the estate that declared no mention facet,
+         * representable in a fixture exactly as it is in an archive.
+         */
+        private fun objectKind(
+            binding: Map<*, *>?,
+            model: Map<String, MentionKinds.ObjectFacts>,
+            mentionId: String,
+        ): String {
+            require(binding == null || !binding.containsKey("object_kind")) {
+                "$mentionId states `object_kind` directly. Fixtures declare MODEL FACTS in the " +
+                    "fixture's `model:` map and let MentionKinds derive the kind — see " +
+                    "frame-roles/PROVENANCE.md §MS. A stated kind is a kind no producer computed."
+            }
+            val ref = binding?.get("ref") as String? ?: return ""
+            return model[ref]?.let { MentionKinds.of(it) } ?: ""
+        }
+
+        /** The fixture's `model:` section: ref → the facts the model graph would state. */
+        private fun modelFacts(fixture: Map<String, Any?>): Map<String, MentionKinds.ObjectFacts> {
+            val declared = fixture["model"] as Map<*, *>? ?: return emptyMap()
+            return declared.entries.associate { (ref, facts) ->
+                val f = facts as Map<*, *>
+                ref as String to
+                    MentionKinds.ObjectFacts(
+                        isAttribute = f["isAttribute"] as Boolean? ?: false,
+                        ownerRef = f["ownerRef"] as String?,
+                        listedAsMeasure = f["listedAsMeasure"] as Boolean? ?: false,
+                        ownerHasMeasures = f["ownerHasMeasures"] as Boolean? ?: false,
+                    )
+            }
+        }
 
         private fun targetClass(name: String?): TargetClass =
             when (name) {
