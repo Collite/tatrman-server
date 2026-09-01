@@ -29,14 +29,22 @@
 # "tag minor == @grammar-version", so the localised-description bundle can only be
 # cut as 0.13.0. Veles reads `descriptionLocalized` off `ModelObject` (the D7
 # locale chain in MetadataServiceImpl) and does not compile against 0.12.x.
-# ⚑ This pin resolves from Maven Local until `grammar/v0.13.0` is pushed (Bora,
-# NLS-P10 T5) — CI on this branch is red until then, by design of the
-# land-then-bump choreography (plan §5).
-tatrman-grammar           = "0.13.0"
+# MS-P2 (2026-09-01): 0.13.2 — the mention-semantics cut (`grammar/v0.13.2` at
+# tatrman `b5451c9`, the MS-P1 merge). PATCH again: MS changed no `.g4`, so
+# `@grammar-version: 0.13` holds and the minor-sync gate wants the 0.13 line.
+# What arrives with it: `Entity`/`DbTable.mentionSemantics` (the resolved
+# `name:`/`code:`/`measures:` block), `MeasureRef`, `MentionKinds`, and the
+# compiled lexicon archive at schema `ttr-lexicon-compiled/v2` with its `targets`
+# map. ⚠ The v1→v2 archive crossing is READERS BEFORE PRODUCERS (MS contracts §6):
+# nothing can make an already-built v1 reader accept a v2 archive — it throws on
+# the unknown `targets` key, and both readers here turn an undecodable archive
+# into an EMPTY declared vocabulary on a WARN. No estate takes a v2-producing
+# lexicon build before its resolver AND lex-matcher are on this pin.
+tatrman-grammar           = "0.13.2"
 # Moves WITH the grammar ref, always: they are one `api` closure (ttr-snapshot api's
 # ttr-metadata, ttr-lexicon-compile's POM names it exactly), and the `bundle grammar` lane
 # publishes them at one version. Two versions here is the 0.10.3/0.10.4 failure.
-tatrman-ttr-metadata      = "0.13.0"
+tatrman-ttr-metadata      = "0.13.2"
 tatrman-ttr-translator    = "0.10.1"
 tatrman-ttr-plan-proto    = "0.10.1"
 # SV-P1 S4 — Maven Central publishing via the Central Portal.
