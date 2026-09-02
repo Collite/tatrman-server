@@ -196,7 +196,13 @@ object GateSpans {
             // MH: the option's SPECIES, so a G2 can be worded as "the stores (a dimension) or the
             // Stores channel (sales)?" instead of two labels a user cannot tell apart. Blank for
             // a MEMBER option and for any ref the archive declares nothing about.
-            objectKind = entityTypes.firstOrNull { it.ref == m.targetRef }?.objectKind.orEmpty(),
+            //
+            // The `isMember` guard is the same one its two neighbours above have, and it is
+            // structural rather than defensive (review-087 F6): a member is a DATA ROW, and a
+            // kind is a claim about a declared object. A member row that happens to carry its
+            // owner's `target_ref` would otherwise be labelled with the owner's species.
+            objectKind =
+                if (isMember) "" else entityTypes.firstOrNull { it.ref == m.targetRef }?.objectKind.orEmpty(),
         )
     }
 

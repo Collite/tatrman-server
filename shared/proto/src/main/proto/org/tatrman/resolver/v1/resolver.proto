@@ -160,7 +160,10 @@ message EntityType {
   repeated Reach reached_from = 6;
 }
 
-// MH — a fact that relates TO an entity (archive `targets[ref].reachedFrom`).
+// MH — an object with a declared relation TO this entity (archive `targets[ref].reachedFrom`),
+// with the to-side lower bound. Named for the case the resolver's rules act on: on a real estate
+// `fact_ref` is often another DIMENSION (a customer relates to a customer_address), which is
+// harmless because those rules only ever pair a dimension with a measure-capable candidate.
 message Reach {
   string fact_ref = 1;
   bool mandatory = 2;

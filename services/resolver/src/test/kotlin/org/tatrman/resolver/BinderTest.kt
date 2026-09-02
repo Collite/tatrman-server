@@ -434,6 +434,37 @@ class BinderTest :
             slotted.rejected.none { it.match.source == SourceTag.MEMBER } shouldBe true
         }
 
+        "mh-b12: a BLANK kind is not a species — a partly-described registry asks, it does not bind" {
+            // review-087 F1. `kindsByRef` omits blank kinds, so a ref the archive declares nothing
+            // about arrives here with `""` — and every md-owned ref is kind-less by construction
+            // (`MentionKinds` covers Entity/DbTable/Attribute/DbColumn; `Model` has no md schema).
+            // Dropping it in favour of a kinded row would make the resolver bind where the
+            // all-undeclared case (mh-b11) correctly asks.
+            val md = "md.measure.revenue"
+            val mixed =
+                listOf(
+                    declared(store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    declared(md, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                )
+            val verdict = decideMh(mixed, slot = SlotHint(Slot.COUNT_HEAD), kindsMap = mapOf(store to "entity"))
+
+            verdict.shouldBeInstanceOf<Binder.Ambiguous>().admitted.map {
+                it.match.targetRef
+            } shouldContainExactlyInAnyOrder
+                listOf(store, md)
+            // …and the undeclared row is not sitting in the rung log as a refusal either.
+            verdict.rejected.none { it.match.targetRef == md } shouldBe true
+        }
+
+        "mh-b12b: COORD_WITH over an all-undeclared sibling prefers nothing — a no-op, not a drop" {
+            // `coordSiblingKinds` is built with `mapNotNull { kindsByRef[it] }.filter { isNotBlank() }`,
+            // so a sibling whose refs are all undeclared yields an EMPTY preference. Confirmed
+            // here rather than assumed (review-087 F1, last bullet).
+            decideMh(slot = SlotHint(Slot.COORD_WITH, coordSiblingKinds = emptySet()))
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted.size shouldBe 2
+        }
+
         "mh-b11: no kinds ⇒ no preference — an estate that declared nothing is unchanged" {
             decideMh(slot = SlotHint(Slot.COUNT_HEAD), kindsMap = emptyMap())
                 .shouldBeInstanceOf<Binder.Ambiguous>()
@@ -691,6 +722,78 @@ class BinderTest :
                         ),
                 ).shouldBeInstanceOf<Binder.Ambiguous>()
             ambiguous.admitted.size shouldBe 2
+        }
+
+        "MH: rule 4 dominates its OWN pair only — another pair's equivalent survives (F5)" {
+            // review-087 F5. One band, two facts: `store_sales` is mandatory (rule 2 — equal) and
+            // `web_sales` is nullable (rule 4 — differ). The nullable pair must refuse, and the
+            // mandatory pair's disclosure must still be there: a global `differ` flag threw the
+            // `reach-equal` away and left the user with a question and no explanation.
+            val band =
+                listOf(
+                    declared(store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    declared(storeSales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    declared(webSales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                )
+            val verdict =
+                decideMh(
+                    band,
+                    slot =
+                        SlotHint(
+                            Slot.FILTER,
+                            headRefs = listOf(storeSales, webSales),
+                            headMeasureCapable = true,
+                        ),
+                    reachMap =
+                        mapOf(
+                            store to
+                                listOf(
+                                    Reach(storeSales, mandatory = true),
+                                    Reach(webSales, mandatory = false),
+                                ),
+                        ),
+                )
+
+            // The nullable pair refuses, so both of ITS readings stay admitted…
+            val ambiguous = verdict.shouldBeInstanceOf<Binder.Ambiguous>()
+            ambiguous.admitted.map { it.match.targetRef } shouldContainExactlyInAnyOrder
+                listOf(store, webSales)
+            // …and the mandatory pair still collapsed, with its fact named in the rung log.
+            ambiguous.rejected.map { it.match.targetRef } shouldContainExactly listOf(storeSales)
+        }
+
+        "MH: a fact re-admitted by rule 4 is never dropped on another pair's account" {
+            // `web_sales` is nullable from `store` (rule 4 — refuse) and, under the OTHER head,
+            // rule 3 would drop it on `region`'s account. A refusal is the stronger claim: the
+            // question must survive, so the intersection keeps the fact in.
+            val secondDim = "er.entity.region"
+            val band =
+                listOf(
+                    declared(store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    declared(secondDim, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    declared(webSales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                )
+            val verdict =
+                decideMh(
+                    band,
+                    slot =
+                        SlotHint(
+                            Slot.FILTER,
+                            headRefs = listOf(storeSales, webSales),
+                            headMeasureCapable = true,
+                        ),
+                    kindsMap = kinds + (secondDim to "entity"),
+                    reachMap =
+                        mapOf(
+                            store to listOf(Reach(webSales, mandatory = false)),
+                            secondDim to listOf(Reach(storeSales, mandatory = true)),
+                        ),
+                )
+
+            verdict.shouldBeInstanceOf<Binder.Ambiguous>().admitted.map {
+                it.match.targetRef
+            } shouldContainExactlyInAnyOrder listOf(store, secondDim, webSales)
+            verdict.rejected.none { it.match.targetRef == webSales } shouldBe true
         }
 
         "MH: rules 2 and 3 name the dropped fact in the rung log — nothing silently dropped" {
