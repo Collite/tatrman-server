@@ -40,11 +40,23 @@
 # the unknown `targets` key, and both readers here turn an undecodable archive
 # into an EMPTY declared vocabulary on a WARN. No estate takes a v2-producing
 # lexicon build before its resolver AND lex-matcher are on this pin.
-tatrman-grammar           = "0.13.2"
+# MH-P0 (2026-09-02): 0.13.3 — the mention-homonymy cut. PATCH again: MH changed no
+# `.g4`, so `@grammar-version: 0.13` holds. What arrives with it: `ttr-lexicon`
+# `Reach` + `TargetFacts.reachedFrom` (the E-R reachability the Binder's T3 rule reads)
+# at archive schema `ttr-lexicon-compiled/v3`, the compiler's `RG-LEXC-004` collision
+# warning, and `TermNormalizer.fold`. The v2→v3 crossing needs NO reader gate, unlike
+# v1→v2: `reachedFrom` is a defaulted field inside `targets`, so a v2 archive decodes
+# in a v3 reader and a v3 archive is read by an MS-era reader as a v2 one
+# (`ignoreUnknownKeys`) with the reachability rules simply inert.
+# ⚠ ALSO in this cut, and worth knowing before an estate takes it: `ttr-metadata`'s
+# file loader used to HARDCODE `Cardinality(0, -1, 0, -1)` and now parses the authored
+# `cardinality:`. Any reader of a loaded `Relation.cardinality` gets real numbers where
+# it used to get zeros.
+tatrman-grammar           = "0.13.3"
 # Moves WITH the grammar ref, always: they are one `api` closure (ttr-snapshot api's
 # ttr-metadata, ttr-lexicon-compile's POM names it exactly), and the `bundle grammar` lane
 # publishes them at one version. Two versions here is the 0.10.3/0.10.4 failure.
-tatrman-ttr-metadata      = "0.13.2"
+tatrman-ttr-metadata      = "0.13.3"
 tatrman-ttr-translator    = "0.10.1"
 tatrman-ttr-plan-proto    = "0.10.1"
 # SV-P1 S4 — Maven Central publishing via the Central Portal.
