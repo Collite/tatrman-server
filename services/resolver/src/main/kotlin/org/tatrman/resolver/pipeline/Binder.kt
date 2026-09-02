@@ -44,6 +44,12 @@ import org.tatrman.resolver.v1.EvidenceClass
  *    things, you group by things, you restrict a measure by what is measured — so the slot's
  *    preferred kinds survive. Two objects of the SAME kind sharing a word is genuine homonymy
  *    and still refuses: that is the definition, not a gap.
+ *  - **two readings proven EQUAL by declared relations collapse to the dimension; a nullable
+ *    reach is a real question.** When every row of the fact the clause is about carries the
+ *    dimension, *"restrict to the Stores channel"* and *"join to the store dimension"* select
+ *    the same rows, so the more informative object wins and the suppressed reading is recorded
+ *    (`Bind.equivalents`). When the key can be missing the two answers differ, and the honest
+ *    verdict is the question — which is also why this rule may VETO the slot rule above it.
  *
  * The verdict keeps [Verdict.rejected] as well as [Verdict.admitted] because they go to different
  * places: admitted candidates are the lattice's bindings, rejected ones are the round's log
@@ -217,13 +223,133 @@ object Binder {
         // question "which OBJECT does this word name" is not asked of it.
         val admitted1 = slotPreference(admitted0, slot, kinds, rejected)
 
-        val admitted = admitted1
+        // MH T3 — the reachability collapse (contracts §7.3, ✅MH-D3 the equivalent is CARRIED).
+        //
+        // The slot said which KIND the sentence wants. This asks the harder question: do the two
+        // readings select the SAME ROWS of the fact this clause is about? Both halves are
+        // decidable from declarations alone — `def relation` gives the reach, `cardinality.to`
+        // gives whether it can be missing — so the answer is checked rather than assumed.
+        //
+        // It runs over the PRE-slot set (`admitted0`), which is what lets it re-admit a reading
+        // the slot dropped (architecture A8): under a nullable reach the two readings genuinely
+        // differ, and the honest verdict is the question, even though the slot had already
+        // picked. It is also what lets it VETO the slot — the E6 case, where the slot prefers
+        // the only measure-ish candidate and that candidate is the wrong fact.
+        val (admitted2, equivalents) = reachabilityCollapse(admitted0, admitted1, slot, kinds, owners, reach, rejected)
+
+        val admitted = admitted2
 
         return if (admitted.size > 1) {
             Ambiguous(admitted, rejected)
         } else {
-            Bind(admitted.single(), admitted, rejected)
+            Bind(admitted.single(), admitted, rejected, equivalents)
         }
+    }
+
+    /**
+     * MH T3 — decide a {dimension, fact} tie against the model's declared relations.
+     *
+     * Let **D** be a `V:` identity of kind `entity`, **F** a `V:` identity of kind
+     * `entity_with_measures` or `measure`, `f` the FACT of F (itself, or its owner when it is a
+     * measure), and **H** each fact in [SlotHint.headRefs] — the fact the clause is actually
+     * about. Four rules, evaluated for every (D, F) pair and every H (contracts §7.3):
+     *
+     *  1. `H ∉ reach(D)` and `H ≠ f` — neither reading is about this clause; say nothing.
+     *  2. `H == f` and the reach is MANDATORY — every row of H carries a D, so *"restrict H to
+     *     the channel"* and *"join H to the dimension"* are the same rows. Collapse to **D** (the
+     *     more informative object: group-by and member filters stay possible) and record F as an
+     *     equivalent reading.
+     *  3. `H ∈ reach(D)` and `H ≠ f` — the channel term is pinned to a DIFFERENT fact than the
+     *     one being measured, so the dimension is the only reading that fits. Collapse to **D**.
+     *     This is E6, and it is the rule that stops the slot rule mis-binding "vratky z prodejen".
+     *  4. `H == f` but the reach is NULLABLE — the join drops H rows with no D while the channel
+     *     restriction keeps them. The readings DIFFER: force both in, so the verdict is the
+     *     question, and let the door say why.
+     *
+     * Rule 4 dominates 2 and 3 for the same pair — an estate that declares both a mandatory and a
+     * nullable relation between one pair is contradicting itself, and refuse-over-guess decides.
+     * With no [SlotHint.headRefs] nothing fires at all: a bare word has no clause head, and the
+     * single-word regression must keep asking (design.md §4).
+     *
+     * ⚠ The equivalence is E-R level. Two readings can be declared-equal and still differ on
+     * dirty data — an orphan FK no constraint enforced — which is exactly why
+     * [EquivalentReading] says *equal by declaration* and nothing stronger.
+     */
+    private fun reachabilityCollapse(
+        admitted0: List<ClassedMatch>,
+        admitted1: List<ClassedMatch>,
+        slot: SlotHint,
+        kinds: Map<String, String>,
+        owners: Map<String, String>,
+        reach: Map<String, List<Reach>>,
+        rejected: MutableList<ClassedMatch>,
+    ): Pair<List<ClassedMatch>, List<EquivalentReading>> {
+        if (slot.headRefs.isEmpty() || reach.isEmpty()) return admitted1 to emptyList()
+
+        val objects = admitted0.filter { isModelObject(it) }
+        val dimensions = objects.filter { kindOf(it, kinds) == KIND_ENTITY }
+        val facts = objects.filter { kindOf(it, kinds) in setOf(KIND_ENTITY_WITH_MEASURES, KIND_MEASURE) }
+        if (dimensions.isEmpty() || facts.isEmpty()) return admitted1 to emptyList()
+
+        val drop = LinkedHashSet<ClassedMatch>()
+        val admit = LinkedHashSet<ClassedMatch>()
+        val equivalents = LinkedHashSet<EquivalentReading>()
+        var differ = false
+
+        for (d in dimensions) {
+            val reachOf = reach[d.match.targetRef].orEmpty()
+            for (f in facts) {
+                val factRef =
+                    if (kindOf(f, kinds) == KIND_MEASURE) {
+                        owners[f.match.targetRef].orEmpty().ifBlank { f.match.targetRef }
+                    } else {
+                        f.match.targetRef
+                    }
+                for (h in slot.headRefs) {
+                    val reachedH = reachOf.filter { it.factRef == h }
+                    when {
+                        // 4 — a nullable reach anywhere in this pair's declarations wins.
+                        h == factRef && reachedH.any { !it.mandatory } -> {
+                            differ = true
+                            admit += d
+                            admit += f
+                        }
+                        // 2 — declared-equal on this model.
+                        h == factRef && reachedH.any { it.mandatory } -> {
+                            admit += d
+                            drop += f
+                            equivalents += EquivalentReading(f.match.targetRef, RULE_REACH_EQUAL)
+                        }
+                        // 3 — the channel's fact is not the fact being measured.
+                        reachedH.isNotEmpty() -> {
+                            admit += d
+                            drop += f
+                        }
+                        // 1 — neither reading is about this clause.
+                        else -> Unit
+                    }
+                }
+            }
+        }
+
+        if (admit.isEmpty() && drop.isEmpty()) return admitted1 to emptyList()
+
+        // Rule 4 dominates: when any pair's readings were shown to DIFFER, nothing is dropped and
+        // nothing is claimed equal — the whole point is that the verdict must be the question.
+        if (differ) {
+            val readmitted = admit.filter { it !in admitted1 }
+            rejected.removeAll(readmitted.toSet())
+            return (admitted1 + readmitted) to emptyList()
+        }
+
+        val readmitted = admit.filter { it !in admitted1 && it !in drop }
+        rejected.removeAll(readmitted.toSet())
+        val result = (admitted1 + readmitted).filter { it !in drop }
+        // Never empty the band: a rule that would leave nothing to bind declines instead, the
+        // same way the containment collapse does (review-084 F3).
+        if (result.isEmpty()) return admitted1 to emptyList()
+        rejected += drop.filter { it in admitted1 || it in readmitted }.filter { it !in rejected }
+        return result to equivalents.toList()
     }
 
     /**
@@ -281,6 +407,9 @@ object Binder {
     private const val KIND_ATTRIBUTE = "attribute"
     private const val KIND_MEASURE = "measure"
     private const val KIND_ENTITY_WITH_MEASURES = "entity_with_measures"
+
+    /** The only rule name MH produces; the wire vocabulary is open (contracts §5). */
+    private const val RULE_REACH_EQUAL = "reach-equal"
 
     /**
      * A `V:` identity — a declared model object rather than a data row.

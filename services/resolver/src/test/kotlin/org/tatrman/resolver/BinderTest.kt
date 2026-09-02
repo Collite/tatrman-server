@@ -545,35 +545,173 @@ class BinderTest :
             withMh.rejected.map { it.match.targetRef } shouldBe plain.rejected.map { it.match.targetRef }
         }
 
-        // --- MH-P1·S4 enables — T3 (reachability) is what makes these two pass -----------------
+        // --- MH T3 (contracts §7.3, rules 1-4) — reachability -----------------------------------
 
-        "mh-b3: a filter under the channel's OWN fact collapses to the dimension, and says so"
-            .config(enabled = false) {
-                // T2 prefers the fact (measure-ish slot); T3 rule 2 says the two readings are
-                // declared-EQUAL on this model — every store_sales row carries a store — and flips
-                // to the dimension, which keeps group-by and member filters possible.
-                val bind =
-                    decideMh(
-                        slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true),
-                        reachMap = reach,
-                    ).shouldBeInstanceOf<Binder.Bind>()
-                bind.winner.match.targetRef shouldBe store
-                bind.equivalents shouldBe listOf(EquivalentReading(storeSales, "reach-equal"))
-            }
+        "mh-b3: a filter under the channel's OWN fact collapses to the dimension, and says so" {
+            // T2 prefers the fact (measure-ish slot); T3 rule 2 says the two readings are
+            // declared-EQUAL on this model — every store_sales row carries a store — and flips
+            // to the dimension, which keeps group-by and member filters possible.
+            val bind =
+                decideMh(
+                    slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true),
+                    reachMap = reach,
+                ).shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe store
+            bind.equivalents shouldBe listOf(EquivalentReading(storeSales, "reach-equal"))
+        }
 
-        "mh-b4: a filter under a DIFFERENT fact collapses to the dimension — the E6 mis-bind"
-            .config(enabled = false) {
-                // "Vratky z prodejen": the channel term is pinned to store_sales, the clause is
-                // about store_returns. T2 alone binds the wrong fact; T3 rule 3 says the dimension
-                // is the only reading that fits this head.
-                val bind =
-                    decideMh(
-                        slot = SlotHint(Slot.FILTER, headRefs = listOf(storeReturns), headMeasureCapable = false),
-                        reachMap = reach,
-                    ).shouldBeInstanceOf<Binder.Bind>()
-                bind.winner.match.targetRef shouldBe store
-                bind.equivalents shouldBe emptyList()
-            }
+        "mh-b4: a filter under a DIFFERENT fact collapses to the dimension — the E6 mis-bind" {
+            // "Vratky z prodejen": the channel term is pinned to store_sales, the clause is
+            // about store_returns. T2 alone binds the wrong fact; T3 rule 3 says the dimension
+            // is the only reading that fits this head.
+            val bind =
+                decideMh(
+                    slot = SlotHint(Slot.FILTER, headRefs = listOf(storeReturns), headMeasureCapable = false),
+                    reachMap = reach,
+                ).shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe store
+            bind.equivalents shouldBe emptyList()
+        }
+
+        "mh-b5: a head OUTSIDE the dimension's reach leaves T2's pick standing (rule 1)" {
+            // "Tržby webu ... na prodejně" — H is web_sales, which no relation ties to `store`
+            // on this model, and H is not the channel's fact either. Neither reading is proven
+            // about this clause, so T3 says nothing and the slot's guess stands. That guess is
+            // the E7-shaped risk design.md accepts for T2 alone; mh-b6 is what turns it into a
+            // question once the estate DECLARES the nullable reach.
+            val bind =
+                decideMh(
+                    slot = SlotHint(Slot.FILTER, headRefs = listOf(webSales), headMeasureCapable = true),
+                    reachMap = reach,
+                ).shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe storeSales
+            bind.equivalents shouldBe emptyList()
+        }
+
+        "mh-b6: a NULLABLE reach makes the readings differ — refuse, and admit both (rule 4)" {
+            // BOPIS-shaped: a store_sales row MAY carry a store. The dimension join would drop
+            // the rows that do not; the channel restriction would keep them. Two different
+            // answers, so the honest verdict is the question — and BOTH readings must be
+            // admitted, because a Clarify offers its contenders.
+            val ambiguous =
+                decideMh(
+                    slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true),
+                    reachMap = mapOf(store to listOf(Reach(storeSales, mandatory = false))),
+                ).shouldBeInstanceOf<Binder.Ambiguous>()
+            ambiguous.admitted.map { it.match.targetRef } shouldContainExactlyInAnyOrder
+                listOf(store, storeSales)
+        }
+
+        "MH: rule 4 RE-ADMITS what T2 dropped — the rule runs over the pre-T2 set" {
+            // The slot dropped the dimension (measure-ish preference); the nullable reach then
+            // says the two readings differ. A rule that could only remove rows would leave one
+            // admitted and call it a Bind — the exact shape review-084 F3 refused.
+            val ambiguous =
+                decideMh(
+                    slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true),
+                    reachMap = mapOf(store to listOf(Reach(storeSales, mandatory = false))),
+                ).shouldBeInstanceOf<Binder.Ambiguous>()
+            ambiguous.admitted.size shouldBe 2
+            // …and the re-admitted row is not ALSO sitting in the rung log as a refusal.
+            ambiguous.rejected.none { it.match.targetRef == store } shouldBe true
+        }
+
+        "MH: with no reach the T3 rules are a no-op — every mh case keeps its S3 verdict" {
+            decideMh(slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true))
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.targetRef shouldBe storeSales
+            decideMh(slot = SlotHint(Slot.COUNT_HEAD))
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.targetRef shouldBe store
+        }
+
+        "MH: an M: member beside the pair is untouched, and never lands in rejected" {
+            val withMember =
+                homonym() +
+                    member("store-42", store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT)
+            val verdict =
+                decideMh(
+                    withMember,
+                    slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true),
+                    reachMap = reach,
+                )
+            // Instance ambiguity forces a Clarify (RS-26) whatever the V: rules decided.
+            val ambiguous = verdict.shouldBeInstanceOf<Binder.Ambiguous>()
+            ambiguous.admitted.any { it.match.source == SourceTag.MEMBER } shouldBe true
+            ambiguous.rejected.none { it.match.source == SourceTag.MEMBER } shouldBe true
+        }
+
+        "MH: a MEASURE candidate is read through its OWNER — the fact is what H compares to" {
+            // The channel word bound the measure rather than the fact. `f` is the owner, so
+            // rule 2 fires exactly as it does for the fact itself.
+            val measureRef = "er.entity.store_sales.ext_sales_price"
+            val bind =
+                decideMh(
+                    listOf(
+                        declared(store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(measureRef, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true),
+                    kindsMap = kinds + (measureRef to "measure"),
+                    reachMap = reach,
+                    ownersMap = mapOf(measureRef to storeSales),
+                ).shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe store
+            bind.equivalents shouldBe listOf(EquivalentReading(measureRef, "reach-equal"))
+        }
+
+        "MH: several head refs — the rule fires for ANY of them, and records the equivalent once" {
+            val bind =
+                decideMh(
+                    slot =
+                        SlotHint(
+                            Slot.FILTER,
+                            headRefs = listOf(storeSales, webSales),
+                            headMeasureCapable = true,
+                        ),
+                    reachMap = reach,
+                ).shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe store
+            bind.equivalents shouldBe listOf(EquivalentReading(storeSales, "reach-equal"))
+        }
+
+        "MH: rule 4 dominates rule 2 for the same pair — a nullable reach wins over an equal one" {
+            // An estate that declares BOTH a mandatory and a nullable relation between the same
+            // pair is contradicting itself. Refuse-over-guess: the nullable one decides.
+            val ambiguous =
+                decideMh(
+                    slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true),
+                    reachMap =
+                        mapOf(
+                            store to
+                                listOf(
+                                    Reach(storeSales, mandatory = true),
+                                    Reach(storeSales, mandatory = false),
+                                ),
+                        ),
+                ).shouldBeInstanceOf<Binder.Ambiguous>()
+            ambiguous.admitted.size shouldBe 2
+        }
+
+        "MH: rules 2 and 3 name the dropped fact in the rung log — nothing silently dropped" {
+            decideMh(
+                slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true),
+                reachMap = reach,
+            ).rejected.map { it.match.targetRef } shouldContainExactly listOf(storeSales)
+
+            decideMh(
+                slot = SlotHint(Slot.FILTER, headRefs = listOf(storeReturns), headMeasureCapable = false),
+                reachMap = reach,
+            ).rejected.map { it.match.targetRef } shouldContainExactly listOf(storeSales)
+        }
+
+        "MH: with NO headRefs the reachability rule never fires — E9 keeps asking" {
+            // The degenerate "any mandatory reach" form was dropped at /planning: a bare word
+            // with no clause head must stay a question (design.md §4, the single-word regression).
+            decideMh(slot = SlotHint(Slot.NONE), reachMap = reach)
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted.size shouldBe 2
+        }
     }) {
     private companion object {
         /** A MEMBER row that nonetheless carries a target ref — a data value inside an object. */
