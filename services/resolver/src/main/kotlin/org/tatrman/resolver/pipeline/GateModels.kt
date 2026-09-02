@@ -47,6 +47,12 @@ data class GatedSpan(
     val candidate: DomainSpanCandidate,
     val contenders: List<Binder.ClassedMatch>,
     val ambiguous: Boolean,
+    /**
+     * MH-D3 — readings the Binder proved equal to the WINNER of this span and suppressed. Empty
+     * unless the reachability rule fired, and empty on every ambiguous span by construction: a
+     * span that is asking proved nothing equal.
+     */
+    val equivalents: List<EquivalentReading> = emptyList(),
 )
 
 /**
@@ -85,6 +91,13 @@ data class ClarificationOption(
     val spanStart: Int,
     val spanEnd: Int,
     val spanText: String,
+    /**
+     * MH — the option's mention kind (`entity` | `entity_with_measures` | `measure` |
+     * `attribute`; blank for a MEMBER option and for a ref the archive declares nothing about).
+     * A G2 over a homonym is unanswerable when both options are just labels; the species is what
+     * makes it a question a human can answer.
+     */
+    val objectKind: String = "",
 )
 
 /**

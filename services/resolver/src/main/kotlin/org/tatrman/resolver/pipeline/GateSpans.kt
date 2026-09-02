@@ -8,7 +8,9 @@ import org.tatrman.fuzzy.v1.SourceTag
 import org.tatrman.fuzzy.v1.SpanQuery
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.model.kindsByRef
 import org.tatrman.resolver.model.ownersByRef
+import org.tatrman.resolver.model.reachByRef
 
 /**
  * gateSpans (RG-P5.S1.T4) — the heart. All proposed spans go out in ONE
@@ -62,7 +64,12 @@ object GateSpans {
     ): GateOutcome =
         outcomeOf(
             // MS-P3·S2 — one owners map per gate call, shared by every span (contracts §8.3).
-            entityTypes.ownersByRef().let { owners ->
+            // MH: two more, built the same way and in the same place, so the three producers that
+            // gate cannot end up asking the registry three slightly different questions.
+            run {
+                val owners = entityTypes.ownersByRef()
+                val kinds = entityTypes.kindsByRef()
+                val reach = entityTypes.reachByRef()
                 candidates.mapIndexed { i, cand ->
                     // The ONE decision, made in the one place that makes it (RV-P2.2). Note what is NOT
                     // filtered before the call: the bind floor is the binder's too, because a candidate
@@ -76,8 +83,17 @@ object GateSpans {
                             cand,
                             thresholds,
                             owners,
+                            kinds,
+                            reach,
                         )
-                    GatedSpan(cand, verdict.admitted, ambiguous = verdict is Binder.Ambiguous)
+                    GatedSpan(
+                        cand,
+                        verdict.admitted,
+                        ambiguous = verdict is Binder.Ambiguous,
+                        // MH-D3: only a Bind can carry equivalents — an ambiguous span proved
+                        // nothing equal, which is precisely why it is asking.
+                        equivalents = (verdict as? Binder.Bind)?.equivalents.orEmpty(),
+                    )
                 }
             },
             entityTypes,
@@ -177,6 +193,10 @@ object GateSpans {
             spanStart = cand.start,
             spanEnd = cand.end,
             spanText = cand.text,
+            // MH: the option's SPECIES, so a G2 can be worded as "the stores (a dimension) or the
+            // Stores channel (sales)?" instead of two labels a user cannot tell apart. Blank for
+            // a MEMBER option and for any ref the archive declares nothing about.
+            objectKind = entityTypes.firstOrNull { it.ref == m.targetRef }?.objectKind.orEmpty(),
         )
     }
 

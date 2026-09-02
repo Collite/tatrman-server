@@ -21,6 +21,7 @@ import org.tatrman.resolver.pipeline.Binder
 import org.tatrman.resolver.pipeline.Bindings
 import org.tatrman.resolver.pipeline.Bound
 import org.tatrman.resolver.pipeline.DomainSpanCandidate
+import org.tatrman.resolver.pipeline.EquivalentReading
 import org.tatrman.resolver.pipeline.EvidenceClasses
 import org.tatrman.resolver.pipeline.FrameRolePreps
 import org.tatrman.resolver.pipeline.GatedSpan
@@ -475,6 +476,37 @@ class LatticeAssemblerTest :
             mention.frameRolesList shouldNotContain FrameRole.FRAME_ROLE_MEASURE
             // it is the only mention left, so R9's residue pick lands on it
             mention.frameRolesList shouldContainExactly listOf(FrameRole.FRAME_ROLE_SUBJECT)
+        }
+
+        // --- MH-D3 — the equivalent reading reaches the wire, on the WINNER only ---------------
+
+        "MH: a binding carries the readings proven equal to it" {
+            val binding =
+                Bindings.of(
+                    classedBy(
+                        declared("er.entity.store", "prodejna", TargetClass.TARGET_CLASS_MODEL_OBJECT, 1.0),
+                        mention("prodejna", 0, 8),
+                    ),
+                    "snap-1",
+                    listOf(EquivalentReading("er.entity.store_sales", "reach-equal")),
+                )
+
+            binding.equivalentsList.map { it.ref to it.rule } shouldContainExactly
+                listOf("er.entity.store_sales" to "reach-equal")
+        }
+
+        "MH: a binding with no equivalents does not print the field — the goldens depend on it" {
+            // An empty repeated field is absent from the text form, which is what keeps every
+            // pre-MH lattice byte-identical after the proto grew.
+            val binding =
+                mapped(
+                    declared("er.entity.store", "prodejna", TargetClass.TARGET_CLASS_MODEL_OBJECT, 1.0),
+                    mention("prodejna", 0, 8),
+                    "snap-1",
+                )
+
+            binding.equivalentsList shouldBe emptyList()
+            binding.toString().contains("equivalents") shouldBe false
         }
 
         "the RV-39 layer tuple is echoed from the matcher's answer, absence and all" {

@@ -3,6 +3,7 @@ package org.tatrman.resolver
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.shouldBe
 import java.io.File
 
 /**
@@ -70,5 +71,46 @@ class SingleBinderTest :
 
         "the class ORDER is consulted only by the binder — ranking candidates IS deciding" {
             filesMatching(Regex("""EvidenceClasses\.rank\(""")) shouldContainExactlyInAnyOrder listOf("Binder.kt")
+        }
+
+        // --- MH (plan risk 6) — a defaulted parameter must not silently skip a producer --------
+        //
+        // MS-P3 hit this: `owners` was added to `Binder.gate` with a default, one of the three
+        // producers was not updated, and the collapse simply did not happen there. MH adds THREE
+        // defaulted parameters, so the same shape of guard is written down rather than trusted.
+
+        "every Binder.gate call in main passes the kinds and reach maps" {
+            val calls =
+                sources
+                    .flatMap { file ->
+                        Regex("""Binder\.gate\((?:[^()]|\([^()]*\))*\)""", RegexOption.DOT_MATCHES_ALL)
+                            .findAll(file.readText())
+                            .map { file.name to it.value }
+                    }.toList()
+
+            // Three producers gate: the broad pass, the lookup rounds, the re-gate.
+            calls.map { it.first }.sorted() shouldContainExactlyInAnyOrder
+                listOf("GateSpans.kt", "LookupRounds.kt", "ReGate.kt")
+            calls.filterNot { it.second.contains("kinds") && it.second.contains("reach") } shouldBe emptyList()
+        }
+
+        "the slot is read from the candidate, and only inside the binder" {
+            // Architecture A3: nothing outside `Binder` may consult a candidate's slot, because
+            // the slot exists to feed ONE decision. `SlotHints` writes it; the Binder reads it.
+            // The trailing `[,)]` keeps this to CODE: `SlotHints`' own KDoc names the expression
+            // in prose, and a guard that fired on a comment would teach people to stop writing them.
+            filesMatching(Regex("""candidate\.slot[,)]""")) shouldContainExactlyInAnyOrder listOf("Binder.kt")
+        }
+
+        "the three registry maps are derived in one place each" {
+            // If a producer built its own kinds map by walking `entityTypes` itself, the three
+            // gates could disagree about what the registry says — which is the drift the helpers
+            // on `ResolverRegistry.kt` exist to prevent.
+            // `ResolverRegistry.kt` is where they are DECLARED; the rest are the readers. The
+            // pipeline reads kinds (to stamp slots) but never reach — nothing there decides.
+            filesMatching(Regex("""\.kindsByRef\(\)""")) shouldContainExactlyInAnyOrder
+                listOf("GateSpans.kt", "LookupRounds.kt", "ReGate.kt", "ResolverPipeline.kt", "ResolverRegistry.kt")
+            filesMatching(Regex("""\.reachByRef\(\)""")) shouldContainExactlyInAnyOrder
+                listOf("GateSpans.kt", "LookupRounds.kt", "ReGate.kt", "ResolverRegistry.kt")
         }
     })

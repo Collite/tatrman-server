@@ -12,6 +12,8 @@ import org.tatrman.resolver.client.GroundingClient
 import org.tatrman.resolver.client.NlpClient
 import org.tatrman.resolver.model.Reach
 import org.tatrman.resolver.model.ResolverEntityType
+import org.tatrman.resolver.model.kindsByRef
+import org.tatrman.resolver.model.ownersByRef
 import org.tatrman.resolver.model.ResolverRegistry
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.registry.SnapshotRegistry
@@ -144,7 +146,18 @@ class ResolverPipeline(
             }
 
         val universals = if (assessment.csNer) UniversalExtraction.extractUniversal(parse) else emptyList()
-        val candidates = SpanProposal.proposeDomainSpans(parse, resolverRegistry.entityTypes)
+        // MH — the slot is stamped HERE, right after proposal, because this is where the parse is
+        // in scope: `GateSpans.gate` receives candidates only (architecture A3). Same list, same
+        // order; only `DomainSpanCandidate.slot` is filled.
+        val candidates =
+            SlotHints.stamp(
+                parse,
+                SpanProposal.proposeDomainSpans(parse, resolverRegistry.entityTypes),
+                resolverRegistry.entityTypes.kindsByRef(),
+                resolverRegistry.entityTypes.ownersByRef(),
+                assessment.language,
+                preps,
+            )
         // The mention layer is derived BEFORE the batch now (RV-P1.6.T6): a mention nothing in the
         // model binds can still be a grounding trigger, and it can only be asked about in the one
         // BatchMatch this pass makes. The gate reads slots [0, candidates), the trigger annotation
@@ -494,6 +507,10 @@ class ResolverPipeline(
             if (o.resolvedId != null) opt.resolvedId = o.resolvedId
             if (o.targetRef != null) opt.targetRef = o.targetRef
             if (o.entityTypeRef.isNotBlank()) opt.entityTypeRef = o.entityTypeRef
+            // MH: the species, so the door can word the question by KIND. Not signed into the
+            // resume token — it is presentation, and a resume must only be able to pick from the
+            // identities that were offered.
+            if (o.objectKind.isNotBlank()) opt.objectKind = o.objectKind
             opt.span = span(o.spanStart, o.spanEnd, o.spanText)
             builder.addOptions(opt)
             signedOptions += ResumeOption(o.id, o.label, o.targetRef, o.resolvedId, o.entityTypeRef)

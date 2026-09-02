@@ -16,6 +16,56 @@ outside this repo could notice is in.
 
 ## Unreleased
 
+### `resolver.v1` — mention homonymy: slots, declared equivalence (MH-P1)
+
+One word claimed by two objects — a dimension and the fact a channel vocabulary is
+pinned to — used to reach the Binder as two unrelated identities in one tie band and
+leave as a clarification. It now gets decided from the sentence's syntax and the
+model's declared relations, and refuses only when the declarations say the two
+readings differ.
+
+**Wire (additive, J-v2 — no message changed meaning)**
+
+- `EntityType.reached_from` (`repeated Reach {fact_ref, mandatory}`) — the facts with
+  a declared relation TO this ref, with the to-side lower bound. Supplied by both
+  channels: the per-request registry override, and the compiled lexicon archive's
+  `targets[ref].reachedFrom` at schema `ttr-lexicon-compiled/v3`.
+- `Binding.equivalents` (`repeated EquivalentReading {ref, rule}`) — a reading the
+  Binder proved **equal by declaration** to this binding and suppressed
+  (`rule = "reach-equal"`). Disclosure, not a second binding: surface it, do not
+  re-plan on it. Two readings can be declared-equal and still differ on dirty data.
+- `Option.object_kind` — a clarification option's species, so a residual question can
+  be worded *"the stores (a dimension), or the Stores channel (sales)?"*.
+
+**Behaviour**
+
+- A tie between candidates of **different** mention kinds is decided by the syntactic
+  slot (count head · group-by · governed value · filter under a measure head ·
+  coordination). A **same-kind** tie is genuine homonymy and still refuses.
+- A `{dimension, fact}` tie collapses to the dimension when the model declares that
+  every row of the fact the clause is about carries that dimension — and is forced to
+  a clarification when the key is nullable, because then the two readings select
+  different rows.
+- Nothing else moves: the frozen frame-role corpora and the four hero lattice goldens
+  are unchanged.
+
+**Compatibility.** Every input is defaulted and absent-tolerant, so an estate that
+declared nothing behaves exactly as before: a pre-v3 archive, a registry with no
+`object_kind`, a `frame-roles.conf` with no `count-heads`, a re-gate with no parse —
+each leaves both rules inert. The v2 → v3 archive crossing needs **no reader gate**
+(unlike v1 → v2): `reachedFrom` is a defaulted field inside `targets`.
+
+**Config.** `frame-roles.conf` gains `count-heads` beside the two prep tables. A file
+written before this release loads unchanged and never fires the count slot.
+
+**Requires** the tatrman toolchain at `0.13.3` (`ttr-lexicon` `Reach` +
+`TargetFacts.reachedFrom`). ⚠ That cut also makes `ttr-metadata` parse a relation's
+authored `cardinality:`, which the file loader previously hardcoded to
+`(0, -1, 0, -1)` — any reader of a loaded `Relation.cardinality` now gets real
+numbers where it used to get zeros.
+
+Detail: [`docs/resolver-slots-and-equivalence.md`](docs/resolver-slots-and-equivalence.md).
+
 ### `ttr-nlp` 0.1.0 — the first wheel (NLS-P0…P4)
 
 The NLP suite as a library: an annotation model, a JAPE-class rule engine,

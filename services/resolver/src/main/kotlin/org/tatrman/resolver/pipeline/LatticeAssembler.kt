@@ -71,7 +71,10 @@ object LatticeAssembler {
                         .setSpan(span(span.candidate.start, span.candidate.end, span.candidate.text))
                         .setLemma(span.candidate.lemma)
                 for (match in span.contenders) {
-                    builder.addBindings(Bindings.of(match, snapshotHash))
+                    // MH-D3: the equivalents qualify the BINDING, so they ride the winner and
+                    // nothing else. A bound span has exactly one contender; an ambiguous span's
+                    // contenders carry none, because nothing was proven equal to anything.
+                    builder.addBindings(Bindings.of(match, snapshotHash, span.equivalents))
                 }
                 // LAST, deliberately (RV-42): a grounding trigger is evidence about which KERNEL
                 // owns the span, not about which model object the mention is, and the top binding

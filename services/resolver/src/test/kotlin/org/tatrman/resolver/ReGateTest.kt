@@ -208,6 +208,36 @@ class ReGateTest :
             first shouldBe second
         }
 
+        "MH: a re-gated homonym still ASKS — no parse, no slot, no rule" {
+            // Structural, not incidental: `anchorCandidate` synthesises a candidate with no slot
+            // because a re-gate has no parse. If a slot ever leaked in here, an LLM rung would be
+            // able to move an object decision by choosing when to re-gate — the shape RV-7
+            // forbids. Two EXACT declared candidates for one span ⇒ AMBIGUOUS, as before MH.
+            // The span has to be one the lattice actually carries (otherwise the answer is
+            // NO_SPAN and nothing is being tested); the hypothesis' TERM is what the fake matcher
+            // is keyed by, so the homonym rides `5010O1`'s span.
+            val fuzzy =
+                GateFuzzy(
+                    answers =
+                        mapOf(
+                            "prodejna" to
+                                listOf(
+                                    declared("er.entity.store"),
+                                    declared("er.entity.store_sales"),
+                                ),
+                        ),
+                )
+            val response =
+                gate(
+                    fuzzy,
+                    lattice = h1primeLattice(),
+                    correction("5010O1", 20, 26, to = "prodejna", ref = "", rung = "local"),
+                )
+
+            response.gatedBindingsList shouldBe emptyList()
+            response.outcomesList.single().reason shouldBe "AMBIGUOUS"
+        }
+
         "(review) a matcher that could not be ASKED is LOOKUP_FAILED, never an empty vocabulary" {
             // The failure mode this replaces: an unreachable matcher answered every hypothesis with
             // `NO_CANDIDATE`, whose own contract is "the vocabulary has no such term". A rung that
