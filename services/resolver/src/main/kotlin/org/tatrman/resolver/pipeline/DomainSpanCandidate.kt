@@ -25,6 +25,10 @@ package org.tatrman.resolver.pipeline
  * @property anchorHeadToken RV-P2.1, [Origin.LITERAL] only: the head token of the mention
  *   whose categories scoped this literal's lookup — "the user said *account*, so check
  *   501001 against account.code first" (RV-33). -1 when nothing scoped it.
+ * @property slot MH — the syntactic slot this span sits in, stamped by [SlotHints.stamp] in the
+ *   pipeline (where the parse is in scope) and read by `Binder.decide`. [SlotHint.NONE] on every
+ *   value-origin candidate, on a re-gated synthetic candidate, and on a parse with no dependency
+ *   tree — all three cases in which both Binder rules must be no-ops.
  */
 data class DomainSpanCandidate(
     val text: String,
@@ -37,6 +41,9 @@ data class DomainSpanCandidate(
     val headToken: Int = -1,
     val lemma: String = "",
     val anchorHeadToken: Int = -1,
+    // LAST and defaulted, on purpose: this class is constructed and `copy`d in a dozen places
+    // (SpanProposal, MentionLayer, ReGate, tests), and every one of them must keep compiling.
+    val slot: SlotHint = SlotHint.NONE,
 ) {
     /** Where a candidate came from — see [DomainSpanCandidate.origin]. */
     enum class Origin {

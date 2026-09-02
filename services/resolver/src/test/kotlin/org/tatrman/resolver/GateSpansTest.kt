@@ -13,12 +13,15 @@ import org.tatrman.fuzzy.v1.FuzzyMatch
 import org.tatrman.fuzzy.v1.FuzzyMatchResponse
 import org.tatrman.fuzzy.v1.Provenance
 import org.tatrman.fuzzy.v1.SourceTag
+import org.tatrman.resolver.model.Reach
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.pipeline.Bound
 import org.tatrman.resolver.pipeline.Clarify
 import org.tatrman.resolver.pipeline.DomainSpanCandidate
 import org.tatrman.resolver.pipeline.GateSpans
+import org.tatrman.resolver.pipeline.Slot
+import org.tatrman.resolver.pipeline.SlotHint
 
 /**
  * RG-P5.S1.T4 — gateSpans against a fake `BatchMatch` loaded with the Q-20
@@ -334,6 +337,111 @@ class GateSpansTest :
                     .single()
             b.siblingRefs shouldContainExactly listOf("er.qxxukazmu.kod")
             b.entityTypeRef shouldBe "er.qxxukazmu"
+        }
+        // --- MH — the slot and the reach reach the gate, and the outcome shows it ---------------
+        //
+        // Everything above feeds `GateSpans.gate` candidates with NO slot, which is exactly the
+        // pre-MH reading, and stays green unchanged. These feed it the hartland homonym.
+
+        val mhStore =
+            ResolverEntityType(
+                ref = "er.entity.store",
+                categories = listOf("er.entity.store"),
+                anchors = listOf("prodejna"),
+                objectKind = "entity",
+                reachedFrom = listOf(Reach("er.entity.store_sales", mandatory = true)),
+            )
+        val mhStoreSales =
+            ResolverEntityType(
+                ref = "er.entity.store_sales",
+                categories = listOf("er.entity.store_sales"),
+                anchors = listOf("prodejna", "tržby"),
+                objectKind = "entity_with_measures",
+            )
+        val mhTypes = listOf(mhStore, mhStoreSales)
+
+        /** One span, two EXACT hits — the tie the Binder used to refuse on kinds alone. */
+        fun mhHomonymResponse() =
+            batch(
+                fmr(
+                    fm(
+                        "lex:er.entity.store",
+                        "prodejna",
+                        1.0,
+                        "er.entity.store",
+                        SourceTag.DECLARED,
+                        "er.entity.store",
+                    ),
+                    fm(
+                        "lex:er.entity.store_sales",
+                        "prodejna",
+                        1.0,
+                        "er.entity.store_sales",
+                        SourceTag.DECLARED,
+                        "er.entity.store_sales",
+                    ),
+                ),
+            )
+
+        fun mhCandidate(slot: SlotHint) =
+            DomainSpanCandidate(
+                text = "prodejna",
+                start = 0,
+                end = 8,
+                gatedEntityRefs = listOf("er.entity.store", "er.entity.store_sales"),
+                categories = listOf("er.entity.store", "er.entity.store_sales"),
+                anchored = true,
+                headToken = 0,
+                lemma = "prodejna",
+                slot = slot,
+            )
+
+        fun mhGate(
+            slot: SlotHint,
+            types: List<ResolverEntityType> = mhTypes,
+        ) = GateSpans.gate(listOf(mhCandidate(slot)), mhHomonymResponse(), types, thresholds, emptyMap(), "snap-mh")
+
+        "MH: a COUNT_HEAD slot binds the dimension through the real gate" {
+            mhGate(SlotHint(Slot.COUNT_HEAD))
+                .shouldBeInstanceOf<Bound>()
+                .bindings
+                .single()
+                .targetRef shouldBe "er.entity.store"
+        }
+
+        "MH: a FILTER under the channel's OWN fact binds the dimension (the reach decided it)" {
+            // T2 prefers the fact here; the mandatory reach flips it to the dimension. That the
+            // flip happens through the REAL gate — registry maps built inside `gate`, not handed
+            // in by the test — is the point of asserting it here rather than only on the Binder.
+            mhGate(SlotHint(Slot.FILTER, headRefs = listOf("er.entity.store_sales"), headMeasureCapable = true))
+                .shouldBeInstanceOf<Bound>()
+                .bindings
+                .single()
+                .targetRef shouldBe "er.entity.store"
+        }
+
+        "MH: a NONE slot still asks, and each option now carries its SPECIES" {
+            val clarify = mhGate(SlotHint.NONE).shouldBeInstanceOf<Clarify>()
+            clarify.options shouldHaveSize 2
+            clarify.options.map { it.objectKind } shouldContainExactlyInAnyOrder
+                listOf("entity", "entity_with_measures")
+        }
+
+        "MH: a registry with no kinds and no reach is the pre-MH gate, unchanged" {
+            val plainTypes =
+                listOf(
+                    ResolverEntityType("er.entity.store", listOf("er.entity.store"), listOf("prodejna")),
+                    ResolverEntityType(
+                        "er.entity.store_sales",
+                        listOf("er.entity.store_sales"),
+                        listOf("prodejna"),
+                    ),
+                )
+            // The slot says "an entity" and the registry says nothing about either ref, so there
+            // is nothing to prefer — and the options carry a blank kind rather than a guess.
+            val clarify = mhGate(SlotHint(Slot.COUNT_HEAD), plainTypes).shouldBeInstanceOf<Clarify>()
+            clarify.options shouldHaveSize 2
+            clarify.options.map { it.objectKind } shouldContainExactlyInAnyOrder listOf("", "")
         }
     }) {
     companion object {

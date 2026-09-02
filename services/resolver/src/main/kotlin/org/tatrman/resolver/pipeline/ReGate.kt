@@ -12,7 +12,9 @@ import org.tatrman.fuzzy.v1.LookupRequest
 import org.tatrman.resolver.client.FuzzyClient
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.model.kindsByRef
 import org.tatrman.resolver.model.ownersByRef
+import org.tatrman.resolver.model.reachByRef
 import org.tatrman.resolver.v1.Attribution
 import org.tatrman.resolver.v1.Binding
 import org.tatrman.resolver.v1.GapKind
@@ -122,6 +124,11 @@ object ReGate {
         val categoriesByRef = entityTypes.associate { it.ref to it.categories }
         // MS-P3·S2 — see GateSpans: every producer gates through the same containment map.
         val owners = entityTypes.ownersByRef()
+        // MH: built once here, like `owners` — plan risk 6 is a defaulted parameter silently
+        // skipping one of the three producers, and the way it is avoided is that all three read
+        // the registry through the same three helpers.
+        val kinds = entityTypes.kindsByRef()
+        val reach = entityTypes.reachByRef()
         // `Gate` is a public rpc and `hypotheses` is an unbounded repeated field, so the fan-out has
         // to be bounded by this service rather than by the caller's good manners: without this a
         // single request opens one concurrent matcher RPC per hypothesis, each with a 30s deadline.
@@ -190,7 +197,15 @@ object ReGate {
             // already said so. The hypothesis' own confidence is NOT evidence of anchoring — a
             // proposer that could talk itself into a higher evidence class is a proposer that binds.
             val anchored = mention != null || (value?.anchorMentionId?.isNotBlank() == true)
-            val verdict = Binder.gate(candidates, anchorCandidate(hypothesis, anchored), thresholds, owners)
+            val verdict =
+                Binder.gate(
+                    candidates,
+                    anchorCandidate(hypothesis, anchored),
+                    thresholds,
+                    owners,
+                    kinds,
+                    reach,
+                )
             when {
                 verdict is Binder.Ambiguous -> outcomes += outcome(hypothesis, Reason.AMBIGUOUS)
                 verdict is Binder.Bind -> {
@@ -404,6 +419,10 @@ object ReGate {
             gatedEntityRefs = emptyList(),
             categories = emptyList(),
             anchored = anchored,
+            // MH: no `slot`, and that is STRUCTURAL rather than an omission (architecture A3).
+            // A re-gate has no parse — it is re-deciding a span the broad pass already slotted —
+            // and a rule that invented a slot here would be deciding an object from a hypothesis'
+            // say-so, which is exactly what RV-7 forbids. `SlotHint.NONE` ⇒ both MH rules no-op.
         )
 
     private fun outcome(

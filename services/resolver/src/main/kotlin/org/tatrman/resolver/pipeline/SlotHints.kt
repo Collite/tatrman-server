@@ -1,0 +1,255 @@
+// SPDX-License-Identifier: Apache-2.0
+package org.tatrman.resolver.pipeline
+
+import org.slf4j.LoggerFactory
+import org.tatrman.nlp.v1.AnalyzeResponse
+
+/**
+ * MH T2 — the SYNTACTIC SLOT a proposed span sits in.
+ *
+ * The problem it exists for: one word, two objects. On hartland `prodejna` is the store
+ * dimension's label AND a form of the Stores-channel term pinned to the sales fact, so the
+ * Binder sees two unrelated identities in one tie band and — correctly, on the evidence it had —
+ * refuses. But the sentence already says which one is wanted: you *count* things, you *group by*
+ * things, and you *restrict a measure* by the thing being measured. Since MS the two candidates
+ * differ in `objectKind`, so the slot's kind preference can break the tie
+ * (`Binder.decide`, contracts §7.3).
+ *
+ * **Why the slot is computed here and not in the Binder** (architecture A3): `GateSpans.gate`
+ * never sees the parse — `ResolverPipeline` hands it candidates only — and `ReGate` synthesises
+ * candidates with `headToken = -1` for a span it is re-deciding. So the slot is stamped onto the
+ * candidate in the pipeline, where the parse is in scope, and the Binder reads
+ * `candidate.slot`. A re-gate therefore gets [SlotHint.NONE], which is structurally right: the
+ * broad pass already slotted that span, and a re-decision with no parse must not invent one.
+ *
+ * The same signals `FrameRoles` (R3–R9) already trusts, read at the same tokens: the `case`
+ * child's lemma, the head token's `deprel`, the `conj` sibling. What is new is only *when* they
+ * are read — before binding instead of after it — and one table (`count-heads`) that had no
+ * reader at all, because nothing in the system had ever looked at a count quantifier.
+ *
+ * ⚠ Under MH a mis-attached preposition costs a wrong OBJECT, where before it cost a wrong ROLE.
+ * That is why the rule is a *preference* (✅MH-D2) that never empties the band, and why T3's
+ * reachability check can veto it.
+ *
+ * Pure, deterministic, no I/O.
+ */
+object SlotHints {
+    private val log = LoggerFactory.getLogger(SlotHints::class.java)
+
+    /** How far up the dependency chain a span looks for the candidate it attaches to. */
+    private const val MAX_HEAD_HOPS = 3
+
+    private const val KIND_MEASURE = "measure"
+    private const val KIND_ENTITY_WITH_MEASURES = "entity_with_measures"
+
+    /** Deprels that make a bare (preposition-less) nominal a restriction of its head. */
+    private val BARE_FILTER_RELATIONS = setOf("nmod", "obl", "compound")
+
+    private val SUBJECT_RELATIONS = setOf("nsubj", "nsubj:pass")
+
+    /**
+     * Stamp [SlotHint] onto every `ANCHOR_PHRASE` candidate. Same list, same order, same size —
+     * only `slot` is filled, so this cannot change which spans are proposed.
+     *
+     * Value-origin candidates (`GOVERNED_VALUE`, `PROPER_NOUN`, `NER_ENTITY`, `LITERAL`,
+     * `NGRAM_FLOOR`) keep [SlotHint.NONE]: they are literals, not mentions of model objects, and
+     * the Binder's kind rules are about which OBJECT a word names.
+     */
+    fun stamp(
+        parse: AnalyzeResponse,
+        candidates: List<DomainSpanCandidate>,
+        kindsByRef: Map<String, String>,
+        ownersByRef: Map<String, String>,
+        lang: String,
+        preps: FrameRolePreps,
+    ): List<DomainSpanCandidate> {
+        val tokens = parse.tokensList
+        // No dependency tree ⇒ no slots. The n-gram floor runs in exactly this case (R4-γ), and
+        // guessing a slot off token order would be the kind of syntax-free inference the whole
+        // anchored-proposal design refuses.
+        if (tokens.none { it.depHead > 0 }) return candidates
+
+        val byHead = HashMap<Int, DomainSpanCandidate>()
+        for (c in candidates) {
+            if (c.origin == DomainSpanCandidate.Origin.ANCHOR_PHRASE && c.headToken >= 0) {
+                byHead.putIfAbsent(c.headToken, c)
+            }
+        }
+
+        fun headIndexOf(depHead: Int): Int = depHead - 1
+
+        fun governorOf(token: Int): Int = if (token in tokens.indices) headIndexOf(tokens[token].depHead) else -1
+
+        /** The `case` child's lemma, exactly as `FrameRoles.prepositionOf` reads it. */
+        fun prepOf(head: Int): String? =
+            tokens
+                .firstOrNull { headIndexOf(it.depHead) == head && it.depRelation == "case" }
+                ?.let { (it.lemma.ifBlank { it.text }).lowercase() }
+
+        val countWords = preps.countHeads(lang)
+
+        /**
+         * A count quantifier sitting on, or beside, the counted noun. Three attachments, because
+         * the UD analyses differ across languages and even across Czech parses of one shape:
+         * `kolik` may govern the noun (`det:numgov`), be a dependent of it, or be an `advmod` of
+         * the same verb ("How many stores do we have?" attaches `how`→`many`→`stores`).
+         */
+        fun hasCountWord(head: Int): Boolean {
+            if (countWords.isEmpty()) return false
+            val headGovernor = governorOf(head)
+            return tokens.withIndex().any { (i, t) ->
+                i < head &&
+                    (t.lemma.ifBlank { t.text }).lowercase() in countWords &&
+                    (
+                        headIndexOf(t.depHead) == head ||
+                            headGovernor == i ||
+                            (head in tokens.indices && t.depHead == tokens[head].depHead)
+                    )
+            }
+        }
+
+        /** The conj-sibling candidate, in either direction — a coordination has no privileged end. */
+        fun conjSibling(head: Int): DomainSpanCandidate? {
+            val child =
+                tokens.withIndex().firstOrNull { (_, t) ->
+                    t.depRelation == "conj" && headIndexOf(t.depHead) == head
+                }
+            if (child != null) byHead[child.index]?.let { return it }
+            if (head in tokens.indices && tokens[head].depRelation == "conj") {
+                return byHead[governorOf(head)]
+            }
+            return null
+        }
+
+        /** True iff some GOVERNED_VALUE candidate names this span as its scoping mention. */
+        fun hasGovernedValue(head: Int): Boolean =
+            candidates.any {
+                it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE && it.anchorHeadToken == head
+            }
+
+        /** Walk up to [MAX_HEAD_HOPS] governors for the candidate this span attaches to. */
+        fun headCandidate(head: Int): DomainSpanCandidate? {
+            var i = governorOf(head)
+            var hops = 0
+            while (i >= 0 && hops < MAX_HEAD_HOPS) {
+                byHead[i]?.let { if (it.headToken != head) return it }
+                i = governorOf(i)
+                hops++
+            }
+            return null
+        }
+
+        /** A ref's FACT: itself when it is one, its owner when it is a measure on one. */
+        fun factOf(ref: String): String =
+            when (kindsByRef[ref]) {
+                KIND_ENTITY_WITH_MEASURES -> ref
+                KIND_MEASURE -> ownersByRef[ref] ?: ref
+                else -> ref
+            }
+
+        fun measureCapable(ref: String): Boolean = kindsByRef[ref] in setOf(KIND_MEASURE, KIND_ENTITY_WITH_MEASURES)
+
+        fun headFields(head: Int): Pair<List<String>, Boolean> {
+            val hc = headCandidate(head) ?: return emptyList<String>() to false
+            return hc.gatedEntityRefs.map(::factOf).distinct() to hc.gatedEntityRefs.any(::measureCapable)
+        }
+
+        return candidates.map { c ->
+            if (c.origin != DomainSpanCandidate.Origin.ANCHOR_PHRASE || c.headToken < 0) return@map c
+            val head = c.headToken
+            val prep = prepOf(head)
+            val deprel = if (head in tokens.indices) tokens[head].depRelation else ""
+
+            val hint =
+                when {
+                    // 1 — coordination first: "srovnej prodejny a web" is a comparison of
+                    // channels, and the sibling's KIND is the only thing that says so. It wins
+                    // over a count head because "kolik prodejen a webů" is still a comparison.
+                    conjSibling(head) != null -> {
+                        val sibling = conjSibling(head)!!
+                        SlotHint(
+                            slot = Slot.COORD_WITH,
+                            coordSiblingKinds =
+                                sibling.gatedEntityRefs
+                                    .mapNotNull { kindsByRef[it] }
+                                    .filter { it.isNotBlank() }
+                                    .toSet(),
+                        )
+                    }
+                    // 2 — you count THINGS.
+                    hasCountWord(head) -> SlotHint(slot = Slot.COUNT_HEAD)
+                    // 3 — "podle X" wants a groupable axis.
+                    prep != null && prep in preps.grouping(lang) -> {
+                        val (refs, capable) = headFields(head)
+                        SlotHint(slot = Slot.GROUP_BY, headRefs = refs, headMeasureCapable = capable)
+                    }
+                    // 4 — a span that governs a value ("prodejna Nashville") names an object
+                    // with members. Before FILTER: the two co-occur, and the value is the
+                    // stronger signal.
+                    hasGovernedValue(head) -> SlotHint(slot = Slot.GOVERNED_VALUE)
+                    // 5 — a filter preposition, or a bare nominal hanging off another mention.
+                    (prep != null && prep in preps.filter(lang)) ||
+                        (prep == null && deprel in BARE_FILTER_RELATIONS && headCandidate(head) != null) -> {
+                        val (refs, capable) = headFields(head)
+                        SlotHint(slot = Slot.FILTER, headRefs = refs, headMeasureCapable = capable)
+                    }
+                    // 6 — a subject with nothing else to say about it. No kind preference; it is
+                    // here so the reachability rule can still see the clause's head.
+                    deprel in SUBJECT_RELATIONS -> {
+                        val (refs, capable) = headFields(head)
+                        SlotHint(slot = Slot.SUBJECT, headRefs = refs, headMeasureCapable = capable)
+                    }
+                    else -> SlotHint.NONE
+                }
+
+            if (hint.slot != Slot.NONE) {
+                log.debug("slot {} for span '{}' (head {}): {}", hint.slot, c.text, head, hint)
+            }
+            c.copy(slot = hint)
+        }
+    }
+}
+
+/**
+ * MH — the syntactic position a span occupies, as far as the Binder needs to know it.
+ *
+ * Not a frame ROLE: `FrameRoles` answers "what does this mention DO in the query" after binding,
+ * over bound mentions; this answers "what kind of thing is the sentence asking for here" before
+ * binding, so a tie between two unrelated objects can be broken. They read the same tokens and
+ * deliberately stay separate rules — a slot that fired only when a role did would inherit the
+ * role's exemptions, which are about measures, not about homonyms.
+ */
+enum class Slot {
+    NONE,
+    SUBJECT,
+    COUNT_HEAD,
+    GROUP_BY,
+    GOVERNED_VALUE,
+    FILTER,
+    COORD_WITH,
+}
+
+/**
+ * MH — a span's slot plus the facts the Binder's two rules need about its clause.
+ *
+ * @property headRefs the FACTS of the candidate this span's head attaches to (`FILTER` /
+ *   `GROUP_BY` / `SUBJECT`) — a measure is mapped to its owner, so the list is always facts, not
+ *   a mix. It is what the reachability rule calls H: the fact the clause is actually about.
+ * @property headMeasureCapable true iff any head ref is `measure` or `entity_with_measures`.
+ *   Only a measure-capable head makes "tržby z prodejen" a restriction OF a measure; a plain
+ *   entity head ("vratky z prodejen" before returns declare measures) still carries [headRefs],
+ *   which is what lets the reachability rule fix the slot rule's mis-bind (design.md T2 §4, E6).
+ * @property coordSiblingKinds the kinds of the `conj` sibling's refs — "compare X and Y" wants
+ *   both sides on the same axis, so the sibling's species is the preference.
+ */
+data class SlotHint(
+    val slot: Slot = Slot.NONE,
+    val headRefs: List<String> = emptyList(),
+    val headMeasureCapable: Boolean = false,
+    val coordSiblingKinds: Set<String> = emptySet(),
+) {
+    companion object {
+        /** No slot: a bare word, a fragment, a re-gate, a parse with no tree. Both rules no-op. */
+        val NONE = SlotHint()
+    }
+}

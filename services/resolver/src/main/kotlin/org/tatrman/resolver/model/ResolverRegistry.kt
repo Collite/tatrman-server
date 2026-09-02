@@ -46,6 +46,32 @@ data class ResolverEntityType(
      * because MS-P3's declared-containment collapse looks the owner up in this same set.
      */
     val ownerRef: String = "",
+    /**
+     * MH — the facts with a declared relation TO this ref, with the to-side lower bound.
+     *
+     * Empty for members, for entities nothing relates to, and for every archive built before
+     * schema `ttr-lexicon-compiled/v3` — which is what makes the Binder's reachability rule a
+     * no-op on a pre-MH estate rather than a behaviour change nobody asked for.
+     *
+     * ⛔ Declared structure, never derived: it comes from the model's `def relation`s, projected
+     * at COMPILE time. Guessing a join from two ref strings that share a prefix would be a second
+     * rule, and the two would eventually disagree — the same argument that keeps `objectKind`
+     * out of the ref string.
+     */
+    val reachedFrom: List<Reach> = emptyList(),
+)
+
+/**
+ * MH — one declared relation, seen from the entity it points AT: the fact's ref, and whether
+ * every row of that fact carries this entity (`cardinality.to`'s lower bound ≥ 1).
+ *
+ * [mandatory] is the load-bearing half. "Sales *of the Stores channel*" and "sales *joined to the
+ * store dimension*" are the same rows only when no fact row can be missing its store; a nullable
+ * key makes the two readings differ, and the Binder must then refuse rather than pick.
+ */
+data class Reach(
+    val factRef: String,
+    val mandatory: Boolean,
 )
 
 /**
@@ -61,6 +87,27 @@ data class ResolverEntityType(
  */
 fun List<ResolverEntityType>.ownersByRef(): Map<String, String> =
     filter { it.ownerRef.isNotBlank() }.associate { it.ref to it.ownerRef }
+
+/**
+ * MH — ref → its declared reach, for the Binder's reachability rule.
+ *
+ * Built here beside [ownersByRef] for the same reason: the three producers that gate
+ * (`GateSpans`, the lookup rounds, the re-gate) must not drift into three spellings of one
+ * question. A ref with no relations is ABSENT rather than mapped to an empty list, so a lookup
+ * answers "nothing declared" by missing — the shape the rule already reads `owners` with.
+ */
+fun List<ResolverEntityType>.reachByRef(): Map<String, List<Reach>> =
+    filter { it.reachedFrom.isNotEmpty() }.associate { it.ref to it.reachedFrom }
+
+/**
+ * MH — ref → its mention kind, for the Binder's slot rule.
+ *
+ * The same map `LatticeAssembler` builds for frame roles, hoisted here so the gate can read kinds
+ * too. Blank kinds are omitted: `""` means "the archive declared nothing", and a rule that
+ * compared against it would be treating silence as a species.
+ */
+fun List<ResolverEntityType>.kindsByRef(): Map<String, String> =
+    filter { it.objectKind.isNotBlank() }.associate { it.ref to it.objectKind }
 
 /**
  * Gating thresholds — ported from the live ENTITIES_ONLY config

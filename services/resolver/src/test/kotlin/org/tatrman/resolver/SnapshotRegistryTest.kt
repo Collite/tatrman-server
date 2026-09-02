@@ -5,7 +5,9 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.runBlocking
+import org.tatrman.resolver.model.Reach
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.model.reachByRef
 import org.tatrman.resolver.registry.DeclaredValue
 import org.tatrman.resolver.registry.DeclaredVocabulary
 import org.tatrman.resolver.registry.DeclaredVocabularyEntry
@@ -15,6 +17,7 @@ import org.tatrman.resolver.registry.SnapshotRegistry
 import org.tatrman.resolver.registry.StubRegistrySource
 import org.tatrman.resolver.pipeline.ResolverPipeline
 import org.tatrman.resolver.v1.EntityType
+import org.tatrman.resolver.v1.Reach as ReachProto
 import org.tatrman.resolver.v1.Registry
 
 /**
@@ -134,5 +137,57 @@ class SnapshotRegistryTest :
             types.getValue("er.entity.sales.amount_czk").ownerRef shouldBe "er.entity.sales"
             types.getValue("er.entity.sales").objectKind shouldBe "entity_with_measures"
             types.getValue("er.entity.sales").ownerRef shouldBe ""
+        }
+
+        // ---- MH: the same argument, one field later ------------------------------------------
+        //
+        // `reached_from` joined the override proto in the same commit as the model field, for the
+        // reason the comment above records: a caller that can state a kind must be able to state
+        // the reach that qualifies it. Without it a fixture could exercise the slot rule and never
+        // the reachability rule, which is exactly the half that stops the slot rule mis-binding.
+
+        "the per-request override carries reachedFrom through, verbatim" {
+            val override =
+                Registry
+                    .newBuilder()
+                    .addEntityTypes(
+                        EntityType
+                            .newBuilder()
+                            .setRef("er.entity.store")
+                            .addCategories("entities")
+                            .addAnchors("prodejna")
+                            .setObjectKind("entity")
+                            .addReachedFrom(
+                                ReachProto.newBuilder().setFactRef("er.entity.store_sales").setMandatory(true),
+                            ).addReachedFrom(
+                                ReachProto.newBuilder().setFactRef("er.entity.web_sales").setMandatory(false),
+                            ),
+                    ).addEntityTypes(
+                        // A ref that states no reach must survive as an EMPTY list, not as the
+                        // previous row's — the same "" argument as ownerRef above.
+                        EntityType
+                            .newBuilder()
+                            .setRef("er.entity.store_sales")
+                            .addCategories("entities")
+                            .setObjectKind("entity_with_measures"),
+                    ).build()
+
+            val types =
+                ResolverPipeline
+                    .fromProto(override, ResolverThresholds.LIVE)
+                    .entityTypes
+                    .associateBy { it.ref }
+
+            types.getValue("er.entity.store").reachedFrom shouldBe
+                listOf(
+                    Reach("er.entity.store_sales", mandatory = true),
+                    Reach("er.entity.web_sales", mandatory = false),
+                )
+            types.getValue("er.entity.store_sales").reachedFrom shouldBe emptyList()
+            // …and the derived maps read the override channel exactly as they read the archive.
+            types.values
+                .toList()
+                .reachByRef()
+                .keys shouldBe setOf("er.entity.store")
         }
     })

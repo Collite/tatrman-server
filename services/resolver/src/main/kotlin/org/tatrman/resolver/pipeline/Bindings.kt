@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.resolver.pipeline
 
+import org.tatrman.resolver.v1.EquivalentReading as ProtoEquivalentReading
 import org.tatrman.fuzzy.v1.FuzzyMatch
 import org.tatrman.resolver.v1.Binding
 import org.tatrman.resolver.v1.BindingProvenance
@@ -38,6 +39,12 @@ object Bindings {
     fun of(
         classed: Binder.ClassedMatch,
         snapshotHash: String,
+        /**
+         * MH-D3 — readings proven equal to this one by declared relations. Defaulted, so every
+         * existing call site keeps producing byte-identical bindings; only the WINNER of a bound
+         * span is ever handed a non-empty list.
+         */
+        equivalents: List<EquivalentReading> = emptyList(),
     ): Binding {
         val match = classed.match
         val isMember = match.source == FuzzySourceTag.MEMBER
@@ -73,6 +80,14 @@ object Bindings {
         }
         if (match.hasUniquenessMargin()) builder.uniquenessMargin = match.uniquenessMargin
         if (match.hasAutoBindable()) builder.autoBindable = match.autoBindable
+        for (e in equivalents) {
+            builder.addEquivalents(
+                ProtoEquivalentReading
+                    .newBuilder()
+                    .setRef(e.ref)
+                    .setRule(e.rule),
+            )
+        }
         return builder.build()
     }
 

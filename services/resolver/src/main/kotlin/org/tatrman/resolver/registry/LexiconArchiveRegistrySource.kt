@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.resolver.registry
 
+import org.tatrman.resolver.model.Reach
 import org.slf4j.LoggerFactory
 import org.tatrman.ttr.lexicon.CompiledEntry
 import org.tatrman.ttr.lexicon.CompiledLexicon
@@ -125,6 +126,10 @@ class LexiconArchiveRegistrySource(
                         values = rows.map { it.toDeclaredValue() },
                         objectKind = facts?.objectKind ?: "",
                         ownerRef = facts?.ownerRef ?: "",
+                        // MH: the same lookup-and-copy. A pre-v3 archive has no `reachedFrom`
+                        // at all and a v3 one may legitimately have none for this ref; both
+                        // read as the empty list, which leaves the Binder's rule inert.
+                        reachedFrom = facts?.reachedFrom.orEmpty().map { Reach(it.factRef, it.mandatory) },
                     )
                 }.sortedBy { it.category }
 

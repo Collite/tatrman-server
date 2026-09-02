@@ -26,10 +26,18 @@ class FrameRolePreps(
     private val groupingPreps: Map<String, Set<String>>,
     private val filterPreps: Map<String, Set<String>>,
     private val defaultLang: String,
+    /**
+     * MH — count quantifiers (`kolik`, `how many`, `number of`). Last and defaulted, so a
+     * config file written before MH keeps loading and simply never fires the count slot.
+     */
+    private val countHeads: Map<String, Set<String>> = emptyMap(),
 ) {
     fun grouping(lang: String): Set<String> = table(groupingPreps, lang)
 
     fun filter(lang: String): Set<String> = table(filterPreps, lang)
+
+    /** MH — the lemmas that mark a counted noun's head; empty for a pre-MH config. */
+    fun countHeads(lang: String): Set<String> = table(countHeads, lang)
 
     private fun table(
         tables: Map<String, Set<String>>,
@@ -77,6 +85,9 @@ class FrameRolePreps(
                     } else {
                         "en"
                     },
+                // MH: `tables` already returns an empty map for an absent path, so a config
+                // that predates the key loads unchanged.
+                countHeads = tables(config, "frame-roles.count-heads"),
             )
 
         private fun tables(

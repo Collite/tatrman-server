@@ -59,6 +59,9 @@ class SnapshotRegistry(
                     // tie-break, there is nothing to break.
                     objectKind = entries.first().objectKind,
                     ownerRef = entries.first().ownerRef,
+                    // MH: same "first is not a tie-break" argument — the facts are per ref and
+                    // the grouping is by ref, so every entry in the group carries the same list.
+                    reachedFrom = entries.first().reachedFrom,
                 )
             }
         val locales = (vocab.locales + configLocales).distinct()

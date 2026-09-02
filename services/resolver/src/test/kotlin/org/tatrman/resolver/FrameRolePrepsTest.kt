@@ -33,6 +33,34 @@ class FrameRolePrepsTest :
             FrameRolePreps.load(config).grouping("cs") shouldContain "podle"
         }
 
+        "MH — the shipped count-head tables, and a config that predates them" {
+            FrameRolePreps.shipped().countHeads("cs") shouldContain "kolik"
+            FrameRolePreps.shipped().countHeads("cs") shouldContain "počet"
+            FrameRolePreps.shipped().countHeads("en") shouldContain "many"
+            FrameRolePreps.shipped().countHeads("en") shouldContain "number"
+            FrameRolePreps.shipped().countHeads("en") shouldContain "count"
+            // A region tag reads its language's table, like every other table here.
+            FrameRolePreps.shipped().countHeads("cs-CZ") shouldBe FrameRolePreps.shipped().countHeads("cs")
+
+            // An estate override written before MH has no `count-heads` key. It must keep
+            // loading — and yield NOTHING rather than inheriting the shipped Czech list, which
+            // would make a wholesale override partly not wholesale.
+            val preMh =
+                write(
+                    """
+                    frame-roles {
+                        grouping-preps { cs = ["podle"] }
+                        filter-preps   { cs = ["v"] }
+                        default-lang = "cs"
+                    }
+                    """.trimIndent(),
+                )
+            val preps = FrameRolePreps.load(configWith(preMh))
+            preps.grouping("cs") shouldContain "podle"
+            preps.countHeads("cs") shouldBe emptySet()
+            preps.countHeads("en") shouldBe emptySet()
+        }
+
         "an estate override replaces the shipped tables wholesale" {
             val file =
                 write(

@@ -26,6 +26,7 @@ import org.tatrman.nlp.v1.NlpOp
 import org.tatrman.nlp.v1.StatusResponse
 import org.tatrman.resolver.client.FuzzyClient
 import org.tatrman.resolver.client.NlpClient
+import org.tatrman.resolver.model.Reach
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.pipeline.ResolverPipeline
 import org.tatrman.resolver.registry.DeclaredVocabulary
@@ -134,6 +135,16 @@ class LatticeGoldenTest :
                                         },
                                     objectKind = kindOf(t.objectKind),
                                     ownerRef = ownerOf(t.ownerRef),
+                                    // MH — a case may state the E-R reach the Binder's
+                                    // reachability rule reads. Absent in every case here, so
+                                    // the four hero goldens must be byte-identical: the rule
+                                    // sees an empty map and is a no-op by construction.
+                                    reachedFrom =
+                                        if (i == 0) {
+                                            t.reachedFromList.map { r -> Reach(r.factRef, r.mandatory) }
+                                        } else {
+                                            emptyList()
+                                        },
                                 )
                             }
                         },

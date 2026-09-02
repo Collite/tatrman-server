@@ -7,6 +7,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.string.shouldContain as shouldContainText
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
@@ -14,7 +15,10 @@ import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
+import org.tatrman.resolver.model.Reach
 import org.tatrman.resolver.model.ResolverThresholds
+import org.tatrman.resolver.model.kindsByRef
+import org.tatrman.resolver.model.reachByRef
 import org.tatrman.ttr.lexicon.CompiledLexiconHeader
 import org.tatrman.ttr.lexicon.LexiconArea
 import org.tatrman.ttr.lexicon.LexiconDataFile
@@ -32,12 +36,14 @@ import org.tatrman.ttr.snapshot.SnapshotReadResult
 import org.tatrman.ttr.snapshot.SnapshotReader
 import org.tatrman.ttr.snapshot.SnapshotWriter
 import org.tatrman.ttr.metadata.model.Attribute
+import org.tatrman.ttr.metadata.model.Cardinality
 import org.tatrman.ttr.metadata.model.Entity
 import org.tatrman.ttr.metadata.model.ErSchema
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.model.ModelVersion
 import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttr.metadata.model.Relation
 import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.semantics.semanticsblock.MeasureRef
 import org.tatrman.ttr.semantics.semanticsblock.ResolvedEntitySemantics
@@ -141,6 +147,22 @@ class LexiconArchiveRegistrySourceTest :
                                                 internalId = "2",
                                                 qname = regionDim,
                                                 attributes = listOf(attr(regionDim, "name", "text")),
+                                            ),
+                                    ),
+                                // MH — the fact points AT the dimension, mandatorily: every sales
+                                // row carries a region. Declared here rather than injected into a
+                                // `targets` map for the same reason the mention facet is — the
+                                // fixture must exercise the real producer, or it would pass even
+                                // if the compiler stopped filling `reachedFrom`.
+                                relations =
+                                    mapOf(
+                                        QualifiedName(SchemaCode.ER, "relation", "rel_sales_region") to
+                                            Relation(
+                                                internalId = "r1",
+                                                qname = QualifiedName(SchemaCode.ER, "relation", "rel_sales_region"),
+                                                fromEntity = sales,
+                                                toEntity = regionDim,
+                                                cardinality = Cardinality(0, -1, 1, 1),
                                             ),
                                     ),
                             ),
@@ -297,6 +319,51 @@ class LexiconArchiveRegistrySourceTest :
             types.getValue(regionDimRef).ownerRef shouldBe ""
             types.getValue("er.entity.region_dim.name").objectKind shouldBe "attribute"
             types.getValue("er.entity.region_dim.name").ownerRef shouldBe regionDimRef
+        }
+
+        "MH — reachedFrom arrives from the archive's targets, verbatim" {
+            val dir = Files.createTempDirectory("resolver-lex")
+            val types = runBlocking { mentionRegistry(dir).current().entityTypes }.associateBy { it.ref }
+
+            // The DIMENSION carries the reach; the fact that points at it carries none. The
+            // direction is what the Binder's rule turns on, so it is asserted in both directions.
+            types.getValue(regionDimRef).reachedFrom shouldBe listOf(Reach(salesRef, mandatory = true))
+            types.getValue(salesRef).reachedFrom shouldBe emptyList()
+            // Members never carry reach — reachability is a fact about whole objects.
+            types.getValue("er.entity.region_dim.name").reachedFrom shouldBe emptyList()
+        }
+
+        "MH — reachByRef omits the empty lists, kindsByRef omits the blanks" {
+            val dir = Files.createTempDirectory("resolver-lex")
+            val types = runBlocking { mentionRegistry(dir).current().entityTypes }
+
+            // Absence IS the answer, on both maps — a lookup answers "nothing declared" by
+            // missing, exactly as `ownersByRef` does. A map full of empty lists would make
+            // "declared nothing" and "declared no relations" indistinguishable at the call site.
+            types.reachByRef().keys shouldBe setOf(regionDimRef)
+            types.reachByRef().getValue(regionDimRef) shouldBe listOf(Reach(salesRef, mandatory = true))
+            types.kindsByRef().keys shouldContain salesRef
+            types.kindsByRef().values.none { it.isBlank() } shouldBe true
+            // `er.entity.absent` is in the registry but has no targets entry — no kind, no reach.
+            types.kindsByRef().keys shouldNotContain "er.entity.absent"
+            types.reachByRef().keys shouldNotContain "er.entity.absent"
+        }
+
+        "MH — a v2 archive (no reachedFrom) projects empty lists, and T3 stays inert" {
+            // The compatibility direction that matters: the field is defaulted, so an archive
+            // built before MH decodes here with every list empty, and every rule that reads it
+            // is a no-op. No reader gate, unlike the v1→v2 crossing.
+            val dir = Files.createTempDirectory("resolver-lex")
+            val registry =
+                SnapshotRegistry(
+                    LexiconArchiveRegistrySource(writeArchive(dir, aliases, objectsOnly)),
+                    ResolverThresholds.LIVE,
+                )
+
+            runBlocking {
+                registry.current().entityTypes.forEach { it.reachedFrom shouldBe emptyList() }
+                registry.current().entityTypes.reachByRef() shouldBe emptyMap()
+            }
         }
 
         "an ownerRef is spelled exactly as a key is — P3's owners map depends on it" {
