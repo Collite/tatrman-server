@@ -83,6 +83,36 @@ measure-capable candidate, and under a returns head that candidate is the wrong 
   question can be worded *"the stores (a dimension), or the Stores channel (sales)?"* instead of
   two labels a user cannot tell apart.
 
+## On a real estate: the rules need a REACHABLE anchor
+
+Measured on hartland, 2026-09-02, through this resolver against that estate's live NLP and its own
+compiled archive. Two of the catalogue's questions behave exactly as designed:
+
+| question | outcome |
+|---|---|
+| *Kolik máme prodejna* ("how many stores") | binds `er.entity.store` — the `COUNT_HEAD` rule, picking the dimension out of a tie the pre-MH resolver raised a clarification for |
+| *prodejna* (bare word) | still asks, and the two options now carry `object_kind` `entity` and `entity_with_measures` |
+
+The rest of the catalogue never reaches the tie, and the reason is worth knowing before debugging
+a rule that looks inert:
+
+- **The anchor index is keyed on unlemmatised anchors, while the matcher is queried with the
+  SURFACE text.** Span proposal finds the anchor through the token's lemma — so the span is
+  proposed and correctly scoped — but `prodejen` (gen. pl.) does not `EXACT`-match the stored
+  `prodejna`, so no candidate reaches the tie band. The mirror image bites in English: the plural
+  anchor `stores` is indexed under `stores`, and the token `stores` lemmatises to `store`, so that
+  anchor can never be met at all.
+- **A multi-word `TOKENS` alias captures a single token.** `'tržba z prodejen'` is a `TOKENS`
+  alias of the revenue measure, so a bare `prodejen` matches it at `1.0` and binds the measure.
+- **With no bare anchor for the clause head, `headRefs` is empty**, so the reachability rules have
+  no `H` to decide against and the slot rule falls back to asking. On that estate `tržby` and
+  `vratky` exist only inside phrases (`'tržby z prodejen'`), so this is the common case.
+
+None of that is a defect of these rules — they decide correctly whenever the tie reaches them —
+but it means **"the rule did not fire" usually means "the tie never formed"**. Check, in order:
+the archive has a row whose *stored term* equals the surface being asked; the anchor's key is
+reachable from the token's lemma; and the clause head bound something.
+
 ## Configuration
 
 `frame-roles.conf` gains `count-heads` beside `grouping-preps` / `filter-preps` — per-language

@@ -266,6 +266,52 @@ class SlotHintsTest :
                 SlotHint(Slot.GROUP_BY, headRefs = listOf(storeSales), headMeasureCapable = true)
         }
 
+        // ---- The REAL parses, recorded by the MH-P2 live drill (plan risk 5) -------------------
+        //
+        // 2026-09-02, hartland's own NLP (stanza-1.10.0, stanza-cs-en) through `resolve.bind:v1`.
+        // Four of the six hand-built tables above came back byte-identical; these two differed in
+        // a field no slot reads, and are pinned with the REAL tokens so a later parser change
+        // cannot move them silently. The rule was NOT adjusted to fit — nothing needed adjusting.
+
+        "E2 (real parse) — `2025` attaches with `dep`, not `nmod`; the FILTER slot is unmoved" {
+            val p =
+                parse(
+                    "cs",
+                    tok("Tržby", 0, 5, "tržba", "NOUN", 0, "root"),
+                    tok("z", 6, 7, "z", "ADP", 3, "case"),
+                    tok("prodejen", 8, 16, "prodejna", "NOUN", 1, "nmod"),
+                    tok("za", 17, 19, "za", "ADP", 5, "case"),
+                    // hand-built said `nmod`; stanza says `dep`. It is the YEAR, not the homonym.
+                    tok("2025", 20, 24, "2025", "NUM", 1, "dep"),
+                )
+            stamp(
+                p,
+                listOf(
+                    anchor("Tržby", 0, listOf(storeSales), lemma = "tržba"),
+                    anchor("prodejen", 2, listOf(store, storeSales), lemma = "prodejna"),
+                ),
+            )[1].slot shouldBe SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true)
+        }
+
+        "E6 (real parse) — `Vratky` lemmatises to `vratek`; the slot reads deprels, not lemmas" {
+            val p =
+                parse(
+                    "cs",
+                    // hand-built said `vratka`; stanza says `vratek`. The head's LEMMA is not an
+                    // input to any slot — only its deprel and its `case` child are.
+                    tok("Vratky", 0, 6, "vratek", "NOUN", 0, "root"),
+                    tok("z", 7, 8, "z", "ADP", 3, "case"),
+                    tok("prodejen", 9, 17, "prodejna", "NOUN", 1, "nmod"),
+                )
+            stamp(
+                p,
+                listOf(
+                    anchor("Vratky", 0, listOf(storeReturns), lemma = "vratek"),
+                    anchor("prodejen", 2, listOf(store, storeSales), lemma = "prodejna"),
+                ),
+            )[1].slot shouldBe SlotHint(Slot.FILTER, headRefs = listOf(storeReturns), headMeasureCapable = false)
+        }
+
         // ---- Precedence and edges (T6) ----------------------------------------------------------
 
         "a governed value outranks a filter preposition — the value is the stronger signal" {
