@@ -149,6 +149,21 @@ message EntityType {
   // never lags the snapshot channel: a caller overriding one object's kind must be able to
   // state its owner too, or the collapse MS-P3 builds would see a half-described registry.
   string owner_ref = 5;
+  // MH — the facts with a declared `def relation` TO this ref, with the to-side lower
+  // bound (`mandatory` = "every row of that fact carries one of these"). Both channels
+  // supply it, exactly like object_kind/owner_ref: this override, and the snapshot
+  // channel from the compiled lexicon archive's `targets[ref].reachedFrom` (schema
+  // `ttr-lexicon-compiled/v3`), derived from the model's relations at compile time.
+  // The Binder reads it to decide whether two readings of one word — a dimension and
+  // the fact a channel term is pinned to — select the SAME rows. Empty ⇒ that rule
+  // stays inert, which is the correct reading for a model that declared no relations.
+  repeated Reach reached_from = 6;
+}
+
+// MH — a fact that relates TO an entity (archive `targets[ref].reachedFrom`).
+message Reach {
+  string fact_ref = 1;
+  bool mandatory = 2;
 }
 
 // Gating thresholds — ported from the live ENTITIES_ONLY config (ResolverGraph).
@@ -266,6 +281,11 @@ message Option {
   // ambiguous span the flat option list would otherwise be unattributable
   // (RG-P6 review M); every option now names its span.
   Span span = 6;
+  // MH — the option's mention kind (`measure` | `attribute` | `entity` |
+  // `entity_with_measures`; empty for MEMBER options), so a clarification can be worded
+  // by SPECIES rather than by label alone: "the stores (a dimension), or the Stores
+  // channel (sales)?" is answerable; "Prodejna, or Tržby z prodejen?" is not.
+  string object_kind = 7;
 }
 
 // ============================================================================
@@ -338,6 +358,18 @@ message Binding {
   // already has. Per-binding `model_versions` are deliberately NOT repeated here — the
   // S-1 engine identity rides `ResolutionState.parse.used`, once for the whole lattice.
   BindingProvenance producer = 10;
+  // MH-D3 — readings the Binder proved EQUAL to this one by declared relations, and
+  // therefore suppressed. Carried because a governed answer should be able to say
+  // "read as the Store dimension; on this model that is the same rows as the Stores
+  // channel". Empty on every binding the rule did not fire for, which is nearly all of
+  // them. A consumer may SURFACE it; it must not re-plan on it.
+  repeated EquivalentReading equivalents = 11;
+}
+
+// MH-D3 — a reading the Binder proved equal to a binding by declared relations.
+message EquivalentReading {
+  string ref = 1;   // the suppressed reading, e.g. er.entity.store_sales
+  string rule = 2;  // "reach-equal" — open vocabulary
 }
 
 // A literal in the question: a code, a number, a proper name, or a grounded span.
