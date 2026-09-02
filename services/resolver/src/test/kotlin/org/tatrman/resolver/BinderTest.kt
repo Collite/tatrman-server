@@ -9,8 +9,12 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.fuzzy.v1.FuzzyMatch
 import org.tatrman.fuzzy.v1.SourceTag
+import org.tatrman.resolver.model.Reach
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.pipeline.Binder
+import org.tatrman.resolver.pipeline.EquivalentReading
+import org.tatrman.resolver.pipeline.Slot
+import org.tatrman.resolver.pipeline.SlotHint
 import org.tatrman.resolver.v1.EvidenceClass
 
 /**
@@ -339,6 +343,237 @@ class BinderTest :
                 .shouldBeInstanceOf<Binder.Bind>()
                 .winner.match.candidateId shouldBe "anchored"
         }
+
+        // --- MH (contracts §7.3, §8.1) — the slot rule and the reachability rule --------------
+        //
+        // One word, two objects: `prodejna` is `er.entity.store`'s label (a six-row dimension)
+        // AND a form of the Stores-channel term pinned to `er.entity.store_sales` (the fact).
+        // Neither owns the other, so the MS collapse does not apply and the band holds two
+        // unrelated `V:` identities — a G2 the Binder is RIGHT to raise on the evidence it had.
+        // What MH adds is evidence: the sentence's slot, and the model's declared relations.
+
+        val store = "er.entity.store"
+        val storeSales = "er.entity.store_sales"
+        val storeReturns = "er.entity.store_returns"
+        val webSales = "er.entity.web_sales"
+
+        val kinds =
+            mapOf(
+                store to "entity",
+                storeSales to "entity_with_measures",
+                storeReturns to "entity",
+                webSales to "entity_with_measures",
+            )
+        val reach =
+            mapOf(
+                store to listOf(Reach(storeSales, mandatory = true), Reach(storeReturns, mandatory = true)),
+            )
+
+        /** The hartland tie: two EXACT identities, same score, inside the band. */
+        fun homonym() =
+            listOf(
+                declared(store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                declared(storeSales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+            )
+
+        fun decideMh(
+            classedMatches: List<Binder.ClassedMatch> = homonym(),
+            slot: SlotHint = SlotHint.NONE,
+            kindsMap: Map<String, String> = kinds,
+            reachMap: Map<String, List<Reach>> = emptyMap(),
+            ownersMap: Map<String, String> = emptyMap(),
+        ) = Binder.decide(classedMatches, thresholds, ownersMap, slot, kindsMap, reachMap)
+
+        "mh-b1: COUNT_HEAD binds the dimension — you count things, not measurements" {
+            val bind = decideMh(slot = SlotHint(Slot.COUNT_HEAD)).shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe store
+            bind.admitted.map { it.match.targetRef } shouldContainExactly listOf(store)
+            // Nothing silently dropped — the fact reading rides the rung log.
+            bind.rejected.map { it.match.targetRef } shouldContainExactly listOf(storeSales)
+        }
+
+        "mh-b2: GROUP_BY binds the dimension — `podle X` wants a groupable axis" {
+            decideMh(slot = SlotHint(Slot.GROUP_BY))
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.targetRef shouldBe store
+        }
+
+        "mh-b7: COORD_WITH takes the sibling's kind — channel vs channel, not six rows vs a channel" {
+            decideMh(slot = SlotHint(Slot.COORD_WITH, coordSiblingKinds = setOf("entity_with_measures")))
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.targetRef shouldBe storeSales
+        }
+
+        "mh-b8: NONE is byte-identical to today — a bare word still asks" {
+            decideMh(slot = SlotHint.NONE).shouldBeInstanceOf<Binder.Ambiguous>().admitted.size shouldBe 2
+        }
+
+        "mh-b9: a SAME-kind tie is genuine homonymy and stays ambiguous" {
+            // Two dimensions sharing a word (`region` as geography vs as sales org). The slot
+            // says "an entity" and both ARE entities: nothing to prefer, so refuse.
+            val bothEntities = mapOf(store to "entity", storeSales to "entity")
+            decideMh(slot = SlotHint(Slot.COUNT_HEAD), kindsMap = bothEntities)
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted.size shouldBe 2
+        }
+
+        "mh-b10: an M: member in the band is untouched by the slot rule" {
+            // Instance ambiguity forces a Clarify (RS-26) and the kind rules have nothing to say
+            // about a data row: `M:` is a different species from `V:` and stays one.
+            val withMember =
+                listOf(
+                    declared(store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    member("store-42", store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                )
+            val slotted = decideMh(withMember, slot = SlotHint(Slot.COUNT_HEAD))
+            val plain = Binder.decide(withMember, thresholds)
+
+            slotted.shouldBeInstanceOf<Binder.Ambiguous>()
+            slotted.admitted.map { Binder.identityKey(it.match) } shouldContainExactlyInAnyOrder
+                plain.admitted.map { Binder.identityKey(it.match) }
+            slotted.rejected.none { it.match.source == SourceTag.MEMBER } shouldBe true
+        }
+
+        "mh-b11: no kinds ⇒ no preference — an estate that declared nothing is unchanged" {
+            decideMh(slot = SlotHint(Slot.COUNT_HEAD), kindsMap = emptyMap())
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted.size shouldBe 2
+        }
+
+        // --- MH invariants: what the slot rule may NOT do ---------------------------------------
+
+        "MH: the slot never promotes from below the band — the band decides first" {
+            val verdict =
+                decideMh(
+                    listOf(
+                        declared(storeSales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(store, 0.80, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    slot = SlotHint(Slot.COUNT_HEAD),
+                )
+            // `store` is 0.20 below the top and the gap is 0.05: it never reaches the rule.
+            verdict
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.targetRef shouldBe storeSales
+        }
+
+        "MH: WEAK is rejected before the slot rule, whatever the slot prefers" {
+            val verdict =
+                decideMh(
+                    listOf(
+                        declared(store, 0.99, EvidenceClass.EVIDENCE_CLASS_WEAK),
+                        declared(storeSales, 0.72, EvidenceClass.EVIDENCE_CLASS_ANCHORED_FUZZY_STRONG),
+                    ),
+                    slot = SlotHint(Slot.COUNT_HEAD),
+                )
+            val bind = verdict.shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe storeSales
+            bind.rejected.map { it.match.targetRef } shouldContainExactly listOf(store)
+        }
+
+        "MH: the MS containment collapse runs FIRST, and the slot rule sees its result" {
+            // `sales` + its own measure `amount_czk` + an unrelated homonym `store`, under a
+            // filter with a measure-capable head. Containment collapses the entity into its
+            // measure; THEN the slot keeps the measure-ish row and drops the dimension.
+            val verdict =
+                decideMh(
+                    listOf(
+                        declared(sales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                        declared(store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    ),
+                    slot = SlotHint(Slot.FILTER, headRefs = listOf(sales), headMeasureCapable = true),
+                    kindsMap =
+                        mapOf(
+                            sales to "entity_with_measures",
+                            amount to "measure",
+                            store to "entity",
+                        ),
+                    ownersMap = owners,
+                )
+            val bind = verdict.shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.targetRef shouldBe amount
+            bind.rejected.map { it.match.targetRef } shouldContainExactlyInAnyOrder listOf(sales, store)
+        }
+
+        "MH: a preference that matches NOTHING leaves the band alone" {
+            // FILTER with a non-measure-capable head prefers nothing at all (contracts §7.3), so
+            // the tie survives as a tie rather than collapsing to whatever happened to be first.
+            decideMh(slot = SlotHint(Slot.FILTER, headRefs = listOf(storeReturns), headMeasureCapable = false))
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted.size shouldBe 2
+        }
+
+        "MH: Ambiguous is never single — a rule that would empty the band yields the band" {
+            // GOVERNED_VALUE prefers `entity`, and NEITHER candidate is one. The rule must not
+            // leave zero (or one) admitted; it must decline (RV-14, the review-084 F3 pattern).
+            val twoFacts =
+                listOf(
+                    declared(storeSales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    declared(webSales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                )
+            val verdict = decideMh(twoFacts, slot = SlotHint(Slot.GOVERNED_VALUE))
+            verdict.shouldBeInstanceOf<Binder.Ambiguous>().admitted.size shouldBe 2
+        }
+
+        "MH: full kinds with slot NONE reproduces the pre-MH verdict on the MS inputs" {
+            // The no-op guarantee, on the corpus this file already had: same inputs, same
+            // verdict, whether or not the new maps are supplied.
+            val msInputs =
+                listOf(
+                    declared(sales, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    declared(amount, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                )
+            val withMh =
+                Binder.decide(
+                    msInputs,
+                    thresholds,
+                    owners,
+                    SlotHint.NONE,
+                    mapOf(sales to "entity_with_measures", amount to "measure"),
+                    reach,
+                )
+            val plain = Binder.decide(msInputs, thresholds, owners)
+
+            withMh
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.targetRef shouldBe
+                plain
+                    .shouldBeInstanceOf<Binder.Bind>()
+                    .winner.match.targetRef
+            withMh.admitted.map { it.match.targetRef } shouldBe plain.admitted.map { it.match.targetRef }
+            withMh.rejected.map { it.match.targetRef } shouldBe plain.rejected.map { it.match.targetRef }
+        }
+
+        // --- MH-P1·S4 enables — T3 (reachability) is what makes these two pass -----------------
+
+        "mh-b3: a filter under the channel's OWN fact collapses to the dimension, and says so"
+            .config(enabled = false) {
+                // T2 prefers the fact (measure-ish slot); T3 rule 2 says the two readings are
+                // declared-EQUAL on this model — every store_sales row carries a store — and flips
+                // to the dimension, which keeps group-by and member filters possible.
+                val bind =
+                    decideMh(
+                        slot = SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true),
+                        reachMap = reach,
+                    ).shouldBeInstanceOf<Binder.Bind>()
+                bind.winner.match.targetRef shouldBe store
+                bind.equivalents shouldBe listOf(EquivalentReading(storeSales, "reach-equal"))
+            }
+
+        "mh-b4: a filter under a DIFFERENT fact collapses to the dimension — the E6 mis-bind"
+            .config(enabled = false) {
+                // "Vratky z prodejen": the channel term is pinned to store_sales, the clause is
+                // about store_returns. T2 alone binds the wrong fact; T3 rule 3 says the dimension
+                // is the only reading that fits this head.
+                val bind =
+                    decideMh(
+                        slot = SlotHint(Slot.FILTER, headRefs = listOf(storeReturns), headMeasureCapable = false),
+                        reachMap = reach,
+                    ).shouldBeInstanceOf<Binder.Bind>()
+                bind.winner.match.targetRef shouldBe store
+                bind.equivalents shouldBe emptyList()
+            }
     }) {
     private companion object {
         /** A MEMBER row that nonetheless carries a target ref — a data value inside an object. */

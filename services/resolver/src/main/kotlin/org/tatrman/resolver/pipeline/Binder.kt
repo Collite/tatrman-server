@@ -3,6 +3,7 @@ package org.tatrman.resolver.pipeline
 
 import org.tatrman.fuzzy.v1.FuzzyMatch
 import org.tatrman.fuzzy.v1.SourceTag
+import org.tatrman.resolver.model.Reach
 import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.v1.EvidenceClass
 
@@ -34,6 +35,16 @@ import org.tatrman.resolver.v1.EvidenceClass
  *    of the top score bind nothing (RS-26); the door renders that as a clarification and the
  *    lattice as a mention with several bindings plus a G2.
  *
+ * MH adds a fourth, in the same shape — a filter INSIDE the one decision, parameterised by
+ * declared data, and a no-op when that data is absent:
+ *
+ *  - **a cross-kind tie is decided by the slot; a same-kind tie is a real ambiguity.** Two
+ *    unrelated objects sharing a word (a dimension and the fact a channel term is pinned to)
+ *    used to be a G2 on kinds alone. The sentence already says which kind it wants — you count
+ *    things, you group by things, you restrict a measure by what is measured — so the slot's
+ *    preferred kinds survive. Two objects of the SAME kind sharing a word is genuine homonymy
+ *    and still refuses: that is the definition, not a gap.
+ *
  * The verdict keeps [Verdict.rejected] as well as [Verdict.admitted] because they go to different
  * places: admitted candidates are the lattice's bindings, rejected ones are the round's log
  * (P2.3.T5 — "rejected candidates appear in the round's log, not in the lattice"). Nothing is
@@ -60,6 +71,14 @@ object Binder {
         val winner: ClassedMatch,
         override val admitted: List<ClassedMatch>,
         override val rejected: List<ClassedMatch>,
+        /**
+         * MH-D3 — readings this bind was proven EQUAL to by the model's declared relations, and
+         * therefore suppressed. Empty for every bind no reachability rule fired on, which is
+         * nearly all of them. It is disclosure, not a second binding: a consumer may SURFACE it
+         * ("read as the Store dimension; on this model the same rows as the Stores channel") and
+         * must not re-plan on it.
+         */
+        val equivalents: List<EquivalentReading> = emptyList(),
     ) : Verdict
 
     /** Several distinct identities, same class, inside the tie band: ask, don't guess (RS-26). */
@@ -87,7 +106,13 @@ object Binder {
         candidate: DomainSpanCandidate,
         thresholds: ResolverThresholds,
         owners: Map<String, String> = emptyMap(),
-    ): Verdict = decide(classify(matches, candidate, thresholds), thresholds, owners)
+        kinds: Map<String, String> = emptyMap(),
+        reach: Map<String, List<Reach>> = emptyMap(),
+    ): Verdict =
+        // MH: the slot rides the CANDIDATE, because this function never sees the parse
+        // (architecture A3). A re-gated synthetic candidate therefore carries `SlotHint.NONE`,
+        // which is right: a re-decision with no parse must not invent a slot.
+        decide(classify(matches, candidate, thresholds), thresholds, owners, candidate.slot, kinds, reach)
 
     fun classify(
         matches: List<FuzzyMatch>,
@@ -100,6 +125,12 @@ object Binder {
         classed: List<ClassedMatch>,
         thresholds: ResolverThresholds,
         owners: Map<String, String> = emptyMap(),
+        // MH — all three defaulted, and all three no-ops when absent: a pre-MH archive, a
+        // registry with no kinds, a re-gate with no parse, and an estate that declared no
+        // relations each land here with empty inputs and get byte-identical pre-MH behaviour.
+        slot: SlotHint = SlotHint.NONE,
+        kinds: Map<String, String> = emptyMap(),
+        reach: Map<String, List<Reach>> = emptyMap(),
     ): Verdict {
         val rejected = mutableListOf<ClassedMatch>()
         val eligible = mutableListOf<ClassedMatch>()
@@ -163,7 +194,7 @@ object Binder {
         // Asking the user to choose between one thing is the failure the containment collapse
         // exists to remove; producing it from malformed data is no better than producing it from
         // good data.
-        val admitted =
+        val admitted0 =
             if (survived.isEmpty()) {
                 distinct
             } else {
@@ -172,12 +203,84 @@ object Binder {
                 survived
             }
 
+        // MH T2 — the slot preference (contracts §7.3, ✅MH-D2 preference, not admissibility).
+        //
+        // Two unrelated objects can share a word — a dimension and the fact a channel term is
+        // pinned to — and neither owns the other, so the collapse above does not apply and this
+        // band is a genuine G2 on kinds alone. But since MS the two DIFFER in kind, and the
+        // sentence says which kind it wants: you count things, you group by things, you restrict
+        // a measure by what is being measured. So the slot's preferred kinds survive.
+        //
+        // A PREFERENCE, deliberately: it removes the dis-preferred kinds only when at least one
+        // preferred candidate remains. It never empties the band, never promotes anything from
+        // below it, and never touches an `M:` row — a data value is a different species, and the
+        // question "which OBJECT does this word name" is not asked of it.
+        val admitted1 = slotPreference(admitted0, slot, kinds, rejected)
+
+        val admitted = admitted1
+
         return if (admitted.size > 1) {
             Ambiguous(admitted, rejected)
         } else {
             Bind(admitted.single(), admitted, rejected)
         }
     }
+
+    /**
+     * MH T2 — keep the kinds the slot prefers, when the band holds more than one kind.
+     *
+     * Returns [admitted0] unchanged when there is nothing to decide: fewer than two distinct
+     * kinds among the `V:` rows (so there is no cross-kind homonymy), a slot with no preference,
+     * or a preference nothing matches. That last case is the one worth stating: an unmatched
+     * preference leaves a genuine tie as a tie rather than collapsing it to whichever row
+     * happened to be first.
+     */
+    private fun slotPreference(
+        admitted0: List<ClassedMatch>,
+        slot: SlotHint,
+        kinds: Map<String, String>,
+        rejected: MutableList<ClassedMatch>,
+    ): List<ClassedMatch> {
+        val objects = admitted0.filter { isModelObject(it) }
+        if (objects.map { kindOf(it, kinds) }.distinct().size < 2) return admitted0
+
+        val preferred = preferredKinds(slot)
+        if (preferred.isEmpty()) return admitted0
+        val keep = objects.filter { kindOf(it, kinds) in preferred }
+        if (keep.isEmpty()) return admitted0
+
+        val dropped = objects - keep.toSet()
+        rejected += dropped
+        return admitted0 - dropped.toSet()
+    }
+
+    /**
+     * What each slot asks for (contracts §7.3). Empty = no preference, and the band is untouched.
+     *
+     * `FILTER` splits on whether the clause head is measure-capable: *"tržby z prodejen"* under a
+     * measure head is naming what is being measured (the channel/fact reading), but *"vratky z
+     * prodejen"* under a plain entity head is not — there the fact reading would be the WRONG
+     * fact, so nothing is preferred and the reachability rule decides instead.
+     */
+    private fun preferredKinds(slot: SlotHint): Set<String> =
+        when (slot.slot) {
+            Slot.COUNT_HEAD -> setOf(KIND_ENTITY)
+            Slot.GROUP_BY -> setOf(KIND_ENTITY, KIND_ATTRIBUTE)
+            Slot.GOVERNED_VALUE -> setOf(KIND_ENTITY)
+            Slot.FILTER -> if (slot.headMeasureCapable) setOf(KIND_ENTITY_WITH_MEASURES, KIND_MEASURE) else emptySet()
+            Slot.COORD_WITH -> slot.coordSiblingKinds
+            Slot.SUBJECT, Slot.NONE -> emptySet()
+        }
+
+    private fun kindOf(
+        c: ClassedMatch,
+        kinds: Map<String, String>,
+    ): String = kinds[c.match.targetRef] ?: ""
+
+    private const val KIND_ENTITY = "entity"
+    private const val KIND_ATTRIBUTE = "attribute"
+    private const val KIND_MEASURE = "measure"
+    private const val KIND_ENTITY_WITH_MEASURES = "entity_with_measures"
 
     /**
      * A `V:` identity — a declared model object rather than a data row.
@@ -194,3 +297,20 @@ object Binder {
     fun identityKey(m: FuzzyMatch): String =
         if (m.source == SourceTag.MEMBER) "M:${m.candidateId}" else "V:${m.targetRef}"
 }
+
+/**
+ * MH-D3 — a reading the Binder proved EQUAL to a binding by the model's declared relations.
+ *
+ * The Kotlin twin of `resolver.v1.EquivalentReading`. It says exactly one thing, and the wording
+ * matters because it is what a governed answer would show a user: *equal by DECLARATION*. Two
+ * readings can be declared-equal and still differ on dirty data (an orphan FK a constraint never
+ * enforced); this claim is about what the model says, not about what the rows do.
+ *
+ * @property ref the suppressed reading, e.g. `er.entity.store_sales`
+ * @property rule which rule proved it — `reach-equal` today; an open vocabulary, so a later tier
+ *   (an MD lattice proof, say) can name itself without a wire change.
+ */
+data class EquivalentReading(
+    val ref: String,
+    val rule: String,
+)
