@@ -10,6 +10,7 @@ import org.tatrman.nlp.v1.StatusResponse
 import org.tatrman.resolver.client.FuzzyClient
 import org.tatrman.resolver.client.GroundingClient
 import org.tatrman.resolver.client.NlpClient
+import org.tatrman.resolver.model.Reach
 import org.tatrman.resolver.model.ResolverEntityType
 import org.tatrman.resolver.model.ResolverRegistry
 import org.tatrman.resolver.model.ResolverThresholds
@@ -539,6 +540,10 @@ class ResolverPipeline(
                         it.anchorsList.toList(),
                         it.objectKind,
                         it.ownerRef,
+                        // MH: the override channel never lags the snapshot channel — a caller
+                        // that can state a kind must be able to state the reach that qualifies
+                        // it, or a fixture could only ever exercise half of the Binder's rules.
+                        it.reachedFromList.map { r -> Reach(r.factRef, r.mandatory) },
                     )
                 }
             val thresholds =

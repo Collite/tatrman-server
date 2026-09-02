@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.resolver.registry
 
+import org.tatrman.resolver.model.Reach
+
 /**
  * The declared-vocabulary snapshot the registry is built from. These types mirror
  * the RG-P2 `SnapshotVocabularySource` seam
@@ -33,6 +35,12 @@ data class DeclaredVocabularyEntry(
     val objectKind: String = "",
     /** The declaring entity/table's ref for a member; `""` for an owner or an unknown ref. */
     val ownerRef: String = "",
+    /**
+     * MH — the facts with a declared relation TO [targetRef], from the archive's
+     * `targets[ref].reachedFrom` (schema `ttr-lexicon-compiled/v3`). Empty for members, for
+     * entities nothing relates to, and for every pre-v3 archive.
+     */
+    val reachedFrom: List<Reach> = emptyList(),
 )
 
 data class DeclaredVocabulary(

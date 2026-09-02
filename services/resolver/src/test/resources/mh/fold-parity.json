@@ -1,0 +1,54 @@
+{
+  "source": "tatrman packages/semantics/src/lexicon/fold-parity.json — keep in sync",
+  "$comment": "MH T1 — the collision fold, pinned across three implementations (contracts §1): @tatrman/semantics foldForCollision, ttr-lexicon TermNormalizer.fold, tatrman-server org.tatrman.text.Normalization.fold. Keep the three readers in sync.",
+  "cases": [
+    [
+      "Prodejna",
+      "prodejna"
+    ],
+    [
+      "prodejny",
+      "prodejny"
+    ],
+    [
+      "Kamenná  prodejna ",
+      "kamenna prodejna"
+    ],
+    [
+      "Tržby",
+      "trzby"
+    ],
+    [
+      "výroba",
+      "vyroba"
+    ],
+    [
+      "Stores",
+      "stores"
+    ],
+    [
+      "3P",
+      "3p"
+    ],
+    [
+      "e-shop",
+      "e-shop"
+    ],
+    [
+      "hartland.com",
+      "hartland.com"
+    ],
+    [
+      "Đ đ Ł ł",
+      "đ đ ł ł"
+    ],
+    [
+      "Ångström",
+      "angstrom"
+    ],
+    [
+      "  ",
+      ""
+    ]
+  ]
+}
