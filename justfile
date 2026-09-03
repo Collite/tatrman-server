@@ -11,9 +11,12 @@
 
 set shell := ["bash", "-uc"]
 
-# The 22 container-image modules release-image.yml builds (per-module `<module>/v*`
+# The container-image modules release-image.yml builds (per-module `<module>/v*`
 # tag → ghcr.io/collite/<module>). Kept in lockstep with release-image.yml's map.
-image_modules := "veles query translate validate dispatch charon lex-matcher llm-gateway nlp golem-py chrono geo money grounding-mcp resolver meta-mcp query-mcp lex-matcher-mcp nlp-mcp worker-postgres worker-mssql worker-polars identity health"
+# `nlp-stanza`/`nlp-spacy` are the two NLP BACKENDS that need no build-arg;
+# `nlp-morphodita`/`nlp-nametag3` bake a LINDAT model and are deliberately NOT here —
+# CI cannot build them without its URL. All four: `just nlp-backend-image`.
+image_modules := "veles query translate validate dispatch charon lex-matcher llm-gateway nlp nlp-stanza nlp-spacy golem-py chrono geo money grounding-mcp resolver meta-mcp query-mcp lex-matcher-mcp nlp-mcp worker-postgres worker-mssql worker-polars identity health"
 
 # The pure-Python wheels publish-python.yml builds (`python-<lane>/v*` tag →
 # PyPI). Kept in lockstep with that workflow's tag map — the wheel-name → tag-
@@ -423,6 +426,124 @@ conformance-verify-hashes:
         shasum -a 256 -c conformance/corpus-hashes.sha256
     fi
 
+# ── NLP backend images (services/nlp/backends/*) ────────────────────────────────
+#
+# The FOUR engines the `nlp` service calls, not the service itself: `just publish
+# nlp` ships the front; this ships a backend. They differ from every other module
+# here in two ways, which is why they need their own recipe:
+#
+#   - they live one level deeper (`services/nlp/backends/<name>`) and publish as
+#     `ghcr.io/collite/nlp-<name>`, so the image name is not the directory name;
+#   - morphodita and nametag3 BAKE a LINDAT model, fetched at build time from a
+#     DSpace bitstream URL that is not in this repo (and, for morphodita, under
+#     CC BY-NC-SA — see its Dockerfile header before publishing anywhere public).
+#     CI cannot build those two without the URL, so they are hand-built here.
+#
+# `nlp-stanza` and `nlp-spacy` need no build-arg and DO have a tag-driven lane
+# (`just publish nlp-stanza` → release-image.yml). This recipe is their local
+# path and the only path for the other two.
+#
+# ⚑ Why this recipe exists at all (2026-09-03). The deployed `nlp-morphodita:0.9.1`
+# was hand-built before b835ecf (2026-07-16) — the commit that changed the server's
+# rest_id from a generic `czech` to the pinned MODEL_ID — and nothing ever rebuilt
+# it. The front asks for `model=czech-morfflex2.0-pdtc1.0-220710`; the deployed
+# server registers `czech`; `morphodita_server` does an exact-match lookup and
+# answers `400 Requested model '…' does not exist` to every call, silently, for
+# seven weeks. `verify` below is that bug turned into a build-time check.
+#
+#   just nlp-backend-image stanza 0.9.1
+#   just nlp-backend-image stanza 0.9.1 push
+#   MODEL_URL='https://lindat.mff.cuni.cz/repository/server/api/core/bitstreams/<uuid>/content' \
+#     MODEL_SHA256=<digest> just nlp-backend-image morphodita 0.9.2 push
+nlp-backend-image name version="dev" push="no":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    NAME="{{name}}"
+    case "$NAME" in
+        morphodita|nametag3|spacy|stanza) ;;
+        *) echo "❌ '$NAME' is not an NLP backend. Valid: morphodita nametag3 spacy stanza" >&2
+           echo "   (Did you mean the FRONT? That is 'just publish nlp'.)" >&2; exit 1 ;;
+    esac
+
+    DIR="services/nlp/backends/${NAME}"
+    IMG="ghcr.io/collite/nlp-${NAME}:{{version}}"
+    [ -f "$DIR/Dockerfile" ] || { echo "❌ No Dockerfile at $DIR" >&2; exit 1; }
+
+    # linux/amd64 for every one of them: the cluster is x86, and MorphoDiTa's
+    # build hard-codes x86 SSE flags (its Dockerfile header). On an arm64 dev box
+    # this goes through QEMU — slow, and correct.
+    BUILD_ARGS=(--platform linux/amd64)
+
+    # The two model-baked ones. MODEL_URL is REQUIRED — their Dockerfiles fail
+    # loudly on the placeholder, but failing here is faster and says why.
+    if [ "$NAME" = "morphodita" ] || [ "$NAME" = "nametag3" ]; then
+        if [ -z "${MODEL_URL:-}" ]; then
+            echo "❌ $NAME bakes a LINDAT model — set MODEL_URL to the resolved DSpace" >&2
+            echo "   bitstream-CONTENT url (the legacy /xmlui/bitstream/... url returns the" >&2
+            echo "   SPA's HTML, not the archive). See $DIR/Dockerfile." >&2
+            exit 1
+        fi
+        BUILD_ARGS+=(--build-arg "MODEL_URL=${MODEL_URL}")
+        if [ -n "${MODEL_SHA256:-}" ]; then
+            BUILD_ARGS+=(--build-arg "MODEL_SHA256=${MODEL_SHA256}")
+        else
+            echo "⚠️  MODEL_SHA256 unset — the model download will NOT be digest-pinned."
+        fi
+    fi
+
+    echo "→ building $IMG  (context $DIR, linux/amd64)"
+    docker buildx build "${BUILD_ARGS[@]}" --load -t "$IMG" "$DIR"
+
+    # ---- the rest_id check (morphodita only; nametag3's server exposes no /models)
+    #
+    # Three names must agree, and the failure when they do not is invisible in
+    # every log except a 400 buried in a DEBUG payload:
+    #   1. the Dockerfile's ARG MODEL_ID   — what the server REGISTERS
+    #   2. config.yaml engines.<name>.model — what the front ASKS FOR
+    #   3. GET /models on the built image   — the ground truth
+    if [ "$NAME" = "morphodita" ]; then
+        DOCKER_ID=$(grep -m1 -E '^ARG MODEL_ID=' "$DIR/Dockerfile" | cut -d= -f2)
+        FRONT_ID=$(awk -v b="  ${NAME}:" '$0==b{f=1;next} /^  [a-z0-9_-]+:/{f=0} f' services/nlp/config.yaml \
+                   | grep -m1 -E '^[[:space:]]+model:' | sed -E 's/^[[:space:]]*model:[[:space:]]*"([^"]+)".*/\1/')
+        if [ "$DOCKER_ID" != "$FRONT_ID" ]; then
+            echo "❌ model-id mismatch BEFORE the image even runs:" >&2
+            echo "     Dockerfile ARG MODEL_ID = $DOCKER_ID" >&2
+            echo "     config.yaml  .model     = $FRONT_ID" >&2
+            echo "   morphodita_server matches the rest_id EXACTLY — fix one of them." >&2
+            exit 1
+        fi
+
+        echo "→ verifying the built image registers '$DOCKER_ID' as its rest_id"
+        CID=$(docker run -d --rm -p 18099:8080 "$IMG")
+        trap 'docker stop "$CID" >/dev/null 2>&1 || true' EXIT
+        for _ in $(seq 1 30); do
+            curl -fsS --max-time 2 "http://127.0.0.1:18099/models" >/dev/null 2>&1 && break
+            sleep 1
+        done
+        MODELS=$(curl -fsS --max-time 5 "http://127.0.0.1:18099/models" || echo '{}')
+        if ! echo "$MODELS" | grep -q "\"$DOCKER_ID\""; then
+            echo "❌ the built image does NOT serve '$DOCKER_ID'. /models says:" >&2
+            echo "   $MODELS" >&2
+            echo "   Every front call would 400 with \"Requested model '…' does not exist\"." >&2
+            exit 1
+        fi
+        echo "✓ /models serves $DOCKER_ID"
+    fi
+
+    if [ "{{push}}" = "push" ]; then
+        if [ "{{version}}" = "dev" ]; then
+            echo "❌ refusing to push the ':dev' tag — pass a real version." >&2; exit 1
+        fi
+        echo "→ pushing $IMG  [GHCR, and a spent version number does not come back]"
+        docker push "$IMG"
+        echo "✓ pushed $IMG"
+        echo "  Roll it:  kubectl -n ttr-server set image deploy/nlp-${NAME} ${NAME}=${IMG}"
+        echo "  (or bump the tag in olymp and let ArgoCD sync — the estate's normal path)"
+    else
+        echo "✓ built $IMG (not pushed — append 'push' to publish)"
+    fi
+
 # ── protos — the wire-compatibility baseline (RV-P2.1) ──────────────────────────
 #
 # `shared/proto/compat/wire-baseline.desc` is the record of every message, field
@@ -573,8 +694,22 @@ publish *args:
         esac
         DESC="the ${WHEEL_NAME} wheel (shared/libs/python/${WHEEL_NAME}) → PyPI"
     else
-        MOD_PATH=$(just _resolve "$WHAT")
-        MOD_NAME=$(basename "$MOD_PATH")
+        # The NLP backends live one level deeper than every other module and their
+        # image name is `nlp-<dir>`, so `_resolve`'s one-level search cannot find
+        # them and `basename` would give the wrong name. Map them explicitly.
+        case "$WHAT" in
+            nlp-stanza|nlp-spacy)
+                MOD_NAME="$WHAT"
+                MOD_PATH="services/nlp/backends/${WHAT#nlp-}" ;;
+            nlp-morphodita|nlp-nametag3)
+                echo "❌ '$WHAT' bakes a LINDAT model and has no CI lane — CI has no MODEL_URL." >&2
+                echo "   Build it here instead:" >&2
+                echo "     MODEL_URL=... MODEL_SHA256=... just nlp-backend-image ${WHAT#nlp-} <version> push" >&2
+                exit 1 ;;
+            *)
+                MOD_PATH=$(just _resolve "$WHAT")
+                MOD_NAME=$(basename "$MOD_PATH") ;;
+        esac
         if ! echo " {{image_modules}} " | grep -q " $MOD_NAME "; then
             echo "❌ '$MOD_NAME' ($MOD_PATH) is not a publishable image module." >&2
             echo "   Valid: {{image_modules}}" >&2
