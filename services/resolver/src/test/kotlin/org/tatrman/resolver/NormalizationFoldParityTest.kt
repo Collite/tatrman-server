@@ -40,8 +40,17 @@ class NormalizationFoldParityTest :
         /** The words the anchor index would key on — `SpanProposal`'s own step, verbatim. */
         fun words(text: String): List<String> = Normalization.fold(text).split(' ').filter { it.isNotBlank() }
 
-        "the parity table is the 12 rows of MH contracts §1" {
-            table.size shouldBe 12
+        "the parity table is the 13 rows of MH contracts §1" {
+            table.size shouldBe 13
+        }
+
+        "a NON-BREAKING space is not a word separator here — it stays inside one word" {
+            // review-087 F3, and this is the reader that DECIDES the question: `Normalization.fold`
+            // does not collapse whitespace at all and `SpanProposal` splits on the literal ' ', so
+            // U+00A0 never separates two index words. The TS twin was collapsing it (JS `\s`
+            // matches NBSP, Java's does not) and could therefore report a collision the matcher
+            // does not have.
+            words("Tržby\u00A0z prodejen") shouldBe listOf("trzby\u00A0z", "prodejen")
         }
 
         table.forEachIndexed { i, (input, expected) ->

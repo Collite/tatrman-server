@@ -52,8 +52,16 @@ readings differ.
 **Compatibility.** Every input is defaulted and absent-tolerant, so an estate that
 declared nothing behaves exactly as before: a pre-v3 archive, a registry with no
 `object_kind`, a `frame-roles.conf` with no `count-heads`, a re-gate with no parse —
-each leaves both rules inert. The v2 → v3 archive crossing needs **no reader gate**
-(unlike v1 → v2): `reachedFrom` is a defaulted field inside `targets`.
+each leaves both rules inert.
+
+⚠ **"No reader gate" is a fact about the FIELD, not about every estate.** The v2 → v3
+crossing needs none — `reachedFrom` is a defaulted field inside `targets`, so a v2
+archive decodes in a v3 reader and a v3 archive is read by a v2 reader as a v2 one.
+An estate still on **v1** is a different crossing: v1 → v3 adds the `targets` map
+itself, which is the v1 → v2 step, and that one **does** carry the mention-facet
+reader gate (readers before producers). Such an estate must either take the v2 step
+first or carry that gate with its v3 rebuild — check the archive's `schemaVersion`
+before rebuilding, not the resolver's version.
 
 **Config.** `frame-roles.conf` gains `count-heads` beside the two prep tables. A file
 written before this release loads unchanged and never fires the count slot.

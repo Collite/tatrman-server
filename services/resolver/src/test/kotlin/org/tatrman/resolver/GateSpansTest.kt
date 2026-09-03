@@ -427,6 +427,33 @@ class GateSpansTest :
                 listOf("entity", "entity_with_measures")
         }
 
+        "MH: a MEMBER option carries a BLANK kind, even when its row names an owner ref" {
+            // review-087 F6. A member is a data ROW; a kind is a claim about a declared OBJECT.
+            // lex-matcher leaves a member's `target_ref` empty today, but nothing forces that —
+            // `BinderTest`'s own member helper sets it — and the proto comment, the KDoc and the
+            // contract all promise "" here. Two members of one category is the instance
+            // ambiguity that reaches a Clarify with member options (RS-26).
+            val outcome =
+                GateSpans.gate(
+                    listOf(mhCandidate(SlotHint.NONE)),
+                    batch(
+                        fmr(
+                            fm("store-42", "Nashville", 1.0, "er.entity.store", SourceTag.MEMBER, "er.entity.store"),
+                            fm("store-43", "Knoxville", 1.0, "er.entity.store", SourceTag.MEMBER, "er.entity.store"),
+                        ),
+                    ),
+                    mhTypes,
+                    thresholds,
+                    emptyMap(),
+                    "snap-mh",
+                )
+
+            val clarify = outcome.shouldBeInstanceOf<Clarify>()
+            clarify.options.map { it.resolvedId } shouldContainExactlyInAnyOrder listOf("store-42", "store-43")
+            // Blank, even though each row names `er.entity.store` — whose kind IS declared.
+            clarify.options.map { it.objectKind } shouldContainExactlyInAnyOrder listOf("", "")
+        }
+
         "MH: a registry with no kinds and no reach is the pre-MH gate, unchanged" {
             val plainTypes =
                 listOf(

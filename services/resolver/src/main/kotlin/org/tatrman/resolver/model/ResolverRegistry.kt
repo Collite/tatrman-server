@@ -62,8 +62,15 @@ data class ResolverEntityType(
 )
 
 /**
- * MH — one declared relation, seen from the entity it points AT: the fact's ref, and whether
- * every row of that fact carries this entity (`cardinality.to`'s lower bound ≥ 1).
+ * MH — one declared relation, seen from the object it points AT: the ref of the object that
+ * relates to it, and whether every row of that object carries this one (`cardinality.to`'s lower
+ * bound ≥ 1).
+ *
+ * [factRef] is named for the case the rules act on, but it is *the object with a declared relation
+ * TO this ref* and nothing narrower — on a real estate it is often another dimension
+ * (`er.entity.customer_address` is reached from `er.entity.customer`). Harmless, because the
+ * reachability rule only pairs a dimension with a measure-CAPABLE candidate, but a reader of a raw
+ * archive should not have to work that out.
  *
  * [mandatory] is the load-bearing half. "Sales *of the Stores channel*" and "sales *joined to the
  * store dimension*" are the same rows only when no fact row can be missing its store; a nullable

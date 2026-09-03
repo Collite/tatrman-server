@@ -294,7 +294,6 @@ object Binder {
         val drop = LinkedHashSet<ClassedMatch>()
         val admit = LinkedHashSet<ClassedMatch>()
         val equivalents = LinkedHashSet<EquivalentReading>()
-        var differ = false
 
         for (d in dimensions) {
             val reachOf = reach[d.match.targetRef].orEmpty()
@@ -305,42 +304,50 @@ object Binder {
                     } else {
                         f.match.targetRef
                     }
+                // Rule 4's domination is PER PAIR (review-087 F5, contracts §7.3): a nullable
+                // reach says THIS dimension and THIS fact select different rows, which is no
+                // reason to discard what another pair proved about a third object. A global flag
+                // silently dropped the mandatory pair's `reach-equal` disclosure.
+                val pairDrop = LinkedHashSet<ClassedMatch>()
+                val pairEquivalents = LinkedHashSet<EquivalentReading>()
+                var differ = false
+
                 for (h in slot.headRefs) {
                     val reachedH = reachOf.filter { it.factRef == h }
                     when {
-                        // 4 — a nullable reach anywhere in this pair's declarations wins.
-                        h == factRef && reachedH.any { !it.mandatory } -> {
-                            differ = true
-                            admit += d
-                            admit += f
-                        }
+                        // 4 — a nullable reach anywhere in THIS pair's declarations wins.
+                        h == factRef && reachedH.any { !it.mandatory } -> differ = true
                         // 2 — declared-equal on this model.
                         h == factRef && reachedH.any { it.mandatory } -> {
-                            admit += d
-                            drop += f
-                            equivalents += EquivalentReading(f.match.targetRef, RULE_REACH_EQUAL)
+                            pairDrop += f
+                            pairEquivalents += EquivalentReading(f.match.targetRef, RULE_REACH_EQUAL)
                         }
                         // 3 — the channel's fact is not the fact being measured.
-                        reachedH.isNotEmpty() -> {
-                            admit += d
-                            drop += f
-                        }
+                        reachedH.isNotEmpty() -> pairDrop += f
                         // 1 — neither reading is about this clause.
                         else -> Unit
                     }
+                }
+
+                if (differ) {
+                    // Both readings stay in, and nothing about THIS pair is claimed equal — a
+                    // pair whose readings were just shown to differ must not also be disclosed
+                    // as equivalent.
+                    admit += d
+                    admit += f
+                } else if (pairDrop.isNotEmpty()) {
+                    admit += d
+                    drop += pairDrop
+                    equivalents += pairEquivalents
                 }
             }
         }
 
         if (admit.isEmpty() && drop.isEmpty()) return admitted1 to emptyList()
 
-        // Rule 4 dominates: when any pair's readings were shown to DIFFER, nothing is dropped and
-        // nothing is claimed equal — the whole point is that the verdict must be the question.
-        if (differ) {
-            val readmitted = admit.filter { it !in admitted1 }
-            rejected.removeAll(readmitted.toSet())
-            return (admitted1 + readmitted) to emptyList()
-        }
+        // A fact a rule-4 pair re-admitted is never dropped on another pair's account: the
+        // refusal is the stronger claim, so it wins the intersection.
+        drop.removeAll(admit)
 
         val readmitted = admit.filter { it !in admitted1 && it !in drop }
         rejected.removeAll(readmitted.toSet())
@@ -375,7 +382,15 @@ object Binder {
         val keep = objects.filter { kindOf(it, kinds) in preferred }
         if (keep.isEmpty()) return admitted0
 
-        val dropped = objects - keep.toSet()
+        // ⛔ SILENCE IS NOT A SPECIES (review-087 F1). Only a row whose kind is KNOWN and
+        // dis-preferred is dropped. A blank kind means the archive declares nothing about that
+        // ref — every md-owned ref is kind-less by construction, since `MentionKinds` is derived
+        // for `Entity`/`DbTable`/`Attribute`/`DbColumn` and `ttr-metadata`'s `Model` has no md
+        // schema — and dropping it would make a PARTIALLY described registry bind where a fully
+        // undeclared one asks. A registry that says less must degrade toward asking, never
+        // toward binding.
+        val dropped = objects.filter { kindOf(it, kinds).isNotBlank() && kindOf(it, kinds) !in preferred }
+        if (dropped.isEmpty()) return admitted0
         rejected += dropped
         return admitted0 - dropped.toSet()
     }

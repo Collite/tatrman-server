@@ -48,6 +48,9 @@
 # v1→v2: `reachedFrom` is a defaulted field inside `targets`, so a v2 archive decodes
 # in a v3 reader and a v3 archive is read by an MS-era reader as a v2 one
 # (`ignoreUnknownKeys`) with the reachability rules simply inert.
+# ⚠ The gate-free crossing is v2 → v3. An estate whose COMMITTED archive is still v1
+# (check its `schemaVersion`, not this pin) rebuilds v1 → v3, which adds the `targets`
+# map — the v1 → v2 step — and therefore carries the MS reader gate with it.
 # ⚠ ALSO in this cut, and worth knowing before an estate takes it: `ttr-metadata`'s
 # file loader used to HARDCODE `Cardinality(0, -1, 0, -1)` and now parses the authored
 # `cardinality:`. Any reader of a loaded `Relation.cardinality` gets real numbers where

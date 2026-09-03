@@ -1,6 +1,6 @@
 {
   "source": "tatrman packages/semantics/src/lexicon/fold-parity.json — keep in sync",
-  "$comment": "MH T1 — the collision fold, pinned across three implementations (contracts §1): @tatrman/semantics foldForCollision, ttr-lexicon TermNormalizer.fold, tatrman-server org.tatrman.text.Normalization.fold. Keep the three readers in sync.",
+  "$comment": "MH T1 — the collision fold, pinned across three implementations (contracts §1): @tatrman/semantics foldForCollision, ttr-lexicon TermNormalizer.fold, tatrman-server org.tatrman.text.Normalization.fold. Keep the three readers in sync. The U+00A0 row pins that a NON-BREAKING space is KEPT, not collapsed: the runtime index does not collapse whitespace at all, so a fold that did would report collisions the matcher has not (review-087 F3).",
   "cases": [
     [
       "Prodejna",
@@ -49,6 +49,10 @@
     [
       "  ",
       ""
+    ],
+    [
+      "Tržby z prodejen",
+      "trzby z prodejen"
     ]
   ]
 }
