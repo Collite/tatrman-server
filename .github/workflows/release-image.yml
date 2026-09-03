@@ -99,6 +99,14 @@ jobs:
             [lex-matcher]=services/lex-matcher
             [llm-gateway]=services/llm-gateway
             [nlp]=services/nlp
+            # The NLP BACKENDS live one level deeper and publish as `nlp-<dir>`, so the
+            # name is not the directory basename and the `find` fallback below (maxdepth 3
+            # from services/) would resolve `nlp-stanza` to nothing. Mapped explicitly.
+            # ⚑ morphodita and nametag3 are deliberately ABSENT: they bake a LINDAT model
+            # from a DSpace URL this workflow has no secret for (and morphodita's is
+            # CC BY-NC-SA). Build those with `just nlp-backend-image <name> <ver> push`.
+            [nlp-stanza]=services/nlp/backends/stanza
+            [nlp-spacy]=services/nlp/backends/spacy
             [golem-py]=services/golem-py
             [morph-studio]=services/morph-studio
             [chrono]=services/chrono
@@ -116,7 +124,7 @@ jobs:
             [identity]=infra/identity
             [health]=infra/health
           )
-          ALL="veles query translate validate dispatch charon lex-matcher llm-gateway nlp golem-py morph-studio chrono geo money grounding-mcp resolver meta-mcp query-mcp lex-matcher-mcp nlp-mcp worker-postgres worker-mssql worker-polars identity health"
+          ALL="veles query translate validate dispatch charon lex-matcher llm-gateway nlp nlp-stanza nlp-spacy golem-py morph-studio chrono geo money grounding-mcp resolver meta-mcp query-mcp lex-matcher-mcp nlp-mcp worker-postgres worker-mssql worker-polars identity health"
 
           declare -a NAMES
           if [ "${{ github.event_name }}" = "push" ]; then
@@ -172,7 +180,14 @@ jobs:
         run: |
           set -euo pipefail
           P="${{ matrix.path }}"
+          # Order matters, and the two existing tests come FIRST so no module that
+          # builds today can change lane: every mapped path carries either a
+          # build.gradle.kts or a pyproject.toml. The third lane is for a module
+          # that is only a Dockerfile with a LOCAL context — the NLP backends —
+          # which the kotlin default would have sent to Jib.
           if [ -f "$P/pyproject.toml" ]; then LANE=python
+          elif [ -f "$P/build.gradle.kts" ]; then LANE=kotlin
+          elif [ -f "$P/Dockerfile" ]; then LANE=dockerfile
           else LANE=kotlin; fi
           echo "lane=$LANE" >> "$GITHUB_OUTPUT"
           echo "Module ${{ matrix.name }} ($P) -> $LANE @ ${{ matrix.version }}"
@@ -254,4 +269,18 @@ jobs:
           ./gradlew :shared:proto:preparePythonPackage --no-configuration-cache
           # Repo-root context: the Dockerfile COPYs shared/ and services/<x> from root.
           docker build -f "${{ matrix.path }}/Dockerfile" -t "$IMG" .
+          docker push "$IMG"
+
+      # ---------- Dockerfile-only, LOCAL context (the NLP backends) ----------
+      # No repo-root context: these Dockerfiles COPY only what sits beside them
+      # (`server.py`), and giving them the whole repo would ship it into the build.
+      # The runner is amd64, so a plain `docker build` produces the arch the
+      # cluster runs — no buildx/QEMU needed here (unlike the local recipe).
+      - name: Build & push (Dockerfile, local context)
+        if: steps.lane.outputs.lane == 'dockerfile'
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMG="${REGISTRY}/${IMAGE_ORG}/${{ matrix.name }}:${{ matrix.version }}"
+          docker build -t "$IMG" "${{ matrix.path }}"
           docker push "$IMG"

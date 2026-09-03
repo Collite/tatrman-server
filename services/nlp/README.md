@@ -332,12 +332,37 @@ The front and each engine backend are **separate images** (RG-P1.S2/S3):
 | `nlp-stanza` | `backends/stanza/Dockerfile` | uniform-JSON `server.py` + baked Stanza cs+en (cs DEP_PARSE hot path) (S3) |
 | `nlp-spacy` | `backends/spacy/Dockerfile` | uniform-JSON `server.py` + baked spaCy `en_core_web_md` (en NER fallback) (S3) |
 
+### Building and publishing a backend image
+
+```bash
+just nlp-backend-image stanza 0.9.1 push          # no build-arg needed
+MODEL_URL='https://lindat…/bitstreams/<uuid>/content' MODEL_SHA256=<digest> \
+  just nlp-backend-image morphodita 0.9.2 push    # bakes the LINDAT model
+```
+
+`nlp-stanza` and `nlp-spacy` also have a **tag-driven lane** — `just publish
+nlp-stanza` cuts `nlp-stanza/v<x.y.z>` and `release-image.yml` builds and pushes
+it, like every other module. `nlp-morphodita` and `nlp-nametag3` deliberately do
+**not**: CI has no `MODEL_URL` secret, so they are hand-built with the recipe
+above, which fails loudly if you forget it.
+
+⚑ **Why the recipe checks the model id.** The front addresses MorphoDiTa with an
+explicit `model=` (S-1) and `morphodita_server` matches its rest_id **exactly**,
+answering `400 Requested model '…' does not exist` on any mismatch — per request,
+into a log nobody reads. That is not hypothetical: the image deployed to hartland
+until 2026-09-03 was built before `b835ecf` (which changed the rest_id from a
+generic `czech` to the pinned `MODEL_ID`), so every `/tag` call had 400ed since
+July while the pod looked healthy and served its access log happily. The recipe
+now cross-checks the Dockerfile's `ARG MODEL_ID`, `config.yaml`'s
+`engines.morphodita.model` and the built image's own `GET /models` before it will
+push.
+
 Backend images target the **x86 cluster** (`docker buildx build --platform
-linux/amd64 …`); UFAL models are **CC BY-NC-SA** (FI-4 — building/running is
-fine, **publishing** the images is the gated legal item). The pinned model
-download URLs (LINDAT) resolve; set the `MODEL_SHA256` build-arg to the verified
-digest on the first build (digest-pin). Local **offline** bring-up (front + both
-backends, no Lindat egress):
+linux/amd64 …`, which the recipe passes for you); UFAL models are **CC BY-NC-SA**
+(FI-4 — building/running is fine, **publishing** the images is the gated legal
+item). The pinned model download URLs (LINDAT) resolve; set the `MODEL_SHA256`
+build-arg to the verified digest on the first build (digest-pin). Local
+**offline** bring-up (front + both backends, no Lindat egress):
 
 ```bash
 docker compose -f services/nlp/docker-compose.offline.yml up   # see the file header for build + hero-parse recipes
