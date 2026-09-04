@@ -113,6 +113,63 @@ but it means **"the rule did not fire" usually means "the tie never formed"**. C
 the archive has a row whose *stored term* equals the surface being asked; the anchor's key is
 reachable from the token's lemma; and the clause head bound something.
 
+## Rule 3 — the GOVERNOR decides a member-vs-member tie (tier M)
+
+The two rules above are about `V:` identities: which OBJECT a word names. There is a second
+homonymy they cannot see, because it is not about objects at all.
+
+```
+'TN'  ->  er.entity.store.state              (a member: the store's state)
+      ->  er.entity.customer_address.state   (a member: the customer's state)
+      ->  er.entity.warehouse.state          (a member: the warehouse's state)
+```
+
+Three `M:` identities — data rows, each its own PK. The slot rule never touches an `M:` row and
+the reachability rule is about facts, so on the evidence those two read, this is a same-kind tie
+that refuses. Three options labelled `TN` is not a question anyone can answer.
+
+What the sentence adds is the **governor**: the noun the value hangs off. *"stores in TN"* is the
+store's state; *"customers in TN"* is the customer's, reached through the address. *"sales in TN"*
+is genuinely either, and stays a question.
+
+| the sentence | what happens |
+|---|---|
+| `stores in TN` | the governor `er.entity.store` OWNS the attribute holding the member ⇒ **bind** |
+| `customers in TN` | `customer` holds no `state`, but `customer_address` does and declares `Reach(customer)` ⇒ one declared hop ⇒ **bind** |
+| `sales in TN` | a FACT governor never selects among member owners ⇒ **ask**, each option naming its owner |
+| `TN` | no governor ⇒ **ask** |
+
+`keep = members.filter { E(m) == G || G ∈ reach(E(m)) || E(m) == owners[G] }`, where `E(m)` is the
+entity owning the attribute whose vocabulary produced the member. One survivor binds; several ask;
+**none is a no-op** — a governor that reaches no owner has said nothing, and an empty band is not
+an answer. `mandatory` is not consulted: a nullable relation still names the owner the user meant.
+
+### How a value reaches the gate at all
+
+A governed value used to be looked up in its anchor's owners **and nowhere else**. Two things
+were wrong with that, both measured before anything was written:
+
+- **A multi-owner anchor emitted one candidate per owner on the same span**, and span dedupe kept
+  whichever the registry listed first. Now there is ONE candidate gated to the union of the
+  value-bearing owners (**A-MH-1a**) — `SpanProposal` proposes spans, it does not decide whose
+  member a word is.
+- **When the owners hold nothing, the span was swallowed.** `sales in TN` gates `TN` to a fact,
+  which has no member vocabulary at all, and the covered-token rule then stopped the value from
+  ever being proposed again: a G3 gap for a reason that has nothing to do with the word. So a
+  governed value is now ALSO proposed openly (`Origin.OPEN_VALUE`), both questions ride the one
+  batch, and `GateSpans.resolveOpenSiblings` collapses the pair to whichever spoke — governed
+  first (**A-MH-1b**). A governed lookup that works is byte-identical to what it was.
+
+⚑ On an archive-backed estate the open sibling is not an edge case, it is the load-bearing path.
+`lex-matcher` keys member vocabulary on the fuzzy COLUMN's category and matches categories by
+exact key, while the resolver's registry gives an entity `categories = [its own ref]` — so a value
+gated to an ENTITY never meets that entity's members. The governed lookup succeeds only where the
+anchor's own type carries the column categories.
+
+**`Option.member_of`** names the owner on a member option. It is what makes the residual question
+answerable: *"the store's state, the customer's, or the warehouse's?"* rather than `TN` three
+times. Blank for a vocabulary option, which names its object through `target_ref` already.
+
 ## Configuration
 
 `frame-roles.conf` gains `count-heads` beside `grouping-preps` / `filter-preps` — per-language
@@ -131,6 +188,8 @@ nothing behaves exactly as it did before:
 | no `count-heads` in an override config | `COUNT_HEAD` never fires |
 | a re-gate (no parse) | `SlotHint.NONE` — both rules inert |
 | `Registry` override without `reached_from` | reachability rule inert |
+| no `owner_ref` on the member's attribute | tier M inert — `E(m)` cannot be resolved, so the tie asks |
+| a value with no governor, or a fact governor | tier M inert — it asks, by owner |
 
 No reader gate is needed for the v2 → v3 archive crossing: `reachedFrom` is a defaulted field
 inside `targets`, so a v2 archive decodes in a v3 reader and a v3 archive is read by an older
