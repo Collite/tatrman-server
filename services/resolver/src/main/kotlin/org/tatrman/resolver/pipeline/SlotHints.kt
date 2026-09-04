@@ -47,6 +47,13 @@ object SlotHints {
 
     private val SUBJECT_RELATIONS = setOf("nsubj", "nsubj:pass")
 
+    /** MH tier M — the kinds that can OWN a member, and so can govern one. */
+    private val GOVERNING_KINDS = setOf("entity", "attribute")
+
+    /** MH tier M — the two candidates a governed value is proposed as (A-MH-1b). */
+    private val VALUE_ORIGINS =
+        setOf(DomainSpanCandidate.Origin.GOVERNED_VALUE, DomainSpanCandidate.Origin.OPEN_VALUE)
+
     /**
      * Stamp [SlotHint] onto every `ANCHOR_PHRASE` candidate. Same list, same order, same size —
      * only `slot` is filled, so this cannot change which spans are proposed.
@@ -154,7 +161,33 @@ object SlotHints {
             return hc.gatedEntityRefs.map(::factOf).distinct() to hc.gatedEntityRefs.any(::measureCapable)
         }
 
+        // MH tier M — the governor of a VALUE span.
+        //
+        // The candidate that reaches the Binder with several member rows is the OPEN sibling,
+        // whose own `gatedEntityRefs` is every declared type — so the governor cannot come from
+        // it. It comes from the GOVERNED_VALUE candidate over the same characters, whose refs
+        // ARE the anchor's owners; the two are proposed as a pair (`SpanProposal`, A-MH-1b).
+        //
+        // Among those owners the governor is the one that could own a member: exactly one
+        // entity/attribute. Two of them, or none, is not a governor this rule can use — a fact
+        // never selects among member owners (design §2a), and an ambiguous anchor must not have
+        // its ambiguity resolved silently by a value.
+        val governedRefsBySpan =
+            candidates
+                .filter { it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE }
+                .associate { (it.start to it.end) to it.gatedEntityRefs }
+
+        fun governorOfValue(c: DomainSpanCandidate): String {
+            val refs = governedRefsBySpan[c.start to c.end] ?: return ""
+            val governing = refs.filter { kindsByRef[it] in GOVERNING_KINDS }
+            return governing.singleOrNull().orEmpty()
+        }
+
         return candidates.map { c ->
+            if (c.origin in VALUE_ORIGINS) {
+                val governor = governorOfValue(c)
+                return@map if (governor.isBlank()) c else c.copy(slot = SlotHint(governorRef = governor))
+            }
             if (c.origin != DomainSpanCandidate.Origin.ANCHOR_PHRASE || c.headToken < 0) return@map c
             val head = c.headToken
             val prep = prepOf(head)
@@ -247,6 +280,17 @@ data class SlotHint(
     val headRefs: List<String> = emptyList(),
     val headMeasureCapable: Boolean = false,
     val coordSiblingKinds: Set<String> = emptySet(),
+    /**
+     * MH tier M — for a VALUE span, the ref of the object that GOVERNS it (`stores in TN` ⇒ the
+     * store dimension). Blank when the value has no governor, when the governor is a fact (which
+     * must never pick among member owners — refuse-over-guess, design §2a), or when the anchor's
+     * owners leave it undecidable.
+     *
+     * Orthogonal to [slot], which is about the span's own syntactic role: a value candidate keeps
+     * `Slot.NONE` and carries this, so the object rules stay no-ops on it by construction and only
+     * the member-governance rule reads it.
+     */
+    val governorRef: String = "",
 ) {
     companion object {
         /** No slot: a bare word, a fragment, a re-gate, a parse with no tree. Both rules no-op. */

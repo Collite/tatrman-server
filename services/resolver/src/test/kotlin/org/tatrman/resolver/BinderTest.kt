@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.fuzzy.v1.FuzzyMatch
@@ -814,6 +815,152 @@ class BinderTest :
             decideMh(slot = SlotHint(Slot.NONE), reachMap = reach)
                 .shouldBeInstanceOf<Binder.Ambiguous>()
                 .admitted.size shouldBe 2
+        }
+
+        // ── MH-P3 tier M — member vs member (contracts §7.5 M3, §8.5) ──────────────────
+        //
+        // Three attributes on three different entities each hold a member `TN`. That is a
+        // SAME-kind tie: `M:` rows are data, so neither the slot rule nor reachability is asked
+        // of them. What the sentence offers instead is the GOVERNOR — the noun the value hangs
+        // off — and M3 keeps the members whose owning entity the governor either IS or reaches
+        // by one declared relation.
+        //
+        // ⚑ `owner(m)` is the COLUMN-level attribute ref (P3·S1·T1 measured it), so every rule
+        // below runs on `entityOf(owner) = owners[owner]`, never on the owner ref itself.
+        val customer = "er.entity.customer"
+        val customerAddress = "er.entity.customer_address"
+        val warehouse = "er.entity.warehouse"
+        val item = "er.entity.item"
+        val storeState = "er.entity.store.state"
+        val caState = "er.entity.customer_address.state"
+        val whState = "er.entity.warehouse.state"
+
+        val memberOwners = mapOf(storeState to storeState, caState to caState, whState to whState)
+        val memberEntityOwners =
+            mapOf(storeState to store, caState to customerAddress, whState to warehouse)
+        val memberKinds =
+            mapOf(
+                store to "entity",
+                customer to "entity",
+                customerAddress to "entity",
+                warehouse to "entity",
+                item to "entity",
+                storeSales to "entity_with_measures",
+                webSales to "entity_with_measures",
+            )
+        val memberReach =
+            mapOf(
+                customerAddress to listOf(Reach(customer, mandatory = true)),
+                store to listOf(Reach(storeSales, mandatory = true), Reach(storeReturns, mandatory = true)),
+                warehouse to listOf(Reach("er.entity.catalog_sales", mandatory = true), Reach(webSales, true)),
+            )
+
+        /** The three `TN` rows, EXACT and tied — one per owning attribute. */
+        fun members() =
+            listOf(
+                member("store#7", storeState, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                member("ca#3", caState, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                member("wh#1", whState, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+            )
+
+        fun decideM(
+            classedMatches: List<Binder.ClassedMatch> = members(),
+            governorRef: String = "",
+            kindsMap: Map<String, String> = memberKinds,
+            reachMap: Map<String, List<Reach>> = memberReach,
+            ownersMap: Map<String, String> = memberEntityOwners,
+        ) = Binder.decide(
+            classedMatches,
+            thresholds,
+            ownersMap,
+            SlotHint(governorRef = governorRef),
+            kindsMap,
+            reachMap,
+            memberOwners,
+        )
+
+        "mh-m1: an ENTITY governor binds its own attribute's member — `stores in TN`" {
+            val bind = decideM(governorRef = store).shouldBeInstanceOf<Binder.Bind>()
+            bind.winner.match.candidateId shouldBe "store#7"
+            bind.rejected.map { it.match.candidateId } shouldContainExactlyInAnyOrder listOf("ca#3", "wh#1")
+        }
+
+        "mh-m2: a governor that REACHES the owner in one declared hop binds — `customers in TN`" {
+            decideM(governorRef = customer)
+                .shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.candidateId shouldBe "ca#3"
+        }
+
+        "mh-m3: a FACT governor never selects among member owners — `sales in TN` refuses" {
+            decideM(governorRef = storeSales)
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted
+                .map { it.match.candidateId } shouldContainExactlyInAnyOrder listOf("store#7", "ca#3", "wh#1")
+        }
+
+        "mh-m4: no governor is byte-identical to today — a bare `TN` still asks" {
+            decideM(governorRef = "")
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted
+                .shouldHaveSize(3)
+        }
+
+        "mh-m5: a governor reaching NONE of the owners is a no-op, never an empty band" {
+            decideM(governorRef = item)
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted
+                .shouldHaveSize(3)
+        }
+
+        "mh-m6: the rule needs two owners — one member row is unchanged" {
+            decideM(
+                classedMatches = listOf(member("store#7", storeState, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT)),
+                governorRef = store,
+            ).shouldBeInstanceOf<Binder.Bind>()
+                .winner.match.candidateId shouldBe "store#7"
+        }
+
+        "mh-m7: an estate that declared no relations is a no-op — reach empty, still asks" {
+            decideM(governorRef = customer, reachMap = emptyMap())
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted
+                .shouldHaveSize(3)
+        }
+
+        "mh-m8: a `V:` row in the band is untouched — the rule speaks only about members" {
+            val mixed =
+                listOf(
+                    member("store#7", storeState, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                    declared(store, 1.0, EvidenceClass.EVIDENCE_CLASS_EXACT),
+                )
+            val withGovernor = decideM(classedMatches = mixed, governorRef = store)
+            val without = decideM(classedMatches = mixed, governorRef = "")
+
+            withGovernor.shouldBeInstanceOf<Binder.Ambiguous>()
+            withGovernor.admitted.map { Binder.identityKey(it.match) } shouldBe
+                without.shouldBeInstanceOf<Binder.Ambiguous>().admitted.map { Binder.identityKey(it.match) }
+        }
+
+        "mh-m1a: the rule reads the OWNER's entity, not the owner ref — no `owners` map, no rule" {
+            // `owner(m)` is `er.entity.store.state`; the governor is `er.entity.store`. Without
+            // the owners map there is nothing to resolve one to the other, so M3 declines.
+            decideM(governorRef = store, ownersMap = emptyMap())
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted
+                .shouldHaveSize(3)
+        }
+
+        "mh-m2a: a governor narrowing to TWO owners asks with the two, not with all three" {
+            // `warehouse` reaches web_sales and catalog_sales; give store's state the same
+            // declared reach so two owners qualify and the third does not.
+            val reach =
+                memberReach + (store to listOf(Reach(webSales, mandatory = true)))
+            val verdict =
+                decideM(governorRef = webSales, kindsMap = memberKinds + (webSales to "entity"), reachMap = reach)
+            verdict
+                .shouldBeInstanceOf<Binder.Ambiguous>()
+                .admitted
+                .map { it.match.candidateId } shouldContainExactlyInAnyOrder listOf("store#7", "wh#1")
         }
     }) {
     private companion object {

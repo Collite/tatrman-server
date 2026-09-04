@@ -14,6 +14,7 @@ import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.model.kindsByRef
 import org.tatrman.resolver.model.ownersByRef
 import org.tatrman.resolver.model.reachByRef
+import org.tatrman.resolver.model.refByCategory
 import org.tatrman.resolver.v1.Hypothesis
 import org.tatrman.resolver.v1.ResolutionState
 import org.tatrman.resolver.v1.RungLogEntry
@@ -120,6 +121,7 @@ class LookupRounds(
         // the registry through the same three helpers.
         val kinds = entityTypes.kindsByRef()
         val reach = entityTypes.reachByRef()
+        val memberOwners = entityTypes.refByCategory()
         val tried = mutableMapOf<Pair<Int, Int>, List<Hypothesis>>()
         var currentGated = gated
         var currentUngated = ungated
@@ -144,7 +146,7 @@ class LookupRounds(
                 val span = spanFor(query, currentGated, currentUngated) ?: continue
                 // The same gate the broad pass used. A round is a proposer; this is where its
                 // proposals stop being proposals (RV-7).
-                val verdict = Binder.gate(candidates, span.candidate, thresholds, owners, kinds, reach)
+                val verdict = Binder.gate(candidates, span.candidate, thresholds, owners, kinds, reach, memberOwners)
                 // What the gate refused, recorded where a refusal belongs. `RungLogEntry.hypotheses`
                 // is contracts' "what it PROPOSED (never what it bound)", and a WEAK candidate is
                 // exactly that: something the round offered and the binder declined. It goes in the

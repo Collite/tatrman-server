@@ -521,4 +521,183 @@ class SlotHintsTest :
                 )[1]
                 .slot shouldBe SlotHint(Slot.FILTER, headRefs = listOf(storeSales), headMeasureCapable = true)
         }
+
+        // ---- MH-P3 tier M: the GOVERNOR of a value span (contracts §8.5) ------------------------
+        //
+        // A value is proposed twice — gated to its anchor's owners (`GOVERNED_VALUE`) and gated
+        // openly (`OPEN_VALUE`) — and it is the OPEN one that reaches the Binder with several
+        // member rows. So the governor is read off the governed twin over the same characters,
+        // and only when exactly one of the anchor's owners could own a member at all.
+
+        val customer = "er.entity.customer"
+        val memberKinds = kinds + mapOf(customer to "entity", "er.entity.store.state" to "attribute")
+
+        fun value(
+            text: String,
+            start: Int,
+            end: Int,
+            head: Int,
+            refs: List<String>,
+            origin: DomainSpanCandidate.Origin,
+        ) = DomainSpanCandidate(
+            text = text,
+            start = start,
+            end = end,
+            gatedEntityRefs = refs,
+            categories = emptyList(),
+            anchored = origin == DomainSpanCandidate.Origin.GOVERNED_VALUE,
+            origin = origin,
+            headToken = head,
+        )
+
+        fun governorOf(
+            p: AnalyzeResponse,
+            candidates: List<DomainSpanCandidate>,
+            lang: String = "en",
+        ) = SlotHints
+            .stamp(p, candidates, memberKinds, emptyMap(), lang, preps)
+            .single { it.origin == DomainSpanCandidate.Origin.OPEN_VALUE }
+            .slot.governorRef
+
+        "E11-en — a value governed by a dimension carries that dimension as its governor" {
+            val p =
+                parse(
+                    "en",
+                    tok("Stores", 0, 6, "store", "NOUN", 0, "root"),
+                    tok("in", 7, 9, "in", "ADP", 3, "case"),
+                    tok("TN", 10, 12, "TN", "PROPN", 1, "nmod"),
+                )
+            val cands =
+                listOf(
+                    anchor("Stores", 0, listOf(store, storeSales)),
+                    value("TN", 10, 12, 2, listOf(store, storeSales), DomainSpanCandidate.Origin.GOVERNED_VALUE),
+                    value("TN", 10, 12, 2, listOf(store, storeSales, customer), DomainSpanCandidate.Origin.OPEN_VALUE),
+                )
+
+            // the anchor gates to BOTH, and only one of them is a kind that can own a member
+            governorOf(p, cands) shouldBe store
+        }
+
+        "E11-cs — the same on the Czech parse" {
+            val p =
+                parse(
+                    "cs",
+                    tok("Prodejny", 0, 8, "prodejna", "NOUN", 0, "root"),
+                    tok("v", 9, 10, "v", "ADP", 3, "case"),
+                    tok("TN", 11, 13, "TN", "PROPN", 1, "nmod"),
+                )
+            val cands =
+                listOf(
+                    anchor("Prodejny", 0, listOf(store, storeSales)),
+                    value("TN", 11, 13, 2, listOf(store, storeSales), DomainSpanCandidate.Origin.GOVERNED_VALUE),
+                    value("TN", 11, 13, 2, listOf(store, storeSales, customer), DomainSpanCandidate.Origin.OPEN_VALUE),
+                )
+
+            governorOf(p, cands, lang = "cs") shouldBe store
+        }
+
+        "E12-en — a FACT governor is no governor at all: blank, so the tie asks" {
+            val p =
+                parse(
+                    "en",
+                    tok("Sales", 0, 5, "sale", "NOUN", 0, "root"),
+                    tok("in", 6, 8, "in", "ADP", 3, "case"),
+                    tok("TN", 9, 11, "TN", "PROPN", 1, "nmod"),
+                )
+            val cands =
+                listOf(
+                    anchor("Sales", 0, listOf(storeSales)),
+                    value("TN", 9, 11, 2, listOf(storeSales), DomainSpanCandidate.Origin.GOVERNED_VALUE),
+                    value("TN", 9, 11, 2, listOf(store, storeSales, customer), DomainSpanCandidate.Origin.OPEN_VALUE),
+                )
+
+            governorOf(p, cands) shouldBe ""
+        }
+
+        "E12-bare — no governed twin, so no governor" {
+            val p = parse("en", tok("TN", 0, 2, "TN", "PROPN", 0, "root"))
+            val cands =
+                listOf(value("TN", 0, 2, 0, listOf(store, customer), DomainSpanCandidate.Origin.OPEN_VALUE))
+
+            governorOf(p, cands) shouldBe ""
+        }
+
+        "E13-en — an entity governor that owns no such member is still the governor" {
+            // `customer` holds no `state`; naming it is exactly what lets M3 make the one
+            // declared hop to `customer_address`.
+            val p =
+                parse(
+                    "en",
+                    tok("Customers", 0, 9, "customer", "NOUN", 0, "root"),
+                    tok("in", 10, 12, "in", "ADP", 3, "case"),
+                    tok("TN", 13, 15, "TN", "PROPN", 1, "nmod"),
+                )
+            val cands =
+                listOf(
+                    anchor("Customers", 0, listOf(customer)),
+                    value("TN", 13, 15, 2, listOf(customer), DomainSpanCandidate.Origin.GOVERNED_VALUE),
+                    value("TN", 13, 15, 2, listOf(store, storeSales, customer), DomainSpanCandidate.Origin.OPEN_VALUE),
+                )
+
+            governorOf(p, cands) shouldBe customer
+        }
+
+        "E13-cs — likewise" {
+            val p =
+                parse(
+                    "cs",
+                    tok("Zákazníci", 0, 9, "zákazník", "NOUN", 0, "root"),
+                    tok("v", 10, 11, "v", "ADP", 3, "case"),
+                    tok("TN", 12, 14, "TN", "PROPN", 1, "nmod"),
+                )
+            val cands =
+                listOf(
+                    anchor("Zákazníci", 0, listOf(customer)),
+                    value("TN", 12, 14, 2, listOf(customer), DomainSpanCandidate.Origin.GOVERNED_VALUE),
+                    value("TN", 12, 14, 2, listOf(store, customer), DomainSpanCandidate.Origin.OPEN_VALUE),
+                )
+
+            governorOf(p, cands, lang = "cs") shouldBe customer
+        }
+
+        "tier M — TWO member-owning owners on the anchor leave the governor blank, never a guess" {
+            val p =
+                parse(
+                    "en",
+                    tok("Stores", 0, 6, "store", "NOUN", 0, "root"),
+                    tok("in", 7, 9, "in", "ADP", 3, "case"),
+                    tok("TN", 10, 12, "TN", "PROPN", 1, "nmod"),
+                )
+            val cands =
+                listOf(
+                    anchor("Stores", 0, listOf(store, storeReturns)),
+                    value("TN", 10, 12, 2, listOf(store, storeReturns), DomainSpanCandidate.Origin.GOVERNED_VALUE),
+                    value("TN", 10, 12, 2, listOf(store, storeReturns), DomainSpanCandidate.Origin.OPEN_VALUE),
+                )
+
+            // both are `entity`: the ANCHOR is ambiguous, and a value must not resolve that
+            // silently by picking one of them to be governed by.
+            governorOf(p, cands) shouldBe ""
+        }
+
+        "tier M — the object rules stay no-ops on a value span: slot is NONE, only the governor is set" {
+            val p =
+                parse(
+                    "en",
+                    tok("Stores", 0, 6, "store", "NOUN", 0, "root"),
+                    tok("in", 7, 9, "in", "ADP", 3, "case"),
+                    tok("TN", 10, 12, "TN", "PROPN", 1, "nmod"),
+                )
+            val cands =
+                listOf(
+                    anchor("Stores", 0, listOf(store, storeSales)),
+                    value("TN", 10, 12, 2, listOf(store, storeSales), DomainSpanCandidate.Origin.GOVERNED_VALUE),
+                    value("TN", 10, 12, 2, listOf(store, storeSales), DomainSpanCandidate.Origin.OPEN_VALUE),
+                )
+
+            SlotHints
+                .stamp(p, cands, memberKinds, emptyMap(), "en", preps)
+                .filter { it.origin != DomainSpanCandidate.Origin.ANCHOR_PHRASE }
+                .forEach { it.slot.slot shouldBe Slot.NONE }
+        }
     })

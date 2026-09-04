@@ -267,18 +267,28 @@ object SpanProposal {
                     )
                 coveredTokens += phraseIdx
             }
-            // Governed values stay PER-OWNER and are never merged: a value candidate is gated
-            // against the vocabulary of the one object whose member it would be, and merging
-            // them would offer `DF ADNAK` to every owner sharing the anchor.
-            for (et in hits.map { it.et }) {
-                // governed value arguments (e.g. `středisko` → `DF ADNAK`). Only for an anchor
-                // that HAS values: an operator or a measure has no member vocabulary, so its
-                // nominal arguments are not its values. Without this the operator word — which
-                // Stanza often makes the root — governs the rest of the question, and every
-                // noun under it is proposed as a value of `op:show` (h2's `stanic`). A blank
-                // kind admits values, which is the pre-RV behaviour for a snapshot that carries
-                // no object kinds.
-                if (et.objectKind in VALUELESS_OBJECT_KINDS) continue
+            // Governed value arguments (e.g. `středisko` → `DF ADNAK`). Only for an anchor that
+            // HAS values: an operator or a measure has no member vocabulary, so its nominal
+            // arguments are not its values. Without this the operator word — which Stanza often
+            // makes the root — governs the rest of the question, and every noun under it is
+            // proposed as a value of `op:show` (h2's `stanic`). A blank kind admits values, which
+            // is the pre-RV behaviour for a snapshot that carries no object kinds.
+            val valueOwners = hits.map { it.et }.filter { it.objectKind !in VALUELESS_OBJECT_KINDS }
+            if (valueOwners.isNotEmpty()) {
+                // ⚑ A-MH-1a (MH-P3·S1·T2). Governed values used to be emitted PER OWNER — one
+                // candidate per owner on the SAME span — on the argument that merging them would
+                // offer `DF ADNAK` to every owner sharing the anchor. But `dedupe` keys on
+                // `(start, end)`, so all but one were silently discarded and WHICH one survived
+                // was decided by the order the registry happened to list the owners in. That is
+                // not scoping, it is a coin toss with a stable-looking result.
+                //
+                // So the candidate is built ONCE, gated to the UNION of the value-bearing owners
+                // — the MS-P3·S1 move applied to values. The gate can then find the one owner
+                // whose vocabulary actually holds the value, which is a question about DATA that
+                // `SpanProposal` has no business answering: it proposes spans, it does not decide
+                // whose member a word is.
+                val refs = valueOwners.map { it.ref }.distinct()
+                val categories = valueOwners.flatMap { it.categories }.distinct()
                 for (childIdx in children[idx + 1].orEmpty()) {
                     val child = tokens[childIdx]
                     if (child.depRelation !in GOVERNED_VALUE_RELATIONS) continue
@@ -290,10 +300,34 @@ object SpanProposal {
                         candidate(
                             valueIdx,
                             tokens,
-                            listOf(et.ref),
-                            et.categories,
+                            refs,
+                            categories,
                             anchored = true,
                             origin = DomainSpanCandidate.Origin.GOVERNED_VALUE,
+                            headToken = childIdx,
+                        )
+                    // ⚑ A-MH-1b (MH-P3·S1·T3) — the OPEN sibling, same span, every declared type.
+                    //
+                    // The governed candidate above asks the anchor's owners and nobody else, which
+                    // is right when they hold the value and silently wrong when they cannot: a
+                    // fact governor (`sales in TN`) has no member vocabulary, so the lookup was
+                    // always going to come back empty, and `coveredTokens` then stopped path (b)
+                    // from ever proposing the word again. The question became a G3 gap for a
+                    // reason that has nothing to do with the word.
+                    //
+                    // `SpanProposal` cannot know which lookup will succeed — that is a fact about
+                    // the DATA — so it proposes both and lets the gate choose. Both ride the one
+                    // batch (no second round trip), and `GateSpans.resolveOpenSiblings` drops this
+                    // sibling whenever the governed reading BOUND, so a working governed lookup is
+                    // byte-identical to what it was before.
+                    out +=
+                        candidate(
+                            valueIdx,
+                            tokens,
+                            allRefs,
+                            allCategories,
+                            anchored = false,
+                            origin = DomainSpanCandidate.Origin.OPEN_VALUE,
                             headToken = childIdx,
                         )
                     coveredTokens += valueIdx
@@ -551,11 +585,20 @@ object SpanProposal {
         return sb.toString()
     }
 
-    /** Collapse candidates that resolve to the same char span (anchored wins). */
+    /**
+     * Collapse candidates that resolve to the same char span (anchored wins).
+     *
+     * ⚑ A-MH-1b: the key carries [DomainSpanCandidate.anchored], so an anchored candidate and an
+     * OPEN one for the same span are kept as two. They are two different QUESTIONS about one span
+     * — "is this a value of the thing that governs it?" and "is it a value of anything?" — and
+     * collapsing them threw the second away unasked. Anchored still wins within its own half, so
+     * nothing that reached the gate before reaches it differently now: no path in this file emits
+     * an anchored and an unanchored candidate for one span except the governed-value pair above.
+     */
     private fun dedupe(cands: List<DomainSpanCandidate>): List<DomainSpanCandidate> {
-        val bySpan = LinkedHashMap<Pair<Int, Int>, DomainSpanCandidate>()
+        val bySpan = LinkedHashMap<Triple<Int, Int, Boolean>, DomainSpanCandidate>()
         for (c in cands) {
-            val k = c.start to c.end
+            val k = Triple(c.start, c.end, c.anchored)
             val existing = bySpan[k]
             if (existing == null || (!existing.anchored && c.anchored)) bySpan[k] = c
         }

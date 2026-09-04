@@ -114,11 +114,20 @@ object Binder {
         owners: Map<String, String> = emptyMap(),
         kinds: Map<String, String> = emptyMap(),
         reach: Map<String, List<Reach>> = emptyMap(),
+        memberOwners: Map<String, String> = emptyMap(),
     ): Verdict =
         // MH: the slot rides the CANDIDATE, because this function never sees the parse
         // (architecture A3). A re-gated synthetic candidate therefore carries `SlotHint.NONE`,
         // which is right: a re-decision with no parse must not invent a slot.
-        decide(classify(matches, candidate, thresholds), thresholds, owners, candidate.slot, kinds, reach)
+        decide(
+            classify(matches, candidate, thresholds),
+            thresholds,
+            owners,
+            candidate.slot,
+            kinds,
+            reach,
+            memberOwners,
+        )
 
     fun classify(
         matches: List<FuzzyMatch>,
@@ -137,6 +146,9 @@ object Binder {
         slot: SlotHint = SlotHint.NONE,
         kinds: Map<String, String> = emptyMap(),
         reach: Map<String, List<Reach>> = emptyMap(),
+        // MH tier M — fuzzy category → the ref whose member vocabulary it is (`owner(m)`).
+        // Defaulted and no-op when absent, like the three above it.
+        memberOwners: Map<String, String> = emptyMap(),
     ): Verdict {
         val rejected = mutableListOf<ClassedMatch>()
         val eligible = mutableListOf<ClassedMatch>()
@@ -237,7 +249,13 @@ object Binder {
         // the only measure-ish candidate and that candidate is the wrong fact.
         val (admitted2, equivalents) = reachabilityCollapse(admitted0, admitted1, slot, kinds, owners, reach, rejected)
 
-        val admitted = admitted2
+        // MH tier M — member governance (contracts §7.5 M3, design §2a).
+        //
+        // Everything above is about `V:` identities: which OBJECT a word names. This is the other
+        // homonymy — one VALUE held by several attributes (`TN` under three `state` columns) —
+        // and it is a SAME-kind tie no object rule can see. The evidence the sentence offers is
+        // the governor, and the model says which owners that governor can reach.
+        val admitted = memberGovernance(admitted2, slot, kinds, owners, reach, memberOwners, rejected)
 
         return if (admitted.size > 1) {
             Ambiguous(admitted, rejected)
@@ -358,6 +376,83 @@ object Binder {
         rejected += drop.filter { it in admitted1 || it in readmitted }.filter { it !in rejected }
         return result to equivalents.toList()
     }
+
+    /**
+     * MH tier M (M3) — decide a MEMBER-vs-MEMBER tie by the value's GOVERNOR.
+     *
+     * `TN` is a member of `store.state`, of `customer_address.state` and of `warehouse.state`.
+     * Three `M:` rows, one label, one span, no target ref: nothing the slot rule or the
+     * reachability rule reads even applies, because those ask which OBJECT a word names and this
+     * word names a data row. What the sentence adds is the noun the value hangs off —
+     * *"**stores** in TN"*, *"**customers** in TN"* — and what the MODEL adds is which entities
+     * that noun can reach.
+     *
+     * So, with **G** the governor ([SlotHint.governorRef]) and **E(m)** the ENTITY owning the
+     * attribute whose vocabulary produced m:
+     *
+     *  1. `E(m) == G` — the governor owns the member outright (`stores in TN`).
+     *  2. `G ∈ reach(E(m))` — the governor is declared to relate to the owning entity in one hop
+     *     (`customers in TN`: `customer_address` declares `Reach(customer)`).
+     *  3. `E(m) == owners[G]` — the governor is itself an attribute or measure of the owning
+     *     entity, so it names the same table at a different granularity.
+     *
+     * Survivors bind if there is exactly one, ask if there are several (the governor narrowed but
+     * did not decide), and — crucially — **an empty survivor set is a NO-OP**: a governor that
+     * reaches none of the owners has said nothing, and silence is not an answer (L-33, and the
+     * same posture the containment collapse takes). `mandatory` is deliberately not consulted: a
+     * nullable relation still names the owner the user meant.
+     *
+     * ⚑ E(m) is `owners[owner(m)]`, not `owner(m)`. P3·S1·T1 measured what `owner(m)` actually is
+     * on this system — the COLUMN-level attribute ref, because the archive projects every declared
+     * vocabulary entry with `category == targetRef` — so comparing it with a governor's entity ref
+     * would never be true. On a registry that does project entities the two coincide and this
+     * reads as contracts §7.5's first clause verbatim.
+     *
+     * Refuse-over-guess is what keeps a FACT governor out: *"sales in TN"* is the store's state or
+     * the customer's, and the fact reaches both. Only `entity`/`attribute` governors are admitted,
+     * and [SlotHints] is the other half of that guard — it never stamps a fact as a governor.
+     */
+    private fun memberGovernance(
+        admitted: List<ClassedMatch>,
+        slot: SlotHint,
+        kinds: Map<String, String>,
+        owners: Map<String, String>,
+        reach: Map<String, List<Reach>>,
+        memberOwners: Map<String, String>,
+        rejected: MutableList<ClassedMatch>,
+    ): List<ClassedMatch> {
+        val governor = slot.governorRef
+        if (governor.isBlank()) return admitted
+        if (kinds[governor] !in GOVERNING_KINDS) return admitted
+
+        val members = admitted.filter { !isModelObject(it) }
+        if (members.size < 2) return admitted
+
+        /** The ENTITY behind a member's owning category — see the ⚑ above. */
+        fun entityOf(c: ClassedMatch): String {
+            val owner = memberOwners[c.match.category] ?: c.match.category
+            return owners[owner]?.takeIf { it.isNotBlank() } ?: owner
+        }
+
+        // Two owning entities at minimum, or there is nothing to break — one owner reached twice
+        // is the `distinctBy` case above, not this one.
+        if (members.map(::entityOf).distinct().size < 2) return admitted
+
+        val governorEntity = owners[governor]?.takeIf { it.isNotBlank() } ?: governor
+        val keep =
+            members.filter { m ->
+                val e = entityOf(m)
+                e == governor || e == governorEntity || reach[e].orEmpty().any { it.factRef == governor }
+            }
+        if (keep.isEmpty() || keep.size == members.size) return admitted
+
+        val dropped = members - keep.toSet()
+        rejected += dropped
+        return admitted - dropped.toSet()
+    }
+
+    /** MH tier M — the kinds a governor may have; a fact never selects among member owners. */
+    private val GOVERNING_KINDS = setOf(KIND_ENTITY, KIND_ATTRIBUTE)
 
     /**
      * MH T2 — keep the kinds the slot prefers, when the band holds more than one kind.

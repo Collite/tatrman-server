@@ -150,10 +150,24 @@ class SpanProposalTest :
                         ),
                     ).build()
             val cands = SpanProposal.proposeDomainSpans(parse, listOf(qstred, branch))
-            val value = cands.single { it.text == "DF ADNAK" }
+            val value =
+                cands.single {
+                    it.text == "DF ADNAK" && it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE
+                }
             value.anchored shouldBe true
             value.gatedEntityRefs shouldBe listOf("er.qstred_df")
             value.categories shouldContainExactlyInAnyOrder listOf("er.qstred_df.kod", "er.qstred_df.nazev")
+
+            // A-MH-1b: the governed scoping above is unchanged, and the span now ALSO carries an
+            // open sibling. It is not a second reading of the value — it is the question "is this
+            // a value of anything?", asked in the same batch and discarded by the gate whenever
+            // the governed lookup answers (`GateSpans.resolveOpenSiblings`).
+            val open =
+                cands.single {
+                    it.text == "DF ADNAK" && it.origin == DomainSpanCandidate.Origin.OPEN_VALUE
+                }
+            open.anchored shouldBe false
+            open.gatedEntityRefs shouldContainExactlyInAnyOrder listOf("er.qstred_df", "er.branch")
         }
 
         "no over-generation: a common noun that is neither an anchor nor a proper noun proposes nothing" {
@@ -312,6 +326,88 @@ class SpanProposalTest :
             cands shouldNotBe emptyList<DomainSpanCandidate>()
             cands.map { it.text } shouldContain "MAJETEK"
             cands.all { !it.anchored } shouldBe true
+        }
+
+        // ── MH-P3 tier M ────────────────────────────────────────────────────────────────
+        //
+        // A value governed by a MULTI-OWNER anchor. `prodejna` names the store dimension AND the
+        // fact the Stores-channel term is pinned to, so the anchor gates to both — and before
+        // A-MH-1a the governed-value loop emitted one candidate PER OWNER on the same span, of
+        // which `dedupe` (keyed on `(start,end)`) kept whichever the registry listed first.
+        val mhStore =
+            ResolverEntityType(
+                ref = "er.entity.store",
+                categories = listOf("er.entity.store"),
+                anchors = listOf("prodejna"),
+                objectKind = "entity",
+            )
+        val mhStoreSales =
+            ResolverEntityType(
+                ref = "er.entity.store_sales",
+                categories = listOf("er.entity.store_sales"),
+                anchors = listOf("prodejna"),
+                objectKind = "entity_with_measures",
+            )
+        val mhMeasure =
+            ResolverEntityType(
+                ref = "er.entity.store_sales.amount",
+                categories = listOf("er.entity.store_sales.amount"),
+                anchors = listOf("prodejna"),
+                objectKind = "measure",
+            )
+
+        // "Prodejny v TN" — 0 Prodejny(root) 1 v(case→2) 2 TN(PROPN,nmod→0)
+        val mhParse =
+            AnalyzeResponse
+                .newBuilder()
+                .addAllTokens(
+                    listOf(
+                        tok("Prodejny", 0, 8, "prodejna", "NOUN", 0, "root"),
+                        tok("v", 9, 10, "v", "ADP", 3, "case"),
+                        tok("TN", 11, 13, "TN", "PROPN", 1, "nmod"),
+                    ),
+                ).build()
+
+        "A-MH-1a — a governed value under a multi-owner anchor is ONE candidate gated to the union" {
+            val cands = SpanProposal.proposeDomainSpans(mhParse, listOf(mhStore, mhStoreSales))
+
+            val governed =
+                cands.filter {
+                    it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE && it.text == "TN"
+                }
+            governed.size shouldBe 1
+            governed.single().anchored shouldBe true
+            governed.single().gatedEntityRefs shouldContainExactlyInAnyOrder
+                listOf("er.entity.store", "er.entity.store_sales")
+            governed.single().categories shouldContainExactlyInAnyOrder
+                listOf("er.entity.store", "er.entity.store_sales")
+        }
+
+        "A-MH-1a — and the union does not depend on the order the registry lists the owners in" {
+            val forward = SpanProposal.proposeDomainSpans(mhParse, listOf(mhStore, mhStoreSales))
+            val reversed = SpanProposal.proposeDomainSpans(mhParse, listOf(mhStoreSales, mhStore))
+
+            fun governedRefs(cands: List<DomainSpanCandidate>) =
+                cands
+                    .single { it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE && it.text == "TN" }
+                    .gatedEntityRefs
+                    .sorted()
+
+            governedRefs(forward) shouldBe governedRefs(reversed)
+        }
+
+        "A-MH-1a — a VALUELESS owner (measure) contributes nothing to the union" {
+            val cands = SpanProposal.proposeDomainSpans(mhParse, listOf(mhStore, mhMeasure))
+
+            cands
+                .single { it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE && it.text == "TN" }
+                .gatedEntityRefs shouldContainExactlyInAnyOrder listOf("er.entity.store")
+        }
+
+        "A-MH-1a — an anchor whose ONLY owner is valueless proposes no governed value at all" {
+            val cands = SpanProposal.proposeDomainSpans(mhParse, listOf(mhMeasure))
+
+            cands.none { it.origin == DomainSpanCandidate.Origin.GOVERNED_VALUE } shouldBe true
         }
     }) {
     companion object {

@@ -98,6 +98,17 @@ data class ClarificationOption(
      * makes it a question a human can answer.
      */
     val objectKind: String = "",
+    /**
+     * MH tier M — for a MEMBER option, the ref whose member vocabulary produced it
+     * (`GateSpans.entityRefOf`); blank for a VOCABULARY option, which names its object through
+     * [targetRef] already.
+     *
+     * The exact complement of [objectKind], and for the same reason: a clarification is only a
+     * question if its options can be told apart. `object_kind` is what separates two OBJECTS
+     * sharing a word; this is what separates two MEMBERS sharing a value, where the label, the
+     * span and the (absent) target ref are all identical and the owner is the whole difference.
+     */
+    val memberOf: String = "",
 )
 
 /**

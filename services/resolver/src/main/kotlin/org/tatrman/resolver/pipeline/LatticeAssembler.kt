@@ -316,6 +316,7 @@ object LatticeAssembler {
         when (span.candidate.origin) {
             DomainSpanCandidate.Origin.ANCHOR_PHRASE -> Layer.MENTION
             DomainSpanCandidate.Origin.GOVERNED_VALUE,
+            DomainSpanCandidate.Origin.OPEN_VALUE,
             DomainSpanCandidate.Origin.PROPER_NOUN,
             DomainSpanCandidate.Origin.NER_ENTITY,
             DomainSpanCandidate.Origin.LITERAL,

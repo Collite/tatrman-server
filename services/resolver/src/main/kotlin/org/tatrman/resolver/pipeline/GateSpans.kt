@@ -11,6 +11,7 @@ import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.model.kindsByRef
 import org.tatrman.resolver.model.ownersByRef
 import org.tatrman.resolver.model.reachByRef
+import org.tatrman.resolver.model.refByCategory
 
 /**
  * gateSpans (RG-P5.S1.T4) — the heart. All proposed spans go out in ONE
@@ -70,31 +71,34 @@ object GateSpans {
                 val owners = entityTypes.ownersByRef()
                 val kinds = entityTypes.kindsByRef()
                 val reach = entityTypes.reachByRef()
-                candidates.mapIndexed { i, cand ->
-                    // The ONE decision, made in the one place that makes it (RV-P2.2). Note what is NOT
-                    // filtered before the call: the bind floor is the binder's too, because a candidate
-                    // the gate refused is still something the rung log should be able to name.
-                    val verdict =
-                        Binder.gate(
-                            response.resultsList
-                                .getOrNull(i)
-                                ?.matchesList
-                                .orEmpty(),
+                val memberOwners = entityTypes.refByCategory()
+                candidates
+                    .mapIndexed { i, cand ->
+                        // The ONE decision, made in the one place that makes it (RV-P2.2). Note what is NOT
+                        // filtered before the call: the bind floor is the binder's too, because a candidate
+                        // the gate refused is still something the rung log should be able to name.
+                        val verdict =
+                            Binder.gate(
+                                response.resultsList
+                                    .getOrNull(i)
+                                    ?.matchesList
+                                    .orEmpty(),
+                                cand,
+                                thresholds,
+                                owners,
+                                kinds,
+                                reach,
+                                memberOwners,
+                            )
+                        GatedSpan(
                             cand,
-                            thresholds,
-                            owners,
-                            kinds,
-                            reach,
+                            verdict.admitted,
+                            ambiguous = verdict is Binder.Ambiguous,
+                            // MH-D3: only a Bind can carry equivalents — an ambiguous span proved
+                            // nothing equal, which is precisely why it is asking.
+                            equivalents = (verdict as? Binder.Bind)?.equivalents.orEmpty(),
                         )
-                    GatedSpan(
-                        cand,
-                        verdict.admitted,
-                        ambiguous = verdict is Binder.Ambiguous,
-                        // MH-D3: only a Bind can carry equivalents — an ambiguous span proved
-                        // nothing equal, which is precisely why it is asking.
-                        equivalents = (verdict as? Binder.Bind)?.equivalents.orEmpty(),
-                    )
-                }
+                    }.let(::resolveOpenSiblings)
             },
             entityTypes,
             thresholds,
@@ -147,6 +151,51 @@ object GateSpans {
     }
 
     // --- helpers ------------------------------------------------------------
+
+    /**
+     * ⚑ A-MH-1b (MH tier M) — one span, one answer: collapse a governed value and its OPEN sibling.
+     *
+     * `SpanProposal` proposes a governed value twice (`GOVERNED_VALUE` gated to the anchor's
+     * owners, `OPEN_VALUE` gated to everything) because it cannot know which lookup will find
+     * anything — that is a fact about the data, and both questions ride the one batch. Here the
+     * ANSWERS are in, so the pair collapses to the one that spoke, and everything downstream —
+     * `outcomeOf`, the lookup rounds, the lattice — sees exactly one span per char range, as it
+     * always has. Without this the sibling reached the lattice as a second value span and a
+     * second G3 gap over the same characters.
+     *
+     * The governed reading has precedence: it is the one the SENTENCE scoped. The open sibling
+     * speaks only where the governor's own vocabulary had nothing to say, which is the case M2
+     * exists for (`sales in TN` — a fact holds no members) and the case that used to become a
+     * silent gap. A governed lookup that is itself ambiguous keeps its span: a tie inside the
+     * governor's scope is a real question, and widening it would not make it easier to answer.
+     *
+     * Paired strictly by origin, so no other candidate on any other path is affected.
+     */
+    private fun resolveOpenSiblings(gated: List<GatedSpan>): List<GatedSpan> {
+        if (gated.none { it.candidate.origin == DomainSpanCandidate.Origin.OPEN_VALUE }) return gated
+
+        fun spanOf(g: GatedSpan) = g.candidate.start to g.candidate.end
+
+        fun spansWith(origin: DomainSpanCandidate.Origin) =
+            gated.filter { it.candidate.origin == origin && it.contenders.isNotEmpty() }.map(::spanOf).toSet()
+
+        val governedAnswered = spansWith(DomainSpanCandidate.Origin.GOVERNED_VALUE)
+        val openAnswered = spansWith(DomainSpanCandidate.Origin.OPEN_VALUE)
+
+        return gated.filter { g ->
+            when (g.candidate.origin) {
+                // An open sibling that found nothing is not a reading, it is a duplicate of the
+                // span the governed candidate already carries — keeping it produced a second
+                // value span and a second G3 gap over the same characters (caught by
+                // `ms-shared-anchor-cs`, whose governed value matches nothing either way).
+                DomainSpanCandidate.Origin.OPEN_VALUE ->
+                    g.contenders.isNotEmpty() && spanOf(g) !in governedAnswered
+                DomainSpanCandidate.Origin.GOVERNED_VALUE ->
+                    g.contenders.isNotEmpty() || spanOf(g) !in openAnswered
+                else -> true
+            }
+        }
+    }
 
     /** The declared entity type owning a match's fuzzy category, or the category itself. */
     private fun entityRefOf(
@@ -203,6 +252,9 @@ object GateSpans {
             // owner's `target_ref` would otherwise be labelled with the owner's species.
             objectKind =
                 if (isMember) "" else entityTypes.firstOrNull { it.ref == m.targetRef }?.objectKind.orEmpty(),
+            // MH tier M — the mirror of the line above, and the same guard: a member is a data
+            // row and its owner is the only thing that names it; a vocabulary row names itself.
+            memberOf = if (isMember) entityRefOf(m, entityTypes) else "",
         )
     }
 
