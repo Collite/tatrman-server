@@ -470,8 +470,170 @@ class GateSpansTest :
             clarify.options shouldHaveSize 2
             clarify.options.map { it.objectKind } shouldContainExactlyInAnyOrder listOf("", "")
         }
+
+        // ── MH-P3 tier M — A-MH-1b: the governed reading wins its own span ──────────────
+        //
+        // A governed value is gated to its anchor's owners. When those owners hold no such
+        // member, the value must still be ASKED openly rather than silently swallowed (M2) —
+        // so `SpanProposal` emits both an anchored governed candidate and an unanchored open
+        // sibling for the same span, and the gate decides which one speaks.
+
+        val storeState = ResolverEntityType("er.entity.store.state", listOf("er.entity.store.state"), emptyList())
+        val caState =
+            ResolverEntityType(
+                "er.entity.customer_address.state",
+                listOf("er.entity.customer_address.state"),
+                emptyList(),
+            )
+        val whState =
+            ResolverEntityType("er.entity.warehouse.state", listOf("er.entity.warehouse.state"), emptyList())
+        val storeSales = ResolverEntityType("er.entity.store_sales", listOf("er.entity.store_sales"), listOf("sale"))
+        val memberTypes = listOf(storeSales, storeState, caState, whState)
+
+        "A-MH-1b — a governed candidate that matched NOTHING lets its open sibling speak" {
+            val cands =
+                listOf(
+                    governedCand("TN", 9, 11, listOf("er.entity.store_sales")),
+                    openCand("TN", 9, 11, memberTypes.map { it.ref }),
+                )
+            val resp =
+                batch(
+                    // the governed query: its owner holds no member `TN`
+                    fmr(),
+                    // the open query: three owners do
+                    fmr(
+                        fm("store#7", "TN", 1.0, "er.entity.store.state", SourceTag.MEMBER),
+                        fm("ca#3", "TN", 1.0, "er.entity.customer_address.state", SourceTag.MEMBER),
+                        fm("wh#1", "TN", 1.0, "er.entity.warehouse.state", SourceTag.MEMBER),
+                    ),
+                )
+
+            val outcome = GateSpans.gate(cands, resp, memberTypes, thresholds, emptyMap(), "snap-m")
+            val clarify = outcome.shouldBeInstanceOf<Clarify>()
+            clarify.options shouldHaveSize 3
+            clarify.options.map { it.entityTypeRef } shouldContainExactlyInAnyOrder
+                listOf("er.entity.store.state", "er.entity.customer_address.state", "er.entity.warehouse.state")
+        }
+
+        "A-MH-1b — a governed candidate that BOUND suppresses its open sibling entirely" {
+            val cands =
+                listOf(
+                    governedCand("TN", 9, 11, listOf("er.entity.store.state")),
+                    openCand("TN", 9, 11, memberTypes.map { it.ref }),
+                )
+            val resp =
+                batch(
+                    // the governed query found its owner's member — this is the answer
+                    fmr(fm("store#7", "TN", 1.0, "er.entity.store.state", SourceTag.MEMBER)),
+                    // the open query found all three, and would otherwise raise a G2 over a
+                    // question the governor already answered
+                    fmr(
+                        fm("store#7", "TN", 1.0, "er.entity.store.state", SourceTag.MEMBER),
+                        fm("ca#3", "TN", 1.0, "er.entity.customer_address.state", SourceTag.MEMBER),
+                        fm("wh#1", "TN", 1.0, "er.entity.warehouse.state", SourceTag.MEMBER),
+                    ),
+                )
+
+            val outcome = GateSpans.gate(cands, resp, memberTypes, thresholds, emptyMap(), "snap-m")
+            val bound = outcome.shouldBeInstanceOf<Bound>()
+            bound.bindings.single().resolvedId shouldBe "store#7"
+            bound.bindings.single().entityTypeRef shouldBe "er.entity.store.state"
+        }
+
+        "A-MH-1b — the suppression is per SPAN: another span's open candidate is untouched" {
+            val cands =
+                listOf(
+                    governedCand("TN", 9, 11, listOf("er.entity.store.state")),
+                    openCand("TN", 9, 11, memberTypes.map { it.ref }),
+                    openCand("Nashville", 20, 29, memberTypes.map { it.ref }),
+                )
+            val resp =
+                batch(
+                    fmr(fm("store#7", "TN", 1.0, "er.entity.store.state", SourceTag.MEMBER)),
+                    fmr(fm("store#7", "TN", 1.0, "er.entity.store.state", SourceTag.MEMBER)),
+                    fmr(
+                        fm("n#1", "Nashville", 1.0, "er.entity.store.state", SourceTag.MEMBER),
+                        fm("n#2", "Nashville", 1.0, "er.entity.warehouse.state", SourceTag.MEMBER),
+                    ),
+                )
+
+            val outcome = GateSpans.gate(cands, resp, memberTypes, thresholds, emptyMap(), "snap-m")
+            val clarify = outcome.shouldBeInstanceOf<Clarify>()
+            clarify.options.map { it.spanText }.distinct() shouldContainExactly listOf("Nashville")
+        }
+
+        "T4 — a MEMBER option names its OWNER; a VOCABULARY option does not" {
+            val cands = listOf(openCand("TN", 9, 11, memberTypes.map { it.ref }))
+            val resp =
+                batch(
+                    fmr(
+                        fm("store#7", "TN", 1.0, "er.entity.store.state", SourceTag.MEMBER),
+                        fm("ca#3", "TN", 1.0, "er.entity.customer_address.state", SourceTag.MEMBER),
+                    ),
+                )
+
+            val clarify =
+                GateSpans
+                    .gate(cands, resp, memberTypes, thresholds, emptyMap(), "snap-m")
+                    .shouldBeInstanceOf<Clarify>()
+
+            clarify.options.map { it.memberOf } shouldContainExactlyInAnyOrder
+                listOf("er.entity.store.state", "er.entity.customer_address.state")
+            // and the species stays blank on a member, review-087 F6
+            clarify.options.map { it.objectKind }.distinct() shouldContainExactly listOf("")
+        }
+
+        "T4 — a VOCABULARY tie leaves member_of empty and keeps naming its species" {
+            val cands = listOf(cand("doklad", 0, 6, listOf("er.qtypdok.kod", "er.qxxukazmu.kod")))
+            val resp =
+                batch(
+                    fmr(
+                        fm("t1", "doklad", 1.0, "er.qtypdok.kod", SourceTag.VOCABULARY, targetRef = "er.qtypdok"),
+                        fm("t2", "doklad", 1.0, "er.qxxukazmu.kod", SourceTag.VOCABULARY, targetRef = "er.qxxukazmu"),
+                    ),
+                )
+
+            val clarify =
+                GateSpans
+                    .gate(cands, resp, allTypes, thresholds, emptyMap(), "snap-1")
+                    .shouldBeInstanceOf<Clarify>()
+
+            clarify.options.map { it.memberOf }.distinct() shouldContainExactly listOf("")
+            clarify.options.map { it.targetRef } shouldContainExactlyInAnyOrder
+                listOf("er.qtypdok", "er.qxxukazmu")
+        }
     }) {
     companion object {
+        private fun governedCand(
+            text: String,
+            start: Int,
+            end: Int,
+            refs: List<String>,
+        ) = DomainSpanCandidate(
+            text,
+            start,
+            end,
+            refs,
+            refs,
+            anchored = true,
+            origin = DomainSpanCandidate.Origin.GOVERNED_VALUE,
+        )
+
+        private fun openCand(
+            text: String,
+            start: Int,
+            end: Int,
+            refs: List<String>,
+        ) = DomainSpanCandidate(
+            text,
+            start,
+            end,
+            refs,
+            refs,
+            anchored = false,
+            origin = DomainSpanCandidate.Origin.OPEN_VALUE,
+        )
+
         private fun cand(
             text: String,
             start: Int,

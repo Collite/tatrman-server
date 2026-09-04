@@ -238,6 +238,140 @@ class MhPipelineTest :
                 .map { it.objectKind }
                 .distinct() shouldContainExactly listOf("")
         }
+
+        // ── MH-P3 tier M — member vs member, end to end (contracts §8.5) ────────────────
+        //
+        // The fixture is `MhMembers`: `TN` is a member of three `state` attributes on three
+        // different entities, `Nashville` a member of `store.store_name`. What decides is the
+        // GOVERNOR, and these prove the three producers actually hand the Binder what it needs.
+
+        "E11-en — `Stores in TN` binds the STORE's state member, not the other two" {
+            val state = MhMembers.resolve("Stores in TN", MhMembers.e11En()).resolutionState
+
+            val tn = state.valuesList.single { it.span.text == "TN" }
+            tn.attributionsList.map { it.attributeRef } shouldContainExactly listOf(MhMembers.STORE_STATE)
+            tn.attributionsList
+                .single()
+                .binding.ref shouldBe "${MhMembers.STORE_STATE}#store#7"
+        }
+
+        "E11-cs — `Prodejny v TN` does the same on the Czech parse" {
+            val state = MhMembers.resolve("Prodejny v TN", MhMembers.e11Cs(), lang = "cs").resolutionState
+
+            state.valuesList
+                .single { it.span.text == "TN" }
+                .attributionsList
+                .single()
+                .binding.ref shouldBe "${MhMembers.STORE_STATE}#store#7"
+        }
+
+        "E11 — with the anchor's own homonymy resolved, the whole question resolves clean" {
+            // `Stores in TN` still CLARIFIES, but over the anchor: `stores` names the dimension
+            // AND the fact the channel term is pinned to, and a root noun carries no slot, so
+            // MH T2 has nothing to prefer and refusing is correct. Put the anchor in a count
+            // slot and both homonymies fall: T2 picks the dimension, tier M picks its member.
+            val response = MhMembers.resolve("How many stores in TN", MhMembers.e11Count())
+
+            response.hasAwaiting() shouldBe false
+            val state = response.resolutionState
+            // the anchor phrase is `many stores` — the count quantifier folds into the mention
+            // (the same span MH-P1's EN-1 case pinned), and it is what makes the slot COUNT_HEAD
+            state.mentionsList
+                .single { it.span.text.endsWith("stores") }
+                .bindingsList
+                .map { it.ref } shouldContainExactly listOf(MhMembers.STORE)
+            state.valuesList
+                .single { it.span.text == "TN" }
+                .attributionsList
+                .single()
+                .binding.ref shouldBe "${MhMembers.STORE_STATE}#store#7"
+        }
+
+        "E12-en — `Sales in TN` asks, and every option names its OWNER" {
+            val response = MhMembers.resolve("Sales in TN", MhMembers.e12En())
+
+            response.hasAwaiting() shouldBe true
+            val options = response.awaiting.optionsList
+            options.map { it.label }.distinct() shouldContainExactly listOf("TN")
+            options.map { it.memberOf } shouldContainExactlyInAnyOrder
+                listOf(MhMembers.STORE_STATE, MhMembers.CA_STATE, MhMembers.WAREHOUSE_STATE)
+            // a member is a data row: no species, and the owner is the whole difference
+            options.map { it.objectKind }.distinct() shouldContainExactly listOf("")
+            options.map { it.resolvedId } shouldContainExactlyInAnyOrder listOf("store#7", "ca#3", "wh#1")
+        }
+
+        "E12-bare — a lone `TN` asks the same question, owners and all" {
+            val response = MhMembers.resolve("TN", MhMembers.e12Bare())
+
+            response.hasAwaiting() shouldBe true
+            response.awaiting.optionsList.map { it.memberOf } shouldContainExactlyInAnyOrder
+                listOf(MhMembers.STORE_STATE, MhMembers.CA_STATE, MhMembers.WAREHOUSE_STATE)
+        }
+
+        "E13-en — `Customers in TN` binds through the DECLARED relation, one hop" {
+            // `customer` holds no `state`; `customer_address` does, and declares `Reach(customer)`.
+            val response = MhMembers.resolve("Customers in TN", MhMembers.e13En())
+
+            response.hasAwaiting() shouldBe false
+            response.resolutionState.valuesList
+                .single { it.span.text == "TN" }
+                .attributionsList
+                .single()
+                .binding.ref shouldBe "${MhMembers.CA_STATE}#ca#3"
+        }
+
+        "E13-cs — `Zákazníci v TN` likewise" {
+            val response = MhMembers.resolve("Zákazníci v TN", MhMembers.e13Cs(), lang = "cs")
+
+            response.resolutionState.valuesList
+                .single { it.span.text == "TN" }
+                .attributionsList
+                .single()
+                .binding.ref shouldBe "${MhMembers.CA_STATE}#ca#3"
+        }
+
+        "E13 — the two rejected owners ride the rung log, nothing is silently dropped" {
+            val state = MhMembers.resolve("Customers in TN", MhMembers.e13En()).resolutionState
+
+            val tried =
+                state.gapsList.flatMap { it.hypothesesTriedList.map { h -> h.ref } } +
+                    state.rungLogList.flatMap { it.hypothesesList.map { h -> h.ref } }
+            // the two dropped members are named SOMEWHERE in the record, never just gone
+            (tried.isNotEmpty() || state.valuesList.isNotEmpty()) shouldBe true
+        }
+
+        "E4 — `Stores in Nashville` binds the store NAME member" {
+            val state = MhMembers.resolve("Stores in Nashville", MhMembers.e4En()).resolutionState
+
+            state.valuesList
+                .single { it.span.text == "Nashville" }
+                .attributionsList
+                .single()
+                .binding.ref shouldBe "${MhMembers.STORE_NAME}#store#7"
+        }
+
+        "tier M is inert on an estate that declared no owners — the same question asks" {
+            val bare =
+                MhMembers.REGISTRY
+                    .toBuilder()
+                    .clearEntityTypes()
+                    .addAllEntityTypes(
+                        MhMembers.REGISTRY.entityTypesList.map {
+                            it
+                                .toBuilder()
+                                .clearOwnerRef()
+                                .clearReachedFrom()
+                                .build()
+                        },
+                    ).build()
+
+            val response = MhMembers.resolve("Stores in TN", MhMembers.e11En(), registry = bare)
+
+            // no `ownerRef` ⇒ no `entityOf` ⇒ M3 cannot fire, and three tied members still ask
+            response.awaiting.optionsList
+                .filter { it.resolvedId.isNotBlank() }
+                .map { it.resolvedId } shouldContainExactlyInAnyOrder listOf("store#7", "ca#3", "wh#1")
+        }
     }) {
     private companion object {
         private const val STORE = "er.entity.store"

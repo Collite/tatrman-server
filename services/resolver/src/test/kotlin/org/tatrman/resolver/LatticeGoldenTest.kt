@@ -3,6 +3,7 @@ package org.tatrman.resolver
 
 import com.google.protobuf.util.JsonFormat
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlinx.coroutines.runBlocking
@@ -342,6 +343,18 @@ class LatticeGoldenTest :
                 val expected = loadJson("/lattice/$id.lattice.json")
                 if (actual != expected) dumpActual(id, actual)
                 actual shouldBe expected
+
+                // MH tier M — the baseline guard stated rather than assumed (P3·S1·T4): no hero
+                // golden clarifies over a MEMBER, so `Option.member_of` must be absent from every
+                // option in all four. The day one of them does carry a member option, this line
+                // fails and the new field's effect on the goldens gets LOOKED at instead of
+                // discovered later.
+                printed["awaiting"]
+                    ?.jsonObject
+                    ?.get("options")
+                    ?.jsonArray
+                    .orEmpty()
+                    .forEach { it.jsonObject["memberOf"].shouldBeNull() }
             }
         }
     }) {

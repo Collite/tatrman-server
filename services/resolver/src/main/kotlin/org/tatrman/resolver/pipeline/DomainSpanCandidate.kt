@@ -56,6 +56,19 @@ data class DomainSpanCandidate(
         /** A proper-noun run not already anchored: a value. */
         PROPER_NOUN,
 
+        /**
+         * MH tier M (A-MH-1b) — the OPEN sibling of a [GOVERNED_VALUE]: the same span, asked of
+         * every declared type instead of the anchor's owners.
+         *
+         * It exists because a governed lookup can fail for a reason that says nothing about the
+         * value: *"sales in TN"* gates `TN` to the sales fact, which holds no member vocabulary
+         * at all, and before this the covered-token rule then swallowed the span and the question
+         * became a gap. Both candidates go out in the one batch and the GATE decides — the
+         * governed reading wins its own span whenever it BINDS (`GateSpans.outcomeOf`), so this
+         * only ever speaks where the anchor's owners had nothing to say.
+         */
+        OPEN_VALUE,
+
         /** A NER span the classifier does not type as universal (`op` products): a value. */
         NER_ENTITY,
 

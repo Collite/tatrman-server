@@ -511,6 +511,9 @@ class ResolverPipeline(
             // resume token — it is presentation, and a resume must only be able to pick from the
             // identities that were offered.
             if (o.objectKind.isNotBlank()) opt.objectKind = o.objectKind
+            // MH tier M: the OWNER of a member option, mapped exactly like the kind above and
+            // for the same reason — presentation, not identity, so it is not signed either.
+            if (o.memberOf.isNotBlank()) opt.memberOf = o.memberOf
             opt.span = span(o.spanStart, o.spanEnd, o.spanText)
             builder.addOptions(opt)
             signedOptions += ResumeOption(o.id, o.label, o.targetRef, o.resolvedId, o.entityTypeRef)

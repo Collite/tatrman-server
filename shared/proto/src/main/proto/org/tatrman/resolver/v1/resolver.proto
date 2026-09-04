@@ -289,6 +289,12 @@ message Option {
   // by SPECIES rather than by label alone: "the stores (a dimension), or the Stores
   // channel (sales)?" is answerable; "Prodejna, or Tržby z prodejen?" is not.
   string object_kind = 7;
+  // MH tier M — the attribute (or entity) whose MEMBER vocabulary this option came from;
+  // empty for VOCABULARY options. A clarification over `TN` ×3 is literally unanswerable
+  // without it: the three options carry the same label, the same span and no target_ref, so
+  // the only thing that distinguishes them is whose value it is — the store's state, the
+  // customer's, or the warehouse's.
+  string member_of = 8;
 }
 
 // ============================================================================

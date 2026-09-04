@@ -15,6 +15,7 @@ import org.tatrman.resolver.model.ResolverThresholds
 import org.tatrman.resolver.model.kindsByRef
 import org.tatrman.resolver.model.ownersByRef
 import org.tatrman.resolver.model.reachByRef
+import org.tatrman.resolver.model.refByCategory
 import org.tatrman.resolver.v1.Attribution
 import org.tatrman.resolver.v1.Binding
 import org.tatrman.resolver.v1.GapKind
@@ -129,6 +130,7 @@ object ReGate {
         // the registry through the same three helpers.
         val kinds = entityTypes.kindsByRef()
         val reach = entityTypes.reachByRef()
+        val memberOwners = entityTypes.refByCategory()
         // `Gate` is a public rpc and `hypotheses` is an unbounded repeated field, so the fan-out has
         // to be bounded by this service rather than by the caller's good manners: without this a
         // single request opens one concurrent matcher RPC per hypothesis, each with a 30s deadline.
@@ -205,6 +207,7 @@ object ReGate {
                     owners,
                     kinds,
                     reach,
+                    memberOwners,
                 )
             when {
                 verdict is Binder.Ambiguous -> outcomes += outcome(hypothesis, Reason.AMBIGUOUS)

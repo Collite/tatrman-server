@@ -113,8 +113,21 @@ fun List<ResolverEntityType>.reachByRef(): Map<String, List<Reach>> =
  * too. Blank kinds are omitted: `""` means "the archive declared nothing", and a rule that
  * compared against it would be treating silence as a species.
  */
+
 fun List<ResolverEntityType>.kindsByRef(): Map<String, String> =
     filter { it.objectKind.isNotBlank() }.associate { it.ref to it.objectKind }
+
+/**
+ * MH tier M — fuzzy category → the ref whose vocabulary that category is.
+ *
+ * This IS `owner(m)` for a member row: the same question `GateSpans.entityRefOf` answers, hoisted
+ * here beside the other three so the Binder can ask it without a second scan of the registry and
+ * without a second spelling of the rule. Built once per gate call like `owners`/`kinds`/`reach`;
+ * a category the registry does not declare is ABSENT, and the caller reads that as "the category
+ * names itself", which is exactly `entityRefOf`'s `?: m.category` fallback.
+ */
+fun List<ResolverEntityType>.refByCategory(): Map<String, String> =
+    flatMap { et -> et.categories.map { it to et.ref } }.toMap()
 
 /**
  * Gating thresholds — ported from the live ENTITIES_ONLY config
