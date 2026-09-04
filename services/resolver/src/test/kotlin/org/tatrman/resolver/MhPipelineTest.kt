@@ -3,6 +3,7 @@ package org.tatrman.resolver
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
@@ -32,6 +33,7 @@ import org.tatrman.resolver.v1.EntityType
 import org.tatrman.resolver.v1.FreshQuestion
 import org.tatrman.resolver.v1.Reach
 import org.tatrman.resolver.v1.Registry
+import org.tatrman.resolver.v1.ValueKind
 import org.tatrman.resolver.v1.ResolveRequest
 import org.tatrman.resolver.v1.ResolveResponse
 
@@ -371,6 +373,59 @@ class MhPipelineTest :
             response.awaiting.optionsList
                 .filter { it.resolvedId.isNotBlank() }
                 .map { it.resolvedId } shouldContainExactlyInAnyOrder listOf("store#7", "ca#3", "wh#1")
+        }
+
+        // ── what the hartland drill measured (P3·S1·T8, 2026-09-04) ─────────────────────
+
+        "drill — Czech Stanza tags `TN` NOUN, not PROPN, and tier M is unaffected" {
+            // The hand-built §8.5 tables said PROPN for both languages; the live service says
+            // NOUN for Czech. It costs nothing HERE because the open sibling is emitted from
+            // the governed-value path (which admits any nominal), not by relaxing the
+            // proper-noun path — had A-MH-1b been built the other way, Czech would have failed.
+            val state = MhMembers.resolve("Prodejny v TN", MhMembers.e11CsReal(), lang = "cs").resolutionState
+
+            state.valuesList
+                .single { it.span.text == "TN" }
+                .attributionsList
+                .single()
+                .binding.ref shouldBe "${MhMembers.STORE_STATE}#store#7"
+        }
+
+        "drill — likewise E13-cs with the real tokens" {
+            MhMembers
+                .resolve("Zákazníci v TN", MhMembers.e13CsReal(), lang = "cs")
+                .resolutionState
+                .valuesList
+                .single { it.span.text == "TN" }
+                .attributionsList
+                .single()
+                .binding.ref shouldBe "${MhMembers.CA_STATE}#ca#3"
+        }
+
+        "⚑ drill — a value the NER calls a PLACE never reaches the domain gate at all" {
+            // The blocking finding of the P3 drill, pinned so it cannot be re-discovered by
+            // accident. hartland's live NLP labels `TN` GPE (en) / MISC (cs) and `Nashville`
+            // GPE; `UniversalClassifier` maps all three to a UNIVERSAL type, and universal
+            // spans are removed BEFORE domain gating. So on the real estate the tier-M value
+            // is extracted by the universal layer and is never offered to the member
+            // vocabulary — the rules are correct and simply never get asked.
+            //
+            // This is not a tier-M defect and must not be "fixed" here: whether a universal
+            // LOCATION should ALSO be gated as a domain member is the universal/domain seam,
+            // and changing it would move every place-named value on every estate.
+            val withPlace =
+                MhMembers.resolve(
+                    "Stores in TN",
+                    MhMembers.e11En(),
+                    entities = listOf(MhMembers.ner("TN", 10, 12, "GPE")),
+                )
+
+            val tn = withPlace.resolutionState.valuesList.single { it.span.text == "TN" }
+            // Not "dropped": CLAIMED. It leaves as a grounded place with no domain attribution
+            // at all, so no member row is ever considered and no governor is ever consulted.
+            tn.kind shouldBe ValueKind.VALUE_KIND_GROUNDED
+            tn.hasGrounding() shouldBe true
+            tn.attributionsList.shouldBeEmpty()
         }
     }) {
     private companion object {

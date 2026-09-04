@@ -12,6 +12,7 @@ import org.tatrman.fuzzy.v1.SourceTag
 import org.tatrman.nlp.v1.AnalyzeRequest
 import org.tatrman.nlp.v1.AnalyzeResponse
 import org.tatrman.nlp.v1.Capability
+import org.tatrman.nlp.v1.NerEntity
 import org.tatrman.nlp.v1.NlpOp
 import org.tatrman.nlp.v1.StatusResponse
 import org.tatrman.nlp.v1.Token
@@ -183,6 +184,22 @@ object MhMembers {
             tok("TN", 19, 21, "TN", "PROPN", 3, "nmod"),
         )
 
+    /** The REAL hartland parse: Czech Stanza tags `TN` NOUN, not PROPN (drill, 2026-09-04). */
+    fun e11CsReal() =
+        arrayOf(
+            tok("Prodejny", 0, 8, "prodejna", "NOUN", 0, "root"),
+            tok("v", 9, 10, "v", "ADP", 3, "case"),
+            tok("TN", 11, 13, "TN", "NOUN", 1, "nmod"),
+        )
+
+    /** Likewise for E13-cs. */
+    fun e13CsReal() =
+        arrayOf(
+            tok("Zákazníci", 0, 9, "zákazník", "NOUN", 0, "root"),
+            tok("v", 10, 11, "v", "ADP", 3, "case"),
+            tok("TN", 12, 14, "TN", "NOUN", 1, "nmod"),
+        )
+
     fun e12En() =
         arrayOf(
             tok("Sales", 0, 5, "sale", "NOUN", 0, "root"),
@@ -226,15 +243,31 @@ object MhMembers {
             .addAllTokens(tokens.toList())
             .build()
 
+    fun ner(
+        text: String,
+        start: Int,
+        end: Int,
+        label: String,
+    ): NerEntity =
+        NerEntity
+            .newBuilder()
+            .setText(text)
+            .setCharStart(start)
+            .setCharEnd(end)
+            .setLabel(label)
+            .build()
+
     fun resolve(
         text: String,
         tokens: Array<Token>,
         lang: String = "en",
         registry: Registry = REGISTRY,
+        entities: List<NerEntity> = emptyList(),
     ): ResolveResponse {
+        val parse = parse(text, tokens, lang).toBuilder().addAllEntities(entities).build()
         val pipeline =
             ResolverPipeline(
-                FakeNlp(parse(text, tokens, lang), lang),
+                FakeNlp(parse, lang),
                 MemberFuzzy(),
                 SnapshotRegistry(StubRegistrySource(DeclaredVocabulary(), ""), ResolverThresholds.LIVE),
                 emptyMap(),
