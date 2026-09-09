@@ -106,13 +106,83 @@ rule packs, and coupling them would make every list update a pack rollout.
 {{- define "tatrman-service.listsEnabled" -}}
 {{- if and .Values.lists .Values.lists.configMapName }}true{{- end -}}
 {{- end -}}
+{{/*
+IE-P2·S2.3 — the OVERLAY CONFIG FRAGMENT, the fourth contributor, and the mechanism
+`services/dispatch/src/main/resources/application.conf` has been asking for since the
+2026-07-19 TPC-DS collision: *"a future multi-connection deployment that genuinely needs
+table-level routing should inject entries via an overlay-provided config (values-driven
+mount/env), not the base conf."* There was no such mechanism. `extraEnv` cannot express
+`world.table-connections { "db.dbo.investment_*" = "pg-entry" }` — the keys carry dots and
+an asterisk, and nothing reads them from the environment.
+
+So: a per-deployment HOCON fragment, mounted as a ConfigMap and handed to the JVM as
+`-Dconfig.file`. Two things make it safe rather than a foot-gun:
+
+  ⛔ **The chart writes the `include` line, not the operator.** `-Dconfig.file` REPLACES the
+     classpath `application.conf` rather than merging with it, so a fragment that forgot
+     `include classpath("application.conf")` would boot a service with ONLY the fragment —
+     every default gone, and the failure looking like a dozen unrelated misconfigurations.
+     The operator supplies the delta; `configFragmentConfigMap` prepends the include.
+
+  ⛔ **It lives here, not in the module chart.** See the ⚑ above: Helm template names are
+     global per render, so a module overriding `tatrman-service.extraVolumes` silently erases
+     any other chart's contribution in the same umbrella. charon already overrides it. Same
+     trap, same fix as the lexicon and the rule packs — implemented once, behind a values
+     contract that is OFF unless `configFragment.content` is set, so every chart that has
+     never heard of one renders byte-identically to before.
+*/}}
+{{- define "tatrman-service.configFragmentEnabled" -}}
+{{- if and .Values.configFragment .Values.configFragment.content }}true{{- end -}}
+{{- end -}}
+{{- define "tatrman-service.configFragmentName" -}}
+{{- printf "%s-config-fragment" (include "tatrman-service.fullname" .) -}}
+{{- end -}}
+{{/* The in-container path of the mounted fragment — the value of `-Dconfig.file`. */}}
+{{- define "tatrman-service.configFragmentPath" -}}
+{{- printf "%s/%s" (.Values.configFragment.mountPath | default "/etc/tatrman/conf.d" | trimSuffix "/") (.Values.configFragment.key | default "overlay.conf") -}}
+{{- end -}}
+{{/*
+The JVM flag that makes the mount do anything. Emitted BESIDE the mount, from the same
+condition, so the two cannot drift: an env var pointing at a path with nothing mounted at it
+is the exact failure the lexicon ⚑ above records paying for four times over.
+*/}}
+{{- define "tatrman-service.configFragmentEnv" -}}
+{{- if include "tatrman-service.configFragmentEnabled" . }}
+- name: JAVA_TOOL_OPTIONS
+  value: "-Dconfig.file={{ include "tatrman-service.configFragmentPath" . }}"
+{{- end }}
+{{- end -}}
+{{/*
+The ConfigMap itself. A module opts in with a one-line `templates/configmap.yaml` that
+includes this; a library chart renders nothing on its own.
+*/}}
+{{- define "tatrman-service.configFragmentConfigMap" -}}
+{{- if include "tatrman-service.configFragmentEnabled" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tatrman-service.configFragmentName" . }}
+  labels:
+    {{- include "tatrman-service.labels" . | nindent 4 }}
+data:
+  {{ .Values.configFragment.key | default "overlay.conf" }}: |
+    # Rendered by the tatrman-service chart. Do not edit in the cluster — the source is the
+    # deployment's `configFragment.content`.
+    #
+    # `-Dconfig.file` REPLACES the classpath application.conf; this include is what keeps every
+    # default. It is written here rather than left to the fragment author on purpose.
+    include classpath("application.conf")
+
+{{ .Values.configFragment.content | indent 4 }}
+{{- end }}
+{{- end -}}
 {{/* The in-container path of the mounted archive — the value of every `*_LEXICON_ARCHIVE_PATH`. */}}
 {{- define "tatrman-service.lexiconPath" -}}
 {{- printf "%s/%s" (.Values.lexicon.mountPath | trimSuffix "/") .Values.lexicon.key -}}
 {{- end -}}
 {{- define "tatrman-service.volumeMounts" -}}
 {{- $extra := include "tatrman-service.extraVolumeMounts" . }}
-{{- $any := or (include "tatrman-service.lexiconEnabled" .) (include "tatrman-service.packsEnabled" .) (include "tatrman-service.listsEnabled" .) }}
+{{- $any := or (include "tatrman-service.lexiconEnabled" .) (include "tatrman-service.packsEnabled" .) (include "tatrman-service.listsEnabled" .) (include "tatrman-service.configFragmentEnabled" .) }}
 {{- if or $any (trim $extra) }}
           volumeMounts:
 {{- if include "tatrman-service.lexiconEnabled" . }}
@@ -130,12 +200,17 @@ rule packs, and coupling them would make every list update a pack rollout.
               mountPath: {{ .Values.lists.mountPath }}
               readOnly: true
 {{- end }}
+{{- if include "tatrman-service.configFragmentEnabled" . }}
+            - name: config-fragment
+              mountPath: {{ .Values.configFragment.mountPath | default "/etc/tatrman/conf.d" }}
+              readOnly: true
+{{- end }}
 {{- with $extra }}{{ . }}{{- end }}
 {{- end }}
 {{- end -}}
 {{- define "tatrman-service.volumes" -}}
 {{- $extra := include "tatrman-service.extraVolumes" . }}
-{{- $any := or (include "tatrman-service.lexiconEnabled" .) (include "tatrman-service.packsEnabled" .) (include "tatrman-service.listsEnabled" .) }}
+{{- $any := or (include "tatrman-service.lexiconEnabled" .) (include "tatrman-service.packsEnabled" .) (include "tatrman-service.listsEnabled" .) (include "tatrman-service.configFragmentEnabled" .) }}
 {{- if or $any (trim $extra) }}
       volumes:
 {{- if include "tatrman-service.lexiconEnabled" . }}
@@ -152,6 +227,11 @@ rule packs, and coupling them would make every list update a pack rollout.
         - name: lists
           configMap:
             name: {{ .Values.lists.configMapName }}
+{{- end }}
+{{- if include "tatrman-service.configFragmentEnabled" . }}
+        - name: config-fragment
+          configMap:
+            name: {{ include "tatrman-service.configFragmentName" . }}
 {{- end }}
 {{- with $extra }}{{ . }}{{- end }}
 {{- end }}

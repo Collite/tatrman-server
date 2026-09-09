@@ -44,6 +44,7 @@ spec:
             {{- end }}
           env:
             {{- include (printf "%s.env" .Chart.Name) . | nindent 12 }}
+            {{- with (include "tatrman-service.configFragmentEnv" .) }}{{- . | nindent 12 }}{{- end }}
           {{- with .Values.envFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
