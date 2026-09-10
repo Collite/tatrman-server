@@ -63,3 +63,24 @@ podAnnotations: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# IE-P2·S2.3 — a per-deployment HOCON overlay, mounted and handed to the JVM as
+# `-Dconfig.file`. This is the mechanism `application.conf`'s `world.table-connections` block
+# has asked for since the 2026-07-19 TPC-DS collision: the base conf stays EMPTY (a table name
+# baked into the shared image hijacks routing for every model that reuses it), and a deployment
+# that genuinely needs table-level routing states it here:
+#
+#   configFragment:
+#     content: |
+#       world.table-connections {
+#         "db.dbo.investment_*" = "pg-entry"
+#       }
+#
+# OFF unless `content` is set — with it empty the render is byte-identical to before. The chart
+# writes `include classpath("application.conf")` at the top of the mounted file itself, because
+# `-Dconfig.file` REPLACES the classpath config rather than merging with it and a fragment that
+# forgot the include would boot dispatch with no defaults at all.
+configFragment:
+  content: ""
+  mountPath: /etc/tatrman/conf.d
+  key: overlay.conf

@@ -1,0 +1,42 @@
+# Golden fixture: CONFIG FRAGMENT MOUNTED (IE-P2·S2.3). One deployment injecting a HOCON overlay
+# — the mechanism `services/dispatch/src/main/resources/application.conf` has asked for since the
+# 2026-07-19 TPC-DS collision, and which did not exist: `extraEnv` cannot express
+# `world.table-connections { "db.dbo.investment_*" = "pg-entry" }`, whose keys carry dots and an
+# asterisk and which nothing reads from the environment.
+#
+# The delivery surface is exactly four things, and this golden is where they are checked TOGETHER,
+# because three of the four are useless without the fourth: a ConfigMap, a volume, a read-only
+# volumeMount, and `JAVA_TOOL_OPTIONS=-Dconfig.file=<the mounted path>`. The lexicon's ⚑ in
+# `_helpers.tpl` is the record of what happens when the env var and the mount drift apart — four
+# services pointed at a path with nothing on it, each reporting itself healthy.
+#
+# ⛔ Read the ConfigMap's `data` in the golden, not just its presence: `-Dconfig.file` REPLACES the
+# classpath application.conf rather than merging with it, so `include classpath("application.conf")`
+# must be the first line of the rendered file. The chart writes it; a fragment author cannot forget
+# it. Without that line dispatch boots with the overlay ALONE — no workers, no default connection —
+# and the failure looks like a dozen unrelated misconfigurations rather than one missing include.
+#
+# The other four fixtures deliberately set no `configFragment`, and their goldens are the other half
+# of this test: with `content` empty the render must stay byte-identical to the pre-S2.3 output.
+dispatch:
+  extraEnv:
+    - { name: WORLD_DEFAULT_CONNECTION, value: "pg-hartland-us" }
+  configFragment:
+    content: |
+      world.table-connections {
+        "db.dbo.investment_*" = "pg-entry"
+      }
+
+# ⚑ charon in the SAME render, for the reason its own values are in the lexicon fixture: Helm
+# template names are global to an umbrella render, so a new volume contributor that was written as
+# a per-chart override of `tatrman-service.extraVolumes` would silently erase charon's. This
+# fixture fails if the config fragment ever moves out of the library and into the dispatch chart.
+charon:
+  connections:
+    configMapName: hartland-connections
+  pluginDir:
+    image: ghcr.io/collite/transfer-secrets-adapter:0.1.0
+    secrets:
+      secretName: charon-secret-material
+    refs:
+      configMapName: charon-conn-refs
