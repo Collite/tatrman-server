@@ -18,9 +18,16 @@
 #
 # The other four fixtures deliberately set no `configFragment`, and their goldens are the other half
 # of this test: with `content` empty the render must stay byte-identical to the pre-S2.3 output.
+#
+# ⛔ `checksum/config-fragment` (review-089 ⒅): the pod template carries a hash of the rendered
+# ConfigMap, because dispatch reads config once at boot — without it the NEXT fragment edit syncs
+# green and changes nothing until a manual restart. `podAnnotations` is set here too so the golden
+# pins the merge: both annotations, under ONE `annotations:` key.
 dispatch:
   extraEnv:
     - { name: WORLD_DEFAULT_CONNECTION, value: "pg-hartland-us" }
+  podAnnotations:
+    example.org/owner: "ie"
   configFragment:
     content: |
       world.table-connections {

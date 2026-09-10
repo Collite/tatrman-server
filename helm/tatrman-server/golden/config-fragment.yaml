@@ -824,6 +824,9 @@ spec:
       app.kubernetes.io/instance: tatrman-server
   template:
     metadata:
+      annotations:
+        checksum/config-fragment: 31a28ee6f733da5469dee347895eec4c999f0e9612d89b6398a2a3da997d16cc
+        example.org/owner: ie
       labels:
         app.kubernetes.io/name: dispatch
         app.kubernetes.io/instance: tatrman-server

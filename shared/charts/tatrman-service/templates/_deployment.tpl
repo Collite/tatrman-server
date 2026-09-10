@@ -19,9 +19,20 @@ spec:
       {{- include "tatrman-service.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
+      {{- /* Roll the pods when the config fragment changes (review-089 ⒅). The service reads its
+             config once at boot, so without this a fragment edit syncs green and changes nothing
+             until a manual restart. Same pattern as `_fe.tpl`'s `checksum/config`: hash the
+             rendered template, not a file path. Only when the fragment is on, so every chart
+             without one renders byte-identically. */}}
+      {{- $fragment := include "tatrman-service.configFragmentEnabled" . }}
+      {{- if or $fragment .Values.podAnnotations }}
       annotations:
+        {{- if $fragment }}
+        checksum/config-fragment: {{ include "tatrman-service.configFragmentConfigMap" . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       labels:
         {{- include "tatrman-service.selectorLabels" . | nindent 8 }}
