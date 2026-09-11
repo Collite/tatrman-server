@@ -109,7 +109,34 @@ message RunRequest {
   // autodetect from the model catalog; DB/ER = caller asserts).
   org.tatrman.plan.v1.SchemaCode source_schema = 6;
 
-  reserved 7 to 10;
+  // The rows the caller wants: how many, and from where. Unset (the default
+  // instance) is the pre-existing behaviour — the validator's default-top-n
+  // caps the answer. See RowWindow.
+  RowWindow row_window = 7;
+
+  reserved 8 to 10;
+}
+
+// A caller-stated row window. Query puts it on the plan as the root
+// LimitOffsetNode — the node the validator's TopN rule reads — and forwards
+// `limit` as ValidationOptions.default_top_n, so the validator can grant it,
+// or cut it down to its max-top-n.
+//
+// Paging: request `limit` rows at `offset`, advance `offset` by the rows
+// received, stop at a short page. That is only sound over an answer with a
+// TOTAL order (an ORDER BY ending in a unique column); over anything less, a
+// page boundary can skip or repeat a row, and this service cannot tell.
+//
+// When the validator's cap is what bounds the answer AND the answer reached
+// it, the LAST ResultBatch carries a `top_n_applied` WARNING in `messages`,
+// naming the cap and what was asked for. A full page with that warning means
+// "the estate's ceiling", not "the end of the data".
+message RowWindow {
+  // Rows wanted. 0 = unstated: the validator's default-top-n applies.
+  int64 limit = 1;
+  // Rows to skip before the first one returned. 0 = from the start.
+  int64 offset = 2;
+  reserved 3 to 5;
 }
 
 // =============================================================================

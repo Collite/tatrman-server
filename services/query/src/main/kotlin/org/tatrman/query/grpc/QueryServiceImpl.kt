@@ -6,6 +6,7 @@ import org.tatrman.dispatch.v1.DispatchRequest
 import org.tatrman.meta.v1.OverallStatus
 import org.tatrman.common.v1.ResponseMessage
 import org.tatrman.common.v1.Severity
+import org.tatrman.plan.v1.LimitOffsetNode
 import org.tatrman.plan.v1.ParameterBinding
 import org.tatrman.plan.v1.PipelineContext
 import org.tatrman.plan.v1.PlanNode
@@ -15,6 +16,7 @@ import org.tatrman.query.v1.CompileResponse
 import org.tatrman.query.v1.GetStatusRequest
 import org.tatrman.query.v1.GetStatusResponse
 import org.tatrman.query.v1.QueryServiceGrpcKt
+import org.tatrman.query.v1.RowWindow
 import org.tatrman.query.v1.RunRequest
 import org.tatrman.translate.v1.DetectSchemaRequest
 import org.tatrman.translate.v1.Language
@@ -105,6 +107,7 @@ class QueryServiceImpl(
     override fun run(request: RunRequest): Flow<ResultBatch> {
         val context = ensureCorrelationId(request.context)
         val key = cacheKeyFor(request)
+        val window = request.rowWindow
 
         // The orchestration body is unchanged; we collect it inside a `query.run`
         // span so the per-stage decorator spans nest under it (Stage 4.1 T3).
@@ -112,6 +115,12 @@ class QueryServiceImpl(
             flow {
                 activeRuns.incrementAndGet()
                 try {
+                    windowRefusal(window)?.let { reason ->
+                        emit(errorBatch("invalid_row_window", reason, context))
+                        return@flow
+                    }
+                    // The validator's `top_n_applied` warnings, from whichever pass raised one.
+                    val capNotices = mutableListOf<ResponseMessage>()
                     val compileStart = System.currentTimeMillis()
                     val cachedHit = if (request.bypassCache) null else cache.lookup(key)
                     val (erPlan, dbPlan, detectionMessages) =
@@ -130,16 +139,20 @@ class QueryServiceImpl(
                                         return@flow
                                     }
                                     val dbValidated =
-                                        validateDbPlanCompile(physicalPlan, context) ?: run { return@flow }
+                                        validateDbPlanCompile(windowed(physicalPlan, window), context, window)
+                                            ?: run { return@flow }
+                                    capNotices += dbValidated.capNotices()
                                     Triple(PlanNode.getDefaultInstance(), dbValidated.plan, cachedHit.detectionMessages)
                                 }
                                 else -> {
                                     val erValidated =
-                                        validateErPlanCompile(cachedHit.erPlan, context) ?: run { return@flow }
+                                        validateErPlanCompile(windowed(cachedHit.erPlan, window), context, window)
+                                            ?: run { return@flow }
                                     val dbParsed =
                                         translateToDbPlain(erValidated.plan, context) ?: run { return@flow }
                                     val dbValidated =
-                                        validateDbPlanCompile(dbParsed.plan, context) ?: run { return@flow }
+                                        validateDbPlanCompile(dbParsed.plan, context, window) ?: run { return@flow }
+                                    capNotices += erValidated.capNotices() + dbValidated.capNotices()
                                     Triple(erValidated.plan, dbValidated.plan, cachedHit.detectionMessages)
                                 }
                             }
@@ -186,7 +199,7 @@ class QueryServiceImpl(
                                         return@flow
                                     }
                                     val dbValidated =
-                                        validateDbPlanCompile(dbParsed.plan, context) ?: run {
+                                        validateDbPlanCompile(windowed(dbParsed.plan, window), context, window) ?: run {
                                             emit(
                                                 errorBatch(
                                                     "validator_unavailable",
@@ -196,6 +209,7 @@ class QueryServiceImpl(
                                             )
                                             return@flow
                                         }
+                                    capNotices += dbValidated.capNotices()
                                     val requiredParams = dbParsed.context.parametersList.toList()
                                     val fp = PredictedFingerprintComputer.compute(dbParsed.plan)
                                     cache.record(
@@ -220,11 +234,13 @@ class QueryServiceImpl(
                                     val erPlanFromParse =
                                         parseAndCache(request, context, key) ?: run { return@flow }
                                     val erValidated =
-                                        validateErPlanCompile(erPlanFromParse, context) ?: run { return@flow }
+                                        validateErPlanCompile(windowed(erPlanFromParse, window), context, window)
+                                            ?: run { return@flow }
                                     val dbParsed =
                                         translateToDbPlain(erValidated.plan, context) ?: run { return@flow }
                                     val dbValidated =
-                                        validateDbPlanCompile(dbParsed.plan, context) ?: run { return@flow }
+                                        validateDbPlanCompile(dbParsed.plan, context, window) ?: run { return@flow }
+                                    capNotices += erValidated.capNotices() + dbValidated.capNotices()
                                     Triple(erValidated.plan, dbValidated.plan, resolution.detectionMessages)
                                 }
                             }
@@ -248,14 +264,25 @@ class QueryServiceImpl(
                             .setOptions(request.executionOptions)
                             .build()
 
+                    // The row cap's warning is a statement about the PLAN — validate cannot see the
+                    // data. It reaches the caller only if the answer actually REACHED the cap, on the
+                    // last batch, where the row count is known: a 5-row answer under a 200-row cap is
+                    // complete and says nothing; a 200-row one may have had rows withheld, and says so.
+                    val rowCap = rootLimit(dbPlan)
+                    val capNotice = capNotices.firstOrNull()
+                    var rowsStreamed = 0L
                     var firstSeen = false
                     dispatcher.dispatch(dispatchReq).collect { batch ->
+                        rowsStreamed += batch.batchRowCount
+                        var out = batch
                         if (!firstSeen && batch.isFirst) {
                             firstSeen = true
-                            emit(annotate(batch, firstBatchAnnotations))
-                        } else {
-                            emit(batch)
+                            out = annotate(out, firstBatchAnnotations)
                         }
+                        if (batch.isLast && capNotice != null && rowCap != null && rowsStreamed >= rowCap) {
+                            out = out.toBuilder().addMessages(capNotice).build()
+                        }
+                        emit(out)
                     }
                 } catch (t: Throwable) {
                     if (t is kotlinx.coroutines.CancellationException) throw t
@@ -324,6 +351,7 @@ class QueryServiceImpl(
     private suspend fun kotlinx.coroutines.flow.FlowCollector<ResultBatch>.validateErPlanCompile(
         erPlan: PlanNode,
         context: PipelineContext,
+        window: RowWindow,
     ): ValidateResponse? {
         val erValidatedResult =
             retry.execute("validator.validate.pass_1") {
@@ -332,9 +360,8 @@ class QueryServiceImpl(
                         .newBuilder()
                         .setPlan(erPlan)
                         .setContext(context)
-                        .setOptions(
-                            ValidationOptions.newBuilder().setApplySecurity(true).setEnforceTopN(true),
-                        ).build(),
+                        .setOptions(validationOptions(window))
+                        .build(),
                 )
             }
         return when (erValidatedResult) {
@@ -387,6 +414,7 @@ class QueryServiceImpl(
     private suspend fun kotlinx.coroutines.flow.FlowCollector<ResultBatch>.validateDbPlanCompile(
         dbPlan: PlanNode,
         context: PipelineContext,
+        window: RowWindow,
     ): ValidateResponse? {
         val dbValidatedResult =
             retry.execute("validator.validate.pass_2") {
@@ -395,9 +423,8 @@ class QueryServiceImpl(
                         .newBuilder()
                         .setPlan(dbPlan)
                         .setContext(context)
-                        .setOptions(
-                            ValidationOptions.newBuilder().setApplySecurity(true).setEnforceTopN(true),
-                        ).build(),
+                        .setOptions(validationOptions(window))
+                        .build(),
                 )
             }
         return when (dbValidatedResult) {
@@ -418,6 +445,7 @@ class QueryServiceImpl(
     private suspend fun validateErPlanCompile(
         erPlan: PlanNode,
         context: PipelineContext,
+        window: RowWindow,
     ): ValidateResponse? {
         val erValidatedResult =
             retry.execute("validator.validate.pass_1") {
@@ -426,9 +454,8 @@ class QueryServiceImpl(
                         .newBuilder()
                         .setPlan(erPlan)
                         .setContext(context)
-                        .setOptions(
-                            ValidationOptions.newBuilder().setApplySecurity(true).setEnforceTopN(true),
-                        ).build(),
+                        .setOptions(validationOptions(window))
+                        .build(),
                 )
             }
         return when (erValidatedResult) {
@@ -440,6 +467,7 @@ class QueryServiceImpl(
     private suspend fun validateDbPlanCompile(
         dbPlan: PlanNode,
         context: PipelineContext,
+        window: RowWindow,
     ): ValidateResponse? {
         val dbValidatedResult =
             retry.execute("validator.validate.pass_2") {
@@ -448,9 +476,8 @@ class QueryServiceImpl(
                         .newBuilder()
                         .setPlan(dbPlan)
                         .setContext(context)
-                        .setOptions(
-                            ValidationOptions.newBuilder().setApplySecurity(true).setEnforceTopN(true),
-                        ).build(),
+                        .setOptions(validationOptions(window))
+                        .build(),
                 )
             }
         return when (dbValidatedResult) {
@@ -484,6 +511,14 @@ class QueryServiceImpl(
 
     override suspend fun compile(request: RunRequest): CompileResponse {
         val context = ensureCorrelationId(request.context)
+        val window = request.rowWindow
+        windowRefusal(window)?.let { reason ->
+            return CompileResponse
+                .newBuilder()
+                .setContext(context)
+                .addMessages(errorMessage("invalid_row_window", reason))
+                .build()
+        }
         val key = cacheKeyFor(request)
         val cached = if (request.bypassCache) null else cache.lookup(key)
 
@@ -516,7 +551,7 @@ class QueryServiceImpl(
                             ).build()
                     }
                     val dbValidated =
-                        validateDbPlanCompile(physicalPlan, context) ?: return CompileResponse
+                        validateDbPlanCompile(windowed(physicalPlan, window), context, window) ?: return CompileResponse
                             .newBuilder()
                             .setContext(context)
                             .addMessages(
@@ -586,15 +621,16 @@ class QueryServiceImpl(
                     }
 
                     val dbValidated =
-                        validateDbPlanCompile(dbParsed.plan, context) ?: return CompileResponse
-                            .newBuilder()
-                            .setContext(context)
-                            .addMessages(
-                                errorMessage(
-                                    "validator_unavailable",
-                                    "Failed to validate DB path",
-                                ),
-                            ).build()
+                        validateDbPlanCompile(windowed(dbParsed.plan, window), context, window)
+                            ?: return CompileResponse
+                                .newBuilder()
+                                .setContext(context)
+                                .addMessages(
+                                    errorMessage(
+                                        "validator_unavailable",
+                                        "Failed to validate DB path",
+                                    ),
+                                ).build()
 
                     requiredParameters = dbParsed.context.parametersList.toList()
                     predictedSchemaFingerprint = PredictedFingerprintComputer.compute(dbParsed.plan)
@@ -646,7 +682,7 @@ class QueryServiceImpl(
                     requiredParameters = erParsed.context.parametersList.toList()
 
                     val erValidated =
-                        validateErPlanCompile(erPlan, context) ?: return CompileResponse
+                        validateErPlanCompile(windowed(erPlan, window), context, window) ?: return CompileResponse
                             .newBuilder()
                             .setContext(context)
                             .addMessages(
@@ -678,7 +714,7 @@ class QueryServiceImpl(
                     predictedSchemaFingerprint = PredictedFingerprintComputer.compute(dbParsed.plan)
 
                     val dbValidated =
-                        validateDbPlanCompile(dbParsed.plan, context) ?: return CompileResponse
+                        validateDbPlanCompile(dbParsed.plan, context, window) ?: return CompileResponse
                             .newBuilder()
                             .setContext(context)
                             .addMessages(
@@ -719,7 +755,7 @@ class QueryServiceImpl(
         }
 
         val erValidated =
-            validateErPlanCompile(erPlan, context) ?: return CompileResponse
+            validateErPlanCompile(windowed(erPlan, window), context, window) ?: return CompileResponse
                 .newBuilder()
                 .setContext(context)
                 .addMessages(
@@ -751,7 +787,7 @@ class QueryServiceImpl(
         predictedSchemaFingerprint = PredictedFingerprintComputer.compute(dbParsed.plan)
 
         val dbValidated =
-            validateDbPlanCompile(dbParsed.plan, context) ?: return CompileResponse
+            validateDbPlanCompile(dbParsed.plan, context, window) ?: return CompileResponse
                 .newBuilder()
                 .setContext(context)
                 .addMessages(
@@ -868,6 +904,55 @@ class QueryServiceImpl(
             sourceLanguage = request.sourceLanguage,
             paramSignature = CompiledPlanCache.paramSignature(request.context.parametersList),
         )
+
+    /**
+     * The caller's row window on the plan, as the ROOT LimitOffset the validator's TopN rule reads
+     * and caps. Applied ONCE, to the first plan validated — the ER plan on the two-pass path (the
+     * translator carries the node into the DB plan), the DB plan on the one-pass path. Wrapping the
+     * DB plan again on the two-pass path would apply the offset twice. An unset window leaves the
+     * plan exactly as it was.
+     *
+     * The window is deliberately NOT part of the compiled-plan cache key: the cache holds the
+     * translator's output, before validation, and the window goes on top of it per request — so
+     * every page of one query shares one compiled plan.
+     */
+    private fun windowed(
+        plan: PlanNode,
+        window: RowWindow,
+    ): PlanNode {
+        if (window.limit <= 0 && window.offset <= 0) return plan
+        val node = LimitOffsetNode.newBuilder().setInput(plan)
+        if (window.limit > 0) node.setLimit(window.limit)
+        if (window.offset > 0) node.setOffset(window.offset)
+        return PlanNode.newBuilder().setLimitOffset(node).build()
+    }
+
+    /**
+     * Validation options for one request. `default_top_n` carries the rows the caller ASKED for
+     * (0 = unstated); the validator decides how many it gets and warns when it cuts.
+     */
+    private fun validationOptions(window: RowWindow): ValidationOptions.Builder =
+        ValidationOptions
+            .newBuilder()
+            .setApplySecurity(true)
+            .setEnforceTopN(true)
+            .setDefaultTopN(window.limit.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+
+    private fun windowRefusal(window: RowWindow): String? =
+        when {
+            window.limit < 0 -> "row_window.limit must be >= 0, got ${window.limit}"
+            window.offset < 0 -> "row_window.offset must be >= 0, got ${window.offset}"
+            else -> null
+        }
+
+    /** The row bound a validated plan executes under, when its root states one. */
+    private fun rootLimit(plan: PlanNode): Long? =
+        plan
+            .takeIf { it.nodeCase == PlanNode.NodeCase.LIMIT_OFFSET && it.limitOffset.hasLimit() }
+            ?.limitOffset
+            ?.limit
+
+    private fun ValidateResponse.capNotices(): List<ResponseMessage> = messagesList.filter { it.code == TOP_N_APPLIED }
 
     private fun ensureCorrelationId(context: PipelineContext): PipelineContext =
         if (context.correlationId.isEmpty()) {
@@ -992,5 +1077,8 @@ class QueryServiceImpl(
 
     companion object {
         private val log = LoggerFactory.getLogger(QueryServiceImpl::class.java)
+
+        /** validate's `RuleEnforcer.TOP_N_APPLIED` — spelled here because query does not depend on validate. */
+        private const val TOP_N_APPLIED = "top_n_applied"
     }
 }

@@ -4,17 +4,20 @@ package org.tatrman.query.grpc
 import com.google.protobuf.kotlin.toByteString
 import org.tatrman.common.v1.ResponseMessage
 import org.tatrman.common.v1.Severity
+import org.tatrman.plan.v1.LimitOffsetNode
 import org.tatrman.plan.v1.PipelineContext
 import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.TableScanNode
 import org.tatrman.query.v1.GetStatusRequest
+import org.tatrman.query.v1.RowWindow
 import org.tatrman.query.v1.RunRequest
 import org.tatrman.translate.v1.DetectSchemaResponse
 import org.tatrman.translate.v1.Language
 import org.tatrman.translate.v1.ParseResponse
 import org.tatrman.translate.v1.TranslateRequest
 import org.tatrman.translate.v1.TranslateResponse
+import org.tatrman.validate.v1.ValidateRequest
 import org.tatrman.validate.v1.ValidateResponse
 import org.tatrman.worker.v1.ExecutionOptions
 import org.tatrman.worker.v1.ResultBatch
@@ -844,6 +847,203 @@ class QueryServiceImplSpec :
                 resp.messagesList[0].code shouldBe "validation_failed"
                 resp.messagesList[0].humanMessage.contains("is a db object") shouldBe true
                 parseCallCount shouldBe 1
+            }
+        }
+
+        // ── the row window ──────────────────────────────────────────────────────────────────────
+        // RunRequest.row_window goes on the plan as its root LimitOffset (the node the validator's
+        // TopN rule reads) and into ValidationOptions.default_top_n (what the caller asked for).
+
+        val dbDetect =
+            TranslatorDetectClient {
+                DetectSchemaResponse
+                    .newBuilder()
+                    .setDecision(org.tatrman.translate.v1.SchemaDecision.CONFIRMED)
+                    .setEffectiveSchema(org.tatrman.plan.v1.SchemaCode.DB)
+                    .build()
+            }
+
+        fun capturing(seen: MutableList<ValidateRequest>): ValidatorClient =
+            ValidatorClient { req ->
+                seen.add(req)
+                ValidateResponse
+                    .newBuilder()
+                    .setPlan(req.plan)
+                    .setContext(req.context)
+                    .build()
+            }
+
+        fun windowRequest(
+            limit: Long,
+            offset: Long,
+        ): RunRequest =
+            RunRequest
+                .newBuilder()
+                .setSource("SELECT id FROM customers ORDER BY id")
+                .setSourceLanguage(Language.SQL)
+                .setContext(PipelineContext.newBuilder().setUserId("u").setModelVersion("v"))
+                .setRowWindow(RowWindow.newBuilder().setLimit(limit).setOffset(offset))
+                .build()
+
+        "a row window reaches the validator as default_top_n and the plan as its root LimitOffset" {
+            runBlocking {
+                val seen = CopyOnWriteArrayList<ValidateRequest>()
+                service(translatorDetect = dbDetect, validator = capturing(seen)).run(windowRequest(200, 400)).toList()
+                seen.size shouldBe 1
+                val root = seen[0].plan
+                root.hasLimitOffset() shouldBe true
+                root.limitOffset.limit shouldBe 200L
+                root.limitOffset.offset shouldBe 400L
+                root.limitOffset.input shouldBe planAfterParse
+                seen[0].options.defaultTopN shouldBe 200
+                seen[0].options.enforceTopN shouldBe true
+                seen[0].options.applySecurity shouldBe true
+            }
+        }
+
+        "no row window: the plan reaches the validator unwrapped and default_top_n stays 0" {
+            runBlocking {
+                val seen = CopyOnWriteArrayList<ValidateRequest>()
+                service(translatorDetect = dbDetect, validator = capturing(seen))
+                    .run(
+                        RunRequest
+                            .newBuilder()
+                            .setSource("SELECT id FROM customers")
+                            .setSourceLanguage(Language.SQL)
+                            .setContext(PipelineContext.newBuilder().setUserId("u").setModelVersion("v"))
+                            .build(),
+                    ).toList()
+                seen.single().plan shouldBe planAfterParse
+                seen.single().options.defaultTopN shouldBe 0
+            }
+        }
+
+        "the two-pass ER path applies the window ONCE: pass 1 is wrapped, the DB pass is not" {
+            runBlocking {
+                val seen = CopyOnWriteArrayList<ValidateRequest>()
+                // Default detect stub → ER. The REL_NODE→DB re-parse returns `planAfterParse`
+                // whatever it is given, so a second wrap would show up on the pass-2 plan.
+                service(validator = capturing(seen)).run(windowRequest(200, 400)).toList()
+                seen.size shouldBe 2
+                seen[0].plan.limitOffset.offset shouldBe 400L
+                seen[0].plan.limitOffset.input shouldBe planAfterParse
+                seen[1].plan shouldBe planAfterParse
+                seen[1].options.defaultTopN shouldBe 200
+            }
+        }
+
+        "every page of one query shares its compiled plan: the window is not part of the cache key" {
+            runBlocking {
+                val cache = CompiledPlanCache(100, Duration.ofMinutes(60))
+                val seen = CopyOnWriteArrayList<ValidateRequest>()
+                val svc = service(translatorDetect = dbDetect, validator = capturing(seen), cache = cache)
+                svc.run(windowRequest(200, 0)).toList()
+                val second = svc.run(windowRequest(200, 200)).toList()
+                second[0].context.warningsList.map { it.code } shouldContain "cache_hit"
+                seen[0].plan.limitOffset.hasOffset() shouldBe false
+                seen[1].plan.limitOffset.offset shouldBe 200L
+            }
+        }
+
+        "a negative row window is refused in-band, before any stage runs" {
+            runBlocking {
+                val seen = CopyOnWriteArrayList<ValidateRequest>()
+                val out = service(validator = capturing(seen)).run(windowRequest(-1, 0)).toList()
+                out.size shouldBe 1
+                out[0].messagesList.single().code shouldBe "invalid_row_window"
+                out[0].messagesList.single().severity shouldBe Severity.ERROR
+                seen.size shouldBe 0
+            }
+        }
+
+        // ── top_n_applied: the validator's statement about the PLAN, passed on only when the
+        //    answer actually reached the cap ──
+
+        val capNotice =
+            ResponseMessage
+                .newBuilder()
+                .setSeverity(Severity.WARNING)
+                .setCode("top_n_applied")
+                .setHumanMessage("Answer limited to 2 rows by the row cap; the caller asked for 5.")
+                .build()
+
+        // A validator that caps every plan at 2 rows; `notice` decides whether it says so.
+        fun cappingAt2(notice: Boolean): ValidatorClient =
+            ValidatorClient { req ->
+                val resp =
+                    ValidateResponse
+                        .newBuilder()
+                        .setPlan(
+                            PlanNode
+                                .newBuilder()
+                                .setLimitOffset(LimitOffsetNode.newBuilder().setInput(req.plan).setLimit(2)),
+                        ).setContext(req.context)
+                if (notice) resp.addMessages(capNotice)
+                resp.build()
+            }
+
+        // Data batches carrying `rows[i]` rows each, then the worker's empty `is_last` tail.
+        fun streaming(vararg rows: Long): DispatcherClient =
+            DispatcherClient { _ ->
+                val batches =
+                    rows.mapIndexed { i, n ->
+                        ResultBatch
+                            .newBuilder()
+                            .setIsFirst(i == 0)
+                            .setBatchIndex(i)
+                            .setBatchRowCount(n)
+                            .setArrowIpc(ByteArray(0).toByteString())
+                            .setContext(PipelineContext.getDefaultInstance())
+                            .build()
+                    } +
+                        ResultBatch
+                            .newBuilder()
+                            .setIsLast(true)
+                            .setBatchIndex(rows.size)
+                            .setArrowIpc(ByteArray(0).toByteString())
+                            .build()
+                flowOf(*batches.toTypedArray())
+            }
+
+        "an answer that REACHED the row cap carries top_n_applied on its last batch" {
+            runBlocking {
+                val out =
+                    service(
+                        translatorDetect = dbDetect,
+                        validator = cappingAt2(notice = true),
+                        dispatcher = streaming(1, 1),
+                    ).run(windowRequest(5, 0))
+                        .toList()
+                val warning = out.last().messagesList.single { it.code == "top_n_applied" }
+                warning.severity shouldBe Severity.WARNING
+                warning.humanMessage shouldBe capNotice.humanMessage
+                out.dropLast(1).flatMap { it.messagesList } shouldBe emptyList()
+            }
+        }
+
+        "an answer under the row cap carries nothing: 1 row under a 2-row cap is the whole answer" {
+            runBlocking {
+                val out =
+                    service(
+                        translatorDetect = dbDetect,
+                        validator = cappingAt2(notice = true),
+                        dispatcher = streaming(1),
+                    ).run(windowRequest(5, 0))
+                        .toList()
+                out.flatMap { it.messagesList }.none { it.code == "top_n_applied" } shouldBe true
+            }
+        }
+
+        "a full page the caller asked for, granted, carries nothing: the caller pages on" {
+            runBlocking {
+                val out =
+                    service(
+                        translatorDetect = dbDetect,
+                        validator = cappingAt2(notice = false),
+                        dispatcher = streaming(2),
+                    ).run(windowRequest(2, 0))
+                        .toList()
+                out.flatMap { it.messagesList } shouldBe emptyList()
             }
         }
     })

@@ -30,15 +30,25 @@ import org.tatrman.plan.v1.schemaCodeToToken
  *      errs toward denying, which is the safe v1 posture. Document any false-positive surprises
  *      as DF-V01 follow-ups.
  *
- *   2. **TopN enforcement** (unchanged): cap the root limit at `min(options.default_top_n,
- *      validator.default-top-n)` when `options.enforce_top_n` is true.
+ *   2. **TopN enforcement**: cap the root limit when `options.enforce_top_n` is true. Two service
+ *      numbers and one request number decide the cap:
+ *        - [serviceDefault] (`validate.default-top-n`) — what a caller gets when it asks for nothing;
+ *        - [serviceMax] (`validate.max-top-n`) — the ceiling a caller may ask up to;
+ *        - `options.default_top_n` — what the caller asked for (0 = nothing).
+ *      `cap = min(requested > 0 ? requested : serviceDefault, serviceMax)`. [serviceMax] defaults to
+ *      [serviceDefault], which is the older rule exactly: a caller could ask for fewer rows than the
+ *      default and never more, because the default and the ceiling were one number.
  *
- * The cap is the smaller of:
- *   - `options.default_top_n`, when the caller supplied one (>0)
- *   - the service-level default from HOCON (`validator.default-top-n`), passed in as [serviceDefault].
+ *      When the cap is what bounds the plan — a limit injected where there was none, or an existing
+ *      one lowered — and the caller did not ask for exactly that many, the result carries a
+ *      [TOP_N_APPLIED] WARNING naming the cap and the request. Without it a capped answer is
+ *      indistinguishable from a complete one. The warning is a statement about the PLAN: whether the
+ *      data actually reached the cap is only known after execution, which is where `query` decides
+ *      whether to pass it on.
  */
 class RuleEnforcer(
     private val serviceDefault: Int = 30,
+    private val serviceMax: Int = serviceDefault,
 ) {
     fun enforce(
         plan: PlanNode,
@@ -56,7 +66,13 @@ class RuleEnforcer(
         // 2. TopN.
         val withTopN =
             if (options.enforceTopN) {
-                applyTopN(rewritten, effectiveCap(options))
+                val cap = effectiveCap(options)
+                val (capped, bound) = applyTopN(rewritten, cap)
+                val requested = options.defaultTopN
+                if (bound && (requested <= 0 || requested > cap)) {
+                    messages.add(topNApplied(cap, requested))
+                }
+                capped
             } else {
                 log.debug("TopN enforcement disabled by ValidationOptions")
                 rewritten
@@ -213,35 +229,59 @@ class RuleEnforcer(
 
     private fun effectiveCap(options: ValidationOptions): Int {
         val requested = options.defaultTopN
-        return if (requested > 0) minOf(requested, serviceDefault) else serviceDefault
+        return minOf(if (requested > 0) requested else serviceDefault, serviceMax)
     }
 
+    /** The plan with its root limit capped, and whether the cap was what bounded it. */
     private fun applyTopN(
         plan: PlanNode,
         cap: Int,
-    ): PlanNode {
+    ): Pair<PlanNode, Boolean> {
         if (plan.nodeCase != PlanNode.NodeCase.LIMIT_OFFSET) {
-            return PlanNode
-                .newBuilder()
-                .setLimitOffset(
-                    LimitOffsetNode
-                        .newBuilder()
-                        .setInput(plan)
-                        .setLimit(cap.toLong()),
-                ).build()
+            val wrapped =
+                PlanNode
+                    .newBuilder()
+                    .setLimitOffset(
+                        LimitOffsetNode
+                            .newBuilder()
+                            .setInput(plan)
+                            .setLimit(cap.toLong()),
+                    ).build()
+            return wrapped to true
         }
         val existing = plan.limitOffset
         if (existing.hasLimit() && existing.limit <= cap.toLong()) {
-            return plan
+            return plan to false
         }
         val rewritten =
             existing
                 .toBuilder()
                 .setLimit(cap.toLong())
-        return PlanNode.newBuilder().setLimitOffset(rewritten).build()
+        return PlanNode.newBuilder().setLimitOffset(rewritten).build() to true
+    }
+
+    private fun topNApplied(
+        cap: Int,
+        requested: Int,
+    ): ResponseMessage {
+        val asked =
+            if (requested > 0) {
+                "the caller asked for $requested"
+            } else {
+                "the caller stated no row limit, so the service default applies"
+            }
+        return ResponseMessage
+            .newBuilder()
+            .setSeverity(Severity.WARNING)
+            .setCode(TOP_N_APPLIED)
+            .setHumanMessage("Answer limited to $cap rows by the row cap; $asked.")
+            .build()
     }
 
     companion object {
         private val log = LoggerFactory.getLogger(RuleEnforcer::class.java)
+
+        /** The code of the WARNING raised when the row cap bounds a plan below what was asked. */
+        const val TOP_N_APPLIED = "top_n_applied"
     }
 }
