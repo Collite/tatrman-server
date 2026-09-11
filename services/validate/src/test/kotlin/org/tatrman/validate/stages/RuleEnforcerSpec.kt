@@ -92,6 +92,98 @@ class RuleEnforcerSpec :
             out.plan.limitOffset.offset shouldBe 50L
         }
 
+        // --- the ceiling: default-top-n is what an unstated request gets, max-top-n what a stated
+        //     one may reach; and a cap that bounds the plan says so ---
+
+        val ceilinged = RuleEnforcer(serviceDefault = 200, serviceMax = 1000)
+
+        "a caller may ask ABOVE the default, up to the ceiling, and a granted request is silent" {
+            val out = ceilinged.enforce(scan, options(enforce = true, defaultTopN = 500))
+            out.plan.limitOffset.limit shouldBe 500L
+            out.messages shouldHaveSize 0
+        }
+
+        "above the ceiling the ceiling wins, and the answer says so" {
+            val out = ceilinged.enforce(scan, options(enforce = true, defaultTopN = 5000))
+            out.plan.limitOffset.limit shouldBe 1000L
+            val warning = out.messages.single()
+            warning.code shouldBe RuleEnforcer.TOP_N_APPLIED
+            warning.severity shouldBe Severity.WARNING
+            warning.humanMessage shouldContainStr "1000"
+            warning.humanMessage shouldContainStr "5000"
+        }
+
+        "an unstated request gets the default, not the ceiling, and a warning that a cap was applied" {
+            val out = ceilinged.enforce(scan, options(enforce = true))
+            out.plan.limitOffset.limit shouldBe 200L
+            out.messages.single().code shouldBe RuleEnforcer.TOP_N_APPLIED
+        }
+
+        "an unset ceiling IS the default — the older rule: a caller cannot ask for more" {
+            val out = enforcer.enforce(scan, options(enforce = true, defaultTopN = 500))
+            out.plan.limitOffset.limit shouldBe 30L
+            out.messages.single().code shouldBe RuleEnforcer.TOP_N_APPLIED
+        }
+
+        "a caller's own window granted in full (limit = what it asked) raises no warning" {
+            // query puts the caller's window on the plan root; granting it is not a cut.
+            val window =
+                PlanNode
+                    .newBuilder()
+                    .setLimitOffset(
+                        LimitOffsetNode
+                            .newBuilder()
+                            .setInput(scan)
+                            .setLimit(200)
+                            .setOffset(400),
+                    ).build()
+            val out = ceilinged.enforce(window, options(enforce = true, defaultTopN = 200))
+            out.plan shouldBe window
+            out.messages shouldHaveSize 0
+        }
+
+        "a window above the ceiling is cut to it, keeps its offset, and warns" {
+            val window =
+                PlanNode
+                    .newBuilder()
+                    .setLimitOffset(
+                        LimitOffsetNode
+                            .newBuilder()
+                            .setInput(scan)
+                            .setLimit(5000)
+                            .setOffset(400),
+                    ).build()
+            val out = ceilinged.enforce(window, options(enforce = true, defaultTopN = 5000))
+            out.plan.limitOffset.limit shouldBe 1000L
+            out.plan.limitOffset.offset shouldBe 400L
+            out.messages.single().code shouldBe RuleEnforcer.TOP_N_APPLIED
+        }
+
+        "an offset-only window gets the cap as its limit, and the warning" {
+            val window =
+                PlanNode
+                    .newBuilder()
+                    .setLimitOffset(LimitOffsetNode.newBuilder().setInput(scan).setOffset(400))
+                    .build()
+            val out = ceilinged.enforce(window, options(enforce = true))
+            out.plan.limitOffset.limit shouldBe 200L
+            out.plan.limitOffset.offset shouldBe 400L
+            out.messages.single().code shouldBe RuleEnforcer.TOP_N_APPLIED
+        }
+
+        "a plan already bounded below the cap is not a cap binding" {
+            val bounded =
+                PlanNode
+                    .newBuilder()
+                    .setLimitOffset(LimitOffsetNode.newBuilder().setInput(scan).setLimit(10))
+                    .build()
+            enforcer.enforce(bounded, options(enforce = true)).messages shouldHaveSize 0
+        }
+
+        "enforce_top_n = false never warns" {
+            ceilinged.enforce(scan, options(enforce = false, defaultTopN = 5000)).messages shouldHaveSize 0
+        }
+
         // --- DF-V01: column deny/mask enforcement ---
 
         "DENY on a referenced (table, column) rejects with column_denied ERROR" {
@@ -134,7 +226,8 @@ class RuleEnforcerSpec :
             val out = enforcer.enforce(plan, options(enforce = true), listOf(deny))
 
             out.rejected shouldBe false
-            out.messages.map { it.code } shouldBe emptyList()
+            // The DENY adds nothing; the one message is the row cap's, injected into an unbounded plan.
+            out.messages.map { it.code } shouldBe listOf(RuleEnforcer.TOP_N_APPLIED)
         }
 
         "DENY scoped to a table NOT in the plan is a no-op" {

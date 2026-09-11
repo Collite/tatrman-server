@@ -73,7 +73,13 @@ message ValidationOptions {
 
   // Enforce a row limit (TopN) wrapper. Default true.
   bool enforce_top_n = 2;
-  // Default top-N to apply when caller hasn't specified one. Typically 30.
+  // The rows the caller ASKED for; 0 = unstated. The validator decides how
+  // many it gets: an unstated request gets the service's default-top-n, a
+  // stated one is granted up to the service's max-top-n and cut to it above
+  // that. max-top-n defaults to default-top-n, which keeps the older rule —
+  // a caller could ask for fewer rows than the default, never more. When the
+  // cap bounds the plan below what was asked, the response carries a
+  // `top_n_applied` WARNING.
   int32 default_top_n = 3;
 
   // Run an optional LLM-as-judge for semantic safety review. Off by default;

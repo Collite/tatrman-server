@@ -96,7 +96,18 @@ fun Application.module(config: Config) {
 
     val securityApplier = SecurityApplier(securityClient)
     val defaultTopN = config.getInt("validate.default-top-n")
-    val ruleEnforcer = RuleEnforcer(serviceDefault = defaultTopN)
+    // Absent = the default: a caller can ask for fewer rows, never more (the pre-max-top-n rule).
+    val maxTopN =
+        if (config.hasPath("validate.max-top-n")) config.getInt("validate.max-top-n") else defaultTopN
+    if (maxTopN < defaultTopN) {
+        log.warn(
+            "validate.max-top-n ({}) is below validate.default-top-n ({}); every answer is capped at {}",
+            maxTopN,
+            defaultTopN,
+            maxTopN,
+        )
+    }
+    val ruleEnforcer = RuleEnforcer(serviceDefault = defaultTopN, serviceMax = maxTopN)
     val llmGuardEnabled = config.getBoolean("validate.llm-guard.enabled")
     val llmGuardGateway = buildLlmGatewayClient(config)
     val llmGuardModel =
@@ -217,6 +228,7 @@ fun Application.module(config: Config) {
                     put("metadata_version", version)
                     put("llm_guard_enabled", llmGuardEnabled)
                     put("default_top_n", defaultTopN)
+                    put("max_top_n", maxTopN)
                     put("ready", dependencyMonitor.ready())
                     putJsonObject("dependencies") {
                         dependencyMonitor.statuses().forEach { (name, up) -> put(name, up) }

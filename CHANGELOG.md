@@ -16,6 +16,36 @@ outside this repo could notice is in.
 
 ## Unreleased
 
+### `query.v1` / `validate.v1` — a caller-stated row window, a ceiling, and a warning when the cap binds
+
+`validate` caps every answer at `default-top-n` rows by injecting a `LIMIT`, and the cap was a
+hard ceiling a caller could only lower: `effectiveCap = min(requested, default)`. It also said
+nothing when it applied, so a capped answer and a complete one looked the same to the caller —
+and there was no way to ask for the next page.
+
+**Wire (additive — no message changed meaning)**
+
+- `RunRequest.row_window` (`RowWindow {limit, offset}`) — the rows the caller wants. `query`
+  puts it on the plan as the root `LimitOffsetNode` and forwards `limit` as
+  `ValidationOptions.default_top_n`. Unset is exactly the old behaviour. Paging over it is only
+  sound for an answer with a **total** order (an `ORDER BY` ending in a unique column).
+- `ValidationOptions.default_top_n` is documented as what it always was in practice: the rows
+  the caller *asked for* (0 = unstated).
+
+**Behaviour**
+
+- `validate` gains **`max-top-n`** (`VALIDATE_MAX_TOP_N`) beside `default-top-n`:
+  `cap = min(requested > 0 ? requested : default-top-n, max-top-n)`. **Unset, `max-top-n` equals
+  `default-top-n`** — the old rule, unchanged for every deployment that does not set it.
+  `/status` reports both.
+- `validate` raises a **`top_n_applied` WARNING** when the cap bounds a plan below what was asked
+  (a limit injected where the caller stated none, or one lowered), naming the cap and the request.
+- `query` passes that warning on **on the last `ResultBatch`, and only when the answer reached the
+  cap** — the validator sees the plan, not the data, so a 5-row answer under a 200-row cap is
+  complete and says nothing. A full page carrying `top_n_applied` means the estate's ceiling, not
+  the end of the data.
+- `query` refuses a negative `limit`/`offset` in-band with `invalid_row_window`.
+
 ### `resolver.v1` — mention homonymy: slots, declared equivalence (MH-P1)
 
 One word claimed by two objects — a dimension and the fact a channel vocabulary is
